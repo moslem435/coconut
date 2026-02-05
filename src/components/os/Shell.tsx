@@ -5,10 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { DATA } from '@/lib/data'
 import { useLanguage } from '@/lib/LanguageContext'
 import { useWindowManager } from '@/lib/WindowManagerContext'
-import { Box } from 'lucide-react'
-
-// Apps
-import Portfolio from '../apps/Portfolio'
+import { APPS_REGISTRY } from '@/lib/apps-registry'
 import AppSplashScreen from '../apps/AppSplashScreen'
 
 // Components
@@ -45,17 +42,20 @@ export default function Shell({
 
   const handleBootComplete = () => {
     setIsBooting(false)
+    const appConfig = APPS_REGISTRY['system-core']
+    const PortfolioComponent = appConfig.component
+    
     openWindow(
-      'system-core', 
-      'PORTFOLIO_HUB', 
-      <Portfolio 
+      appConfig.id, 
+      appConfig.title, 
+      <PortfolioComponent 
         activeProject={activeProject}
         onProjectChange={onProjectChange}
         onProjectClick={onProjectClick}
         sceneSlot={sceneSlot}
       />,
-      Box,
-      { isMaximized: true }
+      appConfig.icon,
+      appConfig.defaultWindowOptions
     )
   }
 

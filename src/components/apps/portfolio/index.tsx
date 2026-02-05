@@ -1,19 +1,20 @@
 'use client'
 
-import React, { useRef, useEffect, useState, Suspense } from 'react'
+import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { DATA } from '@/lib/data'
 import { useLanguage } from '@/lib/LanguageContext'
+import { useProject } from '@/lib/ProjectContext'
 import { soundManager } from '@/lib/sound'
-import IOSPicker, { type IOSPickerHandle } from '../ui/IOSPicker'
-import About from './About'
-import Projects from './Projects'
-import Logs from './Logs'
-import Lab from './Lab'
-import MusicPlayer from './MusicPlayer'
-import Contact from './Contact'
-import Resume from './Resume'
-import Services from './Services'
+import IOSPicker, { type IOSPickerHandle } from '../../ui/IOSPicker'
+import About from './components/About'
+import Projects from './components/Projects'
+import Logs from './components/Logs'
+import Lab from './components/Lab'
+import MusicPlayer from './components/MusicPlayer'
+import Contact from './components/Contact'
+import Resume from './components/Resume'
+import Services from './components/Services'
 
 // Utility Component for CRT/Screen Effect
 const ScreenOverlay = () => (
@@ -34,26 +35,43 @@ const ScreenOverlay = () => (
 )
 
 interface PortfolioProps {
-  activeProject: number
-  onProjectChange: (index: number) => void
-  onProjectClick: (index: number) => void
-  sceneSlot: React.ReactNode
+  activeProject?: number
+  onProjectChange?: (index: number) => void
+  onProjectClick?: (index: number) => void
+  sceneSlot?: React.ReactNode
   onClose?: () => void
 }
 
 export default function Portfolio({ 
-  activeProject, 
-  onProjectChange, 
-  onProjectClick,
+  activeProject: propActiveProject, 
+  onProjectChange: propOnProjectChange, 
+  onProjectClick: propOnProjectClick,
   sceneSlot,
   onClose
 }: PortfolioProps) {
   const { language, toggleLanguage } = useLanguage()
+  const projectContext = useProject()
   const PROJECTS = DATA[language].PROJECTS
 
   const pickerRef = useRef<IOSPickerHandle>(null)
   const [selectedSubProject, setSelectedSubProject] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  
+  // Internal State
+  const [internalActiveProject, setInternalActiveProject] = useState(0)
+  
+  // Priority: Context > Prop > Internal
+  const activeProject = projectContext?.activeProject ?? propActiveProject ?? internalActiveProject
+
+  const changeProject = useCallback((index: number) => {
+     if (projectContext) {
+        projectContext.setActiveProject(index)
+     } else if (propOnProjectChange) {
+        propOnProjectChange(index)
+     } else {
+        setInternalActiveProject(index)
+     }
+  }, [propOnProjectChange, projectContext])
 
   // Layout Configuration
   const LEFT_WIDTH = 25 
@@ -92,14 +110,14 @@ export default function Portfolio({
         case 'W':
           e.preventDefault()
           soundManager.playClick()
-          onProjectChange((activeProject - 1 + PROJECTS.length) % PROJECTS.length)
+          changeProject((activeProject - 1 + PROJECTS.length) % PROJECTS.length)
           break
         case 'ArrowDown':
         case 's':
         case 'S':
           e.preventDefault()
           soundManager.playClick()
-          onProjectChange((activeProject + 1) % PROJECTS.length)
+          changeProject((activeProject + 1) % PROJECTS.length)
           break
         case 'Escape':
           if (selectedSubProject) {
@@ -113,18 +131,19 @@ export default function Portfolio({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeProject, PROJECTS.length, onProjectChange, selectedSubProject])
+  }, [activeProject, PROJECTS.length, changeProject, selectedSubProject])
 
   const handleProjectChange = (index: number) => {
     if (activeProject !== index) {
-      onProjectChange(index)
+      changeProject(index)
       setSelectedSubProject(null)
     }
   }
 
   const handleClick = (index: number) => {
     soundManager.playClick()
-    onProjectClick(index)
+    changeProject(index)
+    propOnProjectClick?.(index)
   }
 
   // Mobile Layout Render
@@ -309,7 +328,7 @@ export default function Portfolio({
                     transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                     className="flex flex-col h-full justify-between"
                   >
-                    {project.id === "01" && <Projects activeProject={activeProject} onProjectChange={onProjectChange} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
+                    {project.id === "01" && <Projects activeProject={activeProject} onProjectChange={changeProject} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
                     {project.id === "02" && <About />}
                     {project.id === "03" && <Logs />}
                     {project.id === "04" && <Lab />}

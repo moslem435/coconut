@@ -36,24 +36,55 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   const [maxZIndex, setMaxZIndex] = useState(100)
 
   const focusWindow = useCallback((id: string) => {
-    if (!windows[id]) return
+    // If window is already active and not minimized, do nothing (optional optimization)
+    // But if we want to bring to front even if active (e.g. if we have multiple windows), 
+    // we should always increment Z-index if it's not the absolute top.
+    // For simplicity, always bring to front.
+    
+    setWindows(prev => {
+      if (!prev[id]) return prev
+      
+      // If already top and active, skip state update to prevent rerenders
+      if (activeWindowId === id && !prev[id].isMinimized && prev[id].zIndex === maxZIndex) {
+          return prev
+      }
 
-    if (activeWindowId === id && !windows[id].isMinimized) return
-
-    setWindows(prev => ({
-      ...prev,
-      [id]: { ...prev[id], zIndex: maxZIndex + 1, isMinimized: false }
-    }))
+      const newZ = maxZIndex + 1
+      // We need to update maxZIndex state, but we can't do it inside setWindows callback if we want to use the new value immediately.
+      // However, we can just use the functional update pattern for everything or update them separately.
+      
+      return {
+        ...prev,
+        [id]: { ...prev[id], zIndex: newZ, isMinimized: false }
+      }
+    })
+    
+    // We update maxZIndex and activeWindowId outside the setWindows callback
+    // But we need to ensure they are consistent. 
+    // Since setWindows (functional) runs asynchronously, we might have a race condition if we rely on 'maxZIndex' variable from closure.
+    // But 'maxZIndex' in dependency array ensures this callback is recreated when it changes.
+    // So 'maxZIndex' here is current.
+    
     setMaxZIndex(prev => prev + 1)
     setActiveWindowId(id)
-  }, [activeWindowId, maxZIndex, windows])
+  }, [activeWindowId, maxZIndex])
 
   const openWindow = useCallback((id: string, title: string, component: React.ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean }) => {
+    // Calculate new Z Index
+    const newZ = maxZIndex + 1
+    setMaxZIndex(prev => prev + 1)
+    setActiveWindowId(id)
+
     setWindows(prev => {
       if (prev[id]) {
-        // If window exists, just focus it (handled by effect or subsequent call, but let's do it here too)
-        return prev
+        // Window exists, just update Z-index and restore if minimized
+        return {
+           ...prev,
+           [id]: { ...prev[id], isMinimized: false, zIndex: newZ }
+        }
       }
+      
+      // New Window
       return {
         ...prev,
         [id]: {
@@ -64,29 +95,11 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
           isMaximized: options?.isMaximized ?? false,
           position: { x: 50 + Object.keys(prev).length * 20, y: 50 + Object.keys(prev).length * 20 },
           size: options?.size ?? { width: 800, height: 600 },
-          zIndex: maxZIndex + 1,
+          zIndex: newZ,
           component,
           icon
         }
       }
-    })
-    
-    // If it was already open, we still want to focus it. 
-    // If it's new, we also focus it.
-    // The state update above is async, so we can't rely on 'windows' state immediately.
-    // We'll increment z-index blindly here for the new window logic.
-    setMaxZIndex(prev => prev + 1)
-    setActiveWindowId(id)
-    
-    // If window existed but was minimized, we need to un-minimize it.
-    setWindows(prev => {
-      if (prev[id]) {
-         return {
-            ...prev,
-            [id]: { ...prev[id], isMinimized: false, zIndex: maxZIndex + 2 }
-         }
-      }
-      return prev
     })
   }, [maxZIndex])
 

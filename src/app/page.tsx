@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react'
 import { motion } from 'framer-motion'
 import Shell from '@/components/os/Shell'
 import BootSequence from '@/components/os/BootSequence'
+import { ProjectContext } from '@/lib/ProjectContext'
 
 // Dynamically import the Scene to avoid SSR issues with WebGL
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
@@ -41,18 +42,24 @@ export default function Home() {
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
         >
-          <Shell
-            activeProject={activeProjectIndex}
-            onProjectChange={setActiveProjectIndex}
-            onProjectClick={handleProjectClick}
-            sceneSlot={
-              <Scene 
-                activeProjectIndex={activeProjectIndex} 
-                isPortalActive={isPortalActive}
-                onPortalComplete={handlePortalComplete}
-              />
-            }
-          />
+          <ProjectContext.Provider value={{ 
+            activeProject: activeProjectIndex, 
+            setActiveProject: setActiveProjectIndex,
+            onProjectClick: handleProjectClick 
+          }}>
+            <Shell
+              activeProject={activeProjectIndex}
+              onProjectChange={setActiveProjectIndex}
+              onProjectClick={handleProjectClick}
+              sceneSlot={
+                <Scene 
+                  activeProjectIndex={activeProjectIndex} 
+                  isPortalActive={isPortalActive}
+                  onPortalComplete={handlePortalComplete}
+                />
+              }
+            />
+          </ProjectContext.Provider>
 
           {/* Persistent HUD Elements - Background Layer */}
           <div className="pointer-events-none absolute inset-0 z-0 flex flex-col justify-between p-12 mix-blend-difference opacity-50">

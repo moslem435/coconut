@@ -45,8 +45,18 @@ const IOSPicker = forwardRef<IOSPickerHandle, IOSPickerProps>(({
   // Track the last index to trigger sound
   const lastIndex = useRef(Math.floor(INITIAL_SCROLL / itemHeight))
 
+  // Refs for stable access in motion callbacks
+  const onChangeRef = useRef(onChange)
+  const valueRef = useRef(value)
+  
+  useEffect(() => {
+    onChangeRef.current = onChange
+    valueRef.current = value
+  }, [onChange, value])
+
   useMotionValueEvent(scrollY, "change", (latest) => {
     const currentIndex = Math.round(latest / itemHeight)
+    
     if (currentIndex !== lastIndex.current) {
       // Resume context on scroll interaction if needed
       soundManager.resume()
@@ -59,8 +69,8 @@ const IOSPicker = forwardRef<IOSPickerHandle, IOSPickerProps>(({
       // Safety check for NaN
       if (Number.isNaN(normalizedIndex)) return
 
-      if (value !== normalizedIndex) {
-         onChange(normalizedIndex)
+      if (valueRef.current !== normalizedIndex) {
+         onChangeRef.current(normalizedIndex)
       }
     }
   })
