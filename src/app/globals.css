@@ -1,15 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,7 +18,69 @@
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
+  background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden; /* Prevent default scroll for our custom scroll experience */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none; /* Optional: prevents interaction completely if desired, but user-drag is usually enough for copy protection */
+}
+
+/* NUCLEAR OPTION: Globally hide all scrollbars */
+::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+@utility mask-gradient {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+@utility preserve-3d {
+  transform-style: preserve-3d;
+}
+
+@utility backface-hidden {
+  backface-visibility: hidden;
+}
+
+@utility backface-visible {
+  backface-visibility: visible;
+}
+
+/* Hide debug panels and overlays */
+/* Target common debug panel patterns */
+[class*="debug"],
+[class*="Debug"],
+[id*="debug"],
+[id*="Debug"],
+iframe[src*="debug"],
+/* Hide fixed positioned elements in bottom-left corner that look like debug panels */
+body > div[style*="position: fixed"][style*="bottom: 0"][style*="left: 0"],
+body > div[style*="position:fixed"][style*="bottom:0"][style*="left:0"],
+/* Hide React DevTools and similar */
+.__react-dev-tools,
+#__next-build-watcher,
+#webpack-dev-server-client-overlay,
+/* Generic bottom-left fixed panels */
+div[style*="position: fixed"][style*="bottom"][style*="left"][style*="z-index"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
