@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Roboto, Orbitron, Rajdhani } from 'next/font/google'
 import './globals.css'
-import { SiteProtection } from '@/components/os/SiteProtection'
-import { LanguageProvider } from "@/lib/LanguageContext"
-import { WindowManagerProvider } from "@/lib/WindowManagerContext"
+import { SiteProtection } from '@/os/system/SiteProtection'
+import { LanguageProvider } from "@/os/kernel/LanguageContext"
+import { WindowManagerProvider } from "@/os/kernel/WindowManagerContext"
+import { SystemSettingsProvider } from "@/os/kernel/SystemSettingsContext"
 
 const roboto = Roboto({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-roboto' })
 const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron' })
@@ -23,11 +24,13 @@ export default function RootLayout({
     <html lang="en" className="dark overflow-hidden">
       <body className={`${roboto.variable} ${orbitron.variable} ${rajdhani.variable} font-sans bg-black text-white antialiased overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-100`}>
         <SiteProtection />
-        <LanguageProvider>
-          <WindowManagerProvider>
-            {children}
-          </WindowManagerProvider>
-        </LanguageProvider>
+        <SystemSettingsProvider>
+          <LanguageProvider>
+            <WindowManagerProvider>
+              {children}
+            </WindowManagerProvider>
+          </LanguageProvider>
+        </SystemSettingsProvider>
       </body>
     </html>
   )

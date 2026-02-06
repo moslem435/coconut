@@ -34,31 +34,31 @@ export default function SystemContextMenu() {
   }, [])
 
   const menuItems = [
-    { 
-      label: 'SYSTEM_REBOOT', 
-      icon: RefreshCw, 
-      action: () => window.location.reload() 
+    {
+      label: 'SYSTEM_REBOOT',
+      icon: RefreshCw,
+      action: () => window.location.reload()
     },
-    { 
-      label: 'TOGGLE_FULLSCREEN', 
-      icon: Monitor, 
+    {
+      label: 'TOGGLE_FULLSCREEN',
+      icon: Monitor,
       action: () => {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(e => console.error(e))
         } else {
           document.exitFullscreen()
         }
-      } 
+      }
     },
-    { 
-      label: 'RUN_DIAGNOSTICS', 
-      icon: Terminal, 
-      action: () => console.log('System diagnostics running... OK') 
+    {
+      label: 'RUN_DIAGNOSTICS',
+      icon: Terminal,
+      action: () => console.log('System diagnostics running... OK')
     },
-    { 
-      label: 'SECURITY_PROTOCOL', 
-      icon: Shield, 
-      action: () => alert('Security Protocol: ACTIVE. Unauthorized access will be logged.') 
+    {
+      label: 'SECURITY_PROTOCOL',
+      icon: Shield,
+      action: () => alert('Security Protocol: ACTIVE. Unauthorized access will be logged.')
     }
   ]
 
@@ -71,16 +71,27 @@ export default function SystemContextMenu() {
           animate={{ opacity: 1, scale: 1, height: 'auto' }}
           exit={{ opacity: 0, scale: 0.9, height: 0 }}
           transition={{ duration: 0.1 }}
-          className="fixed z-[9999] bg-black/90 border border-cyan-500/30 backdrop-blur-md min-w-[200px] shadow-[0_0_20px_rgba(6,182,212,0.15)] overflow-hidden"
-          style={{ 
-            top: position.y, 
+          className="fixed z-[9999] backdrop-blur-md min-w-[200px] shadow-lg overflow-hidden"
+          style={{
+            top: position.y,
             left: position.x,
             // Adjust if near screen edge
-            transform: `translate(${position.x > window.innerWidth - 200 ? '-100%' : '0'}, ${position.y > window.innerHeight - 200 ? '-100%' : '0'})`
+            transform: `translate(${position.x > window.innerWidth - 200 ? '-100%' : '0'}, ${position.y > window.innerHeight - 200 ? '-100%' : '0'})`,
+            backgroundColor: 'var(--os-bg-panel)',
+            borderColor: 'var(--os-border)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)'
           }}
         >
           <div className="flex flex-col p-1">
-            <div className="px-3 py-2 text-[10px] text-cyan-500/50 tracking-widest border-b border-white/5 mb-1">
+            <div
+              className="px-3 py-2 text-[10px] tracking-widest border-b mb-1"
+              style={{
+                color: 'var(--os-text-muted)',
+                borderColor: 'var(--os-border)'
+              }}
+            >
               SYSTEM_COMMANDS
             </div>
             {menuItems.map((item, index) => (
@@ -90,10 +101,17 @@ export default function SystemContextMenu() {
                   item.action()
                   setVisible(false)
                 }}
-                className="flex items-center gap-3 px-3 py-2 text-xs font-mono text-white/80 hover:bg-cyan-500/20 hover:text-cyan-400 transition-colors text-left group"
+                className="flex items-center gap-3 px-3 py-2 text-xs font-mono transition-colors text-left group"
+                style={{ color: 'var(--os-text-primary)' }}
               >
                 <item.icon size={14} className="group-hover:scale-110 transition-transform" />
                 <span>{item.label}</span>
+                <style jsx>{`
+                  button:hover {
+                    background-color: var(--os-accent-glow);
+                    color: var(--os-accent) !important;
+                  }
+                `}</style>
               </button>
             ))}
           </div>

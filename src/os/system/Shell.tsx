@@ -3,10 +3,10 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/lib/LanguageContext'
-import { useWindowManager } from '@/lib/WindowManagerContext'
-import { APPS_REGISTRY } from '@/lib/apps-registry'
-import AppSplashScreen from '../apps/AppSplashScreen'
+import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useWindowManager } from '@/os/kernel/WindowManagerContext'
+import { APPS_REGISTRY } from '@/os/registry/config'
+import AppSplashScreen from '@/apps/AppSplashScreen'
 
 // Components
 import Taskbar from './Taskbar'
@@ -22,9 +22,9 @@ interface ShellProps {
   sceneSlot: React.ReactNode
 }
 
-export default function Shell({ 
-  activeProject, 
-  onProjectChange, 
+export default function Shell({
+  activeProject,
+  onProjectChange,
   onProjectClick,
   sceneSlot
 }: ShellProps) {
@@ -44,11 +44,11 @@ export default function Shell({
     setIsBooting(false)
     const appConfig = APPS_REGISTRY['system-core']
     const PortfolioComponent = appConfig.component
-    
+
     openWindow(
-      appConfig.id, 
-      appConfig.title, 
-      <PortfolioComponent 
+      appConfig.id,
+      appConfig.title,
+      <PortfolioComponent
         activeProject={activeProject}
         onProjectChange={onProjectChange}
         onProjectClick={onProjectClick}
@@ -67,17 +67,17 @@ export default function Shell({
     <>
       {/* 1. Desktop Layer (Always Present) */}
       <div className="fixed inset-0 z-0">
-         <Desktop 
-            onLaunch={handleLaunchSystemCore} 
-            onToggleMenu={() => setIsStartMenuOpen(!isStartMenuOpen)}
-         />
+        <Desktop
+          onLaunch={handleLaunchSystemCore}
+          onToggleMenu={() => setIsStartMenuOpen(!isStartMenuOpen)}
+        />
       </div>
 
       {/* 2. Window Manager / App Layer */}
       <AnimatePresence>
         {/* Boot Sequence Overlay */}
         {isBooting && (
-           <AppSplashScreen onComplete={handleBootComplete} />
+          <AppSplashScreen onComplete={handleBootComplete} />
         )}
 
         {/* Windows */}
@@ -87,26 +87,26 @@ export default function Shell({
       </AnimatePresence>
 
       {/* 3. System UI Layer (Always Top) */}
-      
+
       {/* Start Menu - z-[250] */}
-      <StartMenu 
-         isOpen={isStartMenuOpen} 
-         onClose={() => setIsStartMenuOpen(false)} 
+      <StartMenu
+        isOpen={isStartMenuOpen}
+        onClose={() => setIsStartMenuOpen(false)}
       />
 
       {/* Status Bar - z-[200] */}
-      <Taskbar 
+      <Taskbar
         onStartClick={handleStartClick}
       />
-      
+
       {/* Context Menu */}
       <ContextMenu />
 
       {/* Close Start Menu when clicking outside (Overlay) */}
       {isStartMenuOpen && (
-        <div 
-          className="fixed inset-0 z-[150]" 
-          onClick={() => setIsStartMenuOpen(false)} 
+        <div
+          className="fixed inset-0 z-[150]"
+          onClick={() => setIsStartMenuOpen(false)}
         />
       )}
     </>

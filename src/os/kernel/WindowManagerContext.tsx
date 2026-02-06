@@ -11,6 +11,11 @@ export interface WindowState {
   position: { x: number; y: number }
   size: { width: number; height: number }
   zIndex: number
+  preMaximizeState?: {
+    position: { x: number; y: number }
+    size: { width: number; height: number }
+  }
+  taskbarPosition?: { x: number; y: number }
   icon?: React.ComponentType<{ size?: number; className?: string }>
   component: React.ReactNode
 }
@@ -25,6 +30,7 @@ interface WindowManagerContextType {
   focusWindow: (id: string) => void
   updateWindowPosition: (id: string, position: { x: number; y: number }) => void
   updateWindowSize: (id: string, size: { width: number; height: number }) => void
+  updateTaskbarPosition: (id: string, position: { x: number; y: number }) => void
   showDesktop: () => void
 }
 
@@ -36,72 +42,67 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   const [maxZIndex, setMaxZIndex] = useState(100)
 
   const focusWindow = useCallback((id: string) => {
-    // If window is already active and not minimized, do nothing (optional optimization)
-    // But if we want to bring to front even if active (e.g. if we have multiple windows), 
-    // we should always increment Z-index if it's not the absolute top.
-    // For simplicity, always bring to front.
-    
     setWindows(prev => {
       if (!prev[id]) return prev
-      
-      // If already top and active, skip state update to prevent rerenders
+
+      // If already top and active and NOT minimized, do nothing
       if (activeWindowId === id && !prev[id].isMinimized && prev[id].zIndex === maxZIndex) {
-          return prev
+        return prev
       }
 
       const newZ = maxZIndex + 1
-      // We need to update maxZIndex state, but we can't do it inside setWindows callback if we want to use the new value immediately.
-      // However, we can just use the functional update pattern for everything or update them separately.
-      
+
       return {
         ...prev,
         [id]: { ...prev[id], zIndex: newZ, isMinimized: false }
       }
     })
-    
-    // We update maxZIndex and activeWindowId outside the setWindows callback
-    // But we need to ensure they are consistent. 
-    // Since setWindows (functional) runs asynchronously, we might have a race condition if we rely on 'maxZIndex' variable from closure.
-    // But 'maxZIndex' in dependency array ensures this callback is recreated when it changes.
-    // So 'maxZIndex' here is current.
-    
+
+    // We increment maxZIndex externally to ensure subsequent calls get a higher index
     setMaxZIndex(prev => prev + 1)
     setActiveWindowId(id)
   }, [activeWindowId, maxZIndex])
 
   const openWindow = useCallback((id: string, title: string, component: React.ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean }) => {
-    // Calculate new Z Index
-    const newZ = maxZIndex + 1
-    setMaxZIndex(prev => prev + 1)
-    setActiveWindowId(id)
+    // Calculate new Z Index outside to capture current max
+    // Note: In a high-frequency event, this might need a ref, but for UI clicks it's fine
 
-    setWindows(prev => {
-      if (prev[id]) {
-        // Window exists, just update Z-index and restore if minimized
+    setMaxZIndex(prev => {
+      const newZ = prev + 1
+
+      setWindows(currentWindows => {
+        if (currentWindows[id]) {
+          // Window exists, restore and focus
+          return {
+            ...currentWindows,
+            [id]: { ...currentWindows[id], isMinimized: false, zIndex: newZ }
+          }
+        }
+
+        // New Window
         return {
-           ...prev,
-           [id]: { ...prev[id], isMinimized: false, zIndex: newZ }
+          ...currentWindows,
+          [id]: {
+            id,
+            title,
+            isOpen: true,
+            isMinimized: false,
+            isMaximized: options?.isMaximized ?? false,
+            // Simple cascade positioning
+            position: { x: 50 + (Object.keys(currentWindows).length % 10) * 30, y: 50 + (Object.keys(currentWindows).length % 10) * 30 },
+            size: options?.size ?? { width: 800, height: 600 },
+            zIndex: newZ,
+            component,
+            icon
+          }
         }
-      }
-      
-      // New Window
-      return {
-        ...prev,
-        [id]: {
-          id,
-          title,
-          isOpen: true,
-          isMinimized: false,
-          isMaximized: options?.isMaximized ?? false,
-          position: { x: 50 + Object.keys(prev).length * 20, y: 50 + Object.keys(prev).length * 20 },
-          size: options?.size ?? { width: 800, height: 600 },
-          zIndex: newZ,
-          component,
-          icon
-        }
-      }
+      })
+
+      setActiveWindowId(id)
+      return newZ
     })
-  }, [maxZIndex])
+
+  }, [])
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => {
@@ -125,10 +126,38 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   }, [activeWindowId])
 
   const maximizeWindow = useCallback((id: string) => {
-    setWindows(prev => ({
-      ...prev,
-      [id]: { ...prev[id], isMaximized: !prev[id].isMaximized }
-    }))
+    setWindows(prev => {
+      const win = prev[id]
+      if (!win) return prev
+
+      if (win.isMaximized) {
+        // Restore
+        return {
+          ...prev,
+          [id]: {
+            ...win,
+            isMaximized: false,
+            // Restore position and size if they exist, otherwise keep current (fallback)
+            position: win.preMaximizeState?.position ?? win.position,
+            size: win.preMaximizeState?.size ?? win.size,
+            preMaximizeState: undefined
+          }
+        }
+      } else {
+        // Maximize
+        return {
+          ...prev,
+          [id]: {
+            ...win,
+            isMaximized: true,
+            preMaximizeState: {
+              position: win.position,
+              size: win.size
+            }
+          }
+        }
+      }
+    })
     focusWindow(id)
   }, [focusWindow])
 
@@ -144,6 +173,20 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
       ...prev,
       [id]: { ...prev[id], size }
     }))
+  }, [])
+
+  const updateTaskbarPosition = useCallback((id: string, position: { x: number; y: number }) => {
+    setWindows(prev => {
+      if (!prev[id]) return prev
+      // Only update if position actually changed to prevent unnecessary rerenders
+      if (prev[id].taskbarPosition?.x === position.x && prev[id].taskbarPosition?.y === position.y) {
+        return prev
+      }
+      return {
+        ...prev,
+        [id]: { ...prev[id], taskbarPosition: position }
+      }
+    })
   }, [])
 
   const showDesktop = useCallback(() => {
@@ -168,6 +211,7 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
       focusWindow,
       updateWindowPosition,
       updateWindowSize,
+      updateTaskbarPosition,
       showDesktop
     }}>
       {children}

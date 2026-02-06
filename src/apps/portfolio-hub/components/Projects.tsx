@@ -5,17 +5,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Terminal, Layers, Code, Cpu, ExternalLink } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/lib/LanguageContext'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 interface ProjectsProps {
   activeProject?: number
   onProjectChange?: (index: number) => void
   selectedSubProject?: string | null
   onSubProjectChange?: (id: string) => void
-  onSelect?: (id: string) => void 
+  onSelect?: (id: string) => void
 }
 
-export default function Projects({ 
+export default function Projects({
   activeProject,
   onProjectChange,
   selectedSubProject,
@@ -38,7 +38,7 @@ export default function Projects({
 
   return (
     <div className="h-full w-full flex flex-col gap-4 p-2 font-mono text-white/90">
-      
+
       {/* Header Area */}
       <div className="flex items-center justify-between border-b border-white/10 pb-2 min-h-[40px]">
         <div className="flex items-center gap-2 text-xs tracking-widest text-cyan-400">
@@ -46,14 +46,14 @@ export default function Projects({
           <span>PROJECT_DECK // SELECTED_WORKS</span>
         </div>
         <div className="flex gap-2">
-           <div className="w-2 h-2 bg-cyan-500 animate-pulse" />
-           <div className="w-2 h-2 bg-white/20" />
-           <div className="w-2 h-2 bg-white/20" />
+          <div className="w-2 h-2 bg-cyan-500 animate-pulse" />
+          <div className="w-2 h-2 bg-white/20" />
+          <div className="w-2 h-2 bg-white/20" />
         </div>
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
-        
+
         {/* LEFT: List View */}
         <div className="w-full h-1/3 md:w-1/3 md:h-auto flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-2">
           {WORK_ITEMS.map((item) => (
@@ -63,14 +63,14 @@ export default function Projects({
               onMouseEnter={() => soundManager.playHover()}
               className={`
                 group relative p-3 text-left border transition-all duration-300
-                ${selectedId === item.id 
-                  ? 'border-cyan-500 bg-cyan-500/10' 
+                ${selectedId === item.id
+                  ? 'border-cyan-500 bg-cyan-500/10'
                   : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'}
               `}
             >
               {/* Active Indicator */}
               {selectedId === item.id && (
-                <motion.div 
+                <motion.div
                   layoutId="activeGlow"
                   className="absolute inset-0 shadow-[inset_0_0_15px_rgba(6,182,212,0.2)]"
                 />
@@ -84,7 +84,7 @@ export default function Projects({
                   {item.title}
                 </span>
               </div>
-              
+
               {/* Corner accent */}
               <div className={`absolute top-0 right-0 w-0 h-0 border-t-[6px] border-r-[6px] transition-all
                 ${selectedId === item.id ? 'border-t-cyan-500 border-r-transparent' : 'border-t-transparent border-r-transparent'}
@@ -96,8 +96,8 @@ export default function Projects({
         {/* RIGHT: Detail View */}
         <div className="flex-1 border border-white/10 bg-black/20 relative overflow-hidden flex flex-col">
           {/* Background Grid */}
-          <div className="absolute inset-0 opacity-10" 
-             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px' }} 
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px' }}
           />
 
           <AnimatePresence mode="wait">
@@ -111,11 +111,11 @@ export default function Projects({
             >
               {/* Image/Preview Placeholder */}
               <div className={`h-[45%] w-full bg-gradient-to-br ${selectedWork.color} opacity-20 relative overflow-hidden`}>
-                 <div className="absolute inset-0 flex items-center justify-center">
-                    <Layers size={64} className="text-white opacity-20" />
-                 </div>
-                 {/* Scanline */}
-                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-transparent h-[50%] animate-[scan_3s_linear_infinite]" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Layers size={64} className="text-white opacity-20" />
+                </div>
+                {/* Scanline */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-transparent h-[50%] animate-[scan_3s_linear_infinite]" />
               </div>
 
               {/* Info Area */}
@@ -130,7 +130,7 @@ export default function Projects({
                     </div>
                     <span className="text-white/30 font-mono text-sm">{selectedWork.year}</span>
                   </div>
-                  
+
                   <p className="text-sm text-white/70 leading-relaxed mb-6 border-l-2 border-white/10 pl-4">
                     {selectedWork.desc}
                   </p>
@@ -151,14 +151,14 @@ export default function Projects({
                 </div>
 
                 <div className="mt-6 flex justify-end">
-                   <button 
-                     className="group flex items-center gap-2 px-6 py-3 bg-white text-black font-bold text-sm tracking-wider hover:bg-cyan-400 transition-colors"
-                     onMouseEnter={() => soundManager.playHover()}
-                     onClick={() => soundManager.playClick()}
-                   >
-                     <span>INITIATE_PROTOCOL</span>
-                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                   </button>
+                  <button
+                    className="group flex items-center gap-2 px-6 py-3 bg-white text-black font-bold text-sm tracking-wider hover:bg-cyan-400 transition-colors"
+                    onMouseEnter={() => soundManager.playHover()}
+                    onClick={() => soundManager.playClick()}
+                  >
+                    <span>INITIATE_PROTOCOL</span>
+                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
                 </div>
               </div>
             </motion.div>

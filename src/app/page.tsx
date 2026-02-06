@@ -3,9 +3,9 @@
 import dynamic from 'next/dynamic'
 import { Suspense, useState } from 'react'
 import { motion } from 'framer-motion'
-import Shell from '@/components/os/Shell'
-import BootSequence from '@/components/os/BootSequence'
-import { ProjectContext } from '@/lib/ProjectContext'
+import Shell from '@/os/system/Shell'
+import BootSequence from '@/os/system/BootSequence'
+import { ProjectContext } from '@/os/kernel/ProjectContext'
 
 // Dynamically import the Scene to avoid SSR issues with WebGL
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
@@ -36,24 +36,24 @@ export default function Home() {
 
       {/* Main Content - Fades in after boot */}
       {hasBooted && (
-        <motion.div 
+        <motion.div
           className="h-full w-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
         >
-          <ProjectContext.Provider value={{ 
-            activeProject: activeProjectIndex, 
+          <ProjectContext.Provider value={{
+            activeProject: activeProjectIndex,
             setActiveProject: setActiveProjectIndex,
-            onProjectClick: handleProjectClick 
+            onProjectClick: handleProjectClick
           }}>
             <Shell
               activeProject={activeProjectIndex}
               onProjectChange={setActiveProjectIndex}
               onProjectClick={handleProjectClick}
               sceneSlot={
-                <Scene 
-                  activeProjectIndex={activeProjectIndex} 
+                <Scene
+                  activeProjectIndex={activeProjectIndex}
                   isPortalActive={isPortalActive}
                   onPortalComplete={handlePortalComplete}
                 />

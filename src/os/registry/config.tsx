@@ -1,9 +1,9 @@
 import { ComponentType } from 'react'
 import dynamic from 'next/dynamic'
-import { Terminal, FolderOpen, Globe, Trash } from 'lucide-react'
+import { Terminal, FolderOpen, Globe, Trash, Settings } from 'lucide-react'
 
 // Dynamic Imports for Code Splitting / Lazy Loading
-const Portfolio = dynamic(() => import('@/components/apps/portfolio'), {
+const Portfolio = dynamic(() => import('@/apps/portfolio-hub'), {
   loading: () => <div className="flex items-center justify-center h-full text-cyan-500 font-mono animate-pulse">LOADING SYSTEM CORE...</div>
 })
 
@@ -30,11 +30,21 @@ export const APPS_REGISTRY: Record<string, AppConfig> = {
       isMaximized: true
     }
   },
+  'settings': {
+    id: 'settings',
+    title: 'SETTINGS',
+    icon: Settings,
+    component: dynamic(() => import('@/apps/settings')),
+    defaultWindowOptions: {
+      width: 900,
+      height: 600
+    }
+  },
   'archive': {
     id: 'archive',
     title: 'ARCHIVE',
     icon: FolderOpen,
-    component: () => <div className="p-4 text-cyan-500 font-mono">Archive Access Denied: Encrypted</div>, 
+    component: dynamic(() => import('@/apps/archive')),
     defaultWindowOptions: {
       width: 800,
       height: 600
@@ -44,7 +54,7 @@ export const APPS_REGISTRY: Record<string, AppConfig> = {
     id: 'network',
     title: 'NET_NODE',
     icon: Globe,
-    component: () => <div className="p-4 text-cyan-500 font-mono">Network Node: Offline</div>,
+    component: dynamic(() => import('@/apps/network')),
     defaultWindowOptions: {
       width: 800,
       height: 600
@@ -54,7 +64,7 @@ export const APPS_REGISTRY: Record<string, AppConfig> = {
     id: 'trash',
     title: 'PURGE',
     icon: Trash,
-    component: () => <div className="p-4 text-red-500 font-mono">Trash is empty</div>, 
+    component: dynamic(() => import('@/apps/trash')),
     defaultWindowOptions: {
       width: 600,
       height: 400
