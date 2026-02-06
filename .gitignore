@@ -44,6 +44,7 @@ next-env.d.ts
 .idea
 .vscode
 .trae
+.kiro
 
 # System
 Thumbs.db

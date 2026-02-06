@@ -9,23 +9,13 @@ interface TaskbarProps {
   onStartClick?: () => void
 }
 
+import SystemClock from './SystemClock'
+
 export default function Taskbar({
   onStartClick
 }: TaskbarProps) {
   const { windows, activeWindowId, focusWindow, minimizeWindow, showDesktop, updateTaskbarPosition } = useWindowManager()
-  const [time, setTime] = useState("")
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
-
-  // Clock
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date()
-      setTime(now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }))
-    }
-    updateTime()
-    const timer = setInterval(updateTime, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   // Sort windows by creation order (or just object keys for now)
   const openWindows = Object.values(windows).filter(w => w.isOpen)
@@ -119,7 +109,7 @@ export default function Taskbar({
 
         {/* Clock */}
         <div className="flex flex-col items-end leading-none gap-0.5 px-2 py-1 rounded cursor-default">
-          <span className="font-semibold text-xs" style={{ color: 'var(--os-text-primary)' }}>{time}</span>
+          <SystemClock showDate />
         </div>
 
       </div>

@@ -24,6 +24,9 @@ export default function Window({ id }: WindowProps) {
   const [showSnapPreview, setShowSnapPreview] = useState(false)
   const [restorePreview, setRestorePreview] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
 
+  // Ref for local visual updates during resize without triggering React renders
+  const windowRef = useRef<HTMLDivElement>(null)
+
   if (!windowState || !windowState.isOpen) return null
 
   const handleResizeStart = (e: React.PointerEvent, direction: string) => {
@@ -38,7 +41,19 @@ export default function Window({ id }: WindowProps) {
     const startPosX = windowState.position.x
     const startPosY = windowState.position.y
 
+    // Use Refs to track current state during drag to avoid stale closures in event listeners
+    // without needing to add/remove listeners on every render
+    const currentGeo = {
+      w: startWidth,
+      h: startHeight,
+      x: startPosX,
+      y: startPosY
+    }
+
     const onPointerMove = (moveEvent: PointerEvent) => {
+      // Optimized: Uses requestAnimationFrame would be even better, but direct DOM manipulation 
+      // is already much faster than React Context updates.
+
       const deltaX = moveEvent.clientX - startX
       const deltaY = moveEvent.clientY - startY
 
@@ -65,18 +80,45 @@ export default function Window({ id }: WindowProps) {
         newHeight = proposedHeight
       }
 
-      if (newWidth !== startWidth || newHeight !== startHeight) {
-        updateWindowSize(id, { width: newWidth, height: newHeight })
+      // Update Local Visuals Directly
+      if (windowRef.current) {
+        windowRef.current.style.width = `${newWidth}px`
+        windowRef.current.style.height = `${newHeight}px`
+        // Handle position changes for Left/Top resizing
+        // Note: transform is controlled by framer motion, so we might fight it if we aren't careful.
+        // However, we disabled framer motion layout animations during resize via isResizing prop usually.
+        // For simpler approach with Framer Motion, we can use a MotionValue or just set style.left/top if we weren't using transform.
+        // Since we use x/y props in motion.div, updating those via context was the issue.
+        // We need to bypass React for position too.
+        windowRef.current.style.transform = `translateX(${newX}px) translateY(${newY}px)`
       }
-      if (newX !== startPosX || newY !== startPosY) {
-        updateWindowPosition(id, { x: newX, y: newY })
-      }
+
+      // Store for commit
+      currentGeo.w = newWidth
+      currentGeo.h = newHeight
+      currentGeo.x = newX
+      currentGeo.y = newY
     }
 
     const onPointerUp = () => {
       setIsResizing(false)
       document.removeEventListener('pointermove', onPointerMove)
       document.removeEventListener('pointerup', onPointerUp)
+
+      // Commit changes to global state ONCE
+      if (currentGeo.w !== startWidth || currentGeo.h !== startHeight) {
+        updateWindowSize(id, { width: currentGeo.w, height: currentGeo.h })
+      }
+      if (currentGeo.x !== startPosX || currentGeo.y !== startPosY) {
+        updateWindowPosition(id, { x: currentGeo.x, y: currentGeo.y })
+      }
+
+      // Cleanup cleanup - remove direct styles so React takes over again
+      if (windowRef.current) {
+        windowRef.current.style.width = ''
+        windowRef.current.style.height = ''
+        windowRef.current.style.transform = ''
+      }
     }
 
     document.addEventListener('pointermove', onPointerMove)
@@ -122,6 +164,7 @@ export default function Window({ id }: WindowProps) {
       )}
 
       <motion.div
+        ref={windowRef}
         drag={!isResizing && !windowState.isMinimized}
         dragControls={dragControls}
         dragListener={false}

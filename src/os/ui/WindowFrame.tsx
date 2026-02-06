@@ -27,11 +27,14 @@ export function WindowFrame({
       `}
             style={{
                 backgroundColor: 'var(--os-bg-window)',
-                backdropFilter: 'var(--os-backdrop-blur)',
+                // Optimization: Reduce blur quality for inactive windows to save GPU
+                backdropFilter: isActive ? 'var(--os-backdrop-blur)' : 'blur(10px)',
+                WebkitBackdropFilter: isActive ? 'var(--os-backdrop-blur)' : 'blur(10px)',
                 border: isMaximized ? 'none' : '1px solid var(--os-border)',
                 boxShadow: isActive
                     ? '0 20px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0,0,0,0.02)'
                     : '0 10px 30px -15px rgba(0, 0, 0, 0.1)',
+                willChange: 'transform', // Hint for GPU promotion
                 ...style
             }}
         >
