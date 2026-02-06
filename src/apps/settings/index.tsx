@@ -16,7 +16,8 @@ import {
     Moon,
     Languages
 } from 'lucide-react'
-import { useSystem } from '@/os/sdk' // NEW: Import from SDK
+import { useSystem } from '@/os/sdk'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 interface SettingCategory {
     id: string
@@ -25,18 +26,20 @@ interface SettingCategory {
     description: string
 }
 
-const categories: SettingCategory[] = [
-    { id: 'display', label: '显示', icon: Monitor, description: '调整显示设置和主题' },
-    { id: 'appearance', label: '外观', icon: Palette, description: '自定义颜色和视觉效果' },
-    { id: 'sound', label: '声音', icon: Volume2, description: '音量和通知设置' },
-    { id: 'language', label: '语言', icon: Globe, description: '系统语言和区域设置' },
-    { id: 'account', label: '账户', icon: User, description: '个人资料和账户信息' },
-    { id: 'privacy', label: '隐私', icon: Shield, description: '安全和隐私选项' },
-    { id: 'about', label: '关于', icon: Info, description: '系统信息和版本' },
-]
-
 export default function SettingsApp() {
     const [activeCategory, setActiveCategory] = useState('display')
+    const { t } = useLanguage()
+
+    // Dynamic categories based on language
+    const categories: SettingCategory[] = [
+        { id: 'display', label: t('settings.display'), icon: Monitor, description: t('settings.desc.display') },
+        { id: 'appearance', label: t('settings.appearance'), icon: Palette, description: t('settings.desc.appearance') },
+        { id: 'sound', label: t('settings.sound'), icon: Volume2, description: t('settings.desc.sound') },
+        { id: 'language', label: t('settings.language'), icon: Globe, description: t('settings.desc.language') },
+        { id: 'account', label: t('settings.account'), icon: User, description: t('settings.desc.account') },
+        { id: 'privacy', label: t('settings.privacy'), icon: Shield, description: t('settings.desc.privacy') },
+        { id: 'about', label: t('settings.about'), icon: Info, description: t('settings.desc.about') },
+    ]
 
     // Connect to System SDK
     const {
@@ -44,6 +47,7 @@ export default function SettingsApp() {
         accentColor, setAccentColor,
         useTransparency, setUseTransparency,
         useAnimations, setUseAnimations,
+        useTaskbarPreviews, setUseTaskbarPreviews,
         displayScale, setDisplayScale,
         volume, setVolume,
         isMuted, toggleMute,
@@ -51,30 +55,26 @@ export default function SettingsApp() {
         wallpaper, setWallpaper
     } = useSystem()
 
-    // NOTE: The previous SDK implementation missed some fields like useTransparency.
-    // I need to update SDK first or use direct access for now? 
-    // BETTER: Update SDK to expose everything needed.
-
 
     const accentColors = [
-        { name: '青色', value: '#06b6d4' },
-        { name: '蓝色', value: '#3b82f6' },
-        { name: '紫色', value: '#8b5cf6' },
-        { name: '粉色', value: '#ec4899' },
-        { name: '红色', value: '#ef4444' },
-        { name: '橙色', value: '#f97316' },
-        { name: '绿色', value: '#22c55e' },
+        { name: t('color.cyan'), value: '#06b6d4' },
+        { name: t('color.blue'), value: '#3b82f6' },
+        { name: t('color.purple'), value: '#8b5cf6' },
+        { name: t('color.pink'), value: '#ec4899' },
+        { name: t('color.red'), value: '#ef4444' },
+        { name: t('color.orange'), value: '#f97316' },
+        { name: t('color.green'), value: '#22c55e' },
     ]
 
     const wallpaperOptions = [
-        { name: '默认流光', type: 'preset', value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))' },
-        { name: '深邃星空', type: 'preset', value: 'linear-gradient(to top, #30cfd0 0%, #330867 100%)' },
-        { name: '赛博霓虹', type: 'preset', value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
-        { name: '午夜渐变', type: 'preset', value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
-        { name: '每日壁纸', type: 'image', value: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop' },
-        { name: '雪山', type: 'image', value: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
-        { name: '沙漠', type: 'image', value: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
-        { name: '城市', type: 'image', value: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: t('wallpaper.preset.flow'), type: 'preset', value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))' },
+        { name: t('wallpaper.preset.stars'), type: 'preset', value: 'linear-gradient(to top, #30cfd0 0%, #330867 100%)' },
+        { name: t('wallpaper.preset.neon'), type: 'preset', value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
+        { name: t('wallpaper.preset.midnight'), type: 'preset', value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
+        { name: t('wallpaper.image.daily'), type: 'image', value: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop' },
+        { name: t('wallpaper.image.snow'), type: 'image', value: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: t('wallpaper.image.desert'), type: 'image', value: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: t('wallpaper.image.city'), type: 'image', value: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
     ]
 
     const renderContent = () => {
@@ -82,24 +82,24 @@ export default function SettingsApp() {
             case 'display':
                 return (
                     <div className="space-y-6">
-                        <SettingSection title="主题模式">
+                        <SettingSection title={t('settings.display.theme')}>
                             <div className="flex gap-4">
                                 <ThemeOption
                                     icon={Sun}
-                                    label="浅色"
+                                    label={t('settings.display.light')}
                                     active={theme === 'light'}
                                     onClick={() => setTheme('light')}
                                 />
                                 <ThemeOption
                                     icon={Moon}
-                                    label="深色"
+                                    label={t('settings.display.dark')}
                                     active={theme === 'dark'}
                                     onClick={() => setTheme('dark')}
                                 />
                             </div>
                         </SettingSection>
 
-                        <SettingSection title="显示比例">
+                        <SettingSection title={t('settings.display.scale')}>
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <input
@@ -114,7 +114,7 @@ export default function SettingsApp() {
                                     />
                                     <span className="text-sm w-12 text-right" style={{ color: 'var(--os-text-secondary)' }}>{displayScale}%</span>
                                 </div>
-                                <p className="text-xs" style={{ color: 'var(--os-text-muted)' }}>调整系统字体和窗口大小的缩放比例。</p>
+                                <p className="text-xs" style={{ color: 'var(--os-text-muted)' }}>{t('settings.display.scale.desc')}</p>
                             </div>
                         </SettingSection>
                     </div>
@@ -123,7 +123,7 @@ export default function SettingsApp() {
             case 'appearance':
                 return (
                     <div className="space-y-6">
-                        <SettingSection title="桌面壁纸">
+                        <SettingSection title={t('settings.appearance.wallpaper')}>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 {wallpaperOptions.map((wp, i) => (
                                     <button
@@ -151,7 +151,7 @@ export default function SettingsApp() {
                             </div>
                         </SettingSection>
 
-                        <SettingSection title="主题色">
+                        <SettingSection title={t('settings.appearance.accent')}>
                             <div className="flex gap-3 flex-wrap">
                                 {accentColors.map((color) => (
                                     <button
@@ -171,17 +171,22 @@ export default function SettingsApp() {
                             </div>
                         </SettingSection>
 
-                        <SettingSection title="视觉效果">
+                        <SettingSection title={t('settings.appearance.effects')}>
                             <div className="space-y-4">
                                 <ToggleSwitch
                                     checked={useTransparency}
                                     onChange={setUseTransparency}
-                                    label="启用窗口透明与模糊效果"
+                                    label={t('settings.appearance.transparency')}
                                 />
                                 <ToggleSwitch
                                     checked={useAnimations}
                                     onChange={setUseAnimations}
-                                    label="启用系统动画"
+                                    label={t('settings.appearance.animations')}
+                                />
+                                <ToggleSwitch
+                                    checked={useTaskbarPreviews}
+                                    onChange={setUseTaskbarPreviews}
+                                    label={t('settings.appearance.previews')}
                                 />
                             </div>
                         </SettingSection>
@@ -191,7 +196,7 @@ export default function SettingsApp() {
             case 'sound':
                 return (
                     <div className="space-y-6">
-                        <SettingSection title="音量">
+                        <SettingSection title={t('settings.sound.volume')}>
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <button
@@ -221,7 +226,7 @@ export default function SettingsApp() {
             case 'language':
                 return (
                     <div className="space-y-6">
-                        <SettingSection title="选择语言">
+                        <SettingSection title={t('settings.language.select')}>
                             <div className="space-y-2">
                                 {[
                                     { code: 'zh', name: '简体中文' },
@@ -262,18 +267,18 @@ export default function SettingsApp() {
                             >
                                 <Settings size={48} className="text-[var(--os-accent)]" />
                             </motion.div>
-                            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--os-text-primary)' }}>Cloud OS</h2>
+                            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--os-text-primary)' }}>{t('start.os')}</h2>
                             <p className="text-sm mb-4" style={{ color: 'var(--os-text-muted)' }}>Version 1.0.0</p>
                             <div className="inline-block px-4 py-2 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/30 text-[var(--os-accent)] text-sm">
                                 Build 2026.02.05
                             </div>
                         </div>
 
-                        <SettingSection title="系统信息">
+                        <SettingSection title={t('settings.about.system')}>
                             <div className="space-y-2 text-sm">
-                                <InfoRow label="运行环境" value="Web Browser" />
-                                <InfoRow label="内核" value="Next.js 15 + React 19" />
-                                <InfoRow label="渲染引擎" value="Tw + Framer Motion" />
+                                <InfoRow label={t('settings.about.env')} value="Web Browser" />
+                                <InfoRow label={t('settings.about.kernel')} value="Next.js 15 + React 19" />
+                                <InfoRow label={t('settings.about.render')} value="Tw + Framer Motion" />
                             </div>
                         </SettingSection>
                     </div>
@@ -282,7 +287,7 @@ export default function SettingsApp() {
             default:
                 return (
                     <div className="flex items-center justify-center h-64 text-white/40" style={{ color: 'var(--os-text-muted)' }}>
-                        <p>功能开发中...</p>
+                        <p>{t('settings.dev')}</p>
                     </div>
                 )
         }
@@ -294,7 +299,7 @@ export default function SettingsApp() {
             <div className="w-64 border-r border-[var(--os-border)] p-4 space-y-1 overflow-y-auto shrink-0 bg-[var(--os-bg-panel)]">
                 <div className="flex items-center gap-3 px-3 py-4 mb-4">
                     <Settings size={24} className="text-[var(--os-accent)]" />
-                    <span className="text-lg font-semibold">设置</span>
+                    <span className="text-lg font-semibold">{t('start.settings')}</span>
                 </div>
 
                 {categories.map((cat) => {
@@ -381,21 +386,40 @@ function ThemeOption({
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
     return (
-        <label className="flex items-center justify-between cursor-pointer group">
-            <span className="text-sm transition-colors" style={{ color: 'var(--os-text-primary)' }}>{label}</span>
-            <button
-                onClick={() => onChange(!checked)}
-                className={`relative w-11 h-6 rounded-full transition-colors`}
-                style={{
-                    backgroundColor: checked ? 'var(--os-accent)' : 'var(--os-border)' // using border color as disabled slide bg
+        <label className="flex items-center justify-between cursor-pointer group py-2">
+            <span className="text-sm font-medium transition-colors duration-200 group-hover:text-[var(--os-text-primary)] text-[var(--os-text-secondary)]">
+                {label}
+            </span>
+            
+            <div 
+                className="relative"
+                onClick={(e) => {
+                    e.preventDefault()
+                    onChange(!checked)
                 }}
             >
+                {/* Track */}
                 <motion.div
-                    animate={{ x: checked ? 20 : 2 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
+                    className="w-11 h-6 rounded-full transition-colors duration-300 border"
+                    style={{
+                        backgroundColor: checked ? 'var(--os-accent)' : 'var(--os-hover-bg)',
+                        borderColor: checked ? 'var(--os-accent)' : 'var(--os-border)',
+                        boxShadow: checked ? '0 0 8px var(--os-accent-dim)' : 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                    }}
                 />
-            </button>
+                
+                {/* Knob */}
+                <motion.div
+                    initial={false}
+                    animate={{ 
+                        x: checked ? 26 : 2,
+                        scale: 1 
+                    }}
+                    whileTap={{ scale: 0.9, width: 20 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className="absolute top-1 left-0 w-4 h-4 rounded-full bg-white shadow-sm z-10"
+                />
+            </div>
         </label>
     )
 }

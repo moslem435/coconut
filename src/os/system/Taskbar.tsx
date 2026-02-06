@@ -6,6 +6,7 @@ import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
@@ -20,13 +21,14 @@ import SystemClock from './SystemClock'
 export default function Taskbar({
   onStartClick
 }: TaskbarProps) {
+  const { t } = useLanguage()
   // Taskbar needs list of all open windows
   const openWindows = useWindowStore(useShallow(state =>
     Object.values(state.windows).filter(w => w.isOpen)
   ))
   const activeWindowId = useWindowStore(state => state.activeWindowId)
   const snapshots = useWindowStore(state => state.snapshots)
-  const { pinnedAppIds } = useSystemSettings()
+  const { pinnedAppIds, useTaskbarPreviews } = useSystemSettings()
 
   // Actions
   const openWindow = useWindowStore(state => state.openWindow)
@@ -34,8 +36,10 @@ export default function Taskbar({
   const minimizeWindow = useWindowStore(state => state.minimizeWindow)
   const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
   const setSnapshot = useWindowStore(state => state.setSnapshot)
+  const setPeekWindowId = useWindowStore(state => state.setPeekWindowId)
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const peekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   // Merge pinned apps and open windows
@@ -58,10 +62,12 @@ export default function Taskbar({
       // Check if it's open (using appId as windowId for single-instance apps)
       const win = openWindows.find(w => w.id === appId)
       
+      const title = appId === 'settings' ? t('start.settings') : app.title
+
       items.push({
         id: appId,
         appId: appId,
-        title: app.title,
+        title: title,
         icon: app.icon,
         isOpen: !!win,
         isMinimized: win?.isMinimized ?? false,
@@ -128,6 +134,11 @@ export default function Taskbar({
   }
 
   const handleItemClick = (item: typeof taskbarItems[0]) => {
+    // Close preview immediately on click
+    setHoveredId(null)
+    setPeekWindowId(null)
+    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+
     if (item.isOpen) {
       if (item.isActive && !item.isMinimized) {
         // Capture snapshot before minimizing
@@ -148,7 +159,9 @@ export default function Taskbar({
             taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
         }
 
-        openWindow(app.id, app.title, <app.component />, app.icon, {
+        const title = item.appId === 'settings' ? t('start.settings') : app.title
+
+        openWindow(app.id, title, <app.component />, app.icon, {
             ...app.defaultWindowOptions,
             taskbarPosition: taskbarPos
         })
@@ -158,7 +171,7 @@ export default function Taskbar({
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[200] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-2 transition-[width] duration-300"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-2 transition-[width] duration-300"
       style={{
         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
         border: '1px solid var(--os-border)',
@@ -191,13 +204,23 @@ export default function Taskbar({
             ref={(el) => { itemRefs.current[item.id] = el }}
             key={item.id}
             onClick={() => handleItemClick(item)}
+            title={!useTaskbarPreviews ? item.title : undefined}
             onMouseEnter={() => {
                 setHoveredId(item.id)
-                if (item.isOpen && !item.isMinimized) {
-                    captureSnapshot(item.id)
+                if (item.isOpen) {
+                    // Update snapshot
+                    if (!item.isMinimized) {
+                        captureSnapshot(item.id)
+                    }
                 }
             }}
-            onMouseLeave={() => setHoveredId(null)}
+            onMouseLeave={() => {
+                setHoveredId(null)
+                
+                // Clear Peek (Safety fallback)
+                if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                setPeekWindowId(null)
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
               useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', { 
@@ -232,13 +255,25 @@ export default function Taskbar({
 
             {/* Window Preview */}
             <AnimatePresence>
-                  {hoveredId === item.id && (
+                  {useTaskbarPreviews && hoveredId === item.id && (
                     <WindowPreview 
-                        appId={item.appId} 
+                        appId={item.appId}  
                         title={item.title} 
                         icon={item.icon} 
                         isActive={item.isActive}
                         snapshot={snapshots[item.id]} 
+                        onPeek={(shouldPeek) => {
+                             if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                             if (shouldPeek) {
+                                 // Enter peek mode (slight delay to prevent accidental triggers)
+                                 peekTimeoutRef.current = setTimeout(() => {
+                                     setPeekWindowId(item.id)
+                                 }, 200)
+                             } else {
+                                 // Exit peek mode immediately
+                                 setPeekWindowId(null)
+                             }
+                        }}
                     />
                   )}
                 </AnimatePresence>
@@ -254,13 +289,13 @@ export default function Taskbar({
         
         {/* Status Icons */}
         <div className="flex items-center gap-1 px-2">
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Wi-Fi: Connected">
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={t('status.wifi')}>
             <Wifi size={18} />
           </div>
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Volume: 80%">
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={`${t('status.volume')}: 80%`}>
             <Volume2 size={18} />
           </div>
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Battery: 100%">
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={`${t('status.battery')}: 100%`}>
             <Battery size={18} />
           </div>
         </div>

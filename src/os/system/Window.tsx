@@ -19,11 +19,17 @@ interface WindowProps {
 const SNAP_THRESHOLD = 10
 const RESTORE_DRAG_THRESHOLD = 20
 
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useLanguage } from '@/os/kernel/LanguageContext'
+
 export default function Window({ id }: WindowProps) {
   // Granular subscription: Only re-render if THIS window changes.
   // This is the key optimization of using Zustand.
   const windowState = useWindowStore(useShallow(state => state.windows[id]))
+  const { useAnimations } = useSystemSettings()
+  const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
+  const peekWindowId = useWindowStore(state => state.peekWindowId)
 
   // Actions (stable references)
   const closeWindow = useWindowStore(state => state.closeWindow)
@@ -44,25 +50,53 @@ export default function Window({ id }: WindowProps) {
 
   if (!windowState || !windowState.isOpen) return null
 
-  const handleMinimize = () => {
+  // Aero Peek Logic
+  const isPeeking = peekWindowId === id
+  const isOtherPeeking = peekWindowId !== null && peekWindowId !== id
+  
+  // Calculate effective dimensions for animation targets
+  // Maximized windows have 100vw/100vh size, which differs from their 'restored' size in windowState.
+  // This ensures minimize/maximize animations start/end from the correct center point.
+  const effectiveWidth = windowState.isMaximized ? (typeof window !== 'undefined' ? window.innerWidth : windowState.size.width) : windowState.size.width
+  const effectiveHeight = windowState.isMaximized ? (typeof window !== 'undefined' ? window.innerHeight : windowState.size.height) : windowState.size.height
+
+  // If peeking, we want to show it even if minimized
+  // If minimized, restore to last position or center
+  const targetOpacity = isOtherPeeking ? 0 : (windowState.isMinimized && !isPeeking ? 0 : 1)
+  const targetScale = isOtherPeeking ? 1 : (windowState.isMinimized && !isPeeking ? 0 : 1)
+  
+  // Calculate target position based on peek state
+  // If minimized and peeking -> Restore to pre-minimized position (or current position if it wasn't moved)
+  // Logic: windowState.position tracks the "restored" position even when minimized
+  const targetX = (windowState.isMinimized && !isPeeking)
+    ? (windowState.taskbarPosition?.x ? windowState.taskbarPosition.x - (effectiveWidth / 2) : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (effectiveWidth / 2) : 100))
+    : windowState.isMaximized ? 0 : windowState.position.x
+
+  const targetY = (windowState.isMinimized && !isPeeking)
+    ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2) : (typeof window !== 'undefined' ? window.innerHeight : 800))
+    : windowState.isMaximized ? 0 : windowState.position.y
+
+  const captureSnapshot = () => {
     const el = document.getElementById(`window-${id}`)
     if (el) {
-        // Capture snapshot before minimizing
-         toPng(el, { 
+        toPng(el, { 
              cacheBust: true, 
              pixelRatio: 0.5,
              skipAutoScale: true,
              style: {
-                 transform: 'none', // Reset transform to avoid capturing position offset
-                 transition: 'none' // Disable transitions during capture
+                 transform: 'none', 
+                 transition: 'none' 
              }
          })
          .then(dataUrl => setSnapshot(id, dataUrl))
-        .catch(err => console.error('Snapshot failed', err))
-        .finally(() => minimizeWindow(id))
-    } else {
-        minimizeWindow(id)
+         .catch(err => console.error('Snapshot failed', err))
     }
+  }
+
+  const handleMinimize = () => {
+    // Minimize immediately for best responsiveness.
+    // Snapshot is captured on hover of minimize button or taskbar icon.
+    minimizeWindow(id)
   }
 
   const handleResizeStart = (e: React.PointerEvent, direction: string) => {
@@ -182,7 +216,7 @@ export default function Window({ id }: WindowProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9998] pointer-events-none"
+          className="fixed inset-0 z-[6000] pointer-events-none"
           style={{
             background: 'linear-gradient(to bottom, var(--os-accent-dim) 0%, transparent 30%)',
             borderTop: '2px solid var(--os-accent)'
@@ -196,7 +230,7 @@ export default function Window({ id }: WindowProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed z-[9997] pointer-events-none rounded-xl"
+          className="fixed z-[6000] pointer-events-none rounded-xl"
           style={{
             left: restorePreview.x,
             top: restorePreview.y,
@@ -226,31 +260,27 @@ export default function Window({ id }: WindowProps) {
           scale: 0,
           // Start from taskbar position (bottom center of screen)
           x: windowState.taskbarPosition?.x
-            ? windowState.taskbarPosition.x - (windowState.size.width / 2)
-            : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (windowState.size.width / 2) : windowState.position.x),
+            ? windowState.taskbarPosition.x - (effectiveWidth / 2)
+            : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (effectiveWidth / 2) : windowState.position.x),
           y: windowState.taskbarPosition?.y
-            ? (windowState.taskbarPosition.y + 24) - (windowState.size.height / 2)
+            ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2)
             : taskbarY + 100,
         }}
         animate={{
-          opacity: windowState.isMinimized ? 0 : 1,
-          scale: windowState.isMinimized ? 0 : 1,
-          x: windowState.isMinimized
-            ? (windowState.taskbarPosition?.x ? windowState.taskbarPosition.x - (windowState.size.width / 2) : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (windowState.size.width / 2) : 100))
-            : windowState.isMaximized ? 0 : windowState.position.x,
-          y: windowState.isMinimized
-            ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (windowState.size.height / 2) : (typeof window !== 'undefined' ? window.innerHeight : taskbarY))
-            : windowState.isMaximized ? 0 : windowState.position.y,
+          opacity: targetOpacity,
+          scale: targetScale,
+          x: targetX,
+          y: targetY,
           width: windowState.isMaximized ? '100vw' : windowState.size.width,
           height: windowState.isMaximized ? '100vh' : windowState.size.height,
-          zIndex: windowState.zIndex,
-          pointerEvents: windowState.isMinimized ? 'none' as const : 'auto' as const,
+          zIndex: isPeeking ? 5000 : windowState.zIndex, // Bring to front when peeking (below Taskbar)
+          pointerEvents: (windowState.isMinimized && !isPeeking) ? 'none' as const : 'auto' as const,
           transitionEnd: {
-            zIndex: windowState.isMinimized ? -1 : windowState.zIndex
+            zIndex: (windowState.isMinimized && !isPeeking) ? -1 : windowState.zIndex
           }
         }}
         transition={
-          isResizing
+          !useAnimations || isResizing || peekWindowId !== null
             ? { duration: 0 }
             : {
               type: "spring",
@@ -345,10 +375,17 @@ export default function Window({ id }: WindowProps) {
             onClose={() => closeWindow(id)}
             dragControls={dragControls}
             onPointerDown={() => focusWindow(id)}
+            onHoverMinimize={captureSnapshot}
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()
               useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+            }}
+            labels={{
+                minimize: t('menu.minimize'),
+                maximize: t('menu.maximize'),
+                restore: t('menu.restore'),
+                close: t('menu.close')
             }}
           />
 

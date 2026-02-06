@@ -3,6 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Terminal, Power, Settings } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
 interface StartMenuProps {
@@ -12,6 +14,8 @@ interface StartMenuProps {
 }
 
 export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProps) {
+    const { useAnimations } = useSystemSettings()
+    const { t } = useLanguage()
     const openWindow = useWindowStore(state => state.openWindow)
     const windows = useWindowStore(state => state.windows)
     const focusWindow = useWindowStore(state => state.focusWindow)
@@ -26,7 +30,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProp
         } else {
             openWindow(
                 settingsApp.id,
-                settingsApp.title,
+                t('start.settings'),
                 <settingsApp.component />,
                 settingsApp.icon,
                 settingsApp.defaultWindowOptions
@@ -50,8 +54,8 @@ export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProp
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="fixed bottom-24 left-1/2 -translate-x-1/2 w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[250]"
+                    transition={{ duration: useAnimations ? 0.2 : 0, ease: 'easeOut' }}
+                    className="fixed bottom-24 left-1/2 -translate-x-1/2 w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[10001]"
                     style={{
                         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
                         border: '1px solid var(--os-border)',
@@ -68,16 +72,16 @@ export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProp
                             <Terminal size={24} style={{ color: 'var(--os-accent)' }} />
                         </div>
                         <div>
-                            <div className="text-sm font-semibold" style={{ color: 'var(--os-text-primary)' }}>Visitor</div>
-                            <div className="text-xs" style={{ color: 'var(--os-text-secondary)' }}>Portfolio OS</div>
+                            <div className="text-sm font-semibold" style={{ color: 'var(--os-text-primary)' }}>{t('start.visitor')}</div>
+                            <div className="text-xs" style={{ color: 'var(--os-text-secondary)' }}>{t('start.os')}</div>
                         </div>
                     </div>
 
                     {/* Menu Items */}
                     <div className="space-y-1">
-                        <MenuItem icon={Settings} label="Settings" onClick={handleOpenSettings} />
+                        <MenuItem icon={Settings} label={t('start.settings')} onClick={handleOpenSettings} />
                         <div className="h-px w-full my-2 bg-gradient-to-r from-transparent via-[var(--os-border)] to-transparent" />
-                        <MenuItem icon={Power} label="Shut Down" onClick={handleShutdown} danger />
+                        <MenuItem icon={Power} label={t('start.shutdown')} onClick={handleShutdown} danger />
                     </div>
                 </motion.div>
             )}

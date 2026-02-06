@@ -14,6 +14,7 @@ export interface SystemSettings {
     accentColor: string
     useTransparency: boolean
     useAnimations: boolean
+    useTaskbarPreviews: boolean
     displayScale: number
     volume: number
     isMuted: boolean
@@ -27,6 +28,7 @@ interface SystemSettingsContextType extends SystemSettings {
     setAccentColor: (color: string) => void
     setUseTransparency: (enable: boolean) => void
     setUseAnimations: (enable: boolean) => void
+    setUseTaskbarPreviews: (enable: boolean) => void
     setDisplayScale: (scale: number) => void
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
@@ -44,6 +46,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     accentColor: '#06b6d4', // Cyan-500
     useTransparency: true,
     useAnimations: true,
+    useTaskbarPreviews: true,
     displayScale: 100,
     volume: 75,
     isMuted: false,
@@ -137,6 +140,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     const setAccentColor = (color: string) => setSettings(p => ({ ...p, accentColor: color }))
     const setUseTransparency = (enable: boolean) => setSettings(p => ({ ...p, useTransparency: enable }))
     const setUseAnimations = (enable: boolean) => setSettings(p => ({ ...p, useAnimations: enable }))
+    const setUseTaskbarPreviews = (enable: boolean) => setSettings(p => ({ ...p, useTaskbarPreviews: enable }))
     const setDisplayScale = (scale: number) => setSettings(p => ({ ...p, displayScale: scale }))
     const setVolume = (volume: number) => setSettings(p => ({ ...p, volume }))
     const setMuted = (muted: boolean) => setSettings(p => ({ ...p, isMuted: muted }))
@@ -162,6 +166,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             setAccentColor,
             setUseTransparency,
             setUseAnimations,
+            setUseTaskbarPreviews,
             setDisplayScale,
             setVolume,
             setMuted,

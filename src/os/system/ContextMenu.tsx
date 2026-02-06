@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore, MenuType } from '@/os/kernel/useContextMenuStore'
 import { useNotificationStore } from '@/os/kernel/useNotificationStore'
@@ -12,9 +13,10 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 export default function SystemContextMenu() {
   const { visible, position, type, data, hideMenu } = useContextMenuStore()
   const { addNotification } = useNotificationStore()
+  const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp } = useSystemSettings()
+  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations } = useSystemSettings()
   const { openWindow, closeWindow, minimizeWindow, maximizeWindow, updateWindowPosition, updateWindowSize } = useWindowStore()
 
   // Handle outside click
@@ -44,7 +46,7 @@ export default function SystemContextMenu() {
   const handleOpenSettings = () => {
     const app = APPS_REGISTRY['settings']
     if (app) {
-      openWindow(app.id, app.title, <app.component />, app.icon, app.defaultWindowOptions)
+      openWindow(app.id, t('start.settings'), <app.component />, app.icon, app.defaultWindowOptions)
     }
     hideMenu()
   }
@@ -73,7 +75,7 @@ export default function SystemContextMenu() {
         
         return [
           {
-            label: '打开/聚焦',
+            label: t('menu.open'),
             icon: ExternalLink,
             action: () => {
               if (data.windowId) {
@@ -84,28 +86,29 @@ export default function SystemContextMenu() {
                  // Launch App
                  const app = APPS_REGISTRY[data.appId]
                  if (app) {
-                   openWindow(app.id, app.title, <app.component />, app.icon, app.defaultWindowOptions)
+                   const title = app.id === 'settings' ? t('start.settings') : app.title
+                   openWindow(app.id, title, <app.component />, app.icon, app.defaultWindowOptions)
                  }
               }
             }
           },
           {
-            label: isPinned ? '从任务栏取消固定' : '固定到任务栏',
+            label: isPinned ? t('menu.unpin') : t('menu.pin'),
             icon: Check, 
             checked: isPinned,
             action: () => {
               if (isPinned) {
                 unpinApp(data.appId)
-                addNotification({ type: 'info', message: '已取消固定' })
+                addNotification({ type: 'info', message: t('msg.unpinned') })
               } else {
                 pinApp(data.appId)
-                addNotification({ type: 'success', message: '已固定到任务栏' })
+                addNotification({ type: 'success', message: t('msg.pinned') })
               }
             }
           },
           { type: 'separator' },
           {
-            label: '关闭窗口',
+            label: t('menu.close'),
             icon: X,
             danger: true,
             disabled: !data.windowId, // Custom property we need to handle in render
@@ -121,29 +124,29 @@ export default function SystemContextMenu() {
         
         return [
           {
-            label: win.isMaximized ? '还原' : '最大化',
+            label: win.isMaximized ? t('menu.restore') : t('menu.maximize'),
             icon: win.isMaximized ? Minimize2 : Maximize2,
             action: () => maximizeWindow(data.windowId)
           },
           {
-            label: '最小化',
+            label: t('menu.minimize'),
             icon: MinusIcon,
             action: () => minimizeWindow(data.windowId)
           },
           { type: 'separator' },
           {
-            label: '左侧分屏',
+            label: t('menu.snap.left'),
             icon: ArrowLeftToLine,
             action: () => handleSnap('left')
           },
           {
-            label: '右侧分屏',
+            label: t('menu.snap.right'),
             icon: ArrowRightToLine,
             action: () => handleSnap('right')
           },
           { type: 'separator' },
           {
-            label: '关闭',
+            label: t('menu.close'),
             icon: X,
             danger: true,
             action: () => closeWindow(data.windowId)
@@ -154,39 +157,39 @@ export default function SystemContextMenu() {
       default:
         return [
           {
-            label: '刷新',
+            label: t('menu.refresh'),
             icon: RefreshCw,
             action: () => window.location.reload()
           },
           { type: 'separator' },
           {
-            label: '新建文件夹',
+            label: t('menu.newfolder'),
             icon: FolderPlus,
             action: () => addNotification({
               type: 'info',
-              title: '提示',
-              message: '新建文件夹功能尚未实现 (模拟)'
+              title: t('msg.info'),
+              message: t('msg.folder.impl')
             })
           },
           {
-            label: '更换壁纸',
+            label: t('menu.wallpaper'),
             icon: Image,
             action: handleOpenSettings
           },
           {
-            label: '排列方式',
+            label: t('menu.align'),
             icon: Grid3X3,
             checked: snapToGrid,
             action: () => setSnapToGrid(!snapToGrid) // Reusing grid toggle as sort/align
           },
           { type: 'separator' },
           {
-            label: '关于系统',
+            label: t('menu.about'),
             icon: Info,
             action: () => addNotification({
               type: 'info',
-              title: 'Portfolio OS v1.0',
-              message: '一个基于 Web 技术的操作系统模拟界面。',
+              title: t('msg.about.title'),
+              message: t('msg.about.desc'),
               duration: 5000
             })
           }
@@ -229,8 +232,8 @@ export default function SystemContextMenu() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.1 }}
-          className="fixed z-[9999] min-w-[200px] bg-[var(--os-bg-panel)]/95 backdrop-blur-xl border border-[var(--os-border)] shadow-2xl rounded-xl py-1.5 overflow-hidden select-none"
+          transition={{ duration: useAnimations ? 0.1 : 0 }}
+          className="fixed z-[20000] min-w-[200px] bg-[var(--os-bg-panel)]/95 backdrop-blur-xl border border-[var(--os-border)] shadow-2xl rounded-xl py-1.5 overflow-hidden select-none"
           style={getMenuStyle()}
           onContextMenu={(e) => e.preventDefault()}
         >

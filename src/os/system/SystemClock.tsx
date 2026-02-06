@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 interface SystemClockProps {
     className?: string
@@ -11,12 +12,15 @@ interface SystemClockProps {
 export default function SystemClock({ className, style, showDate = false }: SystemClockProps) {
     const [time, setTime] = useState("")
     const [date, setDate] = useState("")
+    const { language } = useLanguage()
 
     useEffect(() => {
         let lastTime = ""
         const updateTime = () => {
             const now = new Date()
-            const newTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+            const locale = language === 'zh' ? 'zh-CN' : 'en-US'
+            
+            const newTime = now.toLocaleTimeString(locale, { hour12: false, hour: '2-digit', minute: '2-digit' })
 
             // Only update state if time actually changed (every minute)
             if (newTime !== lastTime) {
@@ -25,19 +29,19 @@ export default function SystemClock({ className, style, showDate = false }: Syst
             }
 
             if (showDate) {
-                setDate(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+                setDate(now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }))
             }
         }
         updateTime()
         const timer = setInterval(updateTime, 1000)
         return () => clearInterval(timer)
-    }, [showDate])
+    }, [showDate, language])
 
     if (showDate) {
         return (
             <div className={className} style={style}>
                 <span className="font-semibold text-xs" style={{ color: 'var(--os-text-primary)' }}>{time}</span>
-                {/* <span className="text-[9px]" style={{ color: 'var(--os-text-muted)' }}>{date}</span> */}
+                <span className="text-[10px]" style={{ color: 'var(--os-text-muted)' }}>{date}</span>
             </div>
         )
     }

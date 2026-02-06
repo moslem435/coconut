@@ -28,6 +28,7 @@ export function useSystem() {
         accentColor: settings.accentColor,
         useTransparency: settings.useTransparency,
         useAnimations: settings.useAnimations,
+        useTaskbarPreviews: settings.useTaskbarPreviews,
         displayScale: settings.displayScale,
         wallpaper: settings.wallpaper,
 
@@ -40,6 +41,7 @@ export function useSystem() {
         setAccentColor: settings.setAccentColor,
         setUseTransparency: settings.setUseTransparency,
         setUseAnimations: settings.setUseAnimations,
+        setUseTaskbarPreviews: settings.setUseTaskbarPreviews,
         setDisplayScale: settings.setDisplayScale,
         setWallpaper: settings.setWallpaper,
 

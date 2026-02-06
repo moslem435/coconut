@@ -13,7 +13,14 @@ interface WindowTitleBarProps {
     onClose: () => void
     onPointerDown?: (e: React.PointerEvent) => void
     onContextMenu?: (e: React.MouseEvent) => void
+    onHoverMinimize?: () => void
     dragControls?: any
+    labels?: {
+        minimize: string
+        maximize: string
+        restore: string
+        close: string
+    }
 }
 
 export function WindowTitleBar({
@@ -26,7 +33,14 @@ export function WindowTitleBar({
     onClose,
     onPointerDown,
     onContextMenu,
-    dragControls
+    onHoverMinimize,
+    dragControls,
+    labels = {
+        minimize: 'Minimize',
+        maximize: 'Maximize',
+        restore: 'Restore',
+        close: 'Close'
+    }
 }: WindowTitleBarProps) {
     return (
         <div
@@ -65,7 +79,9 @@ export function WindowTitleBar({
                 {/* Minimize */}
                 <button
                     onClick={onMinimize}
-                    aria-label="Minimize"
+                    onMouseEnter={onHoverMinimize}
+                    aria-label={labels.minimize}
+                    title={labels.minimize}
                     className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
                     style={{ color: 'var(--os-text-secondary)' }}
                 >
@@ -75,7 +91,8 @@ export function WindowTitleBar({
                 {/* Maximize/Restore */}
                 <button
                     onClick={onMaximize}
-                    aria-label={isMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isMaximized ? labels.restore : labels.maximize}
+                    title={isMaximized ? labels.restore : labels.maximize}
                     className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
                     style={{ color: 'var(--os-text-secondary)' }}
                 >
@@ -85,7 +102,8 @@ export function WindowTitleBar({
                 {/* Close */}
                 <button
                     onClick={onClose}
-                    aria-label="Close"
+                    aria-label={labels.close}
+                    title={labels.close}
                     className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500/20 hover:text-red-400 active:scale-90"
                     style={{ color: 'var(--os-text-secondary)' }}
                 >

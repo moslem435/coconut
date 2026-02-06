@@ -4,12 +4,13 @@ import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
 import { useNotificationStore, Notification } from '@/os/kernel/useNotificationStore'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 
 export default function Notifications() {
   const { notifications, removeNotification } = useNotificationStore()
 
   return (
-    <div className="fixed top-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed top-20 right-4 z-[21000] flex flex-col gap-2 pointer-events-none">
       <AnimatePresence>
         {notifications.map((notification) => (
           <NotificationItem 
@@ -30,6 +31,8 @@ function NotificationItem({
   notification: Notification
   onDismiss: () => void 
 }) {
+  const { useAnimations } = useSystemSettings()
+  
   useEffect(() => {
     const duration = notification.duration || 3000
     const timer = setTimeout(onDismiss, duration)
@@ -51,7 +54,7 @@ function NotificationItem({
       initial={{ opacity: 0, x: 50, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 20, scale: 0.95 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      transition={useAnimations ? { type: 'spring', stiffness: 400, damping: 30 } : { duration: 0 }}
       className="pointer-events-auto w-80 bg-[var(--os-bg-panel)]/95 backdrop-blur-xl border border-[var(--os-border)] shadow-2xl rounded-xl p-4 flex gap-3 relative overflow-hidden group"
       style={{
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'

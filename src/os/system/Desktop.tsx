@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AppManifest } from '@/os/registry/types'
-import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -89,7 +89,7 @@ const findFreePosition = (
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
-    const { snapToGrid, wallpaper } = useSystemSettings()
+    const { snapToGrid, wallpaper, useAnimations } = useSystemSettings()
     
     // Context Menu
     const showMenu = useContextMenuStore(state => state.showMenu)
@@ -268,16 +268,16 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     x: pos.x,
                                     y: pos.y
                                 }}
-                                transition={{
+                                transition={useAnimations ? {
                                     type: 'spring',
                                     stiffness: 400,
                                     damping: 30
-                                }}
+                                } : { duration: 0 }}
                                 className="absolute group flex flex-col items-center gap-2 w-20 cursor-pointer"
                                 onClick={(e) => handleIconClick(app.id, e)}
                                 onDoubleClick={() => handleDoubleClick(app.id)}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
+                                whileHover={useAnimations ? { scale: 1.05 } : {}}
+                                whileTap={useAnimations ? { scale: 0.95 } : {}}
                                 style={{ touchAction: 'none' }}
                             >
                                 <div

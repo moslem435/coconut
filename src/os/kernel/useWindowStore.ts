@@ -24,6 +24,7 @@ interface WindowStore {
     activeWindowId: string | null
     maxZIndex: number
     snapshots: Record<string, string>
+    peekWindowId: string | null
 
     // Actions
     openWindow: (id: string, title: string, component: ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number } }) => void
@@ -37,6 +38,7 @@ interface WindowStore {
     updateTaskbarPosition: (id: string, position: { x: number; y: number }) => void
     showDesktop: () => void
     setSnapshot: (id: string, dataUrl: string) => void
+    setPeekWindowId: (id: string | null) => void
 }
 
 export const useWindowStore = create<WindowStore>((set, get) => ({
@@ -44,6 +46,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     activeWindowId: null,
     maxZIndex: 100,
     snapshots: {},
+    peekWindowId: null,
 
     openWindow: (id, title, component, icon, options) => {
         const { windows, maxZIndex, focusWindow } = get()
@@ -222,5 +225,9 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         set(state => ({
             snapshots: { ...state.snapshots, [id]: dataUrl }
         }))
+    },
+
+    setPeekWindowId: (id) => {
+        set({ peekWindowId: id })
     }
 }))
