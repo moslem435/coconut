@@ -40,6 +40,7 @@ const ScreenOverlay = () => (
 )
 
 // Portfolio is now a self-contained App, no props needed from Shell
+// Splash screen is handled by Desktop via manifest.splashScreen
 export default function Portfolio() {
   // Local State Management replacing global props/context
   const [activeProject, setActiveProject] = useState(0)

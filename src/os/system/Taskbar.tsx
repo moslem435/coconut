@@ -44,10 +44,11 @@ export default function Taskbar({
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[200] flex items-center justify-between select-none shadow-2xl backdrop-blur-2xl rounded-2xl px-2 transition-all duration-300"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[200] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-2 transition-[width] duration-300"
       style={{
-        backgroundColor: 'var(--os-bg-panel)',
+        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
         border: '1px solid var(--os-border)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
         width: Math.min(openWindows.length * 60 + 300, window.innerWidth - 32) + 'px',
         maxWidth: '90vw'
       }}
@@ -65,15 +66,19 @@ export default function Taskbar({
           <Command size={22} className="text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
         </button>
 
-        {/* Separator */}
-        <div className="w-px h-8 bg-[var(--os-border)] mx-2" />
+        {/* Separator - Only show if there are open windows */}
+        {openWindows.length > 0 && (
+          <div className="w-px h-5 bg-[var(--os-border)] mx-2" />
+        )}
 
         {/* Window List - Icon Only for Dock Look */}
         {openWindows.map((win) => (
           <motion.div
             ref={(el) => { itemRefs.current[win.id] = el }}
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            layout={false}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             key={win.id}
             onClick={() => {
               if (activeWindowId === win.id && !win.isMinimized) {
@@ -82,18 +87,15 @@ export default function Taskbar({
                 focusWindow(win.id)
               }
             }}
-            className="h-12 w-12 flex items-center justify-center rounded-xl transition-all cursor-pointer hover:scale-110 active:scale-95 relative group"
+            className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer hover:scale-110 active:scale-95 relative group"
             style={{
               backgroundColor: activeWindowId === win.id && !win.isMinimized
                 ? 'var(--os-accent-dim)'
                 : 'transparent',
-              willChange: 'transform'
+              willChange: 'transform, opacity',
+              transition: 'background-color 0.2s, transform 0.15s'
             }}
           >
-            {/* Active Indicator Dot */}
-            {!win.isMinimized && (
-              <div className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-[var(--os-accent)] shadow-[0_0_5px_var(--os-accent)]" />
-            )}
 
             {/* Window Icon */}
             {win.icon ? (() => {
@@ -116,11 +118,27 @@ export default function Taskbar({
         ))}
       </div>
 
-      {/* Right: System Tray (Simplified) */}
-      <div className="flex items-center gap-3 h-full pl-4 border-l border-[var(--os-border)] ml-auto" style={{ color: 'var(--os-text-secondary)' }}>
+      {/* Right: System Tray */}
+      <div className="flex items-center gap-1.5 h-full pl-4 ml-auto relative" style={{ color: 'var(--os-text-secondary)' }}>
+        
+        {/* Separator */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
+        
+        {/* Status Icons */}
+        <div className="flex items-center gap-1 px-2">
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Wi-Fi: Connected">
+            <Wifi size={18} />
+          </div>
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Volume: 80%">
+            <Volume2 size={18} />
+          </div>
+          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Battery: 100%">
+            <Battery size={18} />
+          </div>
+        </div>
 
-        {/* Clock */}
-        <div className="flex flex-col items-end leading-none gap-0.5 px-2 py-1 rounded cursor-default">
+        {/* Clock - Interactive */}
+        <div className="flex flex-col items-end leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5 active:scale-95">
           <SystemClock showDate />
         </div>
 

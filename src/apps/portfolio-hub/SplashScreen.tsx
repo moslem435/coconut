@@ -1,27 +1,33 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Terminal, Cpu, Zap, Layers, Command } from 'lucide-react'
 
-interface AppSplashScreenProps {
+interface PortfolioSplashScreenProps {
     onComplete?: () => void
 }
 
 const LOADING_STEPS = [
-    "Initializing Kernel...",
-    "Loading VFS Modules...",
-    "Mounting Root Filesystem...",
-    "Starting Window Manager...",
-    "Loading User Profile...",
-    "Connecting to Neural Network...",
-    "Hydrating UI Components...",
-    "System Ready."
+    "Initializing Portfolio...",
+    "Loading Project Assets...",
+    "Preparing 3D Scene...",
+    "Indexing Works...",
+    "Connecting Services...",
+    "Hydrating UI...",
+    "Ready."
 ]
 
-export default function AppSplashScreen({ onComplete }: AppSplashScreenProps) {
+export default function PortfolioSplashScreen({ onComplete }: PortfolioSplashScreenProps) {
     const [progress, setProgress] = useState(0)
     const [loadingText, setLoadingText] = useState(LOADING_STEPS[0])
+    const [mounted, setMounted] = useState(false)
+
+    // Ensure we only use portal on client side
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     useEffect(() => {
         let stepIndex = 0
@@ -51,12 +57,17 @@ export default function AppSplashScreen({ onComplete }: AppSplashScreenProps) {
         return () => clearInterval(timer)
     }, [onComplete])
 
-    return (
+    // Don't render anything on server side
+    if (!mounted) return null
+
+    // Use portal to render directly into document.body
+    return createPortal(
         <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
             transition={{ duration: 0.4 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"
+            className="fixed inset-0 z-[9999] flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
         >
             <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -117,10 +128,10 @@ export default function AppSplashScreen({ onComplete }: AppSplashScreenProps) {
                             <div className="w-8 h-8 bg-white/5 rounded flex items-center justify-center border border-white/10">
                                 <Terminal size={16} className="text-white/80" />
                             </div>
-                            <span className="text-xs font-medium text-white/40 tracking-wide">PORTFOLIO OS</span>
+                            <span className="text-xs font-medium text-white/40 tracking-wide">PORTFOLIO HUB</span>
                         </div>
                         <h1 className="text-4xl font-bold text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/50">
-                            System Hub
+                            Portfolio Hub
                         </h1>
                         <div className="flex items-baseline gap-2">
                             <span className="text-lg font-light text-cyan-500">Ultimate Edition</span>
@@ -173,6 +184,7 @@ export default function AppSplashScreen({ onComplete }: AppSplashScreenProps) {
 
                 </div>
             </motion.div>
-        </motion.div>
+        </motion.div>,
+        document.body
     )
 }
