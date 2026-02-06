@@ -9,6 +9,7 @@ import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { WindowFrame } from '@/os/ui/WindowFrame'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
 import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
+import { toPng } from 'html-to-image'
 
 interface WindowProps {
   id: string
@@ -31,6 +32,7 @@ export default function Window({ id }: WindowProps) {
   const focusWindow = useWindowStore(state => state.focusWindow)
   const updateWindowPosition = useWindowStore(state => state.updateWindowPosition)
   const updateWindowSize = useWindowStore(state => state.updateWindowSize)
+  const setSnapshot = useWindowStore(state => state.setSnapshot)
 
   const dragControls = useDragControls()
   const [isResizing, setIsResizing] = useState(false)
@@ -41,6 +43,27 @@ export default function Window({ id }: WindowProps) {
   const windowRef = useRef<HTMLDivElement>(null)
 
   if (!windowState || !windowState.isOpen) return null
+
+  const handleMinimize = () => {
+    const el = document.getElementById(`window-${id}`)
+    if (el) {
+        // Capture snapshot before minimizing
+         toPng(el, { 
+             cacheBust: true, 
+             pixelRatio: 0.5,
+             skipAutoScale: true,
+             style: {
+                 transform: 'none', // Reset transform to avoid capturing position offset
+                 transition: 'none' // Disable transitions during capture
+             }
+         })
+         .then(dataUrl => setSnapshot(id, dataUrl))
+        .catch(err => console.error('Snapshot failed', err))
+        .finally(() => minimizeWindow(id))
+    } else {
+        minimizeWindow(id)
+    }
+  }
 
   const handleResizeStart = (e: React.PointerEvent, direction: string) => {
     e.preventDefault()
@@ -187,6 +210,7 @@ export default function Window({ id }: WindowProps) {
       )}
 
       <motion.div
+        id={`window-${id}`}
         ref={windowRef}
         drag={!isResizing && !windowState.isMinimized}
         dragControls={dragControls}
@@ -316,7 +340,7 @@ export default function Window({ id }: WindowProps) {
             icon={windowState.icon}
             isActive={isActive}
             isMaximized={windowState.isMaximized}
-            onMinimize={() => minimizeWindow(id)}
+            onMinimize={handleMinimize}
             onMaximize={() => maximizeWindow(id)}
             onClose={() => closeWindow(id)}
             dragControls={dragControls}

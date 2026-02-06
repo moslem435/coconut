@@ -6,9 +6,10 @@ interface WindowPreviewProps {
   title: string
   icon: any
   isActive: boolean
+  snapshot?: string
 }
 
-export const WindowPreview = memo(({ appId, title, icon: Icon, isActive }: WindowPreviewProps) => {
+export const WindowPreview = memo(({ appId, title, icon: Icon, isActive, snapshot }: WindowPreviewProps) => {
   const isSettings = appId === 'settings'
   
   return (
@@ -25,35 +26,40 @@ export const WindowPreview = memo(({ appId, title, icon: Icon, isActive }: Windo
          <span className="text-[10px] font-medium truncate flex-1 leading-none">{title}</span>
       </div>
 
-      {/* Mini Content - Skeleton */}
-      <div className="flex-1 p-2 bg-[var(--os-bg-base)] relative overflow-hidden flex flex-col gap-1.5 text-[var(--os-text-primary)]">
-         
-         {isSettings ? (
-             <div className="flex gap-1 h-full">
-                 {/* Sidebar */}
-                 <div className="w-1/4 h-full bg-current opacity-5 rounded-[2px]" />
-                 {/* Content */}
-                 <div className="flex-1 flex flex-col gap-1">
-                     <div className="w-1/2 h-1.5 bg-current opacity-10 rounded-[1px]" />
-                     <div className="w-full h-1 bg-current opacity-5 rounded-[1px] mt-1" />
-                     <div className="w-full h-1 bg-current opacity-5 rounded-[1px]" />
-                     <div className="w-3/4 h-1 bg-current opacity-5 rounded-[1px]" />
-                     
-                     <div className="mt-auto w-full h-1/3 bg-current opacity-5 rounded-[1px]" />
-                 </div>
-             </div>
+      {/* Snapshot or Skeleton */}
+      <div className="flex-1 bg-[var(--os-bg-base)] relative overflow-hidden flex flex-col text-[var(--os-text-primary)]">
+         {snapshot ? (
+             <img src={snapshot} className="w-full h-full object-cover" alt="preview" />
          ) : (
-             // Generic / Portfolio
-             <>
-                <div className="w-1/3 h-1.5 bg-current opacity-10 rounded-[1px]" />
-                <div className="w-full flex-1 bg-current opacity-5 rounded-[2px] flex items-center justify-center">
-                    {Icon && <Icon size={24} className="opacity-10" />}
-                </div>
-                <div className="flex gap-1 mt-auto">
-                    <div className="w-1/4 h-1.5 bg-current opacity-10 rounded-[1px]" />
-                    <div className="w-1/4 h-1.5 bg-current opacity-10 rounded-[1px]" />
-                </div>
-             </>
+             <div className="w-full h-full p-2 flex flex-col gap-1.5">
+                {isSettings ? (
+                    <div className="flex gap-1 h-full">
+                        {/* Sidebar */}
+                        <div className="w-1/4 h-full bg-current opacity-5 rounded-[2px]" />
+                        {/* Content */}
+                        <div className="flex-1 flex flex-col gap-1">
+                            <div className="w-1/2 h-1.5 bg-current opacity-10 rounded-[1px]" />
+                            <div className="w-full h-1 bg-current opacity-5 rounded-[1px] mt-1" />
+                            <div className="w-full h-1 bg-current opacity-5 rounded-[1px]" />
+                            <div className="w-3/4 h-1 bg-current opacity-5 rounded-[1px]" />
+                            
+                            <div className="mt-auto w-full h-1/3 bg-current opacity-5 rounded-[1px]" />
+                        </div>
+                    </div>
+                ) : (
+                    // Generic / Portfolio
+                    <>
+                        <div className="w-1/3 h-1.5 bg-current opacity-10 rounded-[1px]" />
+                        <div className="w-full flex-1 bg-current opacity-5 rounded-[2px] flex items-center justify-center">
+                            {Icon && <Icon size={24} className="opacity-10" />}
+                        </div>
+                        <div className="flex gap-1 mt-auto">
+                            <div className="w-1/4 h-1.5 bg-current opacity-10 rounded-[1px]" />
+                            <div className="w-1/4 h-1.5 bg-current opacity-10 rounded-[1px]" />
+                        </div>
+                    </>
+                )}
+             </div>
          )}
          
          {/* Scanline effect overlay */}

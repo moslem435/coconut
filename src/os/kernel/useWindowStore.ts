@@ -23,6 +23,7 @@ interface WindowStore {
     windows: Record<string, WindowState>
     activeWindowId: string | null
     maxZIndex: number
+    snapshots: Record<string, string>
 
     // Actions
     openWindow: (id: string, title: string, component: ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number } }) => void
@@ -35,12 +36,14 @@ interface WindowStore {
     updateWindowSize: (id: string, size: { width: number; height: number }) => void
     updateTaskbarPosition: (id: string, position: { x: number; y: number }) => void
     showDesktop: () => void
+    setSnapshot: (id: string, dataUrl: string) => void
 }
 
 export const useWindowStore = create<WindowStore>((set, get) => ({
     windows: {},
     activeWindowId: null,
     maxZIndex: 100,
+    snapshots: {},
 
     openWindow: (id, title, component, icon, options) => {
         const { windows, maxZIndex, focusWindow } = get()
@@ -213,5 +216,11 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 activeWindowId: null
             }
         })
+    },
+
+    setSnapshot: (id, dataUrl) => {
+        set(state => ({
+            snapshots: { ...state.snapshots, [id]: dataUrl }
+        }))
     }
 }))

@@ -9,6 +9,7 @@ import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
+import { toPng } from 'html-to-image'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -24,6 +25,7 @@ export default function Taskbar({
     Object.values(state.windows).filter(w => w.isOpen)
   ))
   const activeWindowId = useWindowStore(state => state.activeWindowId)
+  const snapshots = useWindowStore(state => state.snapshots)
   const { pinnedAppIds } = useSystemSettings()
 
   // Actions
@@ -31,6 +33,7 @@ export default function Taskbar({
   const focusWindow = useWindowStore(state => state.focusWindow)
   const minimizeWindow = useWindowStore(state => state.minimizeWindow)
   const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
+  const setSnapshot = useWindowStore(state => state.setSnapshot)
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -103,10 +106,34 @@ export default function Taskbar({
     })
   }, [taskbarItems, updateTaskbarPosition])
 
+  const captureSnapshot = async (id: string) => {
+    const el = document.getElementById(`window-${id}`)
+    if (el) {
+        try {
+            // Use lower quality/scale for performance
+            const dataUrl = await toPng(el, { 
+                cacheBust: true, 
+                pixelRatio: 0.5,
+                skipAutoScale: true,
+                style: {
+                    transform: 'none', // Reset transform to avoid capturing position offset
+                    transition: 'none'
+                }
+            })
+            setSnapshot(id, dataUrl)
+        } catch (err) {
+            console.error('Snapshot failed', err)
+        }
+    }
+  }
+
   const handleItemClick = (item: typeof taskbarItems[0]) => {
     if (item.isOpen) {
       if (item.isActive && !item.isMinimized) {
-        minimizeWindow(item.id)
+        // Capture snapshot before minimizing
+        captureSnapshot(item.id).finally(() => {
+            minimizeWindow(item.id)
+        })
       } else {
         focusWindow(item.id)
       }
@@ -164,7 +191,12 @@ export default function Taskbar({
             ref={(el) => { itemRefs.current[item.id] = el }}
             key={item.id}
             onClick={() => handleItemClick(item)}
-            onMouseEnter={() => setHoveredId(item.id)}
+            onMouseEnter={() => {
+                setHoveredId(item.id)
+                if (item.isOpen && !item.isMinimized) {
+                    captureSnapshot(item.id)
+                }
+            }}
             onMouseLeave={() => setHoveredId(null)}
             onContextMenu={(e) => {
               e.preventDefault()
@@ -200,16 +232,16 @@ export default function Taskbar({
 
             {/* Window Preview */}
             <AnimatePresence>
-              {hoveredId === item.id && (
-                <WindowPreview
-                  appId={item.appId}
-                  title={item.title}
-                  icon={item.icon}
-                  isActive={item.isActive}
-                  isVisible={true}
-                />
-              )}
-            </AnimatePresence>
+                  {hoveredId === item.id && (
+                    <WindowPreview 
+                        appId={item.appId} 
+                        title={item.title} 
+                        icon={item.icon} 
+                        isActive={item.isActive}
+                        snapshot={snapshots[item.id]} 
+                    />
+                  )}
+                </AnimatePresence>
           </button>
         ))}
       </div>
