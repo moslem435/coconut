@@ -1,7 +1,48 @@
+'use client'
+
 import { motion, AnimatePresence } from 'framer-motion'
 import { Terminal, Power, Settings } from 'lucide-react'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { APPS_REGISTRY } from '@/os/registry/config'
 
-export default function StartMenu({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+interface StartMenuProps {
+    isOpen: boolean
+    onClose: () => void
+    onShutdown?: () => void
+}
+
+export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProps) {
+    const openWindow = useWindowStore(state => state.openWindow)
+    const windows = useWindowStore(state => state.windows)
+    const focusWindow = useWindowStore(state => state.focusWindow)
+
+    const handleOpenSettings = () => {
+        const settingsApp = APPS_REGISTRY['settings']
+        if (!settingsApp) return
+
+        // If already open, focus it
+        if (windows['settings']?.isOpen) {
+            focusWindow('settings')
+        } else {
+            openWindow(
+                settingsApp.id,
+                settingsApp.title,
+                <settingsApp.component />,
+                settingsApp.icon,
+                settingsApp.defaultWindowOptions
+            )
+        }
+        onClose()
+    }
+
+    const handleShutdown = () => {
+        onClose()
+        // Small delay for menu close animation
+        setTimeout(() => {
+            onShutdown?.()
+        }, 300)
+    }
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -9,15 +50,15 @@ export default function StartMenu({ isOpen, onClose }: { isOpen: boolean, onClos
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="fixed bottom-24 left-1/2 -translate-x-1/2 w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[250]"
                     style={{
-                        backgroundColor: 'var(--os-bg-window)',
-                        borderColor: 'var(--os-border)',
-                        borderWidth: '1px',
-                        borderStyle: 'solid'
+                        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
+                        border: '1px solid var(--os-border)',
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
+                    {/* User Profile */}
                     <div className="flex items-center gap-4 p-2 mb-4">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm"
                             style={{
@@ -28,14 +69,15 @@ export default function StartMenu({ isOpen, onClose }: { isOpen: boolean, onClos
                         </div>
                         <div>
                             <div className="text-sm font-semibold" style={{ color: 'var(--os-text-primary)' }}>Visitor</div>
-                            <div className="text-xs" style={{ color: 'var(--os-text-secondary)' }}>Cloud OS User</div>
+                            <div className="text-xs" style={{ color: 'var(--os-text-secondary)' }}>Portfolio OS</div>
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <MenuItem icon={Settings} label="Settings" />
+                    {/* Menu Items */}
+                    <div className="space-y-1">
+                        <MenuItem icon={Settings} label="Settings" onClick={handleOpenSettings} />
                         <div className="h-px w-full my-2 bg-gradient-to-r from-transparent via-[var(--os-border)] to-transparent" />
-                        <MenuItem icon={Power} label="Shut Down" />
+                        <MenuItem icon={Power} label="Shut Down" onClick={handleShutdown} danger />
                     </div>
                 </motion.div>
             )}
@@ -43,20 +85,30 @@ export default function StartMenu({ isOpen, onClose }: { isOpen: boolean, onClos
     )
 }
 
-function MenuItem({ icon: Icon, label }: { icon: any, label: string }) {
-    return (
-        <div className="flex items-center gap-3 p-2 rounded cursor-pointer transition-colors group relative overflow-hidden">
-            <Icon size={16} className="relative z-10 transition-colors" style={{ color: 'var(--os-text-secondary)' }} />
-            <span className="text-xs tracking-wider relative z-10 transition-colors" style={{ color: 'var(--os-text-primary)' }}>{label}</span>
+interface MenuItemProps {
+    icon: any
+    label: string
+    onClick?: () => void
+    danger?: boolean
+}
 
-            <style jsx>{`
-         div:hover {
-           background-color: var(--os-hover-bg);
-         }
-         div:hover svg {
-           color: var(--os-accent) !important;
-         }
-       `}</style>
+function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
+    return (
+        <div
+            className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-[0.98]"
+            onClick={onClick}
+        >
+            <Icon
+                size={18}
+                className="transition-colors"
+                style={{ color: danger ? 'var(--os-danger)' : 'var(--os-text-secondary)' }}
+            />
+            <span
+                className="text-sm font-medium transition-colors"
+                style={{ color: danger ? 'var(--os-danger)' : 'var(--os-text-primary)' }}
+            >
+                {label}
+            </span>
         </div>
     )
 }

@@ -5,53 +5,105 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 
+  =============================================================================
+  CORE THEME SYSTEM
+  =============================================================================
+  Controlled via data attributes on <html>:
+  - data-theme: "light" | "dark"
+  - data-transparency: "true" | "false"
+*/
+
+/* --- Base Variables (Light Default) --- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 
-  /* OS Theme Variables - Light Mode Default */
-  --os-bg-base: rgba(245, 245, 245, 0.95);
-  --os-bg-base-rgb: 245, 245, 245;
-  --os-bg-window: rgba(255, 255, 255, 0.98);
-  --os-bg-panel: rgba(255, 255, 255, 0.85);
-  --os-bg-panel-rgb: 255, 255, 255;
-
-  --os-border: rgba(0, 0, 0, 0.08);
-  --os-border-active: rgba(0, 0, 0, 0.15);
-  --os-hover-bg: rgba(0, 0, 0, 0.05);
-
+  /* Accent - Overridden by JS */
   --os-accent: #0891b2;
   --os-accent-dim: rgba(8, 145, 178, 0.15);
   --os-accent-glow: rgba(8, 145, 178, 0.08);
 
-  --os-text-primary: rgba(0, 0, 0, 0.9);
-  --os-text-secondary: rgba(0, 0, 0, 0.6);
-  --os-text-muted: rgba(0, 0, 0, 0.4);
+  /* Layout */
+  --os-backdrop-blur: none;
 }
 
+/* --- LIGHT MODE --- */
+[data-theme='light'] {
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+
+  /* Solid Defaults (Transparency OFF) */
+  --os-bg-base: #f5f5f7;
+  --os-bg-base-rgb: 245, 245, 247;
+  --os-bg-window: #ffffff;
+  --os-bg-panel: #ffffff;
+  --os-bg-panel-rgb: 255, 255, 255;
+  
+  --os-text-primary: #1d1d1f;
+  --os-text-secondary: #86868b;
+  --os-text-muted: #aeaeb2;
+
+  --os-border: rgba(0, 0, 0, 0.08);
+  --os-border-active: rgba(0, 0, 0, 0.15);
+  --os-hover-bg: rgba(0, 0, 0, 0.05);
+  --os-bg-selection: rgba(0, 0, 0, 0.1);
+  --os-accent-contrast: #ffffff;
+  
+  --os-shadow-window: 0 10px 30px -15px rgba(0, 0, 0, 0.1);
+  --os-shadow-window-active: 0 20px 60px -15px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0,0,0,0.05);
+
+  --os-danger: #ef4444;
+}
+
+/* Light + Transparency */
+[data-theme='light'][data-transparency='true'] {
+  --os-bg-window: rgba(255, 255, 255, 0.85);
+  --os-bg-panel: rgba(255, 255, 255, 0.65);
+  --os-backdrop-blur: blur(25px);
+}
+
+/* --- DARK MODE --- */
+[data-theme='dark'] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* Solid Defaults (Transparency OFF) */
+  --os-bg-base: #121212;
+  --os-bg-base-rgb: 18, 18, 18;
+  --os-bg-window: #1e1e1e;
+  --os-bg-panel: #252525;
+  --os-bg-panel-rgb: 37, 37, 37;
+
+  --os-text-primary: rgba(255, 255, 255, 0.95);
+  --os-text-secondary: rgba(255, 255, 255, 0.7);
+  --os-text-muted: rgba(255, 255, 255, 0.4);
+
+  --os-border: rgba(255, 255, 255, 0.08);
+  --os-border-active: rgba(255, 255, 255, 0.15);
+  --os-hover-bg: rgba(255, 255, 255, 0.1);
+  --os-bg-selection: rgba(255, 255, 255, 0.15);
+  --os-accent-contrast: #ffffff;
+  
+  --os-shadow-window: 0 10px 30px -15px rgba(0, 0, 0, 0.5);
+  --os-shadow-window-active: 0 20px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05);
+
+  --os-danger: #ef4444;
+}
+
+/* Dark + Transparency */
+[data-theme='dark'][data-transparency='true'] {
+  --os-bg-base: #1a1a1a; /* Softer textured dark background */
+  --os-bg-window: rgba(30, 30, 30, 0.75);
+  --os-bg-panel: rgba(40, 40, 40, 0.65);
+  --os-backdrop-blur: blur(25px);
+}
+
+/* --- FALLBACKS (System Preference) --- */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-
-    /* OS Theme Variables - Dark Mode */
-    --os-bg-base: rgba(0, 0, 0, 0.9);
-    --os-bg-base-rgb: 0, 0, 0;
-    --os-bg-window: rgba(10, 10, 10, 0.95);
-    --os-bg-panel: rgba(20, 20, 20, 0.8);
-    --os-bg-panel-rgb: 20, 20, 20;
-
-    --os-border: rgba(255, 255, 255, 0.03);
-    --os-border-active: rgba(255, 255, 255, 0.06);
-    --os-hover-bg: rgba(255, 255, 255, 0.05);
-
-    --os-accent: #06b6d4;
-    --os-accent-dim: rgba(6, 182, 212, 0.3);
-    --os-accent-glow: rgba(6, 182, 212, 0.1);
-
-    --os-text-primary: rgba(255, 255, 255, 0.9);
-    --os-text-secondary: rgba(255, 255, 255, 0.6);
-    --os-text-muted: rgba(255, 255, 255, 0.4);
+  :root:not([data-theme]) {
+    /* Copy of Dark Mode variables if needed, 
+       but we usually force data-theme via JS immediately. */
   }
 }
 

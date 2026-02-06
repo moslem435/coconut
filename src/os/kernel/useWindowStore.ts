@@ -25,8 +25,9 @@ interface WindowStore {
     maxZIndex: number
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number } }) => void
     closeWindow: (id: string) => void
+    closeAllWindows: () => void
     minimizeWindow: (id: string) => void
     maximizeWindow: (id: string) => void
     focusWindow: (id: string) => void
@@ -59,17 +60,27 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         }
 
         const newZ = maxZIndex + 1
+
+        // Calculate centered position
+        const windowWidth = options?.size?.width ?? 800
+        const windowHeight = options?.size?.height ?? 600
+        const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
+        const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080
+        const centeredX = Math.max(0, (screenWidth - windowWidth) / 2)
+        const centeredY = Math.max(0, (screenHeight - windowHeight) / 2 - 40) // -40 for taskbar
+
         const newWindow: WindowState = {
             id,
             title,
             isOpen: true,
             isMinimized: false,
             isMaximized: options?.isMaximized ?? false,
-            position: { x: 50 + (Object.keys(windows).length % 10) * 30, y: 50 + (Object.keys(windows).length % 10) * 30 },
+            position: { x: centeredX, y: centeredY },
             size: options?.size ?? { width: 800, height: 600 },
             zIndex: newZ,
             component,
-            icon
+            icon,
+            taskbarPosition: options?.taskbarPosition
         }
 
         set(state => ({
@@ -88,6 +99,10 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 activeWindowId: state.activeWindowId === id ? null : state.activeWindowId
             }
         })
+    },
+
+    closeAllWindows: () => {
+        set({ windows: {}, activeWindowId: null, maxZIndex: 100 })
     },
 
     focusWindow: (id) => {

@@ -14,9 +14,13 @@ import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
 import StartMenu from './StartMenu'
 import Window from './Window'
+import Notifications from './Notifications'
 
-// No props needed for Shell anymore
-export default function Shell() {
+interface ShellProps {
+  onShutdown?: () => void
+}
+
+export default function Shell({ onShutdown }: ShellProps) {
   const { language } = useLanguage()
   // Optimize: Only subscribe to the list of window IDs.
   // Shell will only re-render when a window is added or removed.
@@ -51,6 +55,7 @@ export default function Shell() {
       <StartMenu
         isOpen={isStartMenuOpen}
         onClose={() => setIsStartMenuOpen(false)}
+        onShutdown={onShutdown}
       />
 
       {/* Status Bar - z-[200] */}
@@ -60,6 +65,9 @@ export default function Shell() {
 
       {/* Context Menu */}
       <ContextMenu />
+
+      {/* Notifications - z-[9999] defined in component */}
+      <Notifications />
 
       {/* Close Start Menu when clicking outside (Overlay) */}
       {isStartMenuOpen && (

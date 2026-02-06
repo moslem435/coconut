@@ -114,12 +114,10 @@ export default function SettingsApp() {
                         <SettingSection title="主题色">
                             <div className="flex gap-3 flex-wrap">
                                 {accentColors.map((color) => (
-                                    <motion.button
+                                    <button
                                         key={color.value}
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.95 }}
                                         onClick={() => setAccentColor(color.value)}
-                                        className={`w-10 h-10 rounded-full border-2 transition-all ${accentColor === color.value
+                                        className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 ${accentColor === color.value
                                             ? 'scale-110'
                                             : 'border-transparent'
                                             }`}
@@ -158,15 +156,10 @@ export default function SettingsApp() {
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={toggleMute}
-                                        className="p-2 hover:rounded-full transition-colors"
+                                        className="p-2 hover:rounded-full transition-colors hover:bg-[var(--os-hover-bg)]"
                                         style={{ backgroundColor: isMuted ? 'transparent' : 'transparent' }}
                                     >
                                         <Volume2 size={20} className={isMuted ? '' : 'text-[var(--os-accent)]'} style={{ color: isMuted ? 'var(--os-text-muted)' : 'var(--os-accent)' }} />
-                                        <style jsx>{`
-                                            button:hover {
-                                                background-color: var(--os-hover-bg);
-                                            }
-                                        `}</style>
                                     </button>
                                     <input
                                         type="range"
@@ -194,11 +187,10 @@ export default function SettingsApp() {
                                     { code: 'zh', name: '简体中文' },
                                     { code: 'en', name: 'English (US)' },
                                 ].map((lang) => (
-                                    <motion.button
+                                    <button
                                         key={lang.code}
-                                        whileHover={{ x: 4 }}
                                         onClick={() => setLanguage(lang.code as 'zh' | 'en')}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all`}
+                                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all hover:translate-x-1`}
                                         style={{
                                             backgroundColor: language === lang.code ? 'var(--os-accent-glow)' : 'var(--os-hover-bg)',
                                             borderColor: language === lang.code ? 'var(--os-accent)' : 'var(--os-border)',
@@ -212,7 +204,7 @@ export default function SettingsApp() {
                                         {language === lang.code && (
                                             <div className="w-2 h-2 rounded-full bg-[var(--os-accent)]" />
                                         )}
-                                    </motion.button>
+                                    </button>
                                 ))}
                             </div>
                         </SettingSection>
@@ -269,27 +261,21 @@ export default function SettingsApp() {
                     const Icon = cat.icon
                     const isActive = activeCategory === cat.id
                     return (
-                        <motion.button
-                            key={cat.id}
-                            whileHover={{ x: 4 }}
-                            onClick={() => setActiveCategory(cat.id)}
-                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left group`}
-                            style={{
-                                backgroundColor: isActive ? 'var(--os-accent-dim)' : 'transparent',
-                                color: isActive ? 'var(--os-accent)' : 'var(--os-text-secondary)'
-                            }}
-                        >
-                            <Icon size={18} className="group-hover:text-[var(--os-text-primary)]" />
-                            <span className="text-sm group-hover:text-[var(--os-text-primary)]">{cat.label}</span>
-                            {isActive && (
-                                <ChevronRight size={14} className="ml-auto" />
-                            )}
-                            <style jsx>{`
-                                button:hover {
-                                    background-color: ${isActive ? 'var(--os-accent-dim)' : 'var(--os-hover-bg)'};
-                                }
-                             `}</style>
-                        </motion.button>
+                        <button
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left group ${isActive ? '' : 'hover:bg-[var(--os-hover-bg)] hover:translate-x-1'}`}
+                                style={{
+                                    backgroundColor: isActive ? 'var(--os-accent-dim)' : undefined,
+                                    color: isActive ? 'var(--os-accent)' : 'var(--os-text-secondary)'
+                                }}
+                            >
+                                <Icon size={18} className="group-hover:text-[var(--os-text-primary)]" />
+                                <span className="text-sm group-hover:text-[var(--os-text-primary)]">{cat.label}</span>
+                                {isActive && (
+                                    <ChevronRight size={14} className="ml-auto" />
+                                )}
+                            </button>
                     )
                 })}
             </div>
@@ -339,25 +325,17 @@ function ThemeOption({
     onClick: () => void
 }) {
     return (
-        <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+        <button
             onClick={onClick}
-            className={`flex-1 flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all`}
+            className={`flex-1 flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98] ${active ? 'border-[var(--os-accent)]' : 'border-transparent hover:border-[var(--os-border)]'}`}
             style={{
                 backgroundColor: active ? 'var(--os-accent-dim)' : 'var(--os-hover-bg)',
-                borderColor: active ? 'var(--os-accent)' : 'transparent',
                 color: active ? 'var(--os-accent)' : 'var(--os-text-secondary)'
             }}
         >
             <Icon size={24} color={active ? 'var(--os-accent)' : 'var(--os-text-secondary)'} />
             <span className={`text-sm`} style={{ color: active ? 'var(--os-accent)' : 'var(--os-text-secondary)' }}>{label}</span>
-            <style jsx>{`
-                button:hover {
-                    border-color: ${active ? 'var(--os-accent)' : 'var(--os-border)'};
-                }
-             `}</style>
-        </motion.button>
+        </button>
     )
 }
 

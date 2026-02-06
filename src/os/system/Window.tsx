@@ -5,6 +5,7 @@ import { motion, useDragControls } from 'framer-motion'
 import { X, Minus, Square, Maximize2, Minimize2 } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
+import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { WindowFrame } from '@/os/ui/WindowFrame'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
 import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
@@ -160,7 +161,7 @@ export default function Window({ id }: WindowProps) {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[9998] pointer-events-none"
           style={{
-            background: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.15) 0%, transparent 30%)',
+            background: 'linear-gradient(to bottom, var(--os-accent-dim) 0%, transparent 30%)',
             borderTop: '2px solid var(--os-accent)'
           }}
         />
@@ -178,9 +179,9 @@ export default function Window({ id }: WindowProps) {
             top: restorePreview.y,
             width: restorePreview.width,
             height: restorePreview.height,
-            backgroundColor: 'rgba(6, 182, 212, 0.08)',
+            backgroundColor: 'var(--os-accent-glow)',
             border: '2px dashed var(--os-accent)',
-            boxShadow: '0 0 30px rgba(6, 182, 212, 0.2)'
+            boxShadow: '0 0 30px var(--os-accent-dim)'
           }}
         />
       )}
@@ -198,32 +199,39 @@ export default function Window({ id }: WindowProps) {
         }
         initial={{
           opacity: 0,
-          scale: 0.9,
+          scale: 0,
+          // Start from taskbar position (bottom center of screen)
           x: windowState.taskbarPosition?.x
             ? windowState.taskbarPosition.x - (windowState.size.width / 2)
-            : windowState.position.x,
-          y: windowState.taskbarPosition?.y ?? taskbarY,
+            : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (windowState.size.width / 2) : windowState.position.x),
+          y: windowState.taskbarPosition?.y
+            ? (windowState.taskbarPosition.y + 24) - (windowState.size.height / 2)
+            : taskbarY + 100,
         }}
         animate={{
           opacity: windowState.isMinimized ? 0 : 1,
-          scale: windowState.isMinimized ? 0.9 : 1,
+          scale: windowState.isMinimized ? 0 : 1,
           x: windowState.isMinimized
-            ? (windowState.taskbarPosition?.x ?? 100) - (windowState.size.width / 2)
+            ? (windowState.taskbarPosition?.x ? windowState.taskbarPosition.x - (windowState.size.width / 2) : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (windowState.size.width / 2) : 100))
             : windowState.isMaximized ? 0 : windowState.position.x,
           y: windowState.isMinimized
-            ? (windowState.taskbarPosition?.y ?? taskbarY)
+            ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (windowState.size.height / 2) : (typeof window !== 'undefined' ? window.innerHeight : taskbarY))
             : windowState.isMaximized ? 0 : windowState.position.y,
           width: windowState.isMaximized ? '100vw' : windowState.size.width,
           height: windowState.isMaximized ? '100vh' : windowState.size.height,
-          zIndex: windowState.isMinimized ? -1 : windowState.zIndex,
-          pointerEvents: windowState.isMinimized ? 'none' as const : 'auto' as const
+          zIndex: windowState.zIndex,
+          pointerEvents: windowState.isMinimized ? 'none' as const : 'auto' as const,
+          transitionEnd: {
+            zIndex: windowState.isMinimized ? -1 : windowState.zIndex
+          }
         }}
         transition={
           isResizing
             ? { duration: 0 }
             : {
-              duration: 0.35,
-              ease: [0.25, 0.1, 0.25, 1], // CSS ease equivalent
+              type: "spring",
+              stiffness: 260,
+              damping: 20
             }
         }
         style={{ position: 'fixed', top: 0, left: 0, willChange: 'transform, width, height' }}
@@ -313,6 +321,11 @@ export default function Window({ id }: WindowProps) {
             onClose={() => closeWindow(id)}
             dragControls={dragControls}
             onPointerDown={() => focusWindow(id)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+            }}
           />
 
           <div className="flex-1 relative overflow-hidden bg-black">

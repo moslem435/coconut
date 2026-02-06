@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { Wifi, Battery, Volume2, Command } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
+import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { APPS_REGISTRY } from '@/os/registry/config'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -20,27 +22,109 @@ export default function Taskbar({
     Object.values(state.windows).filter(w => w.isOpen)
   ))
   const activeWindowId = useWindowStore(state => state.activeWindowId)
+  const { pinnedAppIds } = useSystemSettings()
 
   // Actions
+  const openWindow = useWindowStore(state => state.openWindow)
   const focusWindow = useWindowStore(state => state.focusWindow)
   const minimizeWindow = useWindowStore(state => state.minimizeWindow)
   const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
 
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  // Sort windows by creation order (or just object keys for now)
-  // const openWindows = Object.values(windows).filter(w => w.isOpen)
+  // Merge pinned apps and open windows
+  const taskbarItems = useMemo(() => {
+    const items: Array<{
+      id: string // appId or windowId
+      appId: string
+      title: string
+      icon: any
+      isOpen: boolean
+      isMinimized: boolean
+      isActive: boolean
+    }> = []
+
+    // 1. Add Pinned Apps first
+    pinnedAppIds.forEach(appId => {
+      const app = APPS_REGISTRY[appId]
+      if (!app) return
+
+      // Check if it's open (using appId as windowId for single-instance apps)
+      const win = openWindows.find(w => w.id === appId)
+      
+      items.push({
+        id: appId,
+        appId: appId,
+        title: app.title,
+        icon: app.icon,
+        isOpen: !!win,
+        isMinimized: win?.isMinimized ?? false,
+        isActive: activeWindowId === appId
+      })
+    })
+
+    // 2. Add remaining Open Windows that aren't pinned
+    openWindows.forEach(win => {
+      // If already added via pinned list, skip
+      if (pinnedAppIds.includes(win.id)) return
+
+      items.push({
+        id: win.id,
+        appId: win.id, // Assuming window id is app id
+        title: win.title,
+        icon: win.icon,
+        isOpen: true,
+        isMinimized: win.isMinimized,
+        isActive: activeWindowId === win.id
+      })
+    })
+
+    return items
+  }, [openWindows, pinnedAppIds, activeWindowId])
 
   // Update taskbar positions after render
   useLayoutEffect(() => {
-    openWindows.forEach(win => {
-      const el = itemRefs.current[win.id]
+    // Only update position for open windows (pinned-only apps don't have windows yet)
+    // But we need to track position for minimize animation target
+    taskbarItems.forEach(item => {
+      const el = itemRefs.current[item.id]
       if (el) {
         const rect = el.getBoundingClientRect()
-        updateTaskbarPosition(win.id, { x: rect.left + rect.width / 2, y: rect.top })
+        // Update position in window store for minimize animation
+        // Even if window isn't open, we update it so when it opens it knows where to go? 
+        // Actually only open windows need this.
+        if (item.isOpen) {
+          updateTaskbarPosition(item.id, { x: rect.left + rect.width / 2, y: rect.top })
+        }
       }
     })
-  }, [openWindows, updateTaskbarPosition])
+  }, [taskbarItems, updateTaskbarPosition])
+
+  const handleItemClick = (item: typeof taskbarItems[0]) => {
+    if (item.isOpen) {
+      if (item.isActive && !item.isMinimized) {
+        minimizeWindow(item.id)
+      } else {
+        focusWindow(item.id)
+      }
+    } else {
+      // Launch App
+      const app = APPS_REGISTRY[item.appId]
+      if (app) {
+        const el = itemRefs.current[item.id]
+        let taskbarPos = undefined
+        if (el) {
+            const rect = el.getBoundingClientRect()
+            taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
+        }
+
+        openWindow(app.id, app.title, <app.component />, app.icon, {
+            ...app.defaultWindowOptions,
+            taskbarPosition: taskbarPos
+        })
+      }
+    }
+  }
 
   return (
     <div
@@ -49,7 +133,7 @@ export default function Taskbar({
         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
         border: '1px solid var(--os-border)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-        width: Math.min(openWindows.length * 60 + 300, window.innerWidth - 32) + 'px',
+        width: Math.min(taskbarItems.length * 60 + 300, window.innerWidth - 32) + 'px',
         maxWidth: '90vw'
       }}
     >
@@ -66,40 +150,35 @@ export default function Taskbar({
           <Command size={22} className="text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
         </button>
 
-        {/* Separator - Only show if there are open windows */}
-        {openWindows.length > 0 && (
+        {/* Separator - Only show if there are items */}
+        {taskbarItems.length > 0 && (
           <div className="w-px h-5 bg-[var(--os-border)] mx-2" />
         )}
 
         {/* Window List - Icon Only for Dock Look */}
-        {openWindows.map((win) => (
-          <motion.div
-            ref={(el) => { itemRefs.current[win.id] = el }}
-            layout={false}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            key={win.id}
-            onClick={() => {
-              if (activeWindowId === win.id && !win.isMinimized) {
-                minimizeWindow(win.id)
-              } else {
-                focusWindow(win.id)
-              }
+        {taskbarItems.map((item) => (
+          <button
+            ref={(el) => { itemRefs.current[item.id] = el }}
+            key={item.id}
+            onClick={() => handleItemClick(item)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', { 
+                windowId: item.isOpen ? item.id : undefined,
+                appId: item.appId
+              })
             }}
-            className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer hover:scale-110 active:scale-95 relative group"
+            className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)]"
             style={{
-              backgroundColor: activeWindowId === win.id && !win.isMinimized
+              backgroundColor: item.isActive && !item.isMinimized
                 ? 'var(--os-accent-dim)'
-                : 'transparent',
-              willChange: 'transform, opacity',
-              transition: 'background-color 0.2s, transform 0.15s'
+                : undefined
             }}
           >
 
             {/* Window Icon */}
-            {win.icon ? (() => {
-              const Icon = win.icon
+            {item.icon ? (() => {
+              const Icon = item.icon
               return <Icon size={22} className="text-[var(--os-text-primary)]" />
             })() : (
               <div className="w-4 h-4 rounded-sm border flex items-center justify-center"
@@ -109,12 +188,17 @@ export default function Taskbar({
               </div>
             )}
 
+            {/* Indicator Dot for Open Apps */}
+            {item.isOpen && (
+              <div className={`absolute bottom-1 w-1 h-1 rounded-full ${item.isActive && !item.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
+            )}
+
             {/* Tooltip */}
             <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded bg-[var(--os-bg-panel)] border border-[var(--os-border)] text-xs shadow-sm whitespace-nowrap pointer-events-none text-[var(--os-text-primary)]">
-              {win.title}
+              {item.title}
             </div>
 
-          </motion.div>
+          </button>
         ))}
       </div>
 

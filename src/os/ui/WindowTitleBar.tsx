@@ -1,5 +1,7 @@
+'use client'
+
 import React from 'react'
-import { X, Minus, Square, Maximize2, Minimize2 } from 'lucide-react'
+import { X, Minus, Maximize2, Minimize2 } from 'lucide-react'
 
 interface WindowTitleBarProps {
     title: string
@@ -10,7 +12,8 @@ interface WindowTitleBarProps {
     onMaximize: () => void
     onClose: () => void
     onPointerDown?: (e: React.PointerEvent) => void
-    dragControls?: any // Framer motion drag controls
+    onContextMenu?: (e: React.MouseEvent) => void
+    dragControls?: any
 }
 
 export function WindowTitleBar({
@@ -22,6 +25,7 @@ export function WindowTitleBar({
     onMaximize,
     onClose,
     onPointerDown,
+    onContextMenu,
     dragControls
 }: WindowTitleBarProps) {
     return (
@@ -30,78 +34,64 @@ export function WindowTitleBar({
                 onPointerDown?.(e)
                 dragControls?.start(e)
             }}
+            onContextMenu={onContextMenu}
             onDoubleClick={(e) => {
                 e.preventDefault()
                 onMaximize()
             }}
-            className={`
-        h-9 flex items-center justify-between px-3 select-none shrink-0
-        border-b-[1px] transition-colors duration-200
-        cursor-grab active:cursor-grabbing
-      `}
+            className="h-10 flex items-center justify-between px-3 select-none shrink-0 cursor-grab active:cursor-grabbing"
             style={{
-                backgroundColor: isActive ? 'var(--os-accent-glow)' : 'transparent',
-                borderColor: 'var(--os-border)',
+                backgroundColor: 'transparent',
             }}
         >
+            {/* Left: Icon + Title */}
             <div className="flex items-center gap-2.5">
-                {Icon && <Icon size={14} color={isActive ? 'var(--os-accent)' : 'var(--os-text-muted)'} />}
+                {Icon && (
+                    <Icon
+                        size={16}
+                        style={{ color: isActive ? 'var(--os-accent)' : 'var(--os-text-muted)' }}
+                    />
+                )}
                 <span
-                    className="text-xs font-mono tracking-wide transition-colors"
+                    className="text-sm font-medium tracking-wide transition-colors"
                     style={{ color: isActive ? 'var(--os-text-primary)' : 'var(--os-text-muted)' }}
                 >
                     {title}
                 </span>
             </div>
 
-            <div className="flex items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
-                <WindowControlBtn onClick={onMinimize} icon={Minus} label="Minimize" />
-                <WindowControlBtn
+            {/* Right: Window Controls */}
+            <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
+                {/* Minimize */}
+                <button
+                    onClick={onMinimize}
+                    aria-label="Minimize"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
+                    style={{ color: 'var(--os-text-secondary)' }}
+                >
+                    <Minus size={16} />
+                </button>
+
+                {/* Maximize/Restore */}
+                <button
                     onClick={onMaximize}
-                    icon={isMaximized ? Minimize2 : Square}
-                    label="Maximize"
-                />
-                <WindowControlBtn
+                    aria-label={isMaximized ? 'Restore' : 'Maximize'}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
+                    style={{ color: 'var(--os-text-secondary)' }}
+                >
+                    {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+
+                {/* Close */}
+                <button
                     onClick={onClose}
-                    icon={X}
-                    label="Close"
-                    variant="danger"
-                />
+                    aria-label="Close"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500/20 hover:text-red-400 active:scale-90"
+                    style={{ color: 'var(--os-text-secondary)' }}
+                >
+                    <X size={16} />
+                </button>
             </div>
         </div>
-    )
-}
-
-function WindowControlBtn({
-    onClick,
-    icon: Icon,
-    variant = 'default',
-    label
-}: {
-    onClick: () => void,
-    icon: any,
-    variant?: 'default' | 'danger',
-    label?: string
-}) {
-    return (
-        <button
-            onClick={onClick}
-            aria-label={label}
-            className={`
-        w-6 h-6 flex items-center justify-center rounded transition-all duration-200
-        hover:bg-opacity-20
-      `}
-            style={{
-                color: variant === 'danger' ? '#ef4444' : 'var(--os-text-secondary)',
-            }}
-        >
-            <Icon size={12} />
-            <style jsx>{`
-        button:hover {
-          background-color: ${variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'var(--os-hover-bg)'};
-          color: ${variant === 'danger' ? '#fca5a5' : 'var(--os-text-primary)'} !important;
-        }
-      `}</style>
-        </button>
     )
 }

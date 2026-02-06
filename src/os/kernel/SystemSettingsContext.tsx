@@ -12,6 +12,8 @@ export interface SystemSettings {
     displayScale: number
     volume: number
     isMuted: boolean
+    snapToGrid: boolean
+    pinnedAppIds: string[]
 }
 
 interface SystemSettingsContextType extends SystemSettings {
@@ -23,6 +25,9 @@ interface SystemSettingsContextType extends SystemSettings {
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
     toggleMute: () => void
+    setSnapToGrid: (enable: boolean) => void
+    pinApp: (appId: string) => void
+    unpinApp: (appId: string) => void
 }
 
 const SystemSettingsContext = createContext<SystemSettingsContextType | undefined>(undefined)
@@ -35,6 +40,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
     displayScale: 100,
     volume: 75,
     isMuted: false,
+    snapToGrid: true,
+    pinnedAppIds: ['portfolio-hub', 'music'] // Default pinned apps
 }
 
 export function SystemSettingsProvider({ children }: { children: ReactNode }) {
@@ -61,6 +68,10 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     // Apply Theme
     useEffect(() => {
         const root = document.documentElement
+        root.dataset.theme = settings.theme
+        root.dataset.transparency = settings.useTransparency.toString()
+        
+        // Remove class manipulation as we now use data-theme
         if (settings.theme === 'dark') {
             root.classList.add('dark')
             root.classList.remove('light')
@@ -68,9 +79,9 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             root.classList.add('light')
             root.classList.remove('dark')
         }
-    }, [settings.theme])
+    }, [settings.theme, settings.useTransparency])
 
-    // Apply CSS Variables for Appearance
+    // Apply CSS Variables for Accent Color Only
     useEffect(() => {
         const root = document.documentElement
 
@@ -93,65 +104,9 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             root.style.setProperty('--os-border-active', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`)
         }
 
-        // Set transparency and Theme Colors
-        if (settings.useTransparency) {
-            if (settings.theme === 'dark') {
-                // Dark Mode: Deep gray instead of pitch black, subtle frosted glass
-                root.style.setProperty('--os-bg-window', 'rgba(30, 30, 30, 0.75)')
-                root.style.setProperty('--os-bg-base', '#1a1a1a') // Softer textured dark background base
-                root.style.setProperty('--os-bg-panel', 'rgba(40, 40, 40, 0.65)')
-
-                root.style.setProperty('--os-text-primary', 'rgba(255, 255, 255, 0.92)')
-                root.style.setProperty('--os-text-secondary', 'rgba(255, 255, 255, 0.65)')
-                root.style.setProperty('--os-text-muted', 'rgba(255, 255, 255, 0.45)')
-
-                root.style.setProperty('--os-border', 'rgba(255, 255, 255, 0.08)')
-                root.style.setProperty('--os-hover-bg', 'rgba(255, 255, 255, 0.1)')
-            } else {
-                // Light Mode: Airy, clean, paper-like
-                root.style.setProperty('--os-bg-window', 'rgba(255, 255, 255, 0.85)')
-                root.style.setProperty('--os-bg-base', '#f5f5f7') // Apple-like light gray
-                root.style.setProperty('--os-bg-panel', 'rgba(255, 255, 255, 0.65)')
-
-                root.style.setProperty('--os-text-primary', '#1d1d1f')
-                root.style.setProperty('--os-text-secondary', '#86868b')
-                root.style.setProperty('--os-text-muted', '#aeaeb2')
-
-                root.style.setProperty('--os-border', 'rgba(0, 0, 0, 0.04)') // Very subtle separation
-                root.style.setProperty('--os-hover-bg', 'rgba(0, 0, 0, 0.05)')
-            }
-            root.style.setProperty('--os-backdrop-blur', 'blur(25px)') // Heavy blur for "Frosted Film" look
-        } else {
-            // Solid Colors (Transparency Off)
-            if (settings.theme === 'dark') {
-                root.style.setProperty('--os-bg-window', '#1e1e1e')
-                root.style.setProperty('--os-bg-base', '#121212')
-                root.style.setProperty('--os-bg-panel', '#252525')
-
-                root.style.setProperty('--os-text-primary', 'rgba(255, 255, 255, 0.95)')
-                root.style.setProperty('--os-text-secondary', 'rgba(255, 255, 255, 0.7)')
-                root.style.setProperty('--os-text-muted', 'rgba(255, 255, 255, 0.4)')
-
-                root.style.setProperty('--os-border', 'rgba(255, 255, 255, 0.1)')
-                root.style.setProperty('--os-hover-bg', 'rgba(255, 255, 255, 0.1)')
-            } else {
-                root.style.setProperty('--os-bg-window', '#ffffff')
-                root.style.setProperty('--os-bg-base', '#f5f5f7')
-                root.style.setProperty('--os-bg-panel', '#ffffff')
-
-                root.style.setProperty('--os-text-primary', '#1d1d1f')
-                root.style.setProperty('--os-text-secondary', '#86868b')
-                root.style.setProperty('--os-text-muted', '#aeaeb2')
-
-                root.style.setProperty('--os-border', 'rgba(0, 0, 0, 0.08)')
-                root.style.setProperty('--os-hover-bg', 'rgba(0, 0, 0, 0.05)')
-            }
-            root.style.setProperty('--os-backdrop-blur', 'none')
-        }
-
-        // Update global CSS variable for other components to use
-        // Note: We're manipulating specific variables defined in globals.css
-    }, [settings.accentColor, settings.useTransparency, settings.theme])
+        // Removed: Hardcoded theme color injections (moved to globals.css)
+        
+    }, [settings.accentColor])
 
     // Apply Display Scale
     useEffect(() => {
@@ -175,6 +130,17 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     const setVolume = (volume: number) => setSettings(p => ({ ...p, volume }))
     const setMuted = (muted: boolean) => setSettings(p => ({ ...p, isMuted: muted }))
     const toggleMute = () => setSettings(p => ({ ...p, isMuted: !p.isMuted }))
+    const setSnapToGrid = (enable: boolean) => setSettings(p => ({ ...p, snapToGrid: enable }))
+    
+    const pinApp = (appId: string) => setSettings(p => {
+        if (p.pinnedAppIds.includes(appId)) return p
+        return { ...p, pinnedAppIds: [...p.pinnedAppIds, appId] }
+    })
+
+    const unpinApp = (appId: string) => setSettings(p => ({
+        ...p,
+        pinnedAppIds: p.pinnedAppIds.filter(id => id !== appId)
+    }))
 
     return (
         <SystemSettingsContext.Provider value={{
@@ -186,7 +152,10 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             setDisplayScale,
             setVolume,
             setMuted,
-            toggleMute
+            toggleMute,
+            setSnapToGrid,
+            pinApp,
+            unpinApp
         }}>
             {children}
         </SystemSettingsContext.Provider>
