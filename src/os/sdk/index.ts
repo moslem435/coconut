@@ -29,6 +29,7 @@ export function useSystem() {
         useTransparency: settings.useTransparency,
         useAnimations: settings.useAnimations,
         displayScale: settings.displayScale,
+        wallpaper: settings.wallpaper,
 
         isMuted: settings.isMuted,
         volume: settings.volume,
@@ -40,6 +41,7 @@ export function useSystem() {
         setUseTransparency: settings.setUseTransparency,
         setUseAnimations: settings.setUseAnimations,
         setDisplayScale: settings.setDisplayScale,
+        setWallpaper: settings.setWallpaper,
 
         setVolume: settings.setVolume,
         toggleMute: settings.toggleMute,

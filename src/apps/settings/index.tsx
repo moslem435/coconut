@@ -47,7 +47,8 @@ export default function SettingsApp() {
         displayScale, setDisplayScale,
         volume, setVolume,
         isMuted, toggleMute,
-        language, setLanguage
+        language, setLanguage,
+        wallpaper, setWallpaper
     } = useSystem()
 
     // NOTE: The previous SDK implementation missed some fields like useTransparency.
@@ -63,6 +64,17 @@ export default function SettingsApp() {
         { name: '红色', value: '#ef4444' },
         { name: '橙色', value: '#f97316' },
         { name: '绿色', value: '#22c55e' },
+    ]
+
+    const wallpaperOptions = [
+        { name: '默认流光', type: 'preset', value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))' },
+        { name: '深邃星空', type: 'preset', value: 'linear-gradient(to top, #30cfd0 0%, #330867 100%)' },
+        { name: '赛博霓虹', type: 'preset', value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
+        { name: '午夜渐变', type: 'preset', value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
+        { name: '每日壁纸', type: 'image', value: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop' },
+        { name: '雪山', type: 'image', value: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: '沙漠', type: 'image', value: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: '城市', type: 'image', value: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
     ]
 
     const renderContent = () => {
@@ -111,6 +123,34 @@ export default function SettingsApp() {
             case 'appearance':
                 return (
                     <div className="space-y-6">
+                        <SettingSection title="桌面壁纸">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {wallpaperOptions.map((wp, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setWallpaper({ type: wp.type as any, value: wp.value })}
+                                        className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${
+                                            wallpaper?.value === wp.value ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-transparent hover:border-[var(--os-text-secondary)]'
+                                        }`}
+                                    >
+                                        {wp.type === 'image' ? (
+                                            <img src={wp.value} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={wp.name} />
+                                        ) : (
+                                            <div className="w-full h-full" style={{ background: wp.value }} />
+                                        )}
+                                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent text-xs text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {wp.name}
+                                        </div>
+                                        {wallpaper?.value === wp.value && (
+                                            <div className="absolute top-2 right-2 w-5 h-5 bg-[var(--os-accent)] rounded-full flex items-center justify-center text-[var(--os-accent-contrast)] shadow-sm">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </SettingSection>
+
                         <SettingSection title="主题色">
                             <div className="flex gap-3 flex-wrap">
                                 {accentColors.map((color) => (

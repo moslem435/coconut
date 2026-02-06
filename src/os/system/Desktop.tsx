@@ -89,7 +89,7 @@ const findFreePosition = (
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
-    const { snapToGrid } = useSystemSettings()
+    const { snapToGrid, wallpaper } = useSystemSettings()
     
     // Context Menu
     const showMenu = useContextMenuStore(state => state.showMenu)
@@ -221,8 +221,30 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     showMenu(e.clientX, e.clientY, 'desktop')
                 }}
             >
-                {/* Background Gradient - Ambient Light */}
-                <div className="absolute inset-0 pointer-events-none transition-opacity duration-1000 bg-gradient-to-br from-[var(--os-bg-base)] via-[var(--os-bg-base)] to-[var(--os-accent-dim)] opacity-50" />
+                {/* Background Wallpaper */}
+                {wallpaper?.type === 'video' ? (
+                    <video
+                        className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-1000"
+                        src={wallpaper.value}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                    />
+                ) : wallpaper?.type === 'image' ? (
+                    <div 
+                        className="absolute inset-0 pointer-events-none transition-all duration-1000 bg-cover bg-center bg-no-repeat"
+                        style={{ backgroundImage: `url(${wallpaper.value})` }}
+                    />
+                ) : (
+                    <div 
+                        className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
+                        style={{ background: wallpaper?.value || 'var(--os-bg-base)' }}
+                    />
+                )}
+                
+                {/* Ambient Overlay for depth if needed, can be optional based on wallpaper type */}
+                <div className="absolute inset-0 pointer-events-none bg-black/10" />
 
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">

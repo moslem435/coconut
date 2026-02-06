@@ -7,6 +7,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
+import { AnimatePresence } from 'framer-motion'
+import { WindowPreview } from './WindowPreview'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -30,6 +32,7 @@ export default function Taskbar({
   const minimizeWindow = useWindowStore(state => state.minimizeWindow)
   const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
 
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   // Merge pinned apps and open windows
@@ -161,6 +164,8 @@ export default function Taskbar({
             ref={(el) => { itemRefs.current[item.id] = el }}
             key={item.id}
             onClick={() => handleItemClick(item)}
+            onMouseEnter={() => setHoveredId(item.id)}
+            onMouseLeave={() => setHoveredId(null)}
             onContextMenu={(e) => {
               e.preventDefault()
               useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', { 
@@ -193,11 +198,18 @@ export default function Taskbar({
               <div className={`absolute bottom-1 w-1 h-1 rounded-full ${item.isActive && !item.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
             )}
 
-            {/* Tooltip */}
-            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded bg-[var(--os-bg-panel)] border border-[var(--os-border)] text-xs shadow-sm whitespace-nowrap pointer-events-none text-[var(--os-text-primary)]">
-              {item.title}
-            </div>
-
+            {/* Window Preview */}
+            <AnimatePresence>
+              {hoveredId === item.id && (
+                <WindowPreview
+                  appId={item.appId}
+                  title={item.title}
+                  icon={item.icon}
+                  isActive={item.isActive}
+                  isVisible={true}
+                />
+              )}
+            </AnimatePresence>
           </button>
         ))}
       </div>

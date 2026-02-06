@@ -4,6 +4,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 
 export type ThemeMode = 'dark' | 'light'
 
+export interface Wallpaper {
+    type: 'preset' | 'image' | 'solid' | 'video'
+    value: string // css background value, image url, or video url
+}
+
 export interface SystemSettings {
     theme: ThemeMode
     accentColor: string
@@ -14,6 +19,7 @@ export interface SystemSettings {
     isMuted: boolean
     snapToGrid: boolean
     pinnedAppIds: string[]
+    wallpaper: Wallpaper
 }
 
 interface SystemSettingsContextType extends SystemSettings {
@@ -28,6 +34,7 @@ interface SystemSettingsContextType extends SystemSettings {
     setSnapToGrid: (enable: boolean) => void
     pinApp: (appId: string) => void
     unpinApp: (appId: string) => void
+    setWallpaper: (wallpaper: Wallpaper) => void
 }
 
 const SystemSettingsContext = createContext<SystemSettingsContextType | undefined>(undefined)
@@ -41,7 +48,11 @@ const DEFAULT_SETTINGS: SystemSettings = {
     volume: 75,
     isMuted: false,
     snapToGrid: true,
-    pinnedAppIds: ['portfolio-hub', 'music'] // Default pinned apps
+    pinnedAppIds: ['portfolio-hub', 'music'], // Default pinned apps
+    wallpaper: {
+        type: 'preset',
+        value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'
+    }
 }
 
 export function SystemSettingsProvider({ children }: { children: ReactNode }) {
@@ -142,6 +153,8 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
         pinnedAppIds: p.pinnedAppIds.filter(id => id !== appId)
     }))
 
+    const setWallpaper = (wallpaper: Wallpaper) => setSettings(p => ({ ...p, wallpaper }))
+
     return (
         <SystemSettingsContext.Provider value={{
             ...settings,
@@ -155,7 +168,8 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             toggleMute,
             setSnapToGrid,
             pinApp,
-            unpinApp
+            unpinApp,
+            setWallpaper
         }}>
             {children}
         </SystemSettingsContext.Provider>
