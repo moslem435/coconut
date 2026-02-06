@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FileText, Tag, Calendar, ChevronRight } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystem } from '@/os/sdk'
 
 export default function LogArchive() {
-  const { language } = useLanguage()
+  const { language } = useSystem()
   const { LOGS } = DATA[language]
 
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null)

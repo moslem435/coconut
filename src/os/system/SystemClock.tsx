@@ -13,16 +13,22 @@ export default function SystemClock({ className, style, showDate = false }: Syst
     const [date, setDate] = useState("")
 
     useEffect(() => {
+        let lastTime = ""
         const updateTime = () => {
             const now = new Date()
-            setTime(now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }))
+            const newTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+
+            // Only update state if time actually changed (every minute)
+            if (newTime !== lastTime) {
+                lastTime = newTime
+                setTime(newTime)
+            }
+
             if (showDate) {
                 setDate(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
             }
         }
         updateTime()
-        // Sync to minute change for efficiency if seconds are not displayed? 
-        // For now sticking to 1s to be safe and simple, optimization is isolation.
         const timer = setInterval(updateTime, 1000)
         return () => clearInterval(timer)
     }, [showDate])

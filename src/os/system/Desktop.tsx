@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { APPS_REGISTRY } from '@/os/registry/config'
-import { useWindowManager } from '@/os/kernel/WindowManagerContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useShallow } from 'zustand/react/shallow'
 
 interface DesktopProps {
     onLaunch: () => void
@@ -11,7 +12,12 @@ interface DesktopProps {
 }
 
 export default function Desktop({ onLaunch, onToggleMenu }: DesktopProps) {
-    const { windows, openWindow, focusWindow } = useWindowManager()
+    // Actions - stable
+    const openWindow = useWindowStore(state => state.openWindow)
+    const focusWindow = useWindowStore(state => state.focusWindow)
+    // Granular subscription for window status checks
+    const windows = useWindowStore(useShallow(state => state.windows))
+
     const [selectedIcon, setSelectedIcon] = useState<string | null>(null)
     const [currentTime, setCurrentTime] = useState('')
 

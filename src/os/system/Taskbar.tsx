@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { Wifi, Battery, Volume2, Command } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useWindowManager } from '@/os/kernel/WindowManagerContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useShallow } from 'zustand/react/shallow'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -14,11 +15,21 @@ import SystemClock from './SystemClock'
 export default function Taskbar({
   onStartClick
 }: TaskbarProps) {
-  const { windows, activeWindowId, focusWindow, minimizeWindow, showDesktop, updateTaskbarPosition } = useWindowManager()
+  // Taskbar needs list of all open windows
+  const openWindows = useWindowStore(useShallow(state =>
+    Object.values(state.windows).filter(w => w.isOpen)
+  ))
+  const activeWindowId = useWindowStore(state => state.activeWindowId)
+
+  // Actions
+  const focusWindow = useWindowStore(state => state.focusWindow)
+  const minimizeWindow = useWindowStore(state => state.minimizeWindow)
+  const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
+
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   // Sort windows by creation order (or just object keys for now)
-  const openWindows = Object.values(windows).filter(w => w.isOpen)
+  // const openWindows = Object.values(windows).filter(w => w.isOpen)
 
   // Update taskbar positions after render
   useLayoutEffect(() => {
@@ -76,6 +87,7 @@ export default function Taskbar({
               backgroundColor: activeWindowId === win.id && !win.isMinimized
                 ? 'var(--os-accent-dim)'
                 : 'transparent',
+              willChange: 'transform'
             }}
           >
             {/* Active Indicator Dot */}

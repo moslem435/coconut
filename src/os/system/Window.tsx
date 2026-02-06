@@ -3,9 +3,11 @@
 import React, { useRef, useState } from 'react'
 import { motion, useDragControls } from 'framer-motion'
 import { X, Minus, Square, Maximize2, Minimize2 } from 'lucide-react'
-import { useWindowManager } from '@/os/kernel/WindowManagerContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useShallow } from 'zustand/react/shallow'
 import { WindowFrame } from '@/os/ui/WindowFrame'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
+import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
 
 interface WindowProps {
   id: string
@@ -16,9 +18,19 @@ const SNAP_THRESHOLD = 10
 const RESTORE_DRAG_THRESHOLD = 20
 
 export default function Window({ id }: WindowProps) {
-  const { activeWindowId, windows, closeWindow, minimizeWindow, maximizeWindow, focusWindow, updateWindowPosition, updateWindowSize } = useWindowManager()
-  const windowState = windows[id]
-  const isActive = activeWindowId === id
+  // Granular subscription: Only re-render if THIS window changes.
+  // This is the key optimization of using Zustand.
+  const windowState = useWindowStore(useShallow(state => state.windows[id]))
+  const isActive = useWindowStore(state => state.activeWindowId === id)
+
+  // Actions (stable references)
+  const closeWindow = useWindowStore(state => state.closeWindow)
+  const minimizeWindow = useWindowStore(state => state.minimizeWindow)
+  const maximizeWindow = useWindowStore(state => state.maximizeWindow)
+  const focusWindow = useWindowStore(state => state.focusWindow)
+  const updateWindowPosition = useWindowStore(state => state.updateWindowPosition)
+  const updateWindowSize = useWindowStore(state => state.updateWindowSize)
+
   const dragControls = useDragControls()
   const [isResizing, setIsResizing] = useState(false)
   const [showSnapPreview, setShowSnapPreview] = useState(false)
@@ -101,7 +113,6 @@ export default function Window({ id }: WindowProps) {
     }
 
     const onPointerUp = () => {
-      setIsResizing(false)
       document.removeEventListener('pointermove', onPointerMove)
       document.removeEventListener('pointerup', onPointerUp)
 
@@ -113,12 +124,23 @@ export default function Window({ id }: WindowProps) {
         updateWindowPosition(id, { x: currentGeo.x, y: currentGeo.y })
       }
 
-      // Cleanup cleanup - remove direct styles so React takes over again
+      // Cleanup manual styles so React takes over again
       if (windowRef.current) {
         windowRef.current.style.width = ''
         windowRef.current.style.height = ''
         windowRef.current.style.transform = ''
       }
+
+      // CRITICAL FIX: We must wait for the state update to propagate and React to re-render 
+      // with the new size/position BEFORE we disable the "no-animation" mode.
+      // If we set isResizing(false) immediately, Framer Motion sees the new props vs old props
+      // and tries to animate the transition because duration is back to 0.35s.
+      requestAnimationFrame(() => {
+        // Double RAF ensures we are in the next frame after DOM updates
+        requestAnimationFrame(() => {
+          setIsResizing(false)
+        })
+      })
     }
 
     document.addEventListener('pointermove', onPointerMove)
@@ -204,7 +226,7 @@ export default function Window({ id }: WindowProps) {
               ease: [0.25, 0.1, 0.25, 1], // CSS ease equivalent
             }
         }
-        style={{ position: 'fixed', top: 0, left: 0 }}
+        style={{ position: 'fixed', top: 0, left: 0, willChange: 'transform, width, height' }}
         onDrag={(_, info) => {
           // Handle maximized window drag-to-restore preview
           if (windowState.isMaximized && info.offset.y > RESTORE_DRAG_THRESHOLD) {
@@ -294,7 +316,9 @@ export default function Window({ id }: WindowProps) {
           />
 
           <div className="flex-1 relative overflow-hidden bg-black">
-            {windowState.component}
+            <AppErrorBoundary appId={id}>
+              {windowState.component}
+            </AppErrorBoundary>
 
             {!windowState.isMaximized && (
               <>

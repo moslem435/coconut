@@ -1,75 +1,19 @@
-import { ComponentType } from 'react'
-import dynamic from 'next/dynamic'
-import { Terminal, FolderOpen, Globe, Trash, Settings } from 'lucide-react'
+import { AppManifest } from './types'
+import { manifest as PortfolioManifest } from '@/apps/portfolio-hub/manifest'
+import { manifest as SettingsManifest } from '@/apps/settings/manifest'
+import { manifest as ArchiveManifest } from '@/apps/archive/manifest'
+import { manifest as NetworkManifest } from '@/apps/network/manifest'
+import { manifest as TrashManifest } from '@/apps/trash/manifest'
 
-// Dynamic Imports for Code Splitting / Lazy Loading
-const Portfolio = dynamic(() => import('@/apps/portfolio-hub'), {
-  loading: () => <div className="flex items-center justify-center h-full text-cyan-500 font-mono animate-pulse">LOADING SYSTEM CORE...</div>
-})
+// Re-export for compatibility
+export type { AppManifest as AppConfig } from './types'
 
-export interface AppConfig {
-  id: string
-  title: string
-  icon: ComponentType<any>
-  component: ComponentType<any>
-  defaultWindowOptions?: {
-    width?: number
-    height?: number
-    isMaximized?: boolean
-    isResizable?: boolean
-  }
-}
-
-export const APPS_REGISTRY: Record<string, AppConfig> = {
-  'system-core': {
-    id: 'system-core',
-    title: 'PORTFOLIO_HUB',
-    icon: Terminal,
-    component: Portfolio,
-    defaultWindowOptions: {
-      isMaximized: true
-    }
-  },
-  'settings': {
-    id: 'settings',
-    title: 'SETTINGS',
-    icon: Settings,
-    component: dynamic(() => import('@/apps/settings')),
-    defaultWindowOptions: {
-      width: 900,
-      height: 600
-    }
-  },
-  'archive': {
-    id: 'archive',
-    title: 'ARCHIVE',
-    icon: FolderOpen,
-    component: dynamic(() => import('@/apps/archive')),
-    defaultWindowOptions: {
-      width: 800,
-      height: 600
-    }
-  },
-  'network': {
-    id: 'network',
-    title: 'NET_NODE',
-    icon: Globe,
-    component: dynamic(() => import('@/apps/network')),
-    defaultWindowOptions: {
-      width: 800,
-      height: 600
-    }
-  },
-  'trash': {
-    id: 'trash',
-    title: 'PURGE',
-    icon: Trash,
-    component: dynamic(() => import('@/apps/trash')),
-    defaultWindowOptions: {
-      width: 600,
-      height: 400
-    }
-  }
+export const APPS_REGISTRY: Record<string, AppManifest> = {
+  [PortfolioManifest.id]: PortfolioManifest,
+  [SettingsManifest.id]: SettingsManifest,
+  [ArchiveManifest.id]: ArchiveManifest,
+  [NetworkManifest.id]: NetworkManifest,
+  [TrashManifest.id]: TrashManifest,
 }
 
 export type AppId = keyof typeof APPS_REGISTRY

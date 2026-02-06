@@ -1,10 +1,9 @@
-'use client'
-
 import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
+import dynamic from 'next/dynamic'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
-import { useProject } from '@/os/kernel/ProjectContext'
+import { useSystem } from '@/os/sdk' // NEW: SDK Import
+import { ProjectContext, useProject } from './context/ProjectContext' // Local Context
 import { soundManager } from '@/lib/sound'
 import IOSPicker, { type IOSPickerHandle } from '@/components/ui/IOSPicker'
 import About from './components/About'
@@ -15,6 +14,12 @@ import MusicPlayer from './components/MusicPlayer'
 import Contact from './components/Contact'
 import Resume from './components/Resume'
 import Services from './components/Services'
+
+// Dynamically import Scene to ensure it stays client-side and optimized
+const Scene = dynamic(() => import('@/components/canvas/Scene'), {
+  ssr: false,
+  loading: () => null
+})
 
 // Utility Component for CRT/Screen Effect
 const ScreenOverlay = () => (
@@ -34,44 +39,32 @@ const ScreenOverlay = () => (
   </div>
 )
 
-interface PortfolioProps {
-  activeProject?: number
-  onProjectChange?: (index: number) => void
-  onProjectClick?: (index: number) => void
-  sceneSlot?: React.ReactNode
-  onClose?: () => void
+// Portfolio is now a self-contained App, no props needed from Shell
+export default function Portfolio() {
+  // Local State Management replacing global props/context
+  const [activeProject, setActiveProject] = useState(0)
+
+  // Wrap the content in the provider
+  return (
+    <ProjectContext.Provider value={{
+      activeProject,
+      setActiveProject,
+      onProjectClick: (index) => setActiveProject(index)
+    }}>
+      <PortfolioContent />
+    </ProjectContext.Provider>
+  )
 }
 
-export default function Portfolio({
-  activeProject: propActiveProject,
-  onProjectChange: propOnProjectChange,
-  onProjectClick: propOnProjectClick,
-  sceneSlot,
-  onClose
-}: PortfolioProps) {
-  const { language, toggleLanguage } = useLanguage()
-  const projectContext = useProject()
+function PortfolioContent() {
+  const { language, toggleLanguage } = useSystem()
+  const { activeProject, setActiveProject } = useProject()!
+
   const PROJECTS = DATA[language].PROJECTS
 
   const pickerRef = useRef<IOSPickerHandle>(null)
   const [selectedSubProject, setSelectedSubProject] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-
-  // Internal State
-  const [internalActiveProject, setInternalActiveProject] = useState(0)
-
-  // Priority: Context > Prop > Internal
-  const activeProject = projectContext?.activeProject ?? propActiveProject ?? internalActiveProject
-
-  const changeProject = useCallback((index: number) => {
-    if (projectContext) {
-      projectContext.setActiveProject(index)
-    } else if (propOnProjectChange) {
-      propOnProjectChange(index)
-    } else {
-      setInternalActiveProject(index)
-    }
-  }, [propOnProjectChange, projectContext])
 
   // Layout Configuration
   const LEFT_WIDTH = 25
@@ -82,13 +75,15 @@ export default function Portfolio({
 
   const project = PROJECTS[activeProject] || PROJECTS[0]
 
-  // Clone the sceneSlot to inject the selectedSubProject prop
-  const sceneWithProps = React.isValidElement(sceneSlot)
-    ? React.cloneElement(sceneSlot as React.ReactElement<any>, {
-      selectedSubProject: project ? (project.id === "02" ? null : selectedSubProject) : null,
-      activeProjectIndex: activeProject
-    })
-    : sceneSlot
+  // Direct Scene Integration
+  const sceneWithProps = (
+    <Scene
+      activeProjectIndex={activeProject}
+      isPortalActive={false}
+      onPortalComplete={() => { }}
+      selectedSubProject={project ? (project.id === "02" ? null : selectedSubProject) : null}
+    />
+  )
 
   // Mobile Detection
   useEffect(() => {
@@ -110,14 +105,14 @@ export default function Portfolio({
         case 'W':
           e.preventDefault()
           soundManager.playClick()
-          changeProject((activeProject - 1 + PROJECTS.length) % PROJECTS.length)
+          setActiveProject((activeProject - 1 + PROJECTS.length) % PROJECTS.length)
           break
         case 'ArrowDown':
         case 's':
         case 'S':
           e.preventDefault()
           soundManager.playClick()
-          changeProject((activeProject + 1) % PROJECTS.length)
+          setActiveProject((activeProject + 1) % PROJECTS.length)
           break
         case 'Escape':
           if (selectedSubProject) {
@@ -131,19 +126,18 @@ export default function Portfolio({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeProject, PROJECTS.length, changeProject, selectedSubProject])
+  }, [activeProject, PROJECTS.length, setActiveProject, selectedSubProject])
 
   const handleProjectChange = (index: number) => {
     if (activeProject !== index) {
-      changeProject(index)
+      setActiveProject(index)
       setSelectedSubProject(null)
     }
   }
 
   const handleClick = (index: number) => {
     soundManager.playClick()
-    changeProject(index)
-    propOnProjectClick?.(index)
+    setActiveProject(index)
   }
 
   // Mobile Layout Render
@@ -327,7 +321,7 @@ export default function Portfolio({
                   transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                   className="flex flex-col h-full justify-between"
                 >
-                  {project.id === "01" && <Projects activeProject={activeProject} onProjectChange={changeProject} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
+                  {project.id === "01" && <Projects activeProject={activeProject} onProjectChange={setActiveProject} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
                   {project.id === "02" && <About />}
                   {project.id === "03" && <Logs />}
                   {project.id === "04" && <Lab />}

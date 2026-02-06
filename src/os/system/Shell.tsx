@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATA } from '@/lib/data'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { useWindowManager } from '@/os/kernel/WindowManagerContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useShallow } from 'zustand/react/shallow'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import AppSplashScreen from '@/apps/AppSplashScreen'
 
@@ -15,21 +16,14 @@ import Desktop from './Desktop'
 import StartMenu from './StartMenu'
 import Window from './Window'
 
-interface ShellProps {
-  activeProject: number
-  onProjectChange: (index: number) => void
-  onProjectClick: (index: number) => void
-  sceneSlot: React.ReactNode
-}
-
-export default function Shell({
-  activeProject,
-  onProjectChange,
-  onProjectClick,
-  sceneSlot
-}: ShellProps) {
+// No props needed for Shell anymore
+export default function Shell() {
   const { language } = useLanguage()
-  const { windows, openWindow } = useWindowManager()
+  // Optimize: Only subscribe to the list of window IDs.
+  // Shell will only re-render when a window is added or removed.
+  const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
+  const openWindow = useWindowStore(state => state.openWindow)
+
   const PROJECTS = DATA[language].PROJECTS
 
   const [isBooting, setIsBooting] = useState(false)
@@ -45,15 +39,11 @@ export default function Shell({
     const appConfig = APPS_REGISTRY['system-core']
     const PortfolioComponent = appConfig.component
 
+    // Open standard window without prop injection
     openWindow(
       appConfig.id,
       appConfig.title,
-      <PortfolioComponent
-        activeProject={activeProject}
-        onProjectChange={onProjectChange}
-        onProjectClick={onProjectClick}
-        sceneSlot={sceneSlot}
-      />,
+      <PortfolioComponent />,
       appConfig.icon,
       appConfig.defaultWindowOptions
     )
@@ -81,7 +71,7 @@ export default function Shell({
         )}
 
         {/* Windows */}
-        {Object.keys(windows).map(id => (
+        {windowIds.map(id => (
           <Window key={id} id={id} />
         ))}
       </AnimatePresence>

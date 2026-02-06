@@ -3,13 +3,13 @@
 import React, { createContext, useContext } from 'react'
 
 interface ProjectContextType {
-  activeProject: number
-  setActiveProject: (index: number) => void
-  onProjectClick?: (index: number) => void
+    activeProject: number
+    setActiveProject: (index: number) => void
+    onProjectClick?: (index: number) => void
 }
 
 export const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 
 export function useProject() {
-  return useContext(ProjectContext)
+    return useContext(ProjectContext)
 }

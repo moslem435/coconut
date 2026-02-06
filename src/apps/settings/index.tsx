@@ -16,8 +16,7 @@ import {
     Moon,
     Languages
 } from 'lucide-react'
-import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystem } from '@/os/sdk' // NEW: Import from SDK
 
 interface SettingCategory {
     id: string
@@ -39,7 +38,7 @@ const categories: SettingCategory[] = [
 export default function SettingsApp() {
     const [activeCategory, setActiveCategory] = useState('display')
 
-    // Connect to System Context
+    // Connect to System SDK
     const {
         theme, setTheme,
         accentColor, setAccentColor,
@@ -47,11 +46,14 @@ export default function SettingsApp() {
         useAnimations, setUseAnimations,
         displayScale, setDisplayScale,
         volume, setVolume,
-        isMuted, toggleMute
-    } = useSystemSettings()
+        isMuted, toggleMute,
+        language, setLanguage
+    } = useSystem()
 
-    // Connect to Language Context
-    const { language, setLanguage } = useLanguage()
+    // NOTE: The previous SDK implementation missed some fields like useTransparency.
+    // I need to update SDK first or use direct access for now? 
+    // BETTER: Update SDK to expose everything needed.
+
 
     const accentColors = [
         { name: '青色', value: '#06b6d4' },

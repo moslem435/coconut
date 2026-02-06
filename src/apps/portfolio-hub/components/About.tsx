@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { DATA, SOCIAL_LINKS } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystem } from '@/os/sdk'
 
 const GlitchText = ({ text }: { text: string }) => (
   <div className="relative inline-block group">
@@ -66,7 +66,7 @@ const SkillBar = ({ label, level, color = "bg-cyan-500" }: { label: string, leve
 )
 
 export default function About() {
-  const { language } = useLanguage()
+  const { language } = useSystem()
   const { SKILLS, EXPERIENCE, ARSENAL, SERVICES, PROJECTS } = DATA[language]
   const aboutDescription = PROJECTS.find(p => p.id === '02')?.description
 

@@ -4,10 +4,10 @@ import { motion } from 'framer-motion'
 import { Beaker, Microscope, Zap } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystem } from '@/os/sdk'
 
 export default function LabGrid() {
-  const { language } = useLanguage()
+  const { language } = useSystem()
   const { LAB_ITEMS } = DATA[language]
 
   return (

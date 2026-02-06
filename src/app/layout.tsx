@@ -3,7 +3,7 @@ import { Roboto, Orbitron, Rajdhani } from 'next/font/google'
 import './globals.css'
 import { SiteProtection } from '@/os/system/SiteProtection'
 import { LanguageProvider } from "@/os/kernel/LanguageContext"
-import { WindowManagerProvider } from "@/os/kernel/WindowManagerContext"
+
 import { SystemSettingsProvider } from "@/os/kernel/SystemSettingsContext"
 
 const roboto = Roboto({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-roboto' })
@@ -26,9 +26,7 @@ export default function RootLayout({
         <SiteProtection />
         <SystemSettingsProvider>
           <LanguageProvider>
-            <WindowManagerProvider>
-              {children}
-            </WindowManagerProvider>
+            {children}
           </LanguageProvider>
         </SystemSettingsProvider>
       </body>

@@ -5,27 +5,9 @@ import { Suspense, useState } from 'react'
 import { motion } from 'framer-motion'
 import Shell from '@/os/system/Shell'
 import BootSequence from '@/os/system/BootSequence'
-import { ProjectContext } from '@/os/kernel/ProjectContext'
-
-// Dynamically import the Scene to avoid SSR issues with WebGL
-const Scene = dynamic(() => import('@/components/canvas/Scene'), {
-  ssr: false,
-  loading: () => null
-})
 
 export default function Home() {
-  const [activeProjectIndex, setActiveProjectIndex] = useState(0)
-  const [isPortalActive, setIsPortalActive] = useState(false)
   const [hasBooted, setHasBooted] = useState(false)
-
-  const handleProjectClick = (index: number) => {
-    setActiveProjectIndex(index)
-    setIsPortalActive(true)
-  }
-
-  const handlePortalComplete = () => {
-    setIsPortalActive(false)
-  }
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-black">
@@ -42,24 +24,7 @@ export default function Home() {
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
         >
-          <ProjectContext.Provider value={{
-            activeProject: activeProjectIndex,
-            setActiveProject: setActiveProjectIndex,
-            onProjectClick: handleProjectClick
-          }}>
-            <Shell
-              activeProject={activeProjectIndex}
-              onProjectChange={setActiveProjectIndex}
-              onProjectClick={handleProjectClick}
-              sceneSlot={
-                <Scene
-                  activeProjectIndex={activeProjectIndex}
-                  isPortalActive={isPortalActive}
-                  onPortalComplete={handlePortalComplete}
-                />
-              }
-            />
-          </ProjectContext.Provider>
+          <Shell />
 
           {/* Persistent HUD Elements - Background Layer */}
           <div className="pointer-events-none absolute inset-0 z-0 flex flex-col justify-between p-12 mix-blend-difference opacity-50">

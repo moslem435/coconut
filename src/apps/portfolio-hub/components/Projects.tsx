@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Terminal, Layers, Code, Cpu, ExternalLink } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { DATA } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystem } from '@/os/sdk'
 
 interface ProjectsProps {
   activeProject?: number
@@ -22,7 +22,7 @@ export default function Projects({
   onSubProjectChange,
   onSelect
 }: ProjectsProps) {
-  const { language } = useLanguage()
+  const { language } = useSystem()
   const { WORK_ITEMS } = DATA[language]
 
   const [internalSelectedId, setInternalSelectedId] = useState(WORK_ITEMS[0].id)
