@@ -7,8 +7,12 @@ const ResumeApp = dynamic(() => import('./index'), { ssr: false })
 export const manifest: AppManifest = {
   id: 'resume',
   title: 'Resume',
-  icon: FileText,
-  component: ResumeApp,
+    icon: FileText,
+    theme: {
+        backgroundColor: '#10b981',
+        iconColor: '#ffffff'
+    },
+    component: ResumeApp,
   defaultWindowOptions: {
     width: 850,
     height: 900,

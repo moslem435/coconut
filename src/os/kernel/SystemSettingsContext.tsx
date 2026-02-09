@@ -16,6 +16,7 @@ export interface SystemSettings {
     useAnimations: boolean
     useTaskbarPreviews: boolean
     skipBootSequence: boolean
+    iconTheme: 'filled' | 'line'
     displayScale: number
     volume: number
     isMuted: boolean
@@ -31,6 +32,7 @@ interface SystemSettingsContextType extends SystemSettings {
     setUseAnimations: (enable: boolean) => void
     setUseTaskbarPreviews: (enable: boolean) => void
     setSkipBootSequence: (enable: boolean) => void
+    setIconTheme: (theme: 'filled' | 'line') => void
     setDisplayScale: (scale: number) => void
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
@@ -50,6 +52,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     useAnimations: true,
     useTaskbarPreviews: true,
     skipBootSequence: false,
+    iconTheme: 'filled',
     displayScale: 100,
     volume: 75,
     isMuted: false,
@@ -145,6 +148,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     const setUseAnimations = (enable: boolean) => setSettings(p => ({ ...p, useAnimations: enable }))
     const setUseTaskbarPreviews = (enable: boolean) => setSettings(p => ({ ...p, useTaskbarPreviews: enable }))
     const setSkipBootSequence = (enable: boolean) => setSettings(p => ({ ...p, skipBootSequence: enable }))
+    const setIconTheme = (theme: 'filled' | 'line') => setSettings(p => ({ ...p, iconTheme: theme }))
     const setDisplayScale = (scale: number) => setSettings(p => ({ ...p, displayScale: scale }))
     const setVolume = (volume: number) => setSettings(p => ({ ...p, volume }))
     const setMuted = (muted: boolean) => setSettings(p => ({ ...p, isMuted: muted }))
@@ -172,6 +176,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             setUseAnimations,
             setUseTaskbarPreviews,
             setSkipBootSequence,
+            setIconTheme,
             setDisplayScale,
             setVolume,
             setMuted,

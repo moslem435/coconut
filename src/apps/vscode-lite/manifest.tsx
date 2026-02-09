@@ -8,6 +8,10 @@ export const manifest: AppManifest = {
   id: 'vscode-lite',
   title: 'VS Code',
   icon: Code2,
+  theme: {
+      backgroundColor: '#4f46e5',
+      iconColor: '#ffffff'
+  },
   component: VSCodeLite,
   defaultWindowOptions: {
     width: 900,

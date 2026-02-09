@@ -6,10 +6,14 @@ export const manifest: AppManifest = {
     id: 'notepad',
     title: 'Notepad',
     icon: StickyNote,
+    theme: {
+        backgroundColor: '#eab308',
+        iconColor: '#000000'
+    },
     component: Notepad,
     defaultWindowOptions: {
-        size: { width: 600, height: 400 },
-        taskbarPosition: { x: 0, y: 0 },
+        width: 600,
+        height: 400,
         titleBarColor: 'dark'
     }
 }

@@ -5,6 +5,7 @@ import { Folder, FileText, ChevronRight, ArrowUp, Home, HardDrive, Image as Imag
 import { APPS_REGISTRY } from '@/os/registry/config'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
+import { AppIcon } from '@/os/ui/AppIcon'
 
 interface FileExplorerProps {
     initialPath?: string
@@ -170,21 +171,26 @@ function SidebarItem({ icon: Icon, label, active, onClick }: any) {
 }
 
 function FileItem({ node, onDoubleClick }: { node: FileNode, onDoubleClick: () => void }) {
-   // Determine Icon logic (synced with Desktop.tsx)
+   // Determine Icon Properties
+   const manifest = node.appId ? APPS_REGISTRY[node.appId] : undefined
    let Icon = FileText
-   let iconColorClass = 'text-blue-400'
-   let fill = 'none'
+   let backgroundColor = '#3b82f6' // Default blue
 
-   if (node.appId && APPS_REGISTRY[node.appId]) {
-       Icon = APPS_REGISTRY[node.appId].icon
-       iconColorClass = 'text-white' // Apps usually have their own colors, default to white/neutral
+   if (manifest) {
+       Icon = manifest.icon
+       backgroundColor = manifest.theme?.backgroundColor || '#3b82f6'
    } else if (node.type === 'folder') {
        Icon = Folder
-       iconColorClass = 'text-yellow-400'
-       fill = 'currentColor'
+       backgroundColor = '#facc15' // yellow-400
    } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(node.name)) {
        Icon = ImageIcon
-       iconColorClass = 'text-purple-400'
+       backgroundColor = '#a855f7' // purple-500
+   } else if (/\.(txt|md|json)$/i.test(node.name)) {
+       Icon = StickyNote
+       backgroundColor = '#eab308' // yellow-500
+   } else {
+       // Default file
+       backgroundColor = '#94a3b8' // slate-400
    }
 
    return (
@@ -192,9 +198,13 @@ function FileItem({ node, onDoubleClick }: { node: FileNode, onDoubleClick: () =
        onDoubleClick={onDoubleClick}
        className="group flex flex-col items-center gap-2 p-2 rounded hover:bg-white/5 focus:bg-white/10 outline-none transition-colors text-center cursor-default"
      >
-       <div className={`w-12 h-12 flex items-center justify-center rounded-xl text-3xl transition-transform ${iconColorClass}`}>
-          <Icon size={32} strokeWidth={1.5} fill={fill} fillOpacity={0.2} />
-       </div>
+       <AppIcon 
+          manifest={manifest}
+          icon={Icon}
+          size={48}
+          backgroundColor={backgroundColor}
+          className="drop-shadow-sm group-hover:scale-105 transition-transform"
+       />
        <span className="text-xs truncate w-full px-1 select-none">{node.name}</span>
      </button>
    )

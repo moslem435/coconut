@@ -10,6 +10,10 @@ export const manifest: AppManifest = {
     id: 'settings',
     title: 'SETTINGS',
     icon: Settings,
+    theme: {
+        backgroundColor: '#475569',
+        iconColor: '#ffffff'
+    },
     component: SettingsApp,
     defaultWindowOptions: {
         width: 900,

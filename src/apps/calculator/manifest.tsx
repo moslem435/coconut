@@ -6,9 +6,14 @@ export const manifest: AppManifest = {
     id: 'calculator',
     title: 'Calculator',
     icon: CalculatorIcon,
+    theme: {
+        backgroundColor: '#f97316',
+        iconColor: '#ffffff'
+    },
     component: Calculator,
     defaultWindowOptions: {
-        size: { width: 320, height: 480 },
-        taskbarPosition: { x: 0, y: 0 }
+        width: 320,
+        height: 480,
+        isResizable: false
     }
 }

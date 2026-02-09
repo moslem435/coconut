@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
-import { Trash2, RotateCcw, Ban, FileText, Folder } from 'lucide-react'
+import { Trash2, RotateCcw, Ban, FileText, Folder, Image as ImageIcon, StickyNote } from 'lucide-react'
+import { AppIcon } from '@/os/ui/AppIcon'
+import { APPS_REGISTRY } from '@/os/registry/config'
 
 const RecycleBin: React.FC = () => {
   const [deletedFiles, setDeletedFiles] = useState<FileNode[]>([])
@@ -72,7 +74,29 @@ const RecycleBin: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-4">
-            {deletedFiles.map(file => (
+            {deletedFiles.map(file => {
+              // Determine Icon Logic
+              const manifest = file.appId ? APPS_REGISTRY[file.appId] : undefined
+              let Icon = FileText
+              let backgroundColor = '#3b82f6'
+
+              if (manifest) {
+                  Icon = manifest.icon
+                  backgroundColor = manifest.theme?.backgroundColor || '#3b82f6'
+              } else if (file.type === 'folder') {
+                  Icon = Folder
+                  backgroundColor = '#facc15'
+              } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) {
+                  Icon = ImageIcon
+                  backgroundColor = '#a855f7'
+              } else if (/\.(txt|md|json)$/i.test(file.name)) {
+                  Icon = StickyNote
+                  backgroundColor = '#eab308'
+              } else {
+                  backgroundColor = '#94a3b8'
+              }
+
+              return (
               <div
                 key={file.id}
                 onClick={(e) => {
@@ -84,9 +108,13 @@ const RecycleBin: React.FC = () => {
                   ${selectedIds.has(file.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'}
                 `}
               >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center text-gray-500">
-                  {file.type === 'folder' ? <Folder size={32} /> : <FileText size={32} />}
-                </div>
+                <AppIcon 
+                    manifest={manifest}
+                    icon={Icon}
+                    size={48}
+                    backgroundColor={backgroundColor}
+                    className="mb-2 drop-shadow-sm"
+                />
                 <div className="text-xs text-center break-all px-1 line-clamp-2">
                   {file.name}
                 </div>
@@ -94,7 +122,7 @@ const RecycleBin: React.FC = () => {
                    From: {files[file.originalParentId || '']?.name || 'Unknown'}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

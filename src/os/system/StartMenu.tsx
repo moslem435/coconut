@@ -8,6 +8,8 @@ import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
+import { AppManifest } from '@/os/registry/types'
+import { AppIcon } from '@/os/ui/AppIcon'
 
 interface StartMenuProps {
     isOpen: boolean
@@ -140,7 +142,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                         {Object.values(APPS_REGISTRY).filter(app => app.id !== 'portfolio-hub').map((app) => (
                             <MenuItem
                                 key={app.id}
-                                icon={app.icon}
+                                manifest={app}
                                 label={app.title}
                                 onClick={() => handleLaunchApp(app.id)}
                             />
@@ -156,13 +158,14 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
 }
 
 interface MenuItemProps {
-    icon: any
+    manifest?: AppManifest
+    icon?: any
     label: string
     onClick?: () => void
     danger?: boolean
 }
 
-function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
+function MenuItem({ manifest, icon: Icon, label, onClick, danger }: MenuItemProps) {
     return (
         <button
             onClick={onClick}
@@ -171,7 +174,13 @@ function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
                 : 'hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)]'
                 }`}
         >
-            <Icon size={18} className={danger ? 'text-red-400' : 'text-[var(--os-text-secondary)] group-hover:text-[var(--os-text-primary)]'} />
+            <AppIcon 
+                manifest={manifest} 
+                icon={Icon} 
+                size={32} 
+                background={!!manifest}
+                className={danger ? 'text-red-400' : undefined}
+            />
             <span className="text-sm font-medium">{label}</span>
         </button>
     )

@@ -2,314 +2,979 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Heart, ListMusic, Volume2, MoreHorizontal, ChevronDown } from 'lucide-react'
+import { 
+  Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Heart, 
+  ListMusic, Volume2, MoreHorizontal, ChevronLeft, ChevronRight, 
+  Search, Download, Clock, Disc, Mic2, LayoutGrid, Settings, 
+  RefreshCw, Layers, MonitorSpeaker, ChevronUp, ChevronDown, Maximize2,
+  Trash2, Plus
+} from 'lucide-react'
 
-// Mock Data
-const PLAYLIST = [
+// Real Sample Data (SoundHelix)
+const INITIAL_TRACKS = [
   {
     id: '1',
-    title: 'Cyberpunk City',
-    artist: 'Synthwave Boy',
-    album: 'Neon Nights',
-    url: 'https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Tours/Enthusiast/Tours_-_01_-_Enthusiast.mp3',
-    cover: 'https://images.unsplash.com/photo-1535402803947-a950d5f71480?q=80&w=800&auto=format&fit=crop', // Cyberpunk neon
-    color: '#4f46e5' // Indigo
+    title: 'Daily 30',
+    artist: 'SoundHelix',
+    album: 'Ambient Works',
+    cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    duration: 372
   },
   {
     id: '2',
-    title: 'Night Drive',
-    artist: 'Neon Rider',
-    album: 'Midnight Run',
-    url: 'https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Kai_Engel/Satin/Kai_Engel_-_04_-_Sentinel.mp3',
-    cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=800&auto=format&fit=crop', // Surfer/Sunset
-    color: '#f97316' // Orange
+    title: 'Neon Nights',
+    artist: 'Cyberwave',
+    album: 'Future City',
+    cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    duration: 420
   },
   {
     id: '3',
-    title: 'Coding Flow',
-    artist: 'Lo-Fi Beats',
+    title: 'Code & Chill',
+    artist: 'DevBeats',
     album: 'Focus Mode',
-    url: 'https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Chad_Crouch/Arps/Chad_Crouch_-_Elipses.mp3',
-    cover: 'https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=800&auto=format&fit=crop', // Abstract
-    color: '#06b6d4' // Cyan
+    cover: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    duration: 320
+  },
+  {
+    id: '4',
+    title: 'Midnight Drive',
+    artist: 'SynthHero',
+    album: 'Retrowave',
+    cover: 'https://images.unsplash.com/photo-1504509546545-e000b4a62901?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    duration: 300
+  },
+  {
+    id: '5',
+    title: 'Ocean Breeze',
+    artist: 'Coastal Vibe',
+    album: 'Summer Days',
+    cover: 'https://images.unsplash.com/photo-1515405295579-ba7b45490915?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+    duration: 340
+  },
+  {
+    id: '6',
+    title: 'Deep Focus',
+    artist: 'Mindset',
+    album: 'Flow State',
+    cover: 'https://images.unsplash.com/photo-1485579149621-3123dd979885?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+    duration: 290
+  },
+  {
+    id: '7',
+    title: 'Electric Dreams',
+    artist: 'Pulse',
+    album: 'Digital Love',
+    cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+    duration: 310
+  },
+  {
+    id: '8',
+    title: 'Mountain Echo',
+    artist: 'Nature Sounds',
+    album: 'Earth',
+    cover: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    duration: 280
+  },
+  {
+    id: '9',
+    title: 'Piano Solitude',
+    artist: 'Classical Minds',
+    album: 'Keys',
+    cover: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+    duration: 330
+  },
+  {
+    id: '10',
+    title: 'Cyber Funk',
+    artist: 'Groove Bot',
+    album: 'Future Funk',
+    cover: 'https://images.unsplash.com/photo-1494232410401-ad00d5433cfa?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+    duration: 360
+  },
+  {
+    id: '11',
+    title: 'Lost in Space',
+    artist: 'Star Walker',
+    album: 'Galaxy',
+    cover: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3',
+    duration: 400
+  },
+  {
+    id: '12',
+    title: 'Urban Flow',
+    artist: 'City Life',
+    album: 'Metropolis',
+    cover: 'https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3',
+    duration: 350
+  },
+  {
+    id: '13',
+    title: 'Morning Coffee',
+    artist: 'Acoustic Soul',
+    album: 'Wake Up',
+    cover: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3',
+    duration: 240
+  },
+  {
+    id: '14',
+    title: 'Retro Arcade',
+    artist: 'Bit Master',
+    album: 'Level 1',
+    cover: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3',
+    duration: 180
+  },
+  {
+    id: '15',
+    title: 'Sunset Blvd',
+    artist: 'Pop Star',
+    album: 'Dreams',
+    cover: 'https://images.unsplash.com/photo-1477233534935-f5e6fe7c1159?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3',
+    duration: 210
+  },
+  {
+    id: '16',
+    title: 'Night Owl',
+    artist: 'Jazz Quartet',
+    album: 'Blue Note',
+    cover: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?q=80&w=400&auto=format&fit=crop',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3',
+    duration: 390
   }
 ]
 
-const MOCK_LYRICS = [
-  { time: 0, text: "Instrumental Intro..." },
-  { time: 5, text: "Neon lights flashing by" },
-  { time: 10, text: "Driving through the city night" },
-  { time: 15, text: "Synthesizers in the air" },
-  { time: 20, text: "Cyberpunk is everywhere" },
-  { time: 25, text: "..." },
-  { time: 30, text: "(Music fades in)" },
-  { time: 40, text: "Feel the rhythm, feel the beat" },
-  { time: 50, text: "Echoes on the empty street" },
+const MY_PLAYLISTS = [
+  "My 2025 Favorites",
+  "Late Night Coding",
+  "Gym Motivation",
+  "Chill Vibes",
+  "New Playlist 1"
 ]
+
+const formatTime = (seconds: number) => {
+  if (isNaN(seconds)) return "0:00"
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 
 export default function MusicPlayer() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  // State
+  const [playlist, setPlaylist] = useState(INITIAL_TRACKS)
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [showPlaylist, setShowPlaylist] = useState(false)
-  const [mode, setMode] = useState<'loop' | 'shuffle'>('loop')
+  const [volume, setVolume] = useState(0.5)
+  const [activeTab, setActiveTab] = useState('recommend')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDetail, setShowDetail] = useState(false)
+  const [liked, setLiked] = useState<Record<string, boolean>>({})
   
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const track = PLAYLIST[currentIndex]
+  // Optimization State
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off')
+  const [isShuffled, setIsShuffled] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, trackId: string} | null>(null)
 
-  // Audio Handlers
-  const togglePlay = () => {
-    if (!audioRef.current) return
-    if (isPlaying) audioRef.current.pause()
-    else audioRef.current.play()
-    setIsPlaying(!isPlaying)
-  }
+  // iTunes Search State
+  const [onlineTracks, setOnlineTracks] = useState<any[]>([])
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false)
+
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const currentTrack = playlist[currentTrackIndex] || playlist[0]
+
+  // Persistence
+  useEffect(() => {
+    const saved = localStorage.getItem('music-player-state')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.liked) setLiked(parsed.liked)
+        if (parsed.volume) setVolume(parsed.volume)
+        if (parsed.playlist && Array.isArray(parsed.playlist)) setPlaylist(parsed.playlist)
+        if (parsed.currentTrackIndex) setCurrentTrackIndex(parsed.currentTrackIndex)
+        if (parsed.repeatMode) setRepeatMode(parsed.repeatMode)
+        if (parsed.isShuffled) setIsShuffled(parsed.isShuffled)
+      } catch (e) { console.error("Failed to load state", e) }
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('music-player-state', JSON.stringify({
+      liked,
+      volume,
+      playlist: playlist.length > INITIAL_TRACKS.length ? playlist : undefined,
+      currentTrackIndex,
+      repeatMode,
+      isShuffled
+    }))
+  }, [liked, volume, playlist, currentTrackIndex, repeatMode, isShuffled])
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab === 'search' && document.activeElement?.tagName === 'INPUT') return
+      
+      switch(e.code) {
+         case 'Space': 
+            e.preventDefault(); togglePlay(); break;
+         case 'ArrowLeft': 
+            if (e.metaKey || e.ctrlKey) playPrev(); 
+            else if (audioRef.current) audioRef.current.currentTime -= 5; 
+            break;
+         case 'ArrowRight':
+            if (e.metaKey || e.ctrlKey) playNext();
+            else if (audioRef.current) audioRef.current.currentTime += 5;
+            break;
+         case 'ArrowUp':
+            e.preventDefault(); setVolume(v => Math.min(1, v + 0.1)); break;
+         case 'ArrowDown':
+            e.preventDefault(); setVolume(v => Math.max(0, v - 0.1)); break;
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isPlaying, activeTab, volume, playlist, currentTrackIndex, isShuffled, repeatMode])
+
+  // Audio Effects
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.log("Playback failed:", e))
+      } else {
+        audioRef.current.pause()
+      }
+    }
+  }, [isPlaying, currentTrackIndex]) // Removed playlist dep to prevent restart on list change
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume
+    }
+  }, [volume])
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime)
-      setDuration(audioRef.current.duration || 0)
+      const curr = audioRef.current.currentTime
+      const dur = audioRef.current.duration
+      setCurrentTime(curr)
+      setDuration(dur || 0)
+      setProgress(dur > 0 ? (curr / dur) * 100 : 0)
     }
   }
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = Number(e.target.value)
-    if (audioRef.current) {
-      audioRef.current.currentTime = time
-      setCurrentTime(time)
+  const handleTrackEnd = () => {
+    if (repeatMode === 'one') {
+       if (audioRef.current) {
+         audioRef.current.currentTime = 0
+         audioRef.current.play()
+       }
+    } else {
+       playNext(true)
     }
   }
 
-  const changeTrack = (direction: 'next' | 'prev') => {
-    let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
-    if (newIndex >= PLAYLIST.length) newIndex = 0
-    if (newIndex < 0) newIndex = PLAYLIST.length - 1
-    setCurrentIndex(newIndex)
+  // Controls
+  const togglePlay = () => setIsPlaying(prev => !prev)
+  const toggleShuffle = () => setIsShuffled(prev => !prev)
+  const toggleRepeat = () => setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off')
+  
+  const getNextIndex = () => {
+    if (isShuffled) {
+      let nextIndex = Math.floor(Math.random() * playlist.length)
+      while (nextIndex === currentTrackIndex && playlist.length > 1) {
+        nextIndex = Math.floor(Math.random() * playlist.length)
+      }
+      return nextIndex
+    }
+    return (currentTrackIndex + 1) % playlist.length
+  }
+
+  const playNext = (auto = false) => {
+    setCurrentTrackIndex(getNextIndex())
     setIsPlaying(true)
   }
 
-  // Auto-play when track changes
-  useEffect(() => {
-    if (isPlaying && audioRef.current) {
-        audioRef.current.play()
+  const playPrev = () => {
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0
+    } else {
+      setCurrentTrackIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
     }
-  }, [currentIndex])
-
-  const formatTime = (t: number) => {
-    if (isNaN(t)) return "0:00"
-    const m = Math.floor(t / 60)
-    const s = Math.floor(t % 60)
-    return `${m}:${s.toString().padStart(2, '0')}`
+    setIsPlaying(true)
   }
 
-  // Find current lyric
-  const currentLyricIndex = MOCK_LYRICS.findLastIndex(l => l.time <= currentTime)
+  const playTrack = (track: any) => {
+    // Check if track is in playlist
+    const index = playlist.findIndex(t => t.id === track.id)
+    if (index !== -1) {
+      setCurrentTrackIndex(index)
+    } else {
+      // Add to playlist and play
+      const newPlaylist = [...playlist, track]
+      setPlaylist(newPlaylist)
+      setCurrentTrackIndex(newPlaylist.length - 1)
+    }
+    setIsPlaying(true)
+  }
+  
+  // Drag & Drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+  
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'))
+    if (files.length > 0) {
+        const newTracks = files.map(f => ({
+            id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            title: f.name.replace(/\.[^/.]+$/, ""),
+            artist: 'Local File',
+            album: 'Uploads',
+            cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop',
+            url: URL.createObjectURL(f),
+            duration: 0,
+            isLocal: true
+        }))
+        setPlaylist(prev => [...prev, ...newTracks])
+        playTrack(newTracks[0])
+        setActiveTab('local')
+    }
+  }
+
+  const handleDeleteTrack = (id: string) => {
+    const newPlaylist = playlist.filter(t => t.id !== id)
+    setPlaylist(newPlaylist)
+    if (currentTrack.id === id) {
+       playNext()
+    }
+    setContextMenu(null)
+  }
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value)
+    if (audioRef.current) {
+      audioRef.current.currentTime = (val / 100) * audioRef.current.duration
+      setProgress(val)
+    }
+  }
+
+  const toggleLike = (id: string) => {
+    setLiked(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  // Search Effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        if (activeTab !== 'search') setActiveTab('search')
+        searchiTunes(searchQuery)
+      } else {
+        if (activeTab === 'search') setActiveTab('recommend')
+        setOnlineTracks([])
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const searchiTunes = async (term: string) => {
+    if (!term) return
+    setIsSearchingOnline(true)
+    try {
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=24`)
+      const data = await res.json()
+      
+      const results = data.results.map((item: any) => ({
+        id: 'itunes-' + item.trackId,
+        title: item.trackName,
+        artist: item.artistName,
+        album: item.collectionName,
+        cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=400&auto=format&fit=crop',
+        url: item.previewUrl,
+        duration: Math.round(item.trackTimeMillis / 1000),
+        isOnline: true
+      }))
+      setOnlineTracks(results)
+    } catch (e) {
+      console.error("iTunes Search failed:", e)
+    } finally {
+      setIsSearchingOnline(false)
+    }
+  }
+
+  // Components
+  const SidebarItem = ({ icon: Icon, label, id, count }: any) => (
+    <div 
+      onClick={() => setActiveTab(id || label.toLowerCase())}
+      className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors ${
+        activeTab === (id || label.toLowerCase()) 
+          ? 'bg-[#1DB954]/10 text-[#1DB954]' 
+          : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={18} />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      {count && <span className="text-xs text-gray-600">{count}</span>}
+    </div>
+  )
 
   return (
-    <div className="h-full w-full relative overflow-hidden bg-black font-sans select-none text-white/90">
-      {/* Background Layer (Blur) */}
-      <div className="absolute inset-0 z-0">
-        <div 
-            className="absolute inset-0 bg-center bg-cover transition-all duration-1000 ease-in-out opacity-60 scale-110 blur-3xl"
-            style={{ backgroundImage: `url(${track.cover})` }}
-        />
-        <div className="absolute inset-0 bg-black/40" /> {/* Dim overlay */}
-      </div>
-
-      {/* Main Content */}
-      <div className="relative z-10 h-full flex flex-col pt-10 pb-6 px-6">
-        
-        {/* Header Area (Song Info) */}
-        <div className="text-center mb-8 mt-2">
-            <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-md truncate px-8">{track.title}</h1>
-            <p className="text-sm text-white/60 font-medium tracking-wide mt-1">{track.artist}</p>
-        </div>
-
-        {/* Vinyl Record Area */}
-        <div className="flex-1 flex items-center justify-center relative min-h-0">
-            {/* Needle (Stylus) */}
-            <motion.div 
-                className="absolute top-[-20px] left-[55%] w-24 h-36 z-20 origin-top-left pointer-events-none drop-shadow-2xl"
-                animate={{ rotate: isPlaying ? 0 : -25 }}
-                transition={{ type: "spring", stiffness: 50, damping: 10 }}
-            >
-                 {/* Stylus Arm Graphic (CSS Drawing) */}
-                 <div className="w-1.5 h-4 bg-gray-400 absolute top-0 left-0 rounded-full" /> {/* Pivot */}
-                 <div className="w-1 h-24 bg-gradient-to-b from-gray-300 to-gray-500 absolute top-2 left-0.5 origin-top rotate-[-15deg]" /> {/* Arm */}
-                 <div className="w-3 h-5 bg-gray-300 absolute bottom-8 left-[-8px] rounded-sm shadow-md rotate-[-15deg]" /> {/* Head */}
-            </motion.div>
-
-        {/* Vinyl Disc */}
-        <div className="relative w-64 h-64 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.6)] border-4 border-white/5 bg-[#1a1a1a]">
-             {/* Continuous Spin Animation */}
-             <div 
-                className="w-full h-full rounded-full overflow-hidden relative animate-[spin_20s_linear_infinite]"
-                style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-             >
-                 {/* Vinyl Texture Rings */}
-                 <div className="absolute inset-0 rounded-full border-[10px] border-[#111]" />
-                 <div className="absolute inset-2 rounded-full border border-white/10" />
-                 <div className="absolute inset-4 rounded-full border border-white/5" />
-                 
-                 {/* Album Art (Center Label) */}
-                 <div className="absolute inset-[25%] rounded-full overflow-hidden border-2 border-[#111] shadow-inner">
-                    <img src={track.cover} className="w-full h-full object-cover" alt="cover" />
-                 </div>
-            </div>
-        </div>
-    </div>
-
-    {/* Lyrics Snippet */}
     <div 
-        className="h-16 flex items-center justify-center text-center my-4 overflow-hidden"
-        style={{ maskImage: 'linear-gradient(transparent, black 20%, black 80%, transparent)', WebkitMaskImage: 'linear-gradient(transparent, black 20%, black 80%, transparent)' }}
+      className="h-full w-full flex flex-col bg-[#1e1e1e] text-[#e0e0e0] font-sans overflow-hidden select-none relative pt-10"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => setContextMenu(null)}
     >
-        <AnimatePresence mode="wait">
-                <motion.p
-                    key={currentLyricIndex}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="text-white/80 text-base font-medium drop-shadow-sm px-4 leading-tight"
-                >
-                    {MOCK_LYRICS[currentLyricIndex]?.text || "..."}
-                </motion.p>
-            </AnimatePresence>
+      <audio 
+        ref={audioRef}
+        src={currentTrack.url}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleTrackEnd}
+        onLoadedMetadata={handleTimeUpdate}
+        crossOrigin="anonymous"
+      />
+
+      {/* Drag Overlay */}
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-emerald-500/20 backdrop-blur-sm border-4 border-emerald-500 border-dashed m-4 rounded-xl flex items-center justify-center pointer-events-none"
+          >
+            <div className="text-3xl font-bold text-white drop-shadow-md">Drop audio files here to play</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* Sidebar */}
+        <div className="w-56 bg-[#181818] flex flex-col pt-6 pb-2 border-r border-[#2c2c2c] shrink-0">
+          
+          {/* User Profile */}
+          <div className="px-5 mb-8 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-400 to-cyan-500 p-[2px]">
+               <img 
+                 src="https://github.com/shadcn.png" 
+                 className="w-full h-full rounded-full border-2 border-[#181818]"
+                 alt="Avatar"
+               />
+            </div>
+            <div className="flex flex-col">
+               <span className="text-sm font-bold text-white">Yume</span>
+               <span className="text-[10px] text-emerald-400 border border-emerald-400/30 px-1 rounded-sm w-fit">SVIP 7</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1 px-3 mb-6">
+             <SidebarItem icon={LayoutGrid} label="Recommend" id="recommend" />
+             <SidebarItem icon={Disc} label="Music Hall" id="hall" />
+             <SidebarItem icon={MonitorSpeaker} label="Video" id="video" />
+             <SidebarItem icon={Layers} label="Radio" id="radio" />
+          </div>
+
+          <div className="px-5 text-xs text-gray-500 font-medium mb-2">MY MUSIC</div>
+          <div className="flex flex-col gap-1 px-3 mb-6">
+             <SidebarItem icon={Heart} label="Likes" id="likes" count={Object.values(liked).filter(Boolean).length} />
+             <SidebarItem icon={Clock} label="Recent" id="recent" count="12" />
+             <SidebarItem icon={Download} label="Local" id="local" />
+          </div>
+
+          <div className="px-5 text-xs text-gray-500 font-medium mb-2 flex justify-between items-center group cursor-pointer">
+            <span>CREATED PLAYLISTS</span>
+            <span className="opacity-0 group-hover:opacity-100 text-lg leading-none">+</span>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
+            {MY_PLAYLISTS.map((pl, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#2a2a2a] cursor-pointer text-sm text-gray-400 hover:text-white transition-colors">
+                    <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center shrink-0">
+                        <ListMusic size={14} />
+                    </div>
+                    <span className="truncate">{pl}</span>
+                </div>
+            ))}
+          </div>
         </div>
 
-        {/* Controls Area */}
-        <div className="flex flex-col gap-4">
-            {/* Actions Row */}
-            <div className="flex justify-between items-center px-4 text-white/70">
-                <button className="hover:text-white transition-colors"><Heart size={22} /></button>
-                <button className="hover:text-white transition-colors"><Volume2 size={22} /></button>
-                <button className="hover:text-white transition-colors"><MoreHorizontal size={22} /></button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full group cursor-pointer" onClick={(e) => {
-                 const rect = e.currentTarget.getBoundingClientRect()
-                 const p = (e.clientX - rect.left) / rect.width
-                 if(audioRef.current) audioRef.current.currentTime = p * (duration || 100)
-            }}>
-                <div className="flex justify-between text-xs text-white/50 font-medium mb-1.5 px-1">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col bg-[#1e1e1e] min-w-0">
+          
+          {/* Header */}
+          <div className="h-16 flex items-center justify-between px-8 shrink-0">
+            <div className="flex items-center gap-4">
+                <div className="flex gap-2 text-gray-400">
+                    <button className="hover:text-white"><ChevronLeft size={20} /></button>
+                    <button className="hover:text-white"><ChevronRight size={20} /></button>
                 </div>
-                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                        className="h-full bg-white/90 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                        style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                <button className="hover:animate-spin text-gray-400 hover:text-white ml-2">
+                    <RefreshCw size={16} />
+                </button>
+                
+                <div className="relative ml-4 group">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-400" />
+                    <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          if (e.target.value) setActiveTab('hall')
+                        }}
+                        placeholder="Search music..." 
+                        className="bg-[#2a2a2a] text-sm text-white rounded-full pl-10 pr-4 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
                     />
                 </div>
             </div>
 
-            {/* Main Buttons */}
-            <div className="flex items-center justify-between px-2 mt-2">
-                <button 
-                    onClick={() => setMode(mode === 'loop' ? 'shuffle' : 'loop')}
-                    className="text-white/50 hover:text-white transition-colors p-2"
-                >
-                    {mode === 'loop' ? <Repeat size={20} /> : <Shuffle size={20} />}
-                </button>
-
-                <button onClick={() => changeTrack('prev')} className="text-white hover:text-cyan-400 transition-colors p-2">
-                    <SkipBack size={28} fill="currentColor" className="opacity-90" />
-                </button>
-
-                <button 
-                    onClick={togglePlay}
-                    className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all active:scale-95 border border-white/10 backdrop-blur-md shadow-lg"
-                >
-                    {isPlaying ? (
-                        <Pause size={32} fill="currentColor" className="text-white" />
-                    ) : (
-                        <Play size={32} fill="currentColor" className="text-white ml-1" />
-                    )}
-                </button>
-
-                <button onClick={() => changeTrack('next')} className="text-white hover:text-cyan-400 transition-colors p-2">
-                    <SkipForward size={28} fill="currentColor" className="opacity-90" />
-                </button>
-
-                <button 
-                    onClick={() => setShowPlaylist(true)}
-                    className="text-white/50 hover:text-white transition-colors p-2"
-                >
-                    <ListMusic size={20} />
-                </button>
+            <div className="flex items-center gap-4 text-gray-400">
+                <button className="hover:text-white"><Mic2 size={18} /></button>
+                <button className="hover:text-white"><Settings size={18} /></button>
             </div>
-        </div>
-      </div>
+          </div>
 
-      {/* Playlist Overlay (Bottom Sheet) */}
-      <AnimatePresence>
-        {showPlaylist && (
-            <>
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setShowPlaylist(false)}
-                    className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm"
-                />
-                <motion.div 
-                    initial={{ y: '100%' }}
-                    animate={{ y: '0%' }}
-                    exit={{ y: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute bottom-0 left-0 right-0 h-[60%] bg-[#1a1a1a] rounded-t-3xl z-50 overflow-hidden flex flex-col shadow-2xl border-t border-white/10"
-                >
-                    <div className="p-4 border-b border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-lg">Current Queue</span>
-                            <span className="text-sm text-white/50">({PLAYLIST.length})</span>
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
+            
+            {activeTab === 'recommend' && (
+              <>
+                <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    Hi Yume <span className="text-lg font-normal text-gray-500">Recommended for you</span>
+                </h1>
+
+                {/* Hero Banner */}
+                <div className="w-full h-48 rounded-xl bg-gradient-to-r from-emerald-900/40 to-black relative overflow-hidden mb-8 group cursor-pointer border border-white/5" onClick={() => playTrack(INITIAL_TRACKS[0])}>
+                    <div className="absolute inset-0 flex items-center p-8">
+                        <div className="relative z-10">
+                            <div className="text-emerald-400 font-medium mb-2 tracking-wider text-sm">DAILY MIX</div>
+                            <h2 className="text-3xl font-bold text-white mb-4 w-2/3 leading-tight">Fresh tracks curated for your coding session</h2>
+                            <button className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center hover:scale-105 transition-transform text-black">
+                                <Play size={20} fill="currentColor" className="ml-1" />
+                            </button>
                         </div>
-                        <button onClick={() => setShowPlaylist(false)} className="p-1 hover:bg-white/10 rounded-full">
-                            <ChevronDown size={20} />
-                        </button>
+                        <img 
+                            src={INITIAL_TRACKS[0].cover}
+                            className="absolute right-0 top-0 h-full w-2/3 object-cover mask-image-linear-fade opacity-60 group-hover:scale-105 transition-transform duration-700"
+                            alt="Banner"
+                        />
+                    </div>
+                </div>
+
+                {/* Grid Section */}
+                <div className="mb-8">
+                    <div className="flex justify-between items-end mb-4">
+                        <h3 className="text-lg font-bold text-white">Your Playlist</h3>
+                        <button className="text-xs text-gray-500 hover:text-white transition-colors">Show All &gt;</button>
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto p-2">
-                        {PLAYLIST.map((t, i) => (
-                            <div 
-                                key={t.id}
-                                onClick={() => {
-                                    setCurrentIndex(i)
-                                    setIsPlaying(true)
-                                }}
-                                className={`p-3 rounded-xl flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer group ${currentIndex === i ? 'bg-white/10' : ''}`}
-                            >
-                                <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                                    <img src={t.cover} className="w-full h-full object-cover" alt="" />
-                                    {currentIndex === i && isPlaying && (
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <div className="w-1 h-3 bg-cyan-400 animate-pulse" />
+                    <div className="grid grid-cols-5 gap-5">
+                        {INITIAL_TRACKS.map((item, index) => (
+                            <div key={item.id} className="group cursor-pointer" onClick={() => playTrack(item)}>
+                                <div className="aspect-square rounded-lg overflow-hidden relative mb-3 bg-[#2a2a2a]">
+                                    <img src={item.cover} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.title} />
+                                    {/* Play Overlay */}
+                                    <div className={`absolute inset-0 bg-black/20 transition-opacity flex items-center justify-center backdrop-blur-[1px] ${currentTrackIndex === index && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                        <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                                            {currentTrackIndex === index && isPlaying ? (
+                                              <Pause size={24} fill="black" className="text-black" />
+                                            ) : (
+                                              <Play size={24} fill="black" className="ml-1 text-black" />
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className={`font-medium truncate ${currentIndex === i ? 'text-cyan-400' : 'text-white'}`}>{t.title}</div>
-                                    <div className="text-xs text-white/50 truncate">{t.artist} - {t.album}</div>
-                                </div>
-                                <button className="opacity-0 group-hover:opacity-100 p-2 hover:text-cyan-400 text-white/50">
-                                    <Play size={14} fill="currentColor" />
-                                </button>
+                                <div className={`text-sm font-medium truncate transition-colors ${currentTrackIndex === index ? 'text-emerald-400' : 'text-white group-hover:text-emerald-400'}`}>{item.title}</div>
+                                <div className="text-xs text-gray-500 truncate mt-0.5">{item.artist}</div>
                             </div>
                         ))}
                     </div>
-                </motion.div>
-            </>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'search' && (
+              <div className="flex flex-col">
+                 <h1 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                   iTunes Search: "{searchQuery}"
+                   {isSearchingOnline && <RefreshCw size={20} className="animate-spin text-emerald-500" />}
+                 </h1>
+                 <div className="grid grid-cols-4 gap-4">
+                   {onlineTracks.map((track) => (
+                     <div key={track.id} className="bg-[#2a2a2a]/50 p-4 rounded-lg hover:bg-[#2a2a2a] group cursor-pointer transition-colors" onClick={() => playTrack(track)}>
+                       <div className="aspect-square rounded-md overflow-hidden relative mb-3 bg-black">
+                         <img src={track.cover} className="w-full h-full object-cover" />
+                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-black">
+                             <Play size={20} fill="currentColor" className="ml-1" />
+                           </div>
+                         </div>
+                         <div className="absolute bottom-1 right-1 bg-black/60 text-[10px] text-white px-1.5 py-0.5 rounded">30s</div>
+                       </div>
+                       <div className="font-medium text-white truncate">{track.title}</div>
+                       <div className="text-xs text-gray-400 truncate">{track.artist}</div>
+                       <div className="text-xs text-gray-500 truncate mt-1">{track.album}</div>
+                     </div>
+                   ))}
+                   {!isSearchingOnline && onlineTracks.length === 0 && (
+                     <div className="col-span-4 text-center text-gray-500 py-10">
+                       No results found
+                     </div>
+                   )}
+                 </div>
+              </div>
+            )}
+
+            {(activeTab === 'hall' || activeTab === 'likes' || activeTab === 'local') && (
+               <div className="flex flex-col">
+                  <h1 className="text-2xl font-bold mb-6">
+                    {activeTab === 'hall' ? 'Music Hall' : activeTab === 'likes' ? 'Liked Songs' : 'Local Files'}
+                  </h1>
+
+                  {activeTab === 'local' && playlist.filter(t => t.isLocal).length === 0 && (
+                     <div className="flex flex-col items-center justify-center h-64 text-gray-500 border-2 border-dashed border-gray-700 rounded-lg bg-gray-800/20">
+                        <Download size={48} className="mb-4 opacity-50" />
+                        <p>Drag and drop audio files here</p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col">
+                    {playlist.filter(t => {
+                      if (activeTab === 'likes' && !liked[t.id]) return false
+                      if (activeTab === 'local' && !t.isLocal) return false
+                      if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false // Keep hall clean with initial tracks
+                      return true
+                    }).map((track, i) => {
+                      const realIndex = playlist.findIndex(p => p.id === track.id)
+                      const isCurrent = currentTrackIndex === realIndex
+                      return (
+                        <div key={track.id} 
+                          className={`flex items-center gap-4 p-3 rounded-md hover:bg-[#2a2a2a] group cursor-pointer ${isCurrent ? 'bg-[#2a2a2a]' : ''}`}
+                          onClick={() => playTrack(track)}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            setContextMenu({ x: e.clientX, y: e.clientY, trackId: track.id })
+                          }}
+                        >
+                          <div className="w-6 text-center text-sm text-gray-500">
+                             {isCurrent && isPlaying ? (
+                               <div className="flex gap-[2px] justify-center items-end h-3">
+                                 <span className="w-0.5 bg-emerald-500 animate-pulse h-2"></span>
+                                 <span className="w-0.5 bg-emerald-500 animate-pulse h-3 animation-delay-75"></span>
+                                 <span className="w-0.5 bg-emerald-500 animate-pulse h-1 animation-delay-150"></span>
+                               </div>
+                             ) : (
+                               i + 1
+                             )}
+                          </div>
+                          <img src={track.cover} className="w-10 h-10 rounded object-cover" />
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium truncate ${isCurrent ? 'text-emerald-500' : 'text-white'}`}>{track.title}</div>
+                            <div className="text-xs text-gray-500">{track.artist}</div>
+                          </div>
+                          <div className="text-xs text-gray-500">{track.album}</div>
+                          <div className="text-xs text-gray-500 w-12 text-right">{formatTime(track.duration)}</div>
+                          <button 
+                            className={`p-2 hover:bg-white/10 rounded-full ${liked[track.id] ? 'text-emerald-500' : 'text-gray-500 opacity-0 group-hover:opacity-100'}`}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                toggleLike(track.id)
+                            }}
+                          >
+                             <Heart size={16} fill={liked[track.id] ? "currentColor" : "none"} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                    {playlist.filter(t => {
+                      if (activeTab === 'likes' && !liked[t.id]) return false
+                      if (activeTab === 'local' && !t.isLocal) return false
+                      if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false
+                      return true
+                    }).length === 0 && activeTab !== 'local' && (
+                        <div className="text-gray-500 text-center py-20">No tracks found</div>
+                    )}
+                  </div>
+               </div>
+            )}
+
+            {(activeTab === 'video' || activeTab === 'radio' || activeTab === 'recent') && (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                    <MonitorSpeaker size={48} className="mb-4 opacity-50" />
+                    <p>This feature is coming soon...</p>
+                </div>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* Player Bar */}
+      <div className="h-20 bg-[#222] border-t border-[#333] flex items-center justify-between px-4 shrink-0 z-30 relative">
+          
+          {/* Track Info */}
+          <div className="flex items-center gap-3 w-[30%]">
+              <div 
+                className="w-12 h-12 rounded-md bg-gray-800 overflow-hidden relative group cursor-pointer"
+                onClick={() => setShowDetail(true)}
+              >
+                  <img 
+                    src={currentTrack.cover} 
+                    className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-110' : 'scale-100'}`}
+                    alt="Cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <ChevronUp size={24} className="text-white" />
+                  </div>
+              </div>
+              <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                      <span className="text-sm text-white font-medium truncate cursor-pointer hover:underline" onClick={() => setShowDetail(true)}>
+                        {currentTrack.title}
+                      </span>
+                      <span className="text-[10px] border border-emerald-500 text-emerald-500 px-0.5 rounded ml-1">HQ</span>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate cursor-pointer hover:underline">{currentTrack.artist}</div>
+              </div>
+              <button 
+                className={`ml-2 transition-colors ${liked[currentTrack.id] ? 'text-emerald-500' : 'text-gray-400 hover:text-white'}`}
+                onClick={() => toggleLike(currentTrack.id)}
+              >
+                <Heart size={16} fill={liked[currentTrack.id] ? "currentColor" : "none"} />
+              </button>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-col items-center w-[40%]">
+              <div className="flex items-center gap-6 mb-1">
+                  <button 
+                    className={`hover:text-white transition-colors ${isShuffled ? 'text-emerald-500' : 'text-gray-400'}`} 
+                    onClick={toggleShuffle}
+                  >
+                    <Shuffle size={16} />
+                  </button>
+                  <button className="text-gray-300 hover:text-white" onClick={playPrev}><SkipBack size={20} fill="currentColor" /></button>
+                  <button 
+                    className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:scale-105 transition-transform text-black"
+                    onClick={togglePlay}
+                  >
+                      {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                  </button>
+                  <button className="text-gray-300 hover:text-white" onClick={() => playNext()}><SkipForward size={20} fill="currentColor" /></button>
+                  <button 
+                    className={`hover:text-white transition-colors relative ${repeatMode !== 'off' ? 'text-emerald-500' : 'text-gray-400'}`} 
+                    onClick={toggleRepeat}
+                  >
+                    <Repeat size={16} />
+                    {repeatMode === 'one' && <span className="absolute -top-1 -right-1 text-[8px] font-bold">1</span>}
+                  </button>
+              </div>
+              <div className="flex items-center gap-2 w-full max-w-md">
+                  <span className="text-[10px] text-gray-500 w-8 text-right">{formatTime(currentTime)}</span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    value={isNaN(progress) ? 0 : progress}
+                    onChange={handleSeek}
+                    className="flex-1 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white hover:[&::-webkit-slider-thumb]:scale-125 transition-all"
+                  />
+                  <span className="text-[10px] text-gray-500 w-8">{formatTime(duration || currentTrack.duration)}</span>
+              </div>
+          </div>
+
+          {/* Volume & More */}
+          <div className="flex items-center justify-end gap-3 w-[30%]">
+              <ListMusic size={18} className="text-gray-400 hover:text-white cursor-pointer" />
+              <div className="flex items-center gap-2 group w-24">
+                  <Volume2 size={18} className="text-gray-400" />
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.01" 
+                    value={volume}
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="flex-1 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
+              </div>
+              <button 
+                className="text-gray-400 hover:text-white ml-2"
+                onClick={() => setShowDetail(true)}
+              >
+                <Maximize2 size={16} />
+              </button>
+          </div>
+      </div>
+
+      {/* Detail Overlay */}
+      <AnimatePresence>
+        {showDetail && (
+          <motion.div 
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="absolute inset-0 z-40 bg-[#1e1e1e]/95 backdrop-blur-3xl flex flex-col pt-10"
+          >
+            {/* Overlay Background */}
+            <div 
+              className="absolute inset-0 opacity-30 pointer-events-none blur-[100px]"
+              style={{ background: `radial-gradient(circle at center, ${currentTrackIndex % 2 === 0 ? '#10b981' : '#3b82f6'} 0%, transparent 70%)` }}
+            />
+
+            {/* Overlay Header */}
+            <div className="h-16 flex items-center justify-between px-8 shrink-0 z-10">
+              <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-white">
+                <ChevronDown size={28} />
+              </button>
+              <div className="text-xs text-gray-400 uppercase tracking-widest">Now Playing</div>
+              <button className="text-gray-400 hover:text-white">
+                <MoreHorizontal size={24} />
+              </button>
+            </div>
+
+            {/* Overlay Content */}
+            <div className="flex-1 flex items-center justify-center gap-12 px-12 z-10">
+              
+              {/* Left: Album Art */}
+              <div className="w-[400px] h-[400px] shrink-0 relative flex items-center justify-center">
+                 <div className={`w-full h-full rounded-full bg-black shadow-2xl flex items-center justify-center border-8 border-[#1a1a1a] ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
+                    <div className="w-[70%] h-[70%] rounded-full overflow-hidden relative">
+                       <img src={currentTrack.cover} className="w-full h-full object-cover" />
+                    </div>
+                 </div>
+              </div>
+
+              {/* Right: Lyrics / Info */}
+              <div className="w-[400px] flex flex-col items-start text-left shrink-0">
+                 <h2 className="text-4xl font-bold text-white mb-2">{currentTrack.title}</h2>
+                 <p className="text-xl text-emerald-400 mb-8">{currentTrack.artist} — {currentTrack.album}</p>
+                 
+                 <div className="w-full h-[300px] overflow-hidden mask-image-linear-fade relative">
+                    <div className="text-2xl font-medium text-white/90 leading-relaxed space-y-6">
+                        <p className="text-white">Music is the language of the soul</p>
+                        <p className="text-gray-300">Drifting through the digital waves</p>
+                        <p className="text-gray-300">Code and rhythm intertwine</p>
+                        <p className="text-gray-300">Creating worlds within the mind</p>
+                        <p className="text-gray-400 blur-[1px]">Echoes of a distant time</p>
+                        <p className="text-gray-500 blur-[2px]">Fading into the sublime</p>
+                    </div>
+                 </div>
+              </div>
+            </div>
+
+            {/* Overlay Footer Controls (Mirrored state) */}
+            <div className="h-24 px-20 flex flex-col justify-center z-10 pb-8">
+               <div className="flex items-center gap-4 w-full mb-4">
+                  <span className="text-xs text-gray-400">{formatTime(currentTime)}</span>
+                  <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-400">{formatTime(duration || currentTrack.duration)}</span>
+               </div>
+               
+               <div className="flex items-center justify-center gap-10">
+                   <button 
+                     className={`hover:text-white transition-colors ${isShuffled ? 'text-emerald-500' : 'text-gray-400'}`} 
+                     onClick={toggleShuffle}
+                   >
+                     <Shuffle size={20} />
+                   </button>
+                   <button className="text-white hover:scale-110 transition-transform" onClick={playPrev}><SkipBack size={28} fill="currentColor" /></button>
+                   <button 
+                      className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center hover:scale-105 transition-transform text-black shadow-lg shadow-emerald-500/20"
+                      onClick={togglePlay}
+                    >
+                        {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                    </button>
+                   <button className="text-white hover:scale-110 transition-transform" onClick={() => playNext()}><SkipForward size={28} fill="currentColor" /></button>
+                   <button 
+                     className={`hover:text-white transition-colors relative ${repeatMode !== 'off' ? 'text-emerald-500' : 'text-gray-400'}`} 
+                     onClick={toggleRepeat}
+                   >
+                     <Repeat size={20} />
+                     {repeatMode === 'one' && <span className="absolute -top-1 -right-1 text-[10px] font-bold">1</span>}
+                   </button>
+               </div>
+            </div>
+
+          </motion.div>
         )}
       </AnimatePresence>
 
-      <audio 
-        ref={audioRef}
-        src={track.url}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={() => changeTrack('next')}
-      />
+      {/* Context Menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            className="fixed z-[100] bg-[#2a2a2a] border border-[#333] rounded-md shadow-xl py-1 w-48 overflow-hidden"
+          >
+             <button 
+                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2"
+                onClick={(e) => {
+                    e.stopPropagation()
+                    const track = playlist.find(t => t.id === contextMenu.trackId)
+                    if (track) playTrack(track)
+                    setContextMenu(null)
+                }}
+             >
+                <Play size={14} /> Play
+             </button>
+             <button 
+                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2"
+                onClick={(e) => {
+                    e.stopPropagation()
+                    // Add to queue logic could go here
+                    setContextMenu(null)
+                }}
+             >
+                <ListMusic size={14} /> Add to Queue
+             </button>
+             <div className="h-[1px] bg-[#333] my-1" />
+             <button 
+                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-[#333] hover:text-red-300 flex items-center gap-2"
+                onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteTrack(contextMenu.trackId)
+                }}
+             >
+                <Trash2 size={14} /> Delete
+             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

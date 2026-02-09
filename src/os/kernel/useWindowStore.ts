@@ -17,6 +17,7 @@ export interface WindowState {
     }
     taskbarPosition?: { x: number; y: number }
     icon?: AppIcon
+    appId?: string
     component: ReactNode
     titleBarColor?: 'light' | 'dark' | 'auto'
 }
@@ -30,7 +31,7 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto' }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string }) => void
     launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
@@ -91,6 +92,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             zIndex: newZ,
             component,
             icon,
+            appId: options?.appId,
             taskbarPosition: options?.taskbarPosition,
             titleBarColor: options?.titleBarColor
         }
@@ -120,7 +122,8 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
         // Simulate boot delay
         setTimeout(() => {
-            openWindow(id, title, component, icon, options)
+            // Pass appId (id) to openWindow options
+            openWindow(id, title, component, icon, { ...options, appId: id })
             set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
         }, 500)
     },

@@ -35,6 +35,9 @@ const translations = {
     "settings.transparency": "Enable Transparency & Blur",
     "settings.animations": "Enable System Animations",
     "settings.previews": "Enable Taskbar Previews",
+    "settings.icons": "Icon Style",
+    "settings.icons.filled": "Modern (Filled)",
+    "settings.icons.line": "Classic (Line)",
     "settings.volume": "Volume",
 
     // Context Menu
@@ -189,6 +192,9 @@ const translations = {
     "settings.appearance.animations": "启用系统动画",
     "settings.appearance.previews": "启用任务栏窗口预览",
     "settings.appearance.skipboot": "跳过开机动画",
+    "settings.appearance.icons": "图标风格",
+    "settings.appearance.icons.filled": "现代 (填充)",
+    "settings.appearance.icons.line": "经典 (线条)",
 
     "settings.sound.volume": "音量",
 

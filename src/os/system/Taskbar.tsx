@@ -12,6 +12,7 @@ import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
 import { Tooltip } from '@/os/ui/Tooltip'
 import StartMenu from './StartMenu'
+import { AppIcon } from '@/os/ui/AppIcon'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -99,6 +100,7 @@ export default function Taskbar({
       // If already added via pinned list, skip
       if (pinnedAppIds.includes(win.id)) return
 
+      const app = APPS_REGISTRY[win.id]
       items.push({
         id: win.id,
         appId: win.id, // Assuming window id is app id
@@ -190,7 +192,7 @@ export default function Taskbar({
   return (
     <div
       data-taskbar
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 transition-[width,height] duration-300 w-fit max-w-[calc(100vw-2rem)]"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-14 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 transition-[width,height] duration-300 w-fit max-w-[calc(100vw-2rem)]"
       style={{
         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
@@ -207,7 +209,7 @@ export default function Taskbar({
           <button
             ref={startBtnRef}
             onClick={onStartClick}
-            className="h-12 w-12 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
+            className="h-10 w-10 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
             style={{ backgroundColor: 'var(--os-hover-bg)' }}
           >
             <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
@@ -216,7 +218,7 @@ export default function Taskbar({
 
         {/* Separator - Only show if there are items */}
         {taskbarItems.length > 0 && (
-          <div className="w-px h-5 bg-[var(--os-border)] mx-2" />
+          <div className="w-px h-5 bg-[var(--os-border)] opacity-50" />
         )}
 
         {/* Window List - Icon Only for Dock Look */}
@@ -247,26 +249,22 @@ export default function Taskbar({
                   appId: item.appId
                 })
               }}
-              className={`h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)] ${item.isLoading ? 'animate-pulse cursor-wait' : ''
+              className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group ${item.isLoading ? 'animate-pulse cursor-wait' : ''
                 }`}
               style={{
                 backgroundColor: item.isActive && !item.isMinimized
-                  ? 'var(--os-accent-dim)'
+                  ? 'var(--os-accent-dim)' // Keep this for active indicator background if needed, but AppIcon has its own bg
                   : undefined
               }}
             >
 
               {/* Window Icon */}
-              {item.icon ? (() => {
-                const Icon = item.icon
-                return <Icon className="w-[1.375rem] h-[1.375rem] text-[var(--os-text-primary)]" />
-              })() : (
-                <div className="w-4 h-4 rounded-sm border flex items-center justify-center"
-                  style={{ borderColor: 'var(--os-text-primary)' }}
-                >
-                  <div className="w-2 h-2 rounded-[1px]" style={{ backgroundColor: 'var(--os-text-primary)' }} />
-                </div>
-              )}
+              <AppIcon
+                  manifest={APPS_REGISTRY[item.appId]}
+                  icon={item.icon}
+                  size={32}
+                  className="drop-shadow-sm"
+              />
 
               {/* Indicator Dot for Open Apps */}
               {item.isOpen && (
@@ -326,7 +324,7 @@ export default function Taskbar({
             onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
           >
             <Volume2 className="w-4 h-4" />
-            <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
+            <div className="w-[1px] h-3 bg-white/10" />
             <Settings2 className="w-4 h-4" />
           </div>
         </Tooltip>

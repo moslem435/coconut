@@ -6,6 +6,10 @@ export const manifest: AppManifest = {
     id: 'browser',
     title: 'Browser',
     icon: Chrome,
+    theme: {
+        backgroundColor: '#0ea5e9',
+        iconColor: '#ffffff'
+    },
     component: Browser,
     defaultWindowOptions: {
         size: { width: 1000, height: 700 },

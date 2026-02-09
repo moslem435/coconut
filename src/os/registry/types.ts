@@ -6,6 +6,11 @@ export interface AppManifest {
     id: string
     title: string
     icon: AppIcon
+    /** Theme colors for flat icon styling */
+    theme?: {
+        backgroundColor: string
+        iconColor: string
+    }
     component: ComponentType<any>
     /** Optional splash screen component, rendered before window opens */
     splashScreen?: ComponentType<{ onComplete: () => void }>

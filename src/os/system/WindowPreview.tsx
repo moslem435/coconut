@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { AppIcon } from '@/os/ui/AppIcon'
+import { APPS_REGISTRY } from '@/os/registry/config'
 
 interface WindowPreviewProps {
   appId: string
@@ -37,7 +39,12 @@ export const WindowPreview = memo(({ appId, title, icon: Icon, isActive, snapsho
       <div className="w-full h-full rounded-lg overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.3)] border border-[var(--os-border)] bg-[var(--os-bg-window)] flex flex-col cursor-pointer hover:ring-2 ring-[var(--os-accent)] transition-all">
         {/* Mini Titlebar */}
         <div className={`h-6 shrink-0 flex items-center px-2 gap-2 border-b border-[var(--os-border)] ${isActive ? 'bg-[var(--os-accent)] text-[var(--os-accent-contrast)]' : 'bg-[var(--os-header-bg)] text-[var(--os-text-muted)]'}`}>
-           {Icon && <Icon size={12} />}
+           <AppIcon 
+               manifest={APPS_REGISTRY[appId]}
+               icon={Icon}
+               size={12}
+               className="drop-shadow-sm"
+           />
            <span className="text-[10px] font-medium truncate flex-1 leading-none">{title}</span>
         </div>
 

@@ -8,6 +8,10 @@ export const manifest: AppManifest = {
   id: 'photo-gallery',
   title: 'Photos',
   icon: Image,
+  theme: {
+      backgroundColor: '#8b5cf6',
+      iconColor: '#ffffff'
+  },
   component: PhotoGallery,
   defaultWindowOptions: {
     width: 800,

@@ -11,6 +11,11 @@ export const manifest: AppManifest = {
     id: 'portfolio-hub',
     title: 'PORTFOLIO_HUB',
     icon: Terminal,
+    // iconUrl: removed for flat style
+    theme: {
+        backgroundColor: '#171717',
+        iconColor: '#ffffff'
+    },
     component: PortfolioApp,
     splashScreen: PortfolioSplashScreen,
     defaultWindowOptions: {

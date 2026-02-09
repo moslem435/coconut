@@ -10,6 +10,10 @@ export const manifest: AppManifest = {
     id: 'file-explorer',
     title: 'File Explorer',
     icon: Folder,
+    theme: {
+        backgroundColor: '#3b82f6',
+        iconColor: '#ffffff'
+    },
     component: FileExplorerApp,
     defaultWindowOptions: {
         width: 800,

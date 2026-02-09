@@ -2,11 +2,14 @@
 
 import React from 'react'
 import { X, Minus, Maximize2, Minimize2 } from 'lucide-react'
+import { AppIcon } from '@/os/ui/AppIcon'
+import { APPS_REGISTRY } from '@/os/registry/config'
 import { Tooltip } from '@/os/ui/Tooltip'
 
 interface WindowTitleBarProps {
     title: string
     icon?: React.ComponentType<any>
+    appId?: string
     isActive: boolean
     isMaximized: boolean
     onMinimize: () => void
@@ -28,6 +31,7 @@ interface WindowTitleBarProps {
 export function WindowTitleBar({
     title,
     icon: Icon,
+    appId,
     isActive,
     isMaximized,
     onMinimize,
@@ -56,6 +60,8 @@ export function WindowTitleBar({
     const buttonColor = isDarkText ? 'rgba(0,0,0,0.7)' : 'var(--os-text-secondary)'
     const buttonHoverBg = isDarkText ? 'rgba(0,0,0,0.1)' : 'var(--os-hover-bg)'
 
+    const manifest = appId ? APPS_REGISTRY[appId] : undefined
+
     return (
         <div
             onPointerDown={(e) => {
@@ -74,12 +80,12 @@ export function WindowTitleBar({
         >
             {/* Left: Icon + Title */}
             <div className="flex items-center gap-2.5">
-                {Icon && (
-                    <Icon
-                        size={16}
-                        style={{ color: iconColor }}
-                    />
-                )}
+                <AppIcon 
+                    manifest={manifest}
+                    icon={Icon}
+                    size={20}
+                    className="drop-shadow-sm"
+                />
                 <span
                     className="text-sm font-medium tracking-wide transition-colors"
                     style={{ color: isActive ? activeTextColor : inactiveTextColor }}

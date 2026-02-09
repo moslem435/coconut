@@ -29,6 +29,7 @@ export function useSystem() {
         useTransparency: settings.useTransparency,
         useAnimations: settings.useAnimations,
         useTaskbarPreviews: settings.useTaskbarPreviews,
+        iconTheme: settings.iconTheme,
         displayScale: settings.displayScale,
         wallpaper: settings.wallpaper,
 
@@ -42,6 +43,7 @@ export function useSystem() {
         setUseTransparency: settings.setUseTransparency,
         setUseAnimations: settings.setUseAnimations,
         setUseTaskbarPreviews: settings.setUseTaskbarPreviews,
+        setIconTheme: settings.setIconTheme,
         setDisplayScale: settings.setDisplayScale,
         setWallpaper: settings.setWallpaper,
 

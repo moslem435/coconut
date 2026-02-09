@@ -15,6 +15,7 @@ import { Tooltip } from '@/os/ui/Tooltip'
 import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
+import { AppIcon } from '@/os/ui/AppIcon'
 import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
 
 interface DesktopProps {
@@ -269,14 +270,26 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
                         const isSelected = selectedIcons.includes(item.id)
 
-                        // Determine Icon
+                        // Determine Icon Properties
+                        const manifest = item.appId ? APPS_REGISTRY[item.appId] : undefined
                         let Icon = FileText
-                        if (item.appId && APPS_REGISTRY[item.appId]) {
-                            Icon = APPS_REGISTRY[item.appId].icon
+                        let backgroundColor = '#3b82f6' // Default blue
+
+                        if (manifest) {
+                            Icon = manifest.icon
+                            backgroundColor = manifest.theme?.backgroundColor || '#3b82f6'
                         } else if (item.type === 'folder') {
                             Icon = Folder
+                            backgroundColor = '#facc15' // yellow-400
                         } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
                             Icon = ImageIcon
+                            backgroundColor = '#a855f7' // purple-500
+                        } else if (/\.(txt|md|json)$/i.test(item.name)) {
+                            Icon = StickyNote
+                            backgroundColor = '#eab308' // yellow-500
+                        } else {
+                            // Default file
+                            backgroundColor = '#94a3b8' // slate-400
                         }
 
                         return (
@@ -339,16 +352,13 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
                                 }}
                             >
-                                <div className={`
-                                    relative flex items-center justify-center rounded-xl p-2 transition-transform duration-200
-                                    ${isSelected ? 'scale-105' : ''}
-                                `}>
-                                    <Icon
-                                        size={32 * scaleFactor}
-                                        strokeWidth={1.5}
-                                        className={item.type === 'folder' ? 'text-yellow-400 fill-yellow-400/20' : ''}
-                                    />
-                                </div>
+                                <AppIcon 
+                                    manifest={manifest}
+                                    icon={Icon}
+                                    size={48 * scaleFactor}
+                                    backgroundColor={backgroundColor}
+                                    className={`drop-shadow-md transition-transform duration-200 ${isSelected ? 'scale-105' : ''}`}
+                                />
 
                                 <span className={`
                                     text-[11px] text-center leading-tight break-words px-1 rounded

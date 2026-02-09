@@ -265,6 +265,7 @@ export default function Window({ id }: WindowProps) {
           <WindowTitleBar
             title={windowState.title}
             icon={windowState.icon}
+            appId={windowState.appId}
             isActive={isActive}
             isMaximized={windowState.isMaximized}
             colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}

@@ -6,12 +6,12 @@ import { FileText, Download, Printer, ZoomIn, ZoomOut, ChevronDown, Share2 } fro
 
 // Resume Data
 const RESUME_DATA = {
-  name: "TRAE_DEVELOPER",
+  name: "YUME",
   title: "SENIOR_SOFTWARE_ENGINEER",
   contact: {
-    email: "dev@trae.ai",
+    email: "dev@yume.me",
     location: "Cyberspace, Net",
-    website: "trae.ai"
+    website: "yume.me"
   },
   summary: "Highly decorated operative with extensive experience in full-stack development and interface design. Proven track record of delivering mission-critical systems under high pressure. Specialized in next-gen web technologies and immersive user experiences.",
   experience: [

@@ -6,6 +6,10 @@ export const manifest: AppManifest = {
     id: 'terminal',
     title: 'Terminal',
     icon: TerminalSquare,
+    theme: {
+        backgroundColor: '#333333',
+        iconColor: '#ffffff'
+    },
     component: Terminal,
     defaultWindowOptions: {
         size: { width: 800, height: 500 },

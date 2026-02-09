@@ -1,5 +1,5 @@
 import { AppManifest } from '@/os/registry/types'
-import { Mail } from 'lucide-react'
+import { Phone } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const ContactApp = dynamic(() => import('./index'), { ssr: false })
@@ -7,7 +7,11 @@ const ContactApp = dynamic(() => import('./index'), { ssr: false })
 export const manifest: AppManifest = {
   id: 'contact',
   title: 'Contact',
-  icon: Mail,
+  icon: Phone,
+  theme: {
+      backgroundColor: '#22c55e',
+      iconColor: '#ffffff'
+  },
   component: ContactApp,
     defaultWindowOptions: {
         width: 900,

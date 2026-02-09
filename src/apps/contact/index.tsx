@@ -27,7 +27,7 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: '1',
     folder: 'inbox',
-    from: 'Trae Developer',
+    from: 'Yume',
     to: 'Visitor',
     subject: 'Welcome to Portfolio OS',
     preview: 'Thanks for visiting my digital workspace...',
@@ -40,12 +40,12 @@ Feel free to explore the file system, run commands in the terminal, or check out
 If you'd like to get in touch, just hit "Reply" or compose a new message.
 
 Best regards,
-Trae Developer
+Yume
 Full Stack Engineer`,
     date: '10:42 AM',
     read: false,
     starred: true,
-    avatar: 'TD'
+    avatar: 'YM'
   },
   {
     id: '2',
@@ -81,7 +81,7 @@ export default function ContactApp() {
   const selectedMessage = messages.find(m => m.id === selectedId)
 
   // Compose State
-  const [composeData, setComposeData] = useState({ to: 'dev@trae.ai', subject: '', content: '' })
+  const [composeData, setComposeData] = useState({ to: 'dev@yume.me', subject: '', content: '' })
 
   const handleSend = () => {
     const newMessage: Message = {
@@ -102,7 +102,7 @@ export default function ContactApp() {
     setIsComposing(false)
     setActiveFolder('sent')
     setSelectedId(newMessage.id)
-    setComposeData({ to: 'dev@trae.ai', subject: '', content: '' })
+    setComposeData({ to: 'dev@yume.me', subject: '', content: '' })
     soundManager.playClick()
   }
 

@@ -89,6 +89,7 @@ export default function SettingsApp() {
         useAnimations, setUseAnimations,
         useTaskbarPreviews, setUseTaskbarPreviews,
         skipBootSequence, setSkipBootSequence,
+        iconTheme, setIconTheme,
         displayScale, setDisplayScale,
         volume, setVolume,
         isMuted, toggleMute,
@@ -189,6 +190,23 @@ export default function SettingsApp() {
                                         )}
                                     </button>
                                 ))}
+                            </div>
+                        </SettingSection>
+
+                        <SettingSection title={t('settings.appearance.icons')}>
+                            <div className="flex gap-4">
+                                <ThemeOption
+                                    icon={Box}
+                                    label={t('settings.appearance.icons.filled')}
+                                    active={iconTheme === 'filled'}
+                                    onClick={() => setIconTheme('filled')}
+                                />
+                                <ThemeOption
+                                    icon={Shapes}
+                                    label={t('settings.appearance.icons.line')}
+                                    active={iconTheme === 'line'}
+                                    onClick={() => setIconTheme('line')}
+                                />
                             </div>
                         </SettingSection>
 
