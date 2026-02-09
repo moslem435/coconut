@@ -37,7 +37,7 @@ export default function CalendarWidget() {
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
 
   return (
-    <div className="p-4 bg-[var(--os-bg-base)] rounded-xl border border-[var(--os-border)]">
+    <div className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-sm">{monthName} {year}</h3>

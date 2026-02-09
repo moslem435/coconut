@@ -8,15 +8,17 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore, MenuType } from '@/os/kernel/useContextMenuStore'
 import { useNotificationStore } from '@/os/kernel/useNotificationStore'
+import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
 export default function SystemContextMenu() {
   const { visible, position, type, data, hideMenu } = useContextMenuStore()
   const { addNotification } = useNotificationStore()
+  const { organizeIcons } = useDesktopStore()
   const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations } = useSystemSettings()
+  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations, displayScale } = useSystemSettings()
   const { openWindow, closeWindow, minimizeWindow, maximizeWindow, updateWindowPosition, updateWindowSize } = useWindowStore()
 
   // Handle outside click
@@ -179,8 +181,18 @@ export default function SystemContextMenu() {
           {
             label: t('menu.align'),
             icon: Grid3X3,
-            checked: snapToGrid,
-            action: () => setSnapToGrid(!snapToGrid) // Reusing grid toggle as sort/align
+            action: () => {
+              // Re-calculate grid parameters (matching Desktop.tsx logic)
+              const GRID_SIZE = 90
+              const GRID_PADDING = 24
+              const scaleFactor = displayScale / 100
+              const currentGridSize = GRID_SIZE * scaleFactor
+              const currentGridPadding = GRID_PADDING * scaleFactor
+              
+              const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
+              
+              organizeIcons(maxRows, currentGridSize, currentGridPadding)
+            } 
           },
           { type: 'separator' },
           {

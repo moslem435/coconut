@@ -8,12 +8,13 @@ import { AppManifest } from '@/os/registry/types'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
+import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useShallow } from 'zustand/react/shallow'
 import { Tooltip } from '@/os/ui/Tooltip'
 
 // Grid settings
-const GRID_SIZE = 90
-const GRID_PADDING = 24
+export const GRID_SIZE = 90
+export const GRID_PADDING = 24
 
 interface DesktopProps {
     onToggleMenu: () => void
@@ -111,94 +112,37 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     // Selection State
     const [selectedIcons, setSelectedIcons] = useState<string[]>([])
-    const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, width: number, height: number } | null>(null)
-    const isSelecting = useRef(false)
-    const selectionStart = useRef({ x: 0, y: 0 })
 
-    const [iconPositions, setIconPositions] = useState<Record<string, IconPosition>>({})
+    // Desktop Store
+    const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore()
     const isDragging = useRef(false)
 
     // Splash screen state: which app is currently splashing
     const [splashingApp, setSplashingApp] = useState<AppManifest | null>(null)
     const [mounted, setMounted] = useState(false)
 
-    // Initialize icon positions in a grid layout (column-first)
+    // Initialize icon positions if empty
     useEffect(() => {
         setMounted(true)
-        const apps = Object.values(APPS_REGISTRY)
-        const initialPositions: Record<string, IconPosition> = {}
-
+        
         // Calculate max rows based on viewport
         const maxRows = typeof window !== 'undefined'
             ? Math.floor((window.innerHeight - 150) / currentGridSize)
             : 6
 
-        apps.forEach((app, index) => {
-            const col = Math.floor(index / maxRows)
-            const row = index % maxRows
-            initialPositions[app.id] = {
-                x: currentGridPadding + col * currentGridSize,
-                y: currentGridPadding + row * currentGridSize
-            }
-        })
-
-        setIconPositions(initialPositions)
-    }, []) // Run once on mount, but we need to handle scale changes separately
+        // If no positions stored (first run), organize them
+        if (Object.keys(iconPositions).length === 0) {
+            organizeIcons(maxRows, currentGridSize, currentGridPadding)
+        }
+    }, []) // Run once on mount
 
     // Handle Scale Changes
     useEffect(() => {
-        // When scale changes, we should ideally re-snap all icons to the new grid
-        // But since we don't store "grid coordinates", we can try to map them proportionally
-        // Simple approach: Re-initialize layout (reset) OR try to scale current positions
-        // Let's re-snap existing positions to the new grid
-        
-        setIconPositions(prev => {
-            const next: Record<string, IconPosition> = {}
-            Object.entries(prev).forEach(([id, pos]) => {
-                // Find nearest grid slot in new grid
-                // This might cause collisions if shrinking, but finding free pos handles it
-                // We need a way to know the "logical" grid position from the old physical position
-                // But we don't know the old grid size here easily without tracking it
-                
-                // Better strategy: Just re-calculate default layout for simplicity to avoid mess
-                // Or: assume they are roughly on a grid
-                
-                // Let's try to preserve relative position
-                // We can't easily do it without previous scale.
-                // Fallback: Re-snap to new grid
-                
-                // Use findFreePosition to place them one by one to avoid overlap
-                // But starting from where? 
-                
-                // Simplest robust solution for this bug fix:
-                // Re-run the initial layout logic. 
-                // It resets user customization but ensures clean layout.
-                // Ideally we'd store (col, row) instead of (x, y).
-                
-                // Let's stick to the initial layout logic for now to ensure consistency.
-            })
-            
-            // Re-run layout logic
-            const apps = Object.values(APPS_REGISTRY)
-            const newPositions: Record<string, IconPosition> = {}
-            const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
-            
-            apps.forEach((app, index) => {
-                // Try to find if we have a stored position?
-                // If we want to persist user moves, we need to map old pos to new pos.
-                // map: x_new = x_old * (newScale / oldScale)
-                // But we don't know oldScale.
-                
-                // Standard default layout:
-                const col = Math.floor(index / maxRows)
-                const row = index % maxRows
-                newPositions[app.id] = {
-                    x: currentGridPadding + col * currentGridSize,
-                    y: currentGridPadding + row * currentGridSize
-                }
-            })
-            return newPositions
-        })
+        // Re-organize when scale changes to ensure everything fits
+        // We could try to preserve positions, but simpler to just re-flow for now
+        // consistent with previous behavior
+        const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
+        organizeIcons(maxRows, currentGridSize, currentGridPadding)
     }, [displayScale, currentGridSize, currentGridPadding]) // Re-run when scale changes
 
     const handleIconClick = (id: string, e: React.MouseEvent) => {
@@ -269,15 +213,23 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     }
 
     const handleDragEnd = (id: string, x: number, y: number) => {
-        setIconPositions(prev => {
-            if (snapToGrid) {
-                // Find free position that doesn't overlap with others
-                const freePos = findFreePosition(x, y, id, prev, currentGridSize, currentGridPadding)
-                return { ...prev, [id]: freePos }
-            } else {
-                // Free placement mode - just use the position directly
-                return { ...prev, [id]: { x: Math.max(0, x), y: Math.max(0, y) } }
-            }
+        // We need the current positions to check for collisions
+        // Use local scope iconPositions to ensure we don't lose data if store is desynced
+        const currentPositions = iconPositions
+        
+        let newPos: IconPosition
+        if (snapToGrid) {
+            // Find free position that doesn't overlap with others
+            newPos = findFreePosition(x, y, id, currentPositions, currentGridSize, currentGridPadding)
+        } else {
+            // Free placement mode - just use the position directly
+            newPos = { x: Math.max(0, x), y: Math.max(0, y) }
+        }
+
+        // Update with full state to avoid data loss
+        setIconPositions({
+            ...currentPositions,
+            [id]: newPos
         })
     }
 
@@ -290,73 +242,6 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         document.body
     )
 
-    // Selection Handlers
-    const handleMouseDown = (e: React.MouseEvent) => {
-        // Only left click on background
-        if (e.button !== 0) return
-        
-        isSelecting.current = true
-        selectionStart.current = { x: e.clientX, y: e.clientY }
-        setSelectionBox({ x: e.clientX, y: e.clientY, width: 0, height: 0 })
-        
-        // Clear selection if not holding modifier
-        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
-            setSelectedIcons([])
-        }
-    }
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isSelecting.current) return
-
-        const currentX = e.clientX
-        const currentY = e.clientY
-        const startX = selectionStart.current.x
-        const startY = selectionStart.current.y
-
-        const x = Math.min(startX, currentX)
-        const y = Math.min(startY, currentY)
-        const width = Math.abs(currentX - startX)
-        const height = Math.abs(currentY - startY)
-
-        setSelectionBox({ x, y, width, height })
-
-        // Check intersections
-        const newSelection: string[] = []
-        Object.entries(iconPositions).forEach(([id, pos]) => {
-            // Icon rect (approximate 80x100)
-            const iconRect = {
-                left: pos.x,
-                right: pos.x + 80,
-                top: pos.y,
-                bottom: pos.y + 100
-            }
-            
-            const selRect = {
-                left: x,
-                right: x + width,
-                top: y,
-                bottom: y + height
-            }
-
-            if (!(iconRect.left > selRect.right || 
-                  iconRect.right < selRect.left || 
-                  iconRect.top > selRect.bottom || 
-                  iconRect.bottom < selRect.top)) {
-                newSelection.push(id)
-            }
-        })
-        
-        // Merge with existing if modifier? For now just replace during drag selection for simplicity
-        // or support additive. Standard behavior is replace unless modifier held.
-        // Let's implement replace for now as we cleared in MouseDown.
-        setSelectedIcons(newSelection)
-    }
-
-    const handleMouseUp = () => {
-        isSelecting.current = false
-        setSelectionBox(null)
-    }
-
     return (
         <>
             <div
@@ -365,13 +250,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     backgroundColor: 'var(--os-bg-base)',
                     color: 'var(--os-text-primary)'
                 }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onClick={() => {
-                    // Handled by MouseDown/Up logic mostly, but to be safe:
-                    if (!isSelecting.current) setSelectedIcons([])
-                }}
+                onClick={() => setSelectedIcons([])}
                 onContextMenu={(e) => {
                     e.preventDefault()
                     showMenu(e.clientX, e.clientY, 'desktop')
@@ -402,19 +281,6 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 {/* Ambient Overlay for depth if needed, can be optional based on wallpaper type */}
                 <div className="absolute inset-0 pointer-events-none bg-black/10" />
 
-                {/* Selection Box */}
-                {selectionBox && (
-                    <div
-                        className="absolute border border-[var(--os-accent)] bg-[var(--os-accent)]/20 z-10 pointer-events-none"
-                        style={{
-                            left: selectionBox.x,
-                            top: selectionBox.y,
-                            width: selectionBox.width,
-                            height: selectionBox.height
-                        }}
-                    />
-                )}
-
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">
                     {Object.values(APPS_REGISTRY).map((app) => {
@@ -436,10 +302,24 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                 onDrag={(_, info) => {
                                     // Multi-drag support
                                     if (isSelected && selectedIcons.length > 1) {
+                                        // We can't update store on every drag frame, it's too heavy?
+                                        // Actually zustand is fast. Let's try.
+                                        // But we need 'prev' state.
+                                        // For multi-drag visual, we might want to use local state or just let framer motion handle the 'visual' drag
+                                        // and only update store onDragEnd.
+                                        
+                                        // Current implementation in Desktop.tsx used setIconPositions(prev => ...)
+                                        // which updates the state driving the 'animate' prop.
+                                        
+                                        // If we want real-time drag of all icons, we need to update their target positions.
+                                        // But 'onDrag' is driven by the gesture.
+                                        
+                                        // The original code was:
+                                        /*
                                         setIconPositions(prev => {
                                             const next = { ...prev }
                                             selectedIcons.forEach(selectedId => {
-                                                if (selectedId !== app.id) {
+                                                 if (selectedId !== app.id) {
                                                      const p = next[selectedId] || { x: 0, y: 0 }
                                                      next[selectedId] = {
                                                          x: p.x + info.delta.x,
@@ -449,36 +329,61 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                             })
                                             return next
                                         })
+                                        */
+                                        
+                                        // We can replicate this with setIconPositions from store
+                                        const currentPos = useDesktopStore.getState().iconPositions
+                                        const next = { ...currentPos }
+                                        let changed = false
+                                        
+                                        selectedIcons.forEach(selectedId => {
+                                            if (selectedId !== app.id) {
+                                                const p = next[selectedId] || { x: 0, y: 0 }
+                                                next[selectedId] = {
+                                                    x: p.x + info.delta.x,
+                                                    y: p.y + info.delta.y
+                                                }
+                                                changed = true
+                                            }
+                                        })
+                                        
+                                        if (changed) setIconPositions(next)
                                     }
                                 }}
                                 onDragEnd={(_, info) => {
                                     // Handle snap for all selected
                                     if (isSelected && selectedIcons.length > 1) {
-                                        setIconPositions(prev => {
-                                            const next = { ...prev }
-                                            
-                                            // First pass: Calculate approximate final positions for all
-                                            // For dragged icon: start pos + total offset
-                                            // For others: they are already updated in 'prev' via onDrag
-                                            
-                                            selectedIcons.forEach(id => {
-                                                let x, y
-                                                if (id === app.id) {
-                                                    x = pos.x + info.offset.x
-                                                    y = pos.y + info.offset.y
-                                                } else {
-                                                    x = next[id].x
-                                                    y = next[id].y
-                                                }
+                                        const currentPos = useDesktopStore.getState().iconPositions
+                                        const next = { ...currentPos }
+                                        
+                                        selectedIcons.forEach(id => {
+                                            let x, y
+                                            if (id === app.id) {
+                                                // For the leader (dragged item), info.offset includes the total drag distance
+                                                // But wait, the leader's position in 'next' hasn't been updated by onDrag?
+                                                // No, onDrag only updated OTHERS.
+                                                // So for the leader, we take its ORIGINAL pos + offset.
                                                 
-                                                if (snapToGrid) {
-                                                    next[id] = findFreePosition(x, y, id, next, currentGridSize, currentGridPadding)
-                                                } else {
-                                                    next[id] = { x: Math.max(0, x), y: Math.max(0, y) }
-                                                }
-                                            })
-                                            return next
+                                                // But wait, 'pos' variable in render is from store.
+                                                // If we didn't update leader in store during drag, 'pos' is start pos.
+                                                // So yes:
+                                                x = pos.x + info.offset.x
+                                                y = pos.y + info.offset.y
+                                            } else {
+                                                // For others, they were updated in 'next' via onDrag
+                                                x = next[id].x
+                                                y = next[id].y
+                                            }
+                                            
+                                            if (snapToGrid) {
+                                                // We need to pass 'next' to findFreePosition so they don't overlap EACH OTHER
+                                                // But 'next' is being built.
+                                                next[id] = findFreePosition(x, y, id, next, currentGridSize, currentGridPadding)
+                                            } else {
+                                                next[id] = { x: Math.max(0, x), y: Math.max(0, y) }
+                                            }
                                         })
+                                        setIconPositions(next)
                                     } else {
                                         handleDragEnd(app.id, pos.x + info.offset.x, pos.y + info.offset.y)
                                     }

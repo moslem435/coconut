@@ -50,7 +50,7 @@ const translations = {
     "menu.refresh": "Refresh",
     "menu.newfolder": "New Folder",
     "menu.wallpaper": "Change Wallpaper",
-    "menu.align": "Align to Grid",
+    "menu.align": "Organize Icons",
     "menu.about": "About System",
 
     // Messages / Notifications
@@ -241,7 +241,7 @@ const translations = {
     "menu.refresh": "刷新",
     "menu.newfolder": "新建文件夹",
     "menu.wallpaper": "更换壁纸",
-    "menu.align": "自动排列",
+    "menu.align": "自动整理桌面图标",
     "menu.about": "关于系统",
 
     // Messages / Notifications

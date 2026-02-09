@@ -142,7 +142,6 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
             {/* Language Toggle */}
             <ToggleButton
               isActive={true}
-              activeColor="bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
               onClick={toggleLanguage}
               label={language === 'en' ? 'English' : '中文'}
               icon={Languages}
