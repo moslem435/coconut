@@ -8,88 +8,17 @@ import { AppManifest } from '@/os/registry/types'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
+import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useShallow } from 'zustand/react/shallow'
 import { Tooltip } from '@/os/ui/Tooltip'
-
-// Grid settings
-export const GRID_SIZE = 90
-export const GRID_PADDING = 24
+import { Folder, FileText, Image as ImageIcon } from 'lucide-react'
+import TextEditor from '@/apps/file-explorer/components/TextEditor'
+import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
+import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
 
 interface DesktopProps {
     onToggleMenu: () => void
-}
-
-// Store icon positions
-interface IconPosition {
-    x: number
-    y: number
-}
-
-// Helper: snap position to grid
-const snapToGridPos = (x: number, y: number, gridSize: number, padding: number) => {
-    const col = Math.round((x - padding) / gridSize)
-    const row = Math.round((y - padding) / gridSize)
-    return {
-        x: Math.max(padding, col * gridSize + padding),
-        y: Math.max(padding, row * gridSize + padding)
-    }
-}
-
-// Helper: check if position is occupied by another icon
-const isPositionOccupied = (
-    x: number,
-    y: number,
-    excludeId: string,
-    positions: Record<string, IconPosition>,
-    gridSize: number
-) => {
-    return Object.entries(positions).some(([id, pos]) =>
-        id !== excludeId &&
-        Math.abs(pos.x - x) < gridSize * 0.8 &&
-        Math.abs(pos.y - y) < gridSize * 0.8
-    )
-}
-
-// Helper: find nearest free grid position using spiral search
-const findFreePosition = (
-    x: number,
-    y: number,
-    excludeId: string,
-    positions: Record<string, IconPosition>,
-    gridSize: number,
-    padding: number
-): IconPosition => {
-    const snapped = snapToGridPos(x, y, gridSize, padding)
-
-    // First try the exact snapped position
-    if (!isPositionOccupied(snapped.x, snapped.y, excludeId, positions, gridSize)) {
-        return snapped
-    }
-
-    // Search in expanding spiral pattern
-    for (let radius = 1; radius <= 15; radius++) {
-        // Check all positions at this radius
-        for (let dx = -radius; dx <= radius; dx++) {
-            for (let dy = -radius; dy <= radius; dy++) {
-                // Only check perimeter positions
-                if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue
-
-                const testX = snapped.x + dx * gridSize
-                const testY = snapped.y + dy * gridSize
-
-                // Check bounds
-                if (testX < padding || testY < padding) continue
-
-                if (!isPositionOccupied(testX, testY, excludeId, positions, gridSize)) {
-                    return { x: testX, y: testY }
-                }
-            }
-        }
-    }
-
-    // Fallback: return original snapped position
-    return snapped
 }
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
@@ -116,6 +45,9 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     // Desktop Store
     const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore()
+    const { getChildren } = useFileSystemStore()
+    const desktopItems = getChildren('desktop')
+
     const isDragging = useRef(false)
     const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
 
@@ -132,19 +64,22 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             ? Math.floor((window.innerHeight - 150) / currentGridSize)
             : 6
 
-        // If no positions stored (first run), organize them
-        if (Object.keys(iconPositions).length === 0) {
-            organizeIcons(maxRows, currentGridSize, currentGridPadding)
+        // If no positions stored (first run), or some items are missing positions, organize them
+        const itemIds = desktopItems.map(i => i.id)
+        const hasMissingPositions = itemIds.some(id => !iconPositions[id])
+
+        if (Object.keys(iconPositions).length === 0 || hasMissingPositions) {
+            organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
         }
     }, []) // Run once on mount
 
     // Handle Scale Changes
     useEffect(() => {
+        if (!mounted) return
         // Re-organize when scale changes to ensure everything fits
-        // We could try to preserve positions, but simpler to just re-flow for now
-        // consistent with previous behavior
         const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
-        organizeIcons(maxRows, currentGridSize, currentGridPadding)
+        const itemIds = desktopItems.map(i => i.id)
+        organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
     }, [displayScale, currentGridSize, currentGridPadding]) // Re-run when scale changes
 
     const handleIconClick = (id: string, e: React.MouseEvent) => {
@@ -176,27 +111,73 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         // Clear selection immediately
         setSelectedIcons([])
 
-        // Check if window already exists and is open
-        if (windows[id]?.isOpen) {
-            focusWindow(id)
+        // Find the item in VFS
+        const item = desktopItems.find(i => i.id === id)
+        if (!item) return
+
+        // 1. If it's an app shortcut
+        if (item.appId) {
+            // Check if window already exists and is open
+            if (windows[item.appId]?.isOpen) {
+                focusWindow(item.appId)
+                return
+            }
+
+            const app = APPS_REGISTRY[item.appId]
+            if (!app) return
+
+            // If app has a splash screen, show it first
+            if (app.splashScreen) {
+                setSplashingApp(app)
+            } else {
+                launchApp(
+                    app.id,
+                    app.title,
+                    <app.component />,
+                    app.icon,
+                    app.defaultWindowOptions
+                )
+            }
             return
         }
 
-        const app = APPS_REGISTRY[id]
-        if (!app) return
+        // 2. If it's a folder
+        if (item.type === 'folder') {
+            const fileExplorer = APPS_REGISTRY['file-explorer']
+            if (fileExplorer) {
+                launchApp(
+                    'file-explorer-' + item.id,
+                    item.name,
+                    <fileExplorer.component initialPath={item.id} />,
+                    fileExplorer.icon,
+                    fileExplorer.defaultWindowOptions
+                )
+            }
+            return
+        }
 
-        // If app has a splash screen, show it first
-        if (app.splashScreen) {
-            setSplashingApp(app)
-        } else {
-            // No splash screen, open window directly
-            launchApp(
-                app.id,
-                app.title,
-                <app.component />,
-                app.icon,
-                app.defaultWindowOptions
-            )
+        // 3. If it's a file
+        if (item.type === 'file') {
+            const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)
+
+            if (isImage) {
+                launchApp(
+                    'preview-' + item.id,
+                    item.name,
+                    <ImageViewer src={item.content || ''} />,
+                    ImageIcon,
+                    { size: { width: 600, height: 400 } }
+                )
+            } else {
+                launchApp(
+                    'editor-' + item.id,
+                    item.name,
+                    <TextEditor initialContent={item.content} readOnly={true} />,
+                    FileText,
+                    { size: { width: 500, height: 400 } }
+                )
+            }
+            return
         }
     }
 
@@ -216,7 +197,6 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     const handleDragEnd = (id: string, x: number, y: number) => {
         // We need the current positions to check for collisions
-        // Use local scope iconPositions to ensure we don't lose data if store is desynced
         const currentPositions = iconPositions
 
         let newPos: IconPosition
@@ -280,195 +260,128 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     />
                 )}
 
-                {/* Ambient Overlay for depth if needed, can be optional based on wallpaper type */}
+                {/* Ambient Overlay */}
                 <div className="absolute inset-0 pointer-events-none bg-black/10" />
 
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">
-                    {Object.values(APPS_REGISTRY).map((app) => {
-                        const pos = iconPositions[app.id] || { x: GRID_PADDING, y: GRID_PADDING }
-                        const isSelected = selectedIcons.includes(app.id)
+                    {desktopItems.map((item) => {
+                        const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
+                        const isSelected = selectedIcons.includes(item.id)
+
+                        // Determine Icon
+                        let Icon = FileText
+                        if (item.appId && APPS_REGISTRY[item.appId]) {
+                            Icon = APPS_REGISTRY[item.appId].icon
+                        } else if (item.type === 'folder') {
+                            Icon = Folder
+                        } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+                            Icon = ImageIcon
+                        }
+
                         return (
                             <motion.div
-                                key={app.id}
+                                key={item.id}
                                 drag
                                 dragMomentum={false}
                                 dragElastic={0}
                                 onDragStart={(e) => {
                                     isDragging.current = true
-                                    // If not selected, select only this one
                                     if (!isSelected) {
-                                        setSelectedIcons([app.id])
+                                        setSelectedIcons([item.id])
                                     }
                                 }}
                                 onDrag={(_, info) => {
-                                    // Ghost Preview for single item drag
                                     if (!isSelected || selectedIcons.length <= 1) {
                                         if (snapToGrid) {
-                                            // info.point is absolute, we need relative?
-                                            // Actually info.offset is better if we know start pos.
-                                            // pos is the start position
                                             const currentX = pos.x + info.offset.x
                                             const currentY = pos.y + info.offset.y
-
-                                            // Calculate snap preview
                                             const preview = snapToGridPos(currentX, currentY, currentGridSize, currentGridPadding)
                                             setDragPreview(preview)
                                         }
                                     }
-                                    // Multi-drag support
-                                    if (isSelected && selectedIcons.length > 1) {
-                                        // We can't update store on every drag frame, it's too heavy?
-                                        // Actually zustand is fast. Let's try.
-                                        // But we need 'prev' state.
-                                        // For multi-drag visual, we might want to use local state or just let framer motion handle the 'visual' drag
-                                        // and only update store onDragEnd.
-
-                                        // Current implementation in Desktop.tsx used setIconPositions(prev => ...)
-                                        // which updates the state driving the 'animate' prop.
-
-                                        // If we want real-time drag of all icons, we need to update their target positions.
-                                        // But 'onDrag' is driven by the gesture.
-
-                                        // The original code was:
-                                        /*
-                                        setIconPositions(prev => {
-                                            const next = { ...prev }
-                                            selectedIcons.forEach(selectedId => {
-                                                 if (selectedId !== app.id) {
-                                                     const p = next[selectedId] || { x: 0, y: 0 }
-                                                     next[selectedId] = {
-                                                         x: p.x + info.delta.x,
-                                                         y: p.y + info.delta.y
-                                                     }
-                                                }
-                                            })
-                                            return next
-                                        })
-                                        */
-
-                                        // We can replicate this with setIconPositions from store
-                                        const currentPos = useDesktopStore.getState().iconPositions
-                                        const next = { ...currentPos }
-                                        let changed = false
-
-                                        selectedIcons.forEach(selectedId => {
-                                            if (selectedId !== app.id) {
-                                                const p = next[selectedId] || { x: 0, y: 0 }
-                                                next[selectedId] = {
-                                                    x: p.x + info.delta.x,
-                                                    y: p.y + info.delta.y
-                                                }
-                                                changed = true
-                                            }
-                                        })
-
-                                        if (changed) setIconPositions(next)
-                                    }
+                                    // Multi-drag support logic could go here
                                 }}
-                                onDragEnd={(_, info) => {
-                                    setDragPreview(null)
-                                    // Handle snap for all selected
-                                    if (isSelected && selectedIcons.length > 1) {
-                                        const currentPos = useDesktopStore.getState().iconPositions
-                                        const next = { ...currentPos }
+                                onDragEnd={(e, info) => {
+                                    // Small delay to prevent click event triggering
+                                    setTimeout(() => {
+                                        isDragging.current = false
+                                        setDragPreview(null)
+                                    }, 50)
 
-                                        selectedIcons.forEach(id => {
-                                            let x, y
-                                            if (id === app.id) {
-                                                // For the leader (dragged item), info.offset includes the total drag distance
-                                                // But wait, the leader's position in 'next' hasn't been updated by onDrag?
-                                                // No, onDrag only updated OTHERS.
-                                                // So for the leader, we take its ORIGINAL pos + offset.
-
-                                                // But wait, 'pos' variable in render is from store.
-                                                // If we didn't update leader in store during drag, 'pos' is start pos.
-                                                // So yes:
-                                                x = pos.x + info.offset.x
-                                                y = pos.y + info.offset.y
-                                            } else {
-                                                // For others, they were updated in 'next' via onDrag
-                                                x = next[id].x
-                                                y = next[id].y
-                                            }
-
-                                            if (snapToGrid) {
-                                                // We need to pass 'next' to findFreePosition so they don't overlap EACH OTHER
-                                                // But 'next' is being built.
-                                                next[id] = findFreePosition(x, y, id, next, currentGridSize, currentGridPadding)
-                                            } else {
-                                                next[id] = { x: Math.max(0, x), y: Math.max(0, y) }
-                                            }
-                                        })
-                                        setIconPositions(next)
-                                    } else {
-                                        handleDragEnd(app.id, pos.x + info.offset.x, pos.y + info.offset.y)
-                                    }
+                                    const finalX = pos.x + info.offset.x
+                                    const finalY = pos.y + info.offset.y
+                                    handleDragEnd(item.id, finalX, finalY)
                                 }}
-                                initial={false}
-                                animate={{
-                                    x: pos.x,
-                                    y: pos.y
+                                initial={{ x: pos.x, y: pos.y }}
+                                animate={{ x: pos.x, y: pos.y }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 500,
+                                    damping: 30,
+                                    // Disable animation when dragging to feel responsive
+                                    x: { duration: isDragging.current ? 0 : undefined },
+                                    y: { duration: isDragging.current ? 0 : undefined }
                                 }}
-                                transition={useAnimations ? {
-                                    type: 'spring',
-                                    stiffness: 400,
-                                    damping: 30
-                                } : { duration: 0 }}
-                                className="absolute group flex flex-col items-center gap-2 w-20 cursor-pointer"
-                                onClick={(e) => handleIconClick(app.id, e)}
-                                onDoubleClick={() => handleDoubleClick(app.id)}
-                                whileHover={useAnimations ? { scale: 1.05 } : {}}
-                                whileTap={useAnimations ? { scale: 0.95 } : {}}
-                                style={{ touchAction: 'none' }}
+                                className={`absolute flex flex-col items-center justify-center gap-1 p-2 rounded w-[90px] group
+                                    ${isSelected ? 'bg-white/10 ring-1 ring-white/20 backdrop-blur-sm' : 'hover:bg-white/5'}
+                                `}
+                                style={{
+                                    width: currentGridSize,
+                                    height: currentGridSize,
+                                    zIndex: isDragging.current ? 50 : 1
+                                }}
+                                onClick={(e) => handleIconClick(item.id, e)}
+                                onDoubleClick={() => handleDoubleClick(item.id)}
+                                onContextMenu={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
+                                }}
                             >
-                                <Tooltip content={app.title} side="bottom" offset={8} className="flex flex-col items-center gap-2 w-full">
-                                    <div
-                                        className="relative p-3 rounded-xl transition-all duration-200 shadow-sm"
-                                        style={{
-                                            backgroundColor: isSelected ? 'var(--os-accent)' : 'var(--os-bg-panel)',
-                                            border: `1px solid ${isSelected ? 'var(--os-accent)' : 'var(--os-border)'}`,
-                                        }}
-                                    >
-                                        <app.icon
-                                            className="w-7 h-7 transition-colors"
-                                            style={{
-                                                color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-accent)'
-                                            }}
-                                        />
-                                    </div>
-                                    <span
-                                        className="text-[0.6875rem] font-medium tracking-wide px-2 py-0.5 rounded shadow-sm backdrop-blur-sm transition-colors text-center truncate max-w-[80px]"
-                                        style={{
-                                            backgroundColor: isSelected ? 'var(--os-accent)' : 'rgba(var(--os-bg-panel-rgb), 0.8)',
-                                            color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-text-secondary)'
-                                        }}
-                                    >
-                                        {app.title}
-                                    </span>
-                                </Tooltip>
+                                <div className={`
+                                    relative flex items-center justify-center rounded-xl p-2 transition-transform duration-200
+                                    ${isSelected ? 'scale-105' : ''}
+                                `}>
+                                    <Icon
+                                        size={32 * scaleFactor}
+                                        strokeWidth={1.5}
+                                        className={item.type === 'folder' ? 'text-yellow-400 fill-yellow-400/20' : ''}
+                                    />
+                                </div>
+
+                                <span className={`
+                                    text-[11px] text-center leading-tight break-words px-1 rounded
+                                    ${isSelected ? 'text-white font-medium' : 'text-gray-100/90'}
+                                    ${scaleFactor > 1.2 ? 'text-sm' : ''}
+                                `} style={{
+                                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                    }}>
+                                    {item.name}
+                                </span>
+
+                                {/* Selection Indicator */}
+                                {isSelected && (
+                                    <div className="absolute inset-0 rounded border border-white/20 pointer-events-none" />
+                                )}
                             </motion.div>
                         )
                     })}
 
-                    {/* Pop noise is a nice idea but not now. */}
-                    {/* Ghost Preview */}
-                    {dragPreview && (
+                    {/* Drag Preview Ghost */}
+                    {dragPreview && snapToGrid && (
                         <div
-                            className="absolute border-2 border-[var(--os-accent)] bg-[var(--os-accent)]/20 rounded-xl transition-all duration-200 z-0"
+                            className="absolute border-2 border-white/30 rounded bg-white/5 pointer-events-none z-0 transition-all duration-150"
                             style={{
-                                width: '80px', // Approximation, since real width is dynamic but w-20 is 5rem = 80px?
-                                height: '80px', // Approximation
                                 left: dragPreview.x,
                                 top: dragPreview.y,
-                                opacity: 0.5
+                                width: currentGridSize,
+                                height: currentGridSize
                             }}
                         />
                     )}
                 </div>
             </div>
-
-            {/* Splash Screen Portal */}
             {splashPortal}
         </>
     )

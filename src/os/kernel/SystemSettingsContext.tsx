@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     volume: 75,
     isMuted: false,
     snapToGrid: true,
-    pinnedAppIds: ['portfolio-hub', 'music'], // Default pinned apps
+    pinnedAppIds: ['portfolio-hub', 'browser'], // Default pinned apps
     wallpaper: {
         type: 'preset',
         value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'

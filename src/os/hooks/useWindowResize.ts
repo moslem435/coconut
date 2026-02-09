@@ -7,7 +7,11 @@ interface ResizeState {
     direction: string | null
 }
 
-export function useWindowResize(id: string) {
+export function useWindowResize(
+    id: string,
+    onSnapPreview?: (show: boolean) => void,
+    onMaximize?: () => void
+) {
     const [resizeState, setResizeState] = useState<ResizeState>({ isResizing: false, direction: null })
     const windowRef = useRef<HTMLDivElement>(null)
 
@@ -76,6 +80,15 @@ export function useWindowResize(id: string) {
                 })
             }
 
+            // Snap detection (North resize)
+            if (direction.includes('n')) {
+                if (newY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
+                    onSnapPreview?.(true)
+                } else {
+                    onSnapPreview?.(false)
+                }
+            }
+
             // Store in ref for finding final value
             currentGeo.w = newWidth
             currentGeo.h = newHeight
@@ -86,6 +99,27 @@ export function useWindowResize(id: string) {
         const onPointerUp = () => {
             document.removeEventListener('pointermove', onPointerMove)
             document.removeEventListener('pointerup', onPointerUp)
+
+            // Handle Snap to Maximize
+            if (direction.includes('n') && currentGeo.y <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
+                onMaximize?.()
+                onSnapPreview?.(false)
+
+                // Cleanup manual styles
+                if (windowRef.current) {
+                    windowRef.current.style.width = ''
+                    windowRef.current.style.height = ''
+                    windowRef.current.style.transform = ''
+                }
+
+                // Reset state
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setResizeState({ isResizing: false, direction: null })
+                    })
+                })
+                return
+            }
 
             // Commit changes to global store
             if (currentGeo.w !== startWidth || currentGeo.h !== startHeight) {

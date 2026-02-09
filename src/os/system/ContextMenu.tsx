@@ -2,19 +2,22 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image } from 'lucide-react'
+import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore, MenuType } from '@/os/kernel/useContextMenuStore'
 import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
+import { findFreePosition, GRID_SIZE, GRID_PADDING } from '@/os/utils/grid'
 
 export default function SystemContextMenu() {
   const { visible, position, type, data, hideMenu } = useContextMenuStore()
   const { addNotification } = useNotificationStore()
-  const { organizeIcons } = useDesktopStore()
+  const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore()
+  const { createItem, deleteItem } = useFileSystemStore()
   const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -55,15 +58,15 @@ export default function SystemContextMenu() {
 
   const handleSnap = (direction: 'left' | 'right') => {
     if (!data?.windowId) return
-    
+
     const screenWidth = window.innerWidth
     const screenHeight = window.innerHeight - 64 // - taskbar
     const width = screenWidth / 2
-    
+
     updateWindowSize(data.windowId, { width, height: screenHeight })
-    updateWindowPosition(data.windowId, { 
-      x: direction === 'left' ? 0 : width, 
-      y: 0 
+    updateWindowPosition(data.windowId, {
+      x: direction === 'left' ? 0 : width,
+      y: 0
     })
     hideMenu()
   }
@@ -74,7 +77,7 @@ export default function SystemContextMenu() {
     switch (type) {
       case 'taskbar-icon':
         const isPinned = pinnedAppIds.includes(data.appId)
-        
+
         return [
           {
             label: t('menu.open'),
@@ -85,18 +88,18 @@ export default function SystemContextMenu() {
                 if (win?.isMinimized) useWindowStore.getState().minimizeWindow(data.windowId)
                 useWindowStore.getState().focusWindow(data.windowId)
               } else {
-                 // Launch App
-                 const app = APPS_REGISTRY[data.appId]
-                 if (app) {
-                   const title = app.id === 'settings' ? t('start.settings') : app.title
-                   openWindow(app.id, title, <app.component />, app.icon, app.defaultWindowOptions)
-                 }
+                // Launch App
+                const app = APPS_REGISTRY[data.appId]
+                if (app) {
+                  const title = app.id === 'settings' ? t('start.settings') : app.title
+                  openWindow(app.id, title, <app.component />, app.icon, app.defaultWindowOptions)
+                }
               }
             }
           },
           {
             label: isPinned ? t('menu.unpin') : t('menu.pin'),
-            icon: Check, 
+            icon: Check,
             checked: isPinned,
             action: () => {
               if (isPinned) {
@@ -123,7 +126,7 @@ export default function SystemContextMenu() {
       case 'window-titlebar':
         const win = useWindowStore.getState().windows[data?.windowId]
         if (!win) return []
-        
+
         return [
           {
             label: win.isMaximized ? t('menu.restore') : t('menu.maximize'),
@@ -155,6 +158,46 @@ export default function SystemContextMenu() {
           }
         ]
 
+      case 'desktop-item':
+        return [
+          {
+            label: t('menu.open'),
+            icon: ExternalLink,
+            action: () => {
+              // We rely on Desktop.tsx handleDoubleClick logic usually, but here we can force it
+              // or just let the user double click. 
+              // For now, let's implement a generic open if possible, or just trigger the same logic as double click
+              // Since we don't have access to handleDoubleClick here easily without passing it, 
+              // we might need to duplicate some logic or expose a global 'openItem' action.
+              // However, for simplicity, we can just say "Open" and maybe trigger a custom event or just use window store if it's an app.
+
+              if (data?.appId) {
+                const app = APPS_REGISTRY[data.appId]
+                if (app) openWindow(app.id, app.title, <app.component />, app.icon, app.defaultWindowOptions)
+              } else if (data?.id) {
+                // For files/folders, we might need to dispatch an event or use a store action if we had one.
+                // Ideally, Desktop should handle this. 
+                // But since we are in a separate component, let's just show a notification for now or try to launch if it's a known type.
+                addNotification({ type: 'info', message: 'Double-click to open' })
+              }
+              hideMenu()
+            }
+          },
+          { type: 'separator' },
+          {
+            label: t('menu.delete'),
+            icon: Trash2,
+            danger: true,
+            action: () => {
+              if (data?.id) {
+                deleteItem(data.id)
+                addNotification({ type: 'success', message: 'Item deleted' })
+              }
+              hideMenu()
+            }
+          }
+        ]
+
       case 'desktop':
       default:
         return [
@@ -167,11 +210,30 @@ export default function SystemContextMenu() {
           {
             label: t('menu.newfolder'),
             icon: FolderPlus,
-            action: () => addNotification({
-              type: 'info',
-              title: t('msg.info'),
-              message: t('msg.folder.impl')
-            })
+            action: () => {
+                const id = createItem('desktop', 'New Folder', 'folder')
+                
+                // Calculate position based on where user clicked
+                const scaleFactor = displayScale / 100
+                const currentGridSize = GRID_SIZE * scaleFactor
+                const currentGridPadding = GRID_PADDING * scaleFactor
+
+                // Use the context menu position as the starting point
+                const startX = position?.x || currentGridPadding
+                const startY = position?.y || currentGridPadding
+
+                const pos = findFreePosition(
+                    startX, 
+                    startY, 
+                    id, 
+                    iconPositions, 
+                    currentGridSize, 
+                    currentGridPadding
+                )
+
+                updateIconPosition(id, pos)
+                hideMenu()
+            }
           },
           {
             label: t('menu.wallpaper'),
@@ -188,11 +250,13 @@ export default function SystemContextMenu() {
               const scaleFactor = displayScale / 100
               const currentGridSize = GRID_SIZE * scaleFactor
               const currentGridPadding = GRID_PADDING * scaleFactor
-              
+
               const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
-              
-              organizeIcons(maxRows, currentGridSize, currentGridPadding)
-            } 
+              const desktopItems = useFileSystemStore.getState().getChildren('desktop')
+              const itemIds = desktopItems.map(i => i.id)
+
+              organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
+            }
           },
           { type: 'separator' },
           {
@@ -208,10 +272,10 @@ export default function SystemContextMenu() {
         ]
     }
   }
-  
+
   // Helper for icons
   const MinusIcon = (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14" /></svg>
   )
 
   const menuItems = getMenuItems()
@@ -220,7 +284,7 @@ export default function SystemContextMenu() {
   const getMenuStyle = () => {
     const menuWidth = 200
     // Estimate height based on items (approx 36px per item + separators)
-    const menuHeight = menuItems.length * 36 + 20 
+    const menuHeight = menuItems.length * 36 + 20
     let x = position.x
     let y = position.y
 
@@ -255,7 +319,7 @@ export default function SystemContextMenu() {
             }
 
             const Icon = item.icon
-            
+
             return (
               <button
                 key={index}
@@ -264,8 +328,8 @@ export default function SystemContextMenu() {
                   hideMenu()
                 }}
                 className={`w-full text-left px-3 py-1.5 flex items-center justify-between text-sm transition-colors relative group
-                  ${item.danger 
-                    ? 'text-red-500 hover:bg-red-500/10' 
+                  ${item.danger
+                    ? 'text-red-500 hover:bg-red-500/10'
                     : 'text-[var(--os-text-primary)] hover:bg-[var(--os-accent)] hover:text-[var(--os-accent-contrast)]'
                   }`}
               >

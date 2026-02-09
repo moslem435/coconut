@@ -5,7 +5,6 @@ import { motion, useDragControls } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
-import { WindowFrame } from '@/os/ui/WindowFrame'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
 import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
 import { SYSTEM_CONSTANTS } from '@/os/config/constants'
@@ -37,12 +36,19 @@ export default function Window({ id }: WindowProps) {
   const focusWindow = useWindowStore(state => state.focusWindow)
   const updateWindowPosition = useWindowStore(state => state.updateWindowPosition)
 
-  const { isResizing, handleResizeStart, windowRef } = useWindowResize(id)
+  const [showSnapPreview, setShowSnapPreview] = useState(false)
+  const [restorePreview, setRestorePreview] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartY = useRef<number>(0)
+
+  const { isResizing, handleResizeStart, windowRef } = useWindowResize(
+    id,
+    setShowSnapPreview,
+    () => maximizeWindow(id)
+  )
   const { captureSnapshot } = useWindowSnapshot(id)
 
   const dragControls = useDragControls()
-  const [showSnapPreview, setShowSnapPreview] = useState(false)
-  const [restorePreview, setRestorePreview] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
 
   if (!windowState || !windowState.isOpen) return null
 
@@ -129,9 +135,10 @@ export default function Window({ id }: WindowProps) {
           ? { left: 0, top: 0, right: 0, bottom: 0 }
           : { left: -Infinity, top: -20, right: Infinity, bottom: Infinity }
         }
+        onPointerDown={() => focusWindow(id)}
         initial={{
           opacity: 0,
-          scale: 0,
+          scale: 0.95,
           // Start from taskbar position (bottom center of screen)
           x: windowState.taskbarPosition?.x
             ? windowState.taskbarPosition.x - (effectiveWidth / 2)
@@ -158,14 +165,34 @@ export default function Window({ id }: WindowProps) {
             ? { duration: 0 }
             : {
               type: "spring",
-              stiffness: 260,
-              damping: 20
+              stiffness: 300,
+              damping: 30
             }
         }
-        style={{ position: 'fixed', top: 0, left: 0, willChange: 'transform, width, height' }}
+        className={`fixed flex flex-col overflow-hidden transition-[background-color,border-radius] duration-300
+          ${windowState.isMaximized ? 'rounded-none' : 'rounded-2xl'}
+        `}
+        style={{
+          top: 0,
+          left: 0,
+          backgroundColor: 'rgba(var(--os-bg-window-rgb), 0.65)',
+          // Optimization: Reduce blur quality for inactive windows to save GPU
+          backdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
+          WebkitBackdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
+          // Use box-shadow for inner border logic to look more premium
+          boxShadow: isActive
+            ? '0 0 0 1px rgba(255, 255, 255, 0.1), var(--os-shadow-window-active)'
+            : '0 0 0 1px rgba(255, 255, 255, 0.05), var(--os-shadow-window)',
+          isolation: 'isolate',
+        }}
+        onDragStart={(_, info) => {
+          setIsDragging(true)
+          dragStartY.current = info.point.y
+        }}
         onDrag={(_, info) => {
           // Handle maximized window drag-to-restore preview
-          if (windowState.isMaximized && info.offset.y > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
+          const deltaY = info.point.y - dragStartY.current
+          if (windowState.isMaximized && deltaY > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
             const mouseX = info.point.x
             const restoredWidth = windowState.preMaximizeState?.size.width ?? 800
             const restoredHeight = windowState.preMaximizeState?.size.height ?? 600
@@ -196,6 +223,7 @@ export default function Window({ id }: WindowProps) {
           }
         }}
         onDragEnd={(_, info) => {
+          setIsDragging(false)
           setShowSnapPreview(false)
           setRestorePreview(null)
 
@@ -233,57 +261,55 @@ export default function Window({ id }: WindowProps) {
           }
         }}
       >
-        <WindowFrame
+        <WindowTitleBar
+          title={windowState.title}
+          icon={windowState.icon}
           isActive={isActive}
           isMaximized={windowState.isMaximized}
+          onMinimize={handleMinimize}
+          onMaximize={() => maximizeWindow(id)}
+          onClose={() => closeWindow(id)}
+          dragControls={dragControls}
           onPointerDown={() => focusWindow(id)}
-          className="h-full w-full"
-        >
-          <WindowTitleBar
-            title={windowState.title}
-            icon={windowState.icon}
-            isActive={isActive}
-            isMaximized={windowState.isMaximized}
-            onMinimize={handleMinimize}
-            onMaximize={() => maximizeWindow(id)}
-            onClose={() => closeWindow(id)}
-            dragControls={dragControls}
-            onPointerDown={() => focusWindow(id)}
-            onHoverMinimize={captureSnapshot}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
-            }}
-            labels={{
-              minimize: t('menu.minimize'),
-              maximize: t('menu.maximize'),
-              restore: t('menu.restore'),
-              close: t('menu.close')
-            }}
-          />
+          onHoverMinimize={captureSnapshot}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+          }}
+          labels={{
+            minimize: t('menu.minimize'),
+            maximize: t('menu.maximize'),
+            restore: t('menu.restore'),
+            close: t('menu.close')
+          }}
+        />
 
-          <div className="flex-1 relative overflow-hidden bg-black">
-            <AppErrorBoundary appId={id}>
-              {windowState.component}
-            </AppErrorBoundary>
+        <div className="flex-1 relative overflow-hidden bg-black">
+          <AppErrorBoundary appId={id}>
+            {windowState.component}
+          </AppErrorBoundary>
 
-            {!windowState.isMaximized && (
-              <>
-                {/* Resize Handles */}
-                <div onPointerDown={(e) => handleResizeStart(e, 'nw')} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" />
-                <div onPointerDown={(e) => handleResizeStart(e, 'ne')} className="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" />
-                <div onPointerDown={(e) => handleResizeStart(e, 'sw')} className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" />
-                <div onPointerDown={(e) => handleResizeStart(e, 'se')} className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" />
+          {/* Transparent Overlay to capture events during resize/drag over iframes */}
+          {(isResizing || isDragging) && (
+            <div className="absolute inset-0 z-[100] bg-transparent" />
+          )}
 
-                <div onPointerDown={(e) => handleResizeStart(e, 'n')} className="absolute top-0 left-4 right-4 h-2 cursor-n-resize z-40" />
-                <div onPointerDown={(e) => handleResizeStart(e, 's')} className="absolute bottom-0 left-4 right-4 h-2 cursor-s-resize z-40" />
-                <div onPointerDown={(e) => handleResizeStart(e, 'w')} className="absolute top-4 bottom-4 left-0 w-2 cursor-w-resize z-40" />
-                <div onPointerDown={(e) => handleResizeStart(e, 'e')} className="absolute top-4 bottom-4 right-0 w-2 cursor-e-resize z-40" />
-              </>
-            )}
-          </div>
-        </WindowFrame>
+          {!windowState.isMaximized && (
+            <>
+              {/* Resize Handles */}
+              <div onPointerDown={(e) => handleResizeStart(e, 'nw')} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" />
+              <div onPointerDown={(e) => handleResizeStart(e, 'ne')} className="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" />
+              <div onPointerDown={(e) => handleResizeStart(e, 'sw')} className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" />
+              <div onPointerDown={(e) => handleResizeStart(e, 'se')} className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" />
+
+              <div onPointerDown={(e) => handleResizeStart(e, 'n')} className="absolute top-0 left-4 right-4 h-2 cursor-n-resize z-40" />
+              <div onPointerDown={(e) => handleResizeStart(e, 's')} className="absolute bottom-0 left-4 right-4 h-2 cursor-s-resize z-40" />
+              <div onPointerDown={(e) => handleResizeStart(e, 'w')} className="absolute top-4 bottom-4 left-0 w-2 cursor-w-resize z-40" />
+              <div onPointerDown={(e) => handleResizeStart(e, 'e')} className="absolute top-4 bottom-4 right-0 w-2 cursor-e-resize z-40" />
+            </>
+          )}
+        </div>
       </motion.div>
     </>
   )

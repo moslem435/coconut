@@ -41,6 +41,8 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
     if (isOpen && toggleRef.current && menuRef.current) {
       const triggerRect = toggleRef.current.getBoundingClientRect()
       const menuRect = menuRef.current.getBoundingClientRect()
+      const taskbar = toggleRef.current.closest('[data-taskbar]')
+      const taskbarRect = taskbar?.getBoundingClientRect()
 
       // Center align relative to trigger
       let x = triggerRect.left + triggerRect.width / 2 - menuRect.width / 2
@@ -50,8 +52,14 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
       const maxX = window.innerWidth - menuRect.width - padding
       x = Math.min(Math.max(padding, x), maxX)
 
-      // Position above trigger
-      const y = window.innerHeight - triggerRect.top + 8 // 8px gap
+      // Baseline positioning: Use taskbar top instead of individual button top
+      const baselineY = taskbarRect ? taskbarRect.top : triggerRect.top
+
+      // Calculate dynamic gap based on REM to support scaling
+      const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      const gap = 0.75 * rootFontSize // 0.75rem gap
+
+      const y = window.innerHeight - baselineY + gap
 
       setPosition({ x, y })
     }
@@ -64,21 +72,27 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
       {isOpen && (
         <motion.div
           ref={menuRef}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           style={{
             position: 'fixed',
             left: position?.x ?? 0,
-            bottom: position?.y ?? 64, // Fallback
-            visibility: position ? 'visible' : 'hidden'
+            bottom: position?.y ?? '5rem', // Fallback in REM
+            visibility: position ? 'visible' : 'hidden',
+            backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
+            backdropFilter: 'blur(40px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(150%)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            isolation: 'isolate',
+            transform: 'translateZ(0)'
           }}
-          className="w-96 h-[calc(100vh-120px)] max-h-[600px] flex flex-col gap-4 z-[5000]"
+          className="w-96 h-[calc(100vh-120px)] max-h-[600px] flex flex-col rounded-2xl overflow-hidden z-[5000]"
         >
-          {/* Notifications Panel */}
-          <div className="flex-1 bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-[var(--os-border)] flex items-center justify-between">
+          {/* Notifications Section */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="p-4 border-b border-[var(--os-border)] flex items-center justify-between bg-white/5">
               <div className="flex items-center gap-2">
                 <Bell size={16} className="text-[var(--os-accent)]" />
                 <h3 className="font-semibold text-sm">Notifications</h3>
@@ -109,8 +123,10 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
             </div>
           </div>
 
-          {/* Calendar Panel */}
-          <div className="shrink-0 bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded-2xl shadow-2xl overflow-hidden">
+          <div className="h-px bg-[var(--os-border)] mx-4 shrink-0" />
+
+          {/* Calendar Section */}
+          <div className="shrink-0">
             <CalendarWidget />
           </div>
         </motion.div>
@@ -119,6 +135,7 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
     document.body
   )
 }
+
 
 function HistoryItem({ notification }: { notification: Notification }) {
   const getIcon = () => {

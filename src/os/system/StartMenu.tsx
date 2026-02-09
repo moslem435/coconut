@@ -48,6 +48,8 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
         if (isOpen && toggleRef.current && menuRef.current) {
             const triggerRect = toggleRef.current.getBoundingClientRect()
             const menuRect = menuRef.current.getBoundingClientRect()
+            const taskbar = toggleRef.current.closest('[data-taskbar]')
+            const taskbarRect = taskbar?.getBoundingClientRect()
 
             // Center align relative to trigger
             let x = triggerRect.left + triggerRect.width / 2 - menuRect.width / 2
@@ -57,27 +59,32 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
             const maxX = window.innerWidth - menuRect.width - padding
             x = Math.min(Math.max(padding, x), maxX)
 
-            // Position above trigger
-            const y = window.innerHeight - triggerRect.top + 8 // 8px gap
+            // Baseline positioning: Use taskbar top for unified alignment
+            const baselineY = taskbarRect ? taskbarRect.top : triggerRect.top
+
+            // Calculate dynamic gap based on REM to support scaling
+            const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+            const gap = 0.75 * rootFontSize // 0.75rem gap
+
+            const y = window.innerHeight - baselineY + gap
 
             setPosition({ x, y })
         }
     }, [isOpen, toggleRef])
 
-    const handleOpenSettings = () => {
-        const settingsApp = APPS_REGISTRY['settings']
-        if (!settingsApp) return
+    const handleLaunchApp = (appId: string) => {
+        const app = APPS_REGISTRY[appId]
+        if (!app) return
 
-        // If already open, focus it
-        if (windows['settings']?.isOpen) {
-            focusWindow('settings')
+        if (windows[appId]?.isOpen) {
+            focusWindow(appId)
         } else {
             launchApp(
-                settingsApp.id,
-                t('start.settings'),
-                <settingsApp.component />,
-                settingsApp.icon,
-                settingsApp.defaultWindowOptions
+                app.id,
+                app.title,
+                <app.component />,
+                app.icon,
+                app.defaultWindowOptions
             )
         }
         onClose()
@@ -104,10 +111,11 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                     transition={{ duration: useAnimations ? 0.2 : 0, ease: 'easeOut' }}
                     className="fixed w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[10001]"
                     style={{
-                        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
-                        border: '1px solid var(--os-border)',
+                        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
+                        boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(40px) saturate(150%)',
                         left: position?.x ?? 0,
-                        bottom: position?.y ?? 64, // Fallback
+                        bottom: position?.y ?? '5rem', // Fallback in REM
                         visibility: position ? 'visible' : 'hidden'
                     }}
                     onClick={(e) => e.stopPropagation()}
@@ -129,7 +137,14 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
 
                     {/* Menu Items */}
                     <div className="space-y-1">
-                        <MenuItem icon={Settings} label={t('start.settings')} onClick={handleOpenSettings} />
+                        {Object.values(APPS_REGISTRY).filter(app => app.id !== 'portfolio-hub').map((app) => (
+                            <MenuItem
+                                key={app.id}
+                                icon={app.icon}
+                                label={app.title}
+                                onClick={() => handleLaunchApp(app.id)}
+                            />
+                        ))}
                         <div className="h-px w-full my-2 bg-gradient-to-r from-transparent via-[var(--os-border)] to-transparent" />
                         <MenuItem icon={Power} label={t('start.shutdown')} onClick={handleShutdown} danger />
                     </div>

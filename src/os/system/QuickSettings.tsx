@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Volume2, VolumeX, Sun, Moon, Monitor,
@@ -47,7 +48,40 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, onClose, toggleRef])
 
-  return (
+  const [position, setPosition] = useState<{ x: number, y: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (isOpen && toggleRef.current && menuRef.current) {
+      const triggerRect = toggleRef.current.getBoundingClientRect()
+      const menuRect = menuRef.current.getBoundingClientRect()
+      const taskbar = toggleRef.current.closest('[data-taskbar]')
+      const taskbarRect = taskbar?.getBoundingClientRect()
+
+      // Center align relative to trigger
+      let x = triggerRect.left + triggerRect.width / 2 - menuRect.width / 2
+
+      // Clamp to screen edges with padding
+      const padding = 16
+      const maxX = window.innerWidth - menuRect.width - padding
+      x = Math.min(Math.max(padding, x), maxX)
+
+      // Baseline positioning: Use taskbar top instead of individual button top
+      // This ensures all panels start from the same height regardless of button size
+      const baselineY = taskbarRect ? taskbarRect.top : triggerRect.top
+
+      // Calculate dynamic gap based on REM to support scaling
+      const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      const gap = 0.75 * rootFontSize // 0.75rem gap
+
+      const y = window.innerHeight - baselineY + gap
+
+      setPosition({ x, y })
+    }
+  }, [isOpen, toggleRef])
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -56,10 +90,17 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-16 right-4 w-80 rounded-2xl shadow-2xl p-4 z-[5000] text-[var(--os-text-primary)] backdrop-blur-2xl"
+          className="fixed z-[5000] w-80 rounded-2xl p-4 text-[var(--os-text-primary)]"
           style={{
-            backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
-            border: '1px solid var(--os-border)'
+            left: position?.x ?? 0,
+            bottom: position?.y ?? '5rem', // Fallback in REM for consistency
+            visibility: position ? 'visible' : 'hidden',
+            backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
+            backdropFilter: 'blur(40px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(150%)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            isolation: 'isolate',
+            transform: 'translateZ(0)'
           }}
         >
           {/* Header */}
@@ -152,7 +193,8 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
 
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

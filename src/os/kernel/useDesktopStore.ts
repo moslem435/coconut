@@ -11,7 +11,7 @@ interface DesktopState {
     iconPositions: Record<string, IconPosition>
     setIconPositions: (positions: Record<string, IconPosition>) => void
     updateIconPosition: (id: string, pos: IconPosition) => void
-    organizeIcons: (maxRows: number, gridSize: number, padding: number) => void
+    organizeIcons: (itemIds: string[], maxRows: number, gridSize: number, padding: number) => void
 }
 
 export const useDesktopStore = create<DesktopState>()(
@@ -22,19 +22,18 @@ export const useDesktopStore = create<DesktopState>()(
             updateIconPosition: (id, pos) => set((state) => ({
                 iconPositions: { ...state.iconPositions, [id]: pos }
             })),
-            organizeIcons: (maxRows, gridSize, padding) => {
-                const apps = Object.values(APPS_REGISTRY)
+            organizeIcons: (itemIds, maxRows, gridSize, padding) => {
                 const newPositions: Record<string, IconPosition> = {}
-                
-                apps.forEach((app, index) => {
+
+                itemIds.forEach((id, index) => {
                     const col = Math.floor(index / maxRows)
                     const row = index % maxRows
-                    newPositions[app.id] = {
+                    newPositions[id] = {
                         x: padding + col * gridSize,
                         y: padding + row * gridSize
                     }
                 })
-                
+
                 set({ iconPositions: newPositions })
             }
         }),

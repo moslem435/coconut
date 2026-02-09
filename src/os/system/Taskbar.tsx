@@ -189,11 +189,13 @@ export default function Taskbar({
 
   return (
     <div
+      data-taskbar
       className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 transition-[width,height] duration-300 w-fit max-w-[calc(100vw-2rem)]"
       style={{
-        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
-        border: '1px solid var(--os-border)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(40px) saturate(150%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(150%)'
       }}
     >
 
