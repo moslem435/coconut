@@ -13,13 +13,14 @@ interface StartMenuProps {
     isOpen: boolean
     onClose: () => void
     onShutdown?: () => void
-    toggleRef: React.RefObject<HTMLElement>
+    toggleRef: React.RefObject<HTMLElement | null>
 }
 
 export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: StartMenuProps) {
     const { useAnimations } = useSystemSettings()
     const { t } = useLanguage()
     const openWindow = useWindowStore(state => state.openWindow)
+    const launchApp = useWindowStore(state => state.launchApp)
     const windows = useWindowStore(state => state.windows)
     const focusWindow = useWindowStore(state => state.focusWindow)
     const menuRef = useRef<HTMLDivElement>(null)
@@ -71,7 +72,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
         if (windows['settings']?.isOpen) {
             focusWindow('settings')
         } else {
-            openWindow(
+            launchApp(
                 settingsApp.id,
                 t('start.settings'),
                 <settingsApp.component />,

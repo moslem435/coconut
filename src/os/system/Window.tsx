@@ -1,23 +1,22 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useDragControls } from 'framer-motion'
-import { X, Minus, Square, Maximize2, Minimize2 } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { WindowFrame } from '@/os/ui/WindowFrame'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
 import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
-import { toPng } from 'html-to-image'
+import { SYSTEM_CONSTANTS } from '@/os/config/constants'
+import { useWindowResize } from '@/os/hooks/useWindowResize'
+import { useWindowSnapshot } from '@/os/hooks/useWindowSnapshot'
 
 interface WindowProps {
   id: string
 }
 
 // Snap zone threshold (pixels from top edge)
-const SNAP_THRESHOLD = 10
-const RESTORE_DRAG_THRESHOLD = 20
 
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
@@ -37,16 +36,13 @@ export default function Window({ id }: WindowProps) {
   const maximizeWindow = useWindowStore(state => state.maximizeWindow)
   const focusWindow = useWindowStore(state => state.focusWindow)
   const updateWindowPosition = useWindowStore(state => state.updateWindowPosition)
-  const updateWindowSize = useWindowStore(state => state.updateWindowSize)
-  const setSnapshot = useWindowStore(state => state.setSnapshot)
+
+  const { isResizing, handleResizeStart, windowRef } = useWindowResize(id)
+  const { captureSnapshot } = useWindowSnapshot(id)
 
   const dragControls = useDragControls()
-  const [isResizing, setIsResizing] = useState(false)
   const [showSnapPreview, setShowSnapPreview] = useState(false)
   const [restorePreview, setRestorePreview] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
-
-  // Ref for local visual updates during resize without triggering React renders
-  const windowRef = useRef<HTMLDivElement>(null)
 
   if (!windowState || !windowState.isOpen) return null
 
@@ -76,136 +72,12 @@ export default function Window({ id }: WindowProps) {
     ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2) : (typeof window !== 'undefined' ? window.innerHeight : 800))
     : windowState.isMaximized ? 0 : windowState.position.y
 
-  const captureSnapshot = () => {
-    const el = document.getElementById(`window-${id}`)
-    if (el) {
-      toPng(el, {
-        cacheBust: true,
-        pixelRatio: 0.5,
-        skipAutoScale: true,
-        style: {
-          transform: 'none',
-          transition: 'none'
-        }
-      })
-        .then(dataUrl => setSnapshot(id, dataUrl))
-        .catch(err => console.error('Snapshot failed', err))
-    }
-  }
-
   const handleMinimize = () => {
-    // Capture snapshot before minimizing
+    // Non-blocking snapshot
     captureSnapshot()
-    // Minimize immediately for best responsiveness.
-    // Snapshot is captured on hover of minimize button or taskbar icon.
     minimizeWindow(id)
   }
 
-  const handleResizeStart = (e: React.PointerEvent, direction: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsResizing(true)
-
-    const startX = e.clientX
-    const startY = e.clientY
-    const startWidth = windowState.size.width
-    const startHeight = windowState.size.height
-    const startPosX = windowState.position.x
-    const startPosY = windowState.position.y
-
-    // Use Refs to track current state during drag to avoid stale closures in event listeners
-    // without needing to add/remove listeners on every render
-    const currentGeo = {
-      w: startWidth,
-      h: startHeight,
-      x: startPosX,
-      y: startPosY
-    }
-
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      // Optimized: Uses requestAnimationFrame would be even better, but direct DOM manipulation 
-      // is already much faster than React Context updates.
-
-      const deltaX = moveEvent.clientX - startX
-      const deltaY = moveEvent.clientY - startY
-
-      let newWidth = startWidth
-      let newHeight = startHeight
-      let newX = startPosX
-      let newY = startPosY
-
-      // Horizontal Resize
-      if (direction.includes('e')) {
-        newWidth = Math.max(300, startWidth + deltaX)
-      } else if (direction.includes('w')) {
-        const proposedWidth = Math.max(300, startWidth - deltaX)
-        newX = startPosX + (startWidth - proposedWidth)
-        newWidth = proposedWidth
-      }
-
-      // Vertical Resize
-      if (direction.includes('s')) {
-        newHeight = Math.max(200, startHeight + deltaY)
-      } else if (direction.includes('n')) {
-        const proposedHeight = Math.max(200, startHeight - deltaY)
-        newY = startPosY + (startHeight - proposedHeight)
-        newHeight = proposedHeight
-      }
-
-      // Update Local Visuals Directly
-      if (windowRef.current) {
-        windowRef.current.style.width = `${newWidth}px`
-        windowRef.current.style.height = `${newHeight}px`
-        // Handle position changes for Left/Top resizing
-        // Note: transform is controlled by framer motion, so we might fight it if we aren't careful.
-        // However, we disabled framer motion layout animations during resize via isResizing prop usually.
-        // For simpler approach with Framer Motion, we can use a MotionValue or just set style.left/top if we weren't using transform.
-        // Since we use x/y props in motion.div, updating those via context was the issue.
-        // We need to bypass React for position too.
-        windowRef.current.style.transform = `translateX(${newX}px) translateY(${newY}px)`
-      }
-
-      // Store for commit
-      currentGeo.w = newWidth
-      currentGeo.h = newHeight
-      currentGeo.x = newX
-      currentGeo.y = newY
-    }
-
-    const onPointerUp = () => {
-      document.removeEventListener('pointermove', onPointerMove)
-      document.removeEventListener('pointerup', onPointerUp)
-
-      // Commit changes to global state ONCE
-      if (currentGeo.w !== startWidth || currentGeo.h !== startHeight) {
-        updateWindowSize(id, { width: currentGeo.w, height: currentGeo.h })
-      }
-      if (currentGeo.x !== startPosX || currentGeo.y !== startPosY) {
-        updateWindowPosition(id, { x: currentGeo.x, y: currentGeo.y })
-      }
-
-      // Cleanup manual styles so React takes over again
-      if (windowRef.current) {
-        windowRef.current.style.width = ''
-        windowRef.current.style.height = ''
-        windowRef.current.style.transform = ''
-      }
-
-      // CRITICAL FIX: We must wait for the state update to propagate and React to re-render 
-      // with the new size/position BEFORE we disable the "no-animation" mode.
-      // If we set isResizing(false) immediately, Framer Motion sees the new props vs old props
-      // and tries to animate the transition because duration is back to 0.35s.
-      requestAnimationFrame(() => {
-        // Double RAF ensures we are in the next frame after DOM updates
-        requestAnimationFrame(() => {
-          setIsResizing(false)
-        })
-      })
-    }
-
-    document.addEventListener('pointermove', onPointerMove)
-    document.addEventListener('pointerup', onPointerUp)
-  }
 
   // Calculate taskbar position for minimize animation target
   const taskbarY = typeof window !== 'undefined' ? window.innerHeight - 40 : 800
@@ -293,7 +165,7 @@ export default function Window({ id }: WindowProps) {
         style={{ position: 'fixed', top: 0, left: 0, willChange: 'transform, width, height' }}
         onDrag={(_, info) => {
           // Handle maximized window drag-to-restore preview
-          if (windowState.isMaximized && info.offset.y > RESTORE_DRAG_THRESHOLD) {
+          if (windowState.isMaximized && info.offset.y > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
             const mouseX = info.point.x
             const restoredWidth = windowState.preMaximizeState?.size.width ?? 800
             const restoredHeight = windowState.preMaximizeState?.size.height ?? 600
@@ -317,7 +189,7 @@ export default function Window({ id }: WindowProps) {
 
           // Detect if near top edge for snap preview (normal window)
           const currentY = windowState.position.y + info.offset.y
-          if (currentY <= SNAP_THRESHOLD && !windowState.isMaximized) {
+          if (currentY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD && !windowState.isMaximized) {
             setShowSnapPreview(true)
           } else {
             setShowSnapPreview(false)
@@ -329,7 +201,7 @@ export default function Window({ id }: WindowProps) {
 
           // Handle maximized window: drag down to restore
           if (windowState.isMaximized) {
-            if (info.offset.y > RESTORE_DRAG_THRESHOLD) {
+            if (info.offset.y > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
               // Restore window and position it at the drag release point
               const mouseX = info.point.x
               const restoredWidth = windowState.preMaximizeState?.size.width ?? 800
@@ -351,7 +223,7 @@ export default function Window({ id }: WindowProps) {
           const newY = windowState.position.y + info.offset.y
 
           // If dropped near top edge, maximize instead of positioning
-          if (newY <= SNAP_THRESHOLD) {
+          if (newY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
             maximizeWindow(id)
           } else {
             updateWindowPosition(id, {

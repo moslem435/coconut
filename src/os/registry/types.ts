@@ -1,9 +1,11 @@
 import { ComponentType } from 'react'
 
+export type AppIcon = ComponentType<{ size?: number; className?: string; color?: string; style?: any }>
+
 export interface AppManifest {
     id: string
     title: string
-    icon: ComponentType<any>
+    icon: AppIcon
     component: ComponentType<any>
     /** Optional splash screen component, rendered before window opens */
     splashScreen?: ComponentType<{ onComplete: () => void }>

@@ -10,7 +10,6 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
-import { toPng } from 'html-to-image'
 import { Tooltip } from '@/os/ui/Tooltip'
 import StartMenu from './StartMenu'
 
@@ -38,6 +37,7 @@ export default function Taskbar({
   ))
   const activeWindowId = useWindowStore(state => state.activeWindowId)
   const snapshots = useWindowStore(state => state.snapshots)
+  const launchingAppIds = useWindowStore(state => state.launchingAppIds)
   const { pinnedAppIds, useTaskbarPreviews } = useSystemSettings()
 
   // Actions
@@ -47,6 +47,7 @@ export default function Taskbar({
   const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
   const setSnapshot = useWindowStore(state => state.setSnapshot)
   const setPeekWindowId = useWindowStore(state => state.setPeekWindowId)
+  const launchApp = useWindowStore(state => state.launchApp)
 
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false)
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false)
@@ -68,6 +69,7 @@ export default function Taskbar({
       isOpen: boolean
       isMinimized: boolean
       isActive: boolean
+      isLoading?: boolean
     }> = []
 
     // 1. Add Pinned Apps first
@@ -87,7 +89,8 @@ export default function Taskbar({
         icon: app.icon,
         isOpen: !!win,
         isMinimized: win?.isMinimized ?? false,
-        isActive: activeWindowId === appId
+        isActive: activeWindowId === appId,
+        isLoading: launchingAppIds.includes(appId)
       })
     })
 
@@ -107,8 +110,28 @@ export default function Taskbar({
       })
     })
 
+    // 3. Add Launching Apps (that are not pinned and not open yet)
+    launchingAppIds.forEach(appId => {
+      // If already in items (pinned or open), we handled it above
+      if (items.some(i => i.appId === appId)) return
+
+      const app = APPS_REGISTRY[appId]
+      if (!app) return
+
+      items.push({
+        id: appId,
+        appId: appId,
+        title: app.title,
+        icon: app.icon,
+        isOpen: false,
+        isMinimized: false,
+        isActive: false,
+        isLoading: true
+      })
+    })
+
     return items
-  }, [openWindows, pinnedAppIds, activeWindowId])
+  }, [openWindows, pinnedAppIds, activeWindowId, launchingAppIds])
 
   // Update taskbar positions after render
   useLayoutEffect(() => {
@@ -128,26 +151,6 @@ export default function Taskbar({
     })
   }, [taskbarItems, updateTaskbarPosition])
 
-  const captureSnapshot = async (id: string) => {
-    const el = document.getElementById(`window-${id}`)
-    if (el) {
-      try {
-        // Use lower quality/scale for performance
-        const dataUrl = await toPng(el, {
-          cacheBust: true,
-          pixelRatio: 0.5,
-          skipAutoScale: true,
-          style: {
-            transform: 'none', // Reset transform to avoid capturing position offset
-            transition: 'none'
-          }
-        })
-        setSnapshot(id, dataUrl)
-      } catch (err) {
-        console.error('Snapshot failed', err)
-      }
-    }
-  }
 
   const handleItemClick = (item: typeof taskbarItems[0]) => {
     // Close preview immediately on click
@@ -157,14 +160,13 @@ export default function Taskbar({
 
     if (item.isOpen) {
       if (item.isActive && !item.isMinimized) {
-        // Capture snapshot before minimizing
-        captureSnapshot(item.id).finally(() => {
-          minimizeWindow(item.id)
-        })
+        minimizeWindow(item.id)
       } else {
         focusWindow(item.id)
       }
     } else {
+      if (item.isLoading) return
+
       // Launch App
       const app = APPS_REGISTRY[item.appId]
       if (app) {
@@ -177,7 +179,7 @@ export default function Taskbar({
 
         const title = item.appId === 'settings' ? t('start.settings') : app.title
 
-        openWindow(app.id, title, <app.component />, app.icon, {
+        launchApp(app.id, title, <app.component />, app.icon, {
           ...app.defaultWindowOptions,
           taskbarPosition: taskbarPos
         })
@@ -243,7 +245,8 @@ export default function Taskbar({
                   appId: item.appId
                 })
               }}
-              className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)]"
+              className={`h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)] ${item.isLoading ? 'animate-pulse cursor-wait' : ''
+                }`}
               style={{
                 backgroundColor: item.isActive && !item.isMinimized
                   ? 'var(--os-accent-dim)'
@@ -344,7 +347,7 @@ export default function Taskbar({
         isOpen={isStartMenuOpen}
         onClose={onCloseStartMenu}
         onShutdown={onShutdown}
-        toggleRef={startBtnRef}
+        toggleRef={startBtnRef as any}
       />
 
       <QuickSettings

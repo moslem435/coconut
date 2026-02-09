@@ -77,13 +77,7 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
           className="w-96 h-[calc(100vh-120px)] max-h-[600px] flex flex-col gap-4 z-[5000]"
         >
           {/* Notifications Panel */}
-          <div 
-            className="flex-1 rounded-2xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-2xl"
-            style={{
-              backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
-              border: '1px solid var(--os-border)'
-            }}
-          >
+          <div className="flex-1 bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 border-b border-[var(--os-border)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell size={16} className="text-[var(--os-accent)]" />
@@ -116,13 +110,7 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
           </div>
 
           {/* Calendar Panel */}
-          <div 
-            className="shrink-0 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-2xl"
-            style={{
-              backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
-              border: '1px solid var(--os-border)'
-            }}
-          >
+          <div className="shrink-0 bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded-2xl shadow-2xl overflow-hidden">
             <CalendarWidget />
           </div>
         </motion.div>

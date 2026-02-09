@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { ReactNode, ComponentType } from 'react'
+import { AppIcon } from '@/os/registry/types'
 
 export interface WindowState {
     id: string
@@ -15,7 +16,7 @@ export interface WindowState {
         size: { width: number; height: number }
     }
     taskbarPosition?: { x: number; y: number }
-    icon?: ComponentType<{ size?: number; className?: string }>
+    icon?: AppIcon
     component: ReactNode
 }
 
@@ -25,9 +26,11 @@ interface WindowStore {
     maxZIndex: number
     snapshots: Record<string, string>
     peekWindowId: string | null
+    launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: any, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number } }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number } }) => void
+    launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
     minimizeWindow: (id: string) => void
@@ -47,6 +50,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     maxZIndex: 100,
     snapshots: {},
     peekWindowId: null,
+    launchingAppIds: [],
 
     openWindow: (id, title, component, icon, options) => {
         const { windows, maxZIndex, focusWindow } = get()
@@ -94,6 +98,29 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             activeWindowId: id,
             maxZIndex: newZ
         }))
+    },
+
+
+    launchApp: (id, title, component, icon, options) => {
+        const { windows, openWindow } = get()
+
+        // If already open, just focus it immediately
+        if (windows[id]) {
+            openWindow(id, title, component, icon, options)
+            return
+        }
+
+        // If already launching, ignore
+        if (get().launchingAppIds.includes(id)) return
+
+        // Set launching state
+        set(state => ({ launchingAppIds: [...state.launchingAppIds, id] }))
+
+        // Simulate boot delay
+        setTimeout(() => {
+            openWindow(id, title, component, icon, options)
+            set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
+        }, 500)
     },
 
     closeWindow: (id) => {

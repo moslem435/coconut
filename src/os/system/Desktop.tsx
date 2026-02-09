@@ -95,7 +95,7 @@ const findFreePosition = (
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
     const { snapToGrid, wallpaper, useAnimations, displayScale } = useSystemSettings()
-    
+
     // Derived Grid Settings
     const scaleFactor = displayScale / 100
     const currentGridSize = GRID_SIZE * scaleFactor
@@ -106,6 +106,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     // Actions - stable
     const openWindow = useWindowStore(state => state.openWindow)
+    const launchApp = useWindowStore(state => state.launchApp)
     const focusWindow = useWindowStore(state => state.focusWindow)
     // Granular subscription for window status checks
     const windows = useWindowStore(useShallow(state => state.windows))
@@ -116,6 +117,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     // Desktop Store
     const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore()
     const isDragging = useRef(false)
+    const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
 
     // Splash screen state: which app is currently splashing
     const [splashingApp, setSplashingApp] = useState<AppManifest | null>(null)
@@ -124,7 +126,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     // Initialize icon positions if empty
     useEffect(() => {
         setMounted(true)
-        
+
         // Calculate max rows based on viewport
         const maxRows = typeof window !== 'undefined'
             ? Math.floor((window.innerHeight - 150) / currentGridSize)
@@ -152,16 +154,16 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             isDragging.current = false
             return
         }
-        
+
         // Multi-select modifiers
         if (e.ctrlKey || e.metaKey) {
-            setSelectedIcons(prev => 
-                prev.includes(id) 
+            setSelectedIcons(prev =>
+                prev.includes(id)
                     ? prev.filter(i => i !== id)
                     : [...prev, id]
             )
         } else if (e.shiftKey) {
-             setSelectedIcons(prev => 
+            setSelectedIcons(prev =>
                 prev.includes(id) ? prev : [...prev, id]
             )
         } else {
@@ -188,7 +190,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             setSplashingApp(app)
         } else {
             // No splash screen, open window directly
-            openWindow(
+            launchApp(
                 app.id,
                 app.title,
                 <app.component />,
@@ -216,7 +218,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         // We need the current positions to check for collisions
         // Use local scope iconPositions to ensure we don't lose data if store is desynced
         const currentPositions = iconPositions
-        
+
         let newPos: IconPosition
         if (snapToGrid) {
             // Find free position that doesn't overlap with others
@@ -267,17 +269,17 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         playsInline
                     />
                 ) : wallpaper?.type === 'image' ? (
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none transition-all duration-1000 bg-cover bg-center bg-no-repeat"
                         style={{ backgroundImage: `url(${wallpaper.value})` }}
                     />
                 ) : (
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
                         style={{ background: wallpaper?.value || 'var(--os-bg-base)' }}
                     />
                 )}
-                
+
                 {/* Ambient Overlay for depth if needed, can be optional based on wallpaper type */}
                 <div className="absolute inset-0 pointer-events-none bg-black/10" />
 
@@ -300,6 +302,20 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     }
                                 }}
                                 onDrag={(_, info) => {
+                                    // Ghost Preview for single item drag
+                                    if (!isSelected || selectedIcons.length <= 1) {
+                                        if (snapToGrid) {
+                                            // info.point is absolute, we need relative?
+                                            // Actually info.offset is better if we know start pos.
+                                            // pos is the start position
+                                            const currentX = pos.x + info.offset.x
+                                            const currentY = pos.y + info.offset.y
+
+                                            // Calculate snap preview
+                                            const preview = snapToGridPos(currentX, currentY, currentGridSize, currentGridPadding)
+                                            setDragPreview(preview)
+                                        }
+                                    }
                                     // Multi-drag support
                                     if (isSelected && selectedIcons.length > 1) {
                                         // We can't update store on every drag frame, it's too heavy?
@@ -307,13 +323,13 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                         // But we need 'prev' state.
                                         // For multi-drag visual, we might want to use local state or just let framer motion handle the 'visual' drag
                                         // and only update store onDragEnd.
-                                        
+
                                         // Current implementation in Desktop.tsx used setIconPositions(prev => ...)
                                         // which updates the state driving the 'animate' prop.
-                                        
+
                                         // If we want real-time drag of all icons, we need to update their target positions.
                                         // But 'onDrag' is driven by the gesture.
-                                        
+
                                         // The original code was:
                                         /*
                                         setIconPositions(prev => {
@@ -330,12 +346,12 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                             return next
                                         })
                                         */
-                                        
+
                                         // We can replicate this with setIconPositions from store
                                         const currentPos = useDesktopStore.getState().iconPositions
                                         const next = { ...currentPos }
                                         let changed = false
-                                        
+
                                         selectedIcons.forEach(selectedId => {
                                             if (selectedId !== app.id) {
                                                 const p = next[selectedId] || { x: 0, y: 0 }
@@ -346,16 +362,17 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                                 changed = true
                                             }
                                         })
-                                        
+
                                         if (changed) setIconPositions(next)
                                     }
                                 }}
                                 onDragEnd={(_, info) => {
+                                    setDragPreview(null)
                                     // Handle snap for all selected
                                     if (isSelected && selectedIcons.length > 1) {
                                         const currentPos = useDesktopStore.getState().iconPositions
                                         const next = { ...currentPos }
-                                        
+
                                         selectedIcons.forEach(id => {
                                             let x, y
                                             if (id === app.id) {
@@ -363,7 +380,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                                 // But wait, the leader's position in 'next' hasn't been updated by onDrag?
                                                 // No, onDrag only updated OTHERS.
                                                 // So for the leader, we take its ORIGINAL pos + offset.
-                                                
+
                                                 // But wait, 'pos' variable in render is from store.
                                                 // If we didn't update leader in store during drag, 'pos' is start pos.
                                                 // So yes:
@@ -374,7 +391,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                                 x = next[id].x
                                                 y = next[id].y
                                             }
-                                            
+
                                             if (snapToGrid) {
                                                 // We need to pass 'next' to findFreePosition so they don't overlap EACH OTHER
                                                 // But 'next' is being built.
@@ -406,33 +423,48 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                 style={{ touchAction: 'none' }}
                             >
                                 <Tooltip content={app.title} side="bottom" offset={8} className="flex flex-col items-center gap-2 w-full">
-                                <div
-                                    className="relative p-3 rounded-xl transition-all duration-200 shadow-sm"
-                                    style={{
-                                        backgroundColor: isSelected ? 'var(--os-accent)' : 'var(--os-bg-panel)',
-                                        border: `1px solid ${isSelected ? 'var(--os-accent)' : 'var(--os-border)'}`,
-                                    }}
-                                >
-                                    <app.icon
-                                        className="w-7 h-7 transition-colors"
+                                    <div
+                                        className="relative p-3 rounded-xl transition-all duration-200 shadow-sm"
                                         style={{
-                                            color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-accent)'
+                                            backgroundColor: isSelected ? 'var(--os-accent)' : 'var(--os-bg-panel)',
+                                            border: `1px solid ${isSelected ? 'var(--os-accent)' : 'var(--os-border)'}`,
                                         }}
-                                    />
-                                </div>
-                                <span
-                                    className="text-[0.6875rem] font-medium tracking-wide px-2 py-0.5 rounded shadow-sm backdrop-blur-sm transition-colors text-center truncate max-w-[80px]"
-                                    style={{
-                                        backgroundColor: isSelected ? 'var(--os-accent)' : 'rgba(var(--os-bg-panel-rgb), 0.8)',
-                                        color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-text-secondary)'
-                                    }}
-                                >
-                                    {app.title}
-                                </span>
+                                    >
+                                        <app.icon
+                                            className="w-7 h-7 transition-colors"
+                                            style={{
+                                                color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-accent)'
+                                            }}
+                                        />
+                                    </div>
+                                    <span
+                                        className="text-[0.6875rem] font-medium tracking-wide px-2 py-0.5 rounded shadow-sm backdrop-blur-sm transition-colors text-center truncate max-w-[80px]"
+                                        style={{
+                                            backgroundColor: isSelected ? 'var(--os-accent)' : 'rgba(var(--os-bg-panel-rgb), 0.8)',
+                                            color: isSelected ? 'var(--os-accent-contrast)' : 'var(--os-text-secondary)'
+                                        }}
+                                    >
+                                        {app.title}
+                                    </span>
                                 </Tooltip>
                             </motion.div>
                         )
                     })}
+
+                    {/* Pop noise is a nice idea but not now. */}
+                    {/* Ghost Preview */}
+                    {dragPreview && (
+                        <div
+                            className="absolute border-2 border-[var(--os-accent)] bg-[var(--os-accent)]/20 rounded-xl transition-all duration-200 z-0"
+                            style={{
+                                width: '80px', // Approximation, since real width is dynamic but w-20 is 5rem = 80px?
+                                height: '80px', // Approximation
+                                left: dragPreview.x,
+                                top: dragPreview.y,
+                                opacity: 0.5
+                            }}
+                        />
+                    )}
                 </div>
             </div>
 
