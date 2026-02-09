@@ -160,6 +160,142 @@ const INITIAL_FILES: Record<string, FileNode> = {
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
+  'shortcut-gallery': {
+    id: 'shortcut-gallery',
+    parentId: 'desktop',
+    name: 'Gallery',
+    type: 'file',
+    appId: 'photo-gallery',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-resume': {
+    id: 'shortcut-resume',
+    parentId: 'desktop',
+    name: 'Resume',
+    type: 'file',
+    appId: 'resume',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-contact': {
+    id: 'shortcut-contact',
+    parentId: 'desktop',
+    name: 'Contact Me',
+    type: 'file',
+    appId: 'contact',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-music': {
+    id: 'shortcut-music',
+    parentId: 'desktop',
+    name: 'Music Player',
+    type: 'file',
+    appId: 'music-player',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-vscode': {
+    id: 'shortcut-vscode',
+    parentId: 'desktop',
+    name: 'VS Code',
+    type: 'file',
+    appId: 'vscode-lite',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  // Sample Folders
+  'music': {
+    id: 'music',
+    parentId: INITIAL_ROOT_ID,
+    name: 'Music',
+    type: 'folder',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'code': {
+    id: 'code',
+    parentId: INITIAL_ROOT_ID,
+    name: 'Code',
+    type: 'folder',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  // Sample Code Files
+  'code-1': {
+    id: 'code-1',
+    parentId: 'code',
+    name: 'hello_world.ts',
+    type: 'file',
+    content: `// Hello World in TypeScript
+function sayHello(name: string): void {
+    console.log("Hello, " + name + "!");
+}
+
+const user = "Developer";
+sayHello(user);
+
+// TODO: Implement more features
+interface Config {
+    debug: boolean;
+    version: number;
+}
+`,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'code-2': {
+    id: 'code-2',
+    parentId: 'code',
+    name: 'component.tsx',
+    type: 'file',
+    content: `import React, { useState } from 'react';
+
+export const Counter = () => {
+    const [count, setCount] = useState(0);
+
+    return (
+        <div className="p-4 border rounded">
+            <h1>Count: {count}</h1>
+            <button onClick={() => setCount(c => c + 1)}>
+                Increment
+            </button>
+        </div>
+    );
+};
+`,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  // Sample Images
+  'img-1': {
+    id: 'img-1',
+    parentId: 'pictures',
+    name: 'Abstract_01.jpg',
+    type: 'file',
+    content: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'img-2': {
+    id: 'img-2',
+    parentId: 'pictures',
+    name: 'Cyber_City.jpg',
+    type: 'file',
+    content: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'img-3': {
+    id: 'img-3',
+    parentId: 'pictures',
+    name: 'Workspace.jpg',
+    type: 'file',
+    content: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&auto=format&fit=crop',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
   // Sample Files
   'welcome-txt': {
     id: 'welcome-txt',

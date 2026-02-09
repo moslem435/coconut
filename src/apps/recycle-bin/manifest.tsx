@@ -9,6 +9,7 @@ export const manifest: AppManifest = {
     component: RecycleBin,
     defaultWindowOptions: {
         size: { width: 700, height: 500 },
-        taskbarPosition: { x: 0, y: 0 }
+        taskbarPosition: { x: 0, y: 0 },
+        titleBarColor: 'dark'
     }
 }

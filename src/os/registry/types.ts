@@ -14,5 +14,7 @@ export interface AppManifest {
         height?: number
         isMaximized?: boolean
         isResizable?: boolean
+        /** Content color theme for the title bar text/icons */
+        titleBarColor?: 'light' | 'dark' | 'auto'
     }
 }

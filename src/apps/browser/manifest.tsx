@@ -9,6 +9,7 @@ export const manifest: AppManifest = {
     component: Browser,
     defaultWindowOptions: {
         size: { width: 1000, height: 700 },
-        taskbarPosition: { x: 0, y: 0 }
+        taskbarPosition: { x: 0, y: 0 },
+        titleBarColor: 'dark'
     }
 }

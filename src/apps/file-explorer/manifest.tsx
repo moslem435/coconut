@@ -14,6 +14,7 @@ export const manifest: AppManifest = {
     defaultWindowOptions: {
         width: 800,
         height: 500,
-        isResizable: true
+        isResizable: true,
+        titleBarColor: 'auto'
     }
 }

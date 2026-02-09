@@ -9,6 +9,7 @@ export const manifest: AppManifest = {
     component: Notepad,
     defaultWindowOptions: {
         size: { width: 600, height: 400 },
-        taskbarPosition: { x: 0, y: 0 }
+        taskbarPosition: { x: 0, y: 0 },
+        titleBarColor: 'dark'
     }
 }

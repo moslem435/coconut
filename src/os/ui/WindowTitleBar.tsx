@@ -16,6 +16,7 @@ interface WindowTitleBarProps {
     onContextMenu?: (e: React.MouseEvent) => void
     onHoverMinimize?: () => void
     dragControls?: any
+    colorMode?: 'light' | 'dark'
     labels?: {
         minimize: string
         maximize: string
@@ -36,6 +37,7 @@ export function WindowTitleBar({
     onContextMenu,
     onHoverMinimize,
     dragControls,
+    colorMode,
     labels = {
         minimize: 'Minimize',
         maximize: 'Maximize',
@@ -43,6 +45,17 @@ export function WindowTitleBar({
         close: 'Close'
     }
 }: WindowTitleBarProps) {
+    // Determine colors based on colorMode
+    // colorMode = 'dark' means dark text (for light backgrounds)
+    // colorMode = 'light' or undefined means light text (for dark backgrounds - default)
+    const isDarkText = colorMode === 'dark'
+    
+    const activeTextColor = isDarkText ? 'rgba(0,0,0,0.9)' : 'var(--os-text-primary)'
+    const inactiveTextColor = isDarkText ? 'rgba(0,0,0,0.5)' : 'var(--os-text-muted)'
+    const iconColor = isActive ? (isDarkText ? 'rgba(0,0,0,0.9)' : 'var(--os-accent)') : inactiveTextColor
+    const buttonColor = isDarkText ? 'rgba(0,0,0,0.7)' : 'var(--os-text-secondary)'
+    const buttonHoverBg = isDarkText ? 'rgba(0,0,0,0.1)' : 'var(--os-hover-bg)'
+
     return (
         <div
             onPointerDown={(e) => {
@@ -64,12 +77,12 @@ export function WindowTitleBar({
                 {Icon && (
                     <Icon
                         size={16}
-                        style={{ color: isActive ? 'var(--os-accent)' : 'var(--os-text-muted)' }}
+                        style={{ color: iconColor }}
                     />
                 )}
                 <span
                     className="text-sm font-medium tracking-wide transition-colors"
-                    style={{ color: isActive ? 'var(--os-text-primary)' : 'var(--os-text-muted)' }}
+                    style={{ color: isActive ? activeTextColor : inactiveTextColor }}
                 >
                     {title}
                 </span>
@@ -83,8 +96,13 @@ export function WindowTitleBar({
                         onClick={onMinimize}
                         onMouseEnter={onHoverMinimize}
                         aria-label={labels.minimize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
-                        style={{ color: 'var(--os-text-secondary)' }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90"
+                        style={{ 
+                            color: buttonColor,
+                            '--hover-bg': buttonHoverBg
+                        } as React.CSSProperties}
+                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverBg)}
+                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                         <Minus size={16} />
                     </button>
@@ -95,10 +113,19 @@ export function WindowTitleBar({
                     <button
                         onClick={onMaximize}
                         aria-label={isMaximized ? labels.restore : labels.maximize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
-                        style={{ color: 'var(--os-text-secondary)' }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90"
+                        style={{ 
+                            color: buttonColor,
+                            '--hover-bg': buttonHoverBg
+                        } as React.CSSProperties}
+                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverBg)}
+                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                        {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                        {isMaximized ? (
+                            <Minimize2 size={16} />
+                        ) : (
+                            <Maximize2 size={16} />
+                        )}
                     </button>
                 </Tooltip>
 
@@ -107,8 +134,8 @@ export function WindowTitleBar({
                     <button
                         onClick={onClose}
                         aria-label={labels.close}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500/20 hover:text-red-400 active:scale-90"
-                        style={{ color: 'var(--os-text-secondary)' }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500 hover:text-white active:scale-90"
+                        style={{ color: buttonColor }}
                     >
                         <X size={16} />
                     </button>

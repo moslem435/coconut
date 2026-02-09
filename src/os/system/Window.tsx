@@ -24,7 +24,7 @@ export default function Window({ id }: WindowProps) {
   // Granular subscription: Only re-render if THIS window changes.
   // This is the key optimization of using Zustand.
   const windowState = useWindowStore(useShallow(state => state.windows[id]))
-  const { useAnimations } = useSystemSettings()
+  const { useAnimations, theme } = useSystemSettings()
   const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
   const peekWindowId = useWindowStore(state => state.peekWindowId)
@@ -267,6 +267,7 @@ export default function Window({ id }: WindowProps) {
             icon={windowState.icon}
             isActive={isActive}
             isMaximized={windowState.isMaximized}
+            colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}
             onMinimize={handleMinimize}
             onMaximize={() => maximizeWindow(id)}
             onClose={() => closeWindow(id)}

@@ -13,6 +13,7 @@ export const manifest: AppManifest = {
     component: SettingsApp,
     defaultWindowOptions: {
         width: 900,
-        height: 600
+        height: 600,
+        titleBarColor: 'auto'
     }
 }

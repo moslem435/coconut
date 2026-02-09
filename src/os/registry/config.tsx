@@ -7,6 +7,11 @@ import { manifest as TerminalManifest } from '@/apps/terminal/manifest'
 import { manifest as CalculatorManifest } from '@/apps/calculator/manifest'
 import { manifest as NotepadManifest } from '@/apps/notepad/manifest'
 import { manifest as RecycleBinManifest } from '@/apps/recycle-bin/manifest'
+import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
+import { manifest as ResumeManifest } from '@/apps/resume/manifest'
+import { manifest as ContactManifest } from '@/apps/contact/manifest'
+import { manifest as MusicPlayerManifest } from '@/apps/music-player/manifest'
+import { manifest as VSCodeLiteManifest } from '@/apps/vscode-lite/manifest'
 
 // Re-export for compatibility
 export type { AppManifest as AppConfig } from './types'
@@ -20,6 +25,11 @@ export const APPS_REGISTRY: Record<string, AppManifest> = {
   [CalculatorManifest.id]: CalculatorManifest,
   [NotepadManifest.id]: NotepadManifest,
   [RecycleBinManifest.id]: RecycleBinManifest,
+  [PhotoGalleryManifest.id]: PhotoGalleryManifest,
+  [ResumeManifest.id]: ResumeManifest,
+  [ContactManifest.id]: ContactManifest,
+  [MusicPlayerManifest.id]: MusicPlayerManifest,
+  [VSCodeLiteManifest.id]: VSCodeLiteManifest,
 }
 
 export type AppId = keyof typeof APPS_REGISTRY
