@@ -40,8 +40,8 @@ export default function SystemClock({ className, style, showDate = false }: Syst
     if (showDate) {
         return (
             <div className={className} style={style}>
-                <span className="font-semibold text-xs" style={{ color: 'var(--os-text-primary)' }}>{time}</span>
-                <span className="text-[10px]" style={{ color: 'var(--os-text-muted)' }}>{date}</span>
+                <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--os-text-primary)' }}>{time}</span>
+                <span className="text-[0.625rem] opacity-80 uppercase tracking-wider" style={{ color: 'var(--os-text-muted)' }}>{date}</span>
             </div>
         )
     }

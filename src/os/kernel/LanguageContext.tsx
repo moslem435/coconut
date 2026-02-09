@@ -109,6 +109,7 @@ const translations = {
     "settings.appearance.transparency": "Enable Transparency & Blur",
     "settings.appearance.animations": "Enable System Animations",
     "settings.appearance.previews": "Enable Taskbar Previews",
+    "settings.appearance.skipboot": "Skip Boot Sequence",
     
     "settings.sound.volume": "Volume",
     
@@ -167,6 +168,7 @@ const translations = {
     "settings.appearance.transparency": "启用窗口透明与模糊效果",
     "settings.appearance.animations": "启用系统动画",
     "settings.appearance.previews": "启用任务栏窗口预览",
+    "settings.appearance.skipboot": "跳过开机动画",
 
     "settings.sound.volume": "音量",
 

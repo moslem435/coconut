@@ -48,6 +48,7 @@ export default function SettingsApp() {
         useTransparency, setUseTransparency,
         useAnimations, setUseAnimations,
         useTaskbarPreviews, setUseTaskbarPreviews,
+        skipBootSequence, setSkipBootSequence,
         displayScale, setDisplayScale,
         volume, setVolume,
         isMuted, toggleMute,
@@ -187,6 +188,11 @@ export default function SettingsApp() {
                                     checked={useTaskbarPreviews}
                                     onChange={setUseTaskbarPreviews}
                                     label={t('settings.appearance.previews')}
+                                />
+                                <ToggleSwitch
+                                    checked={skipBootSequence}
+                                    onChange={setSkipBootSequence}
+                                    label={t('settings.appearance.skipboot')}
                                 />
                             </div>
                         </SettingSection>

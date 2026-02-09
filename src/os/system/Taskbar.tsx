@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
-import { Wifi, Battery, Volume2, Command } from 'lucide-react'
+import { Wifi, Battery, Volume2, Command, Settings2 } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
@@ -17,11 +17,13 @@ interface TaskbarProps {
 }
 
 import SystemClock from './SystemClock'
+import QuickSettings from './QuickSettings'
+import ActionCenter from './ActionCenter'
 
 export default function Taskbar({
   onStartClick
 }: TaskbarProps) {
-  const { t } = useLanguage()
+  const { t, language, toggleLanguage } = useLanguage()
   // Taskbar needs list of all open windows
   const openWindows = useWindowStore(useShallow(state =>
     Object.values(state.windows).filter(w => w.isOpen)
@@ -38,9 +40,14 @@ export default function Taskbar({
   const setSnapshot = useWindowStore(state => state.setSnapshot)
   const setPeekWindowId = useWindowStore(state => state.setPeekWindowId)
 
+  const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false)
+  const [isActionCenterOpen, setIsActionCenterOpen] = useState(false)
+  const quickSettingsRef = useRef<HTMLDivElement>(null)
+  const actionCenterRef = useRef<HTMLDivElement>(null)
+
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const peekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   // Merge pinned apps and open windows
   const taskbarItems = useMemo(() => {
@@ -171,13 +178,11 @@ export default function Taskbar({
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-2 transition-[width] duration-300"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-16 z-[10000] flex items-center justify-between select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 transition-[width,height] duration-300 w-fit max-w-[calc(100vw-2rem)]"
       style={{
         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
         border: '1px solid var(--os-border)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-        width: Math.min(taskbarItems.length * 60 + 300, window.innerWidth - 32) + 'px',
-        maxWidth: '90vw'
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
       }}
     >
 
@@ -190,7 +195,7 @@ export default function Taskbar({
           className="h-12 w-12 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
           style={{ backgroundColor: 'var(--os-hover-bg)' }}
         >
-          <Command size={22} className="text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
+          <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
         </button>
 
         {/* Separator - Only show if there are items */}
@@ -239,7 +244,7 @@ export default function Taskbar({
             {/* Window Icon */}
             {item.icon ? (() => {
               const Icon = item.icon
-              return <Icon size={22} className="text-[var(--os-text-primary)]" />
+              return <Icon className="w-[1.375rem] h-[1.375rem] text-[var(--os-text-primary)]" />
             })() : (
               <div className="w-4 h-4 rounded-sm border flex items-center justify-center"
                 style={{ borderColor: 'var(--os-text-primary)' }}
@@ -286,26 +291,51 @@ export default function Taskbar({
         
         {/* Separator */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
+
+        {/* Language Indicator */}
+        <div 
+           className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-white/5 cursor-pointer text-xs font-medium tracking-wider transition-colors"
+           onClick={toggleLanguage}
+        >
+           {language === 'en' ? 'EN' : '中'}
+        </div>
         
-        {/* Status Icons */}
-        <div className="flex items-center gap-1 px-2">
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={t('status.wifi')}>
-            <Wifi size={18} />
-          </div>
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={`${t('status.volume')}: 80%`}>
-            <Volume2 size={18} />
-          </div>
-          <div className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title={`${t('status.battery')}: 100%`}>
-            <Battery size={18} />
-          </div>
+        {/* Unified Status Pill */}
+        <div 
+           ref={quickSettingsRef}
+           className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
+           onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
+           title={t('settings.desc.appearance')}
+        >
+          <Wifi className="w-4 h-4" />
+          <Volume2 className="w-4 h-4" />
+          <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
+          <Settings2 className="w-4 h-4" />
         </div>
 
-        {/* Clock - Interactive */}
-        <div className="flex flex-col items-end leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5 active:scale-95">
+        {/* Clock - Action Center Trigger */}
+        <div 
+          ref={actionCenterRef}
+          className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
+          onClick={() => setIsActionCenterOpen(!isActionCenterOpen)}
+        >
           <SystemClock showDate />
         </div>
 
       </div>
+
+      {/* Popups */}
+      <QuickSettings 
+        isOpen={isQuickSettingsOpen} 
+        onClose={() => setIsQuickSettingsOpen(false)} 
+        toggleRef={quickSettingsRef}
+      />
+
+      <ActionCenter 
+        isOpen={isActionCenterOpen} 
+        onClose={() => setIsActionCenterOpen(false)} 
+        toggleRef={actionCenterRef}
+      />
     </div>
   )
 }

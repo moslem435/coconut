@@ -1,17 +1,36 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useState, useCallback } from 'react'
+import { Suspense, useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Shell from '@/os/system/Shell'
 import BootSequence from '@/os/system/BootSequence'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 
 export default function Home() {
   const [hasBooted, setHasBooted] = useState(false)
   const [isShuttingDown, setIsShuttingDown] = useState(false)
+  const { skipBootSequence } = useSystemSettings()
 
   const closeAllWindows = useWindowStore(state => state.closeAllWindows)
+
+  // Auto-login / Skip Boot Check
+  useEffect(() => {
+    // Check session storage for "already booted in this session"
+    const sessionBoot = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cloud-os-booted') : null
+    
+    if (skipBootSequence || sessionBoot === 'true') {
+        setHasBooted(true)
+    }
+  }, [skipBootSequence])
+
+  const handleBootComplete = useCallback(() => {
+    setHasBooted(true)
+    if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('cloud-os-booted', 'true')
+    }
+  }, [])
 
   const handleShutdown = useCallback(() => {
     setIsShuttingDown(true)
@@ -21,6 +40,10 @@ export default function Home() {
     setTimeout(() => {
       setHasBooted(false)
       setIsShuttingDown(false)
+      // Clear session boot flag on shutdown
+      if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('cloud-os-booted')
+      }
     }, 1000)
   }, [closeAllWindows])
 
@@ -48,7 +71,7 @@ export default function Home() {
 
       {/* Boot Screen Overlay */}
       {!hasBooted && !isShuttingDown && (
-        <BootSequence onComplete={() => setHasBooted(true)} />
+        <BootSequence onComplete={handleBootComplete} />
       )}
 
       {/* Main Content - Fades in after boot */}
