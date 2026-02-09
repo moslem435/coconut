@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useSystem } from '@/os/sdk'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 interface SettingCategory {
     id: string
@@ -155,19 +156,19 @@ export default function SettingsApp() {
                         <SettingSection title={t('settings.appearance.accent')}>
                             <div className="flex gap-3 flex-wrap">
                                 {accentColors.map((color) => (
-                                    <button
-                                        key={color.value}
-                                        onClick={() => setAccentColor(color.value)}
-                                        className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 ${accentColor === color.value
-                                            ? 'scale-110'
-                                            : 'border-transparent'
-                                            }`}
-                                        style={{
-                                            backgroundColor: color.value,
-                                            borderColor: accentColor === color.value ? 'var(--os-text-primary)' : 'transparent'
-                                        }}
-                                        title={color.name}
-                                    />
+                                    <Tooltip key={color.value} content={color.name} side="top">
+                                        <button
+                                            onClick={() => setAccentColor(color.value)}
+                                            className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 ${accentColor === color.value
+                                                ? 'scale-110'
+                                                : 'border-transparent'
+                                                }`}
+                                            style={{
+                                                backgroundColor: color.value,
+                                                borderColor: accentColor === color.value ? 'var(--os-text-primary)' : 'transparent'
+                                            }}
+                                        />
+                                    </Tooltip>
                                 ))}
                             </div>
                         </SettingSection>

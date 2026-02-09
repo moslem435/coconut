@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Power } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 export default function BootSequence({ onComplete }: { onComplete: () => void }) {
   const [hasStarted, setHasStarted] = useState(false)
@@ -38,13 +39,15 @@ export default function BootSequence({ onComplete }: { onComplete: () => void })
           >
              <div className="relative group cursor-pointer" onClick={() => setHasStarted(true)}>
                 <div className={`absolute inset-0 bg-white/5 blur-[30px] rounded-full group-hover:bg-white/10 transition-all duration-500 ${!useAnimations && 'hidden'}`} />
-                <motion.button
-                  whileHover={useAnimations ? { scale: 1.05 } : {}}
-                  whileTap={useAnimations ? { scale: 0.95 } : {}}
-                  className="relative w-20 h-20 rounded-full border border-white/20 flex items-center justify-center bg-black/50 backdrop-blur-sm group-hover:border-white/40 transition-colors"
-                >
-                   <Power size={32} className="text-white/40 group-hover:text-white/80 group-hover:drop-shadow-[0_0_8px_white] transition-all" />
-                </motion.button>
+                <Tooltip content={t('boot.start')} side="bottom" offset={20}>
+                  <motion.button
+                    whileHover={useAnimations ? { scale: 1.05 } : {}}
+                    whileTap={useAnimations ? { scale: 0.95 } : {}}
+                    className="relative w-20 h-20 rounded-full border border-white/20 flex items-center justify-center bg-black/50 backdrop-blur-sm group-hover:border-white/40 transition-colors"
+                  >
+                     <Power size={32} className="text-white/40 group-hover:text-white/80 group-hover:drop-shadow-[0_0_8px_white] transition-all" />
+                  </motion.button>
+                </Tooltip>
              </div>
           </motion.div>
         ) : (

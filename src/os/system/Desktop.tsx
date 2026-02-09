@@ -9,6 +9,7 @@ import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useShallow } from 'zustand/react/shallow'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 // Grid settings
 const GRID_SIZE = 90
@@ -499,6 +500,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                 whileTap={useAnimations ? { scale: 0.95 } : {}}
                                 style={{ touchAction: 'none' }}
                             >
+                                <Tooltip content={app.title} side="bottom" offset={8} className="flex flex-col items-center gap-2 w-full">
                                 <div
                                     className="relative p-3 rounded-xl transition-all duration-200 shadow-sm"
                                     style={{
@@ -522,6 +524,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                 >
                                     {app.title}
                                 </span>
+                                </Tooltip>
                             </motion.div>
                         )
                     })}

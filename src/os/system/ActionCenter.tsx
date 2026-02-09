@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Bell, Trash2, CheckCircle, AlertTriangle, AlertCircle, Info } from 'lucide-react'
 import { useNotificationStore, Notification } from '@/os/kernel/useNotificationStore'
 import CalendarWidget from './CalendarWidget'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 interface ActionCenterProps {
   isOpen: boolean
@@ -52,13 +53,14 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
                    <h3 className="font-semibold text-sm">Notifications</h3>
                 </div>
                 {history.length > 0 && (
-                   <button 
-                     onClick={clearHistory}
-                     className="p-1.5 text-[var(--os-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                     title="Clear All"
-                   >
-                     <Trash2 size={14} />
-                   </button>
+                   <Tooltip content="Clear All" side="left">
+                     <button 
+                       onClick={clearHistory}
+                       className="p-1.5 text-[var(--os-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                     >
+                       <Trash2 size={14} />
+                     </button>
+                   </Tooltip>
                 )}
              </div>
              

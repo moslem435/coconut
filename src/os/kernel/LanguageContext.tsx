@@ -69,6 +69,7 @@ const translations = {
     "boot.uplink": "ESTABLISHING UPLINK...",
     "boot.ready": "SYSTEM READY",
     "boot.loading": "SYSTEM LOADING",
+    "boot.start": "Start System",
 
     // Taskbar / Status
     "status.wifi": "Wi-Fi: Connected",
@@ -179,6 +180,7 @@ const translations = {
     "settings.about.kernel": "内核",
     "settings.about.render": "渲染引擎",
     "settings.dev": "功能开发中...",
+    "boot.start": "启动系统",
 
     // Wallpaper & Colors
     "wallpaper.preset.flow": "默认流光",

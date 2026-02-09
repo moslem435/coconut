@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 interface QuickSettingsProps {
   isOpen: boolean
@@ -67,12 +68,14 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
           <div className="flex flex-col gap-4 mb-6">
             {/* Volume */}
             <div className="flex items-center gap-3 group">
-              <button 
-                onClick={toggleMute}
-                className="p-2 rounded-full hover:bg-[var(--os-hover-bg)] transition-colors"
-              >
-                {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              </button>
+              <Tooltip content={t('settings.sound.volume')} side="left">
+                <button 
+                    onClick={toggleMute}
+                    className="p-2 rounded-full hover:bg-[var(--os-hover-bg)] transition-colors"
+                >
+                    {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+              </Tooltip>
               <div className="flex-1 h-8 relative flex items-center">
                  <input 
                    type="range" 
@@ -87,9 +90,11 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
 
             {/* Scale - Mock only as we might not want to break layout */}
             <div className="flex items-center gap-3 group">
-              <div className="p-2 rounded-full text-[var(--os-text-secondary)]">
-                <Monitor size={18} />
-              </div>
+              <Tooltip content={t('settings.display.scale')} side="left">
+                <div className="p-2 rounded-full text-[var(--os-text-secondary)]">
+                    <Monitor size={18} />
+                </div>
+              </Tooltip>
               <div className="flex-1 h-8 relative flex items-center">
                  <input 
                    type="range" 

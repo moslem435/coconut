@@ -11,6 +11,7 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
 import { toPng } from 'html-to-image'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -190,6 +191,7 @@ export default function Taskbar({
       <div className="flex items-center gap-2 h-full py-2">
 
         {/* Start Button */}
+        <Tooltip content={t('start.menu')} side="top" offset={20}>
         <button
           onClick={onStartClick}
           className="h-12 w-12 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
@@ -197,6 +199,7 @@ export default function Taskbar({
         >
           <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
         </button>
+        </Tooltip>
 
         {/* Separator - Only show if there are items */}
         {taskbarItems.length > 0 && (
@@ -205,11 +208,15 @@ export default function Taskbar({
 
         {/* Window List - Icon Only for Dock Look */}
         {taskbarItems.map((item) => (
+          <Tooltip
+            key={item.id}
+            content={(!useTaskbarPreviews || !item.isOpen) ? item.title : null}
+            side="top"
+            offset={20}
+          >
           <button
             ref={(el) => { itemRefs.current[item.id] = el }}
-            key={item.id}
             onClick={() => handleItemClick(item)}
-            title={!useTaskbarPreviews ? item.title : undefined}
             onMouseEnter={() => {
                 setHoveredId(item.id)
                 if (item.isOpen) {
@@ -260,7 +267,7 @@ export default function Taskbar({
 
             {/* Window Preview */}
             <AnimatePresence>
-                  {useTaskbarPreviews && hoveredId === item.id && (
+                  {useTaskbarPreviews && item.isOpen && hoveredId === item.id && (
                     <WindowPreview 
                         appId={item.appId}  
                         title={item.title} 
@@ -283,6 +290,7 @@ export default function Taskbar({
                   )}
                 </AnimatePresence>
           </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -293,27 +301,31 @@ export default function Taskbar({
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
 
         {/* Language Indicator */}
+        <Tooltip content={t('settings.language')} side="top">
         <div 
            className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-white/5 cursor-pointer text-xs font-medium tracking-wider transition-colors"
            onClick={toggleLanguage}
         >
            {language === 'en' ? 'EN' : '中'}
         </div>
+        </Tooltip>
         
         {/* Unified Status Pill */}
+        <Tooltip content={t('settings.desc.appearance')} side="top">
         <div 
            ref={quickSettingsRef}
            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
            onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
-           title={t('settings.desc.appearance')}
         >
           <Wifi className="w-4 h-4" />
           <Volume2 className="w-4 h-4" />
           <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
           <Settings2 className="w-4 h-4" />
         </div>
+        </Tooltip>
 
         {/* Clock - Action Center Trigger */}
+        <Tooltip content={t('start.notifications')} side="top" offset={20}>
         <div 
           ref={actionCenterRef}
           className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
@@ -321,6 +333,7 @@ export default function Taskbar({
         >
           <SystemClock showDate />
         </div>
+        </Tooltip>
 
       </div>
 

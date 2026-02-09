@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { X, Minus, Maximize2, Minimize2 } from 'lucide-react'
+import { Tooltip } from '@/os/ui/Tooltip'
 
 interface WindowTitleBarProps {
     title: string
@@ -77,38 +78,41 @@ export function WindowTitleBar({
             {/* Right: Window Controls */}
             <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
                 {/* Minimize */}
-                <button
-                    onClick={onMinimize}
-                    onMouseEnter={onHoverMinimize}
-                    aria-label={labels.minimize}
-                    title={labels.minimize}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
-                    style={{ color: 'var(--os-text-secondary)' }}
-                >
-                    <Minus size={16} />
-                </button>
+                <Tooltip content={labels.minimize} side="bottom">
+                    <button
+                        onClick={onMinimize}
+                        onMouseEnter={onHoverMinimize}
+                        aria-label={labels.minimize}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
+                        style={{ color: 'var(--os-text-secondary)' }}
+                    >
+                        <Minus size={16} />
+                    </button>
+                </Tooltip>
 
                 {/* Maximize/Restore */}
-                <button
-                    onClick={onMaximize}
-                    aria-label={isMaximized ? labels.restore : labels.maximize}
-                    title={isMaximized ? labels.restore : labels.maximize}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
-                    style={{ color: 'var(--os-text-secondary)' }}
-                >
-                    {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                </button>
+                <Tooltip content={isMaximized ? labels.restore : labels.maximize} side="bottom">
+                    <button
+                        onClick={onMaximize}
+                        aria-label={isMaximized ? labels.restore : labels.maximize}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-90"
+                        style={{ color: 'var(--os-text-secondary)' }}
+                    >
+                        {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
+                </Tooltip>
 
                 {/* Close */}
-                <button
-                    onClick={onClose}
-                    aria-label={labels.close}
-                    title={labels.close}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500/20 hover:text-red-400 active:scale-90"
-                    style={{ color: 'var(--os-text-secondary)' }}
-                >
-                    <X size={16} />
-                </button>
+                <Tooltip content={labels.close} side="bottom">
+                    <button
+                        onClick={onClose}
+                        aria-label={labels.close}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500/20 hover:text-red-400 active:scale-90"
+                        style={{ color: 'var(--os-text-secondary)' }}
+                    >
+                        <X size={16} />
+                    </button>
+                </Tooltip>
             </div>
         </div>
     )
