@@ -53,7 +53,7 @@ export default function Window({ id }: WindowProps) {
   // Aero Peek Logic
   const isPeeking = peekWindowId === id
   const isOtherPeeking = peekWindowId !== null && peekWindowId !== id
-  
+
   // Calculate effective dimensions for animation targets
   // Maximized windows have 100vw/100vh size, which differs from their 'restored' size in windowState.
   // This ensures minimize/maximize animations start/end from the correct center point.
@@ -64,7 +64,7 @@ export default function Window({ id }: WindowProps) {
   // If minimized, restore to last position or center
   const targetOpacity = isOtherPeeking ? 0 : (windowState.isMinimized && !isPeeking ? 0 : 1)
   const targetScale = isOtherPeeking ? 1 : (windowState.isMinimized && !isPeeking ? 0 : 1)
-  
+
   // Calculate target position based on peek state
   // If minimized and peeking -> Restore to pre-minimized position (or current position if it wasn't moved)
   // Logic: windowState.position tracks the "restored" position even when minimized
@@ -79,21 +79,23 @@ export default function Window({ id }: WindowProps) {
   const captureSnapshot = () => {
     const el = document.getElementById(`window-${id}`)
     if (el) {
-        toPng(el, { 
-             cacheBust: true, 
-             pixelRatio: 0.5,
-             skipAutoScale: true,
-             style: {
-                 transform: 'none', 
-                 transition: 'none' 
-             }
-         })
-         .then(dataUrl => setSnapshot(id, dataUrl))
-         .catch(err => console.error('Snapshot failed', err))
+      toPng(el, {
+        cacheBust: true,
+        pixelRatio: 0.5,
+        skipAutoScale: true,
+        style: {
+          transform: 'none',
+          transition: 'none'
+        }
+      })
+        .then(dataUrl => setSnapshot(id, dataUrl))
+        .catch(err => console.error('Snapshot failed', err))
     }
   }
 
   const handleMinimize = () => {
+    // Capture snapshot before minimizing
+    captureSnapshot()
     // Minimize immediately for best responsiveness.
     // Snapshot is captured on hover of minimize button or taskbar icon.
     minimizeWindow(id)
@@ -382,10 +384,10 @@ export default function Window({ id }: WindowProps) {
               useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
             }}
             labels={{
-                minimize: t('menu.minimize'),
-                maximize: t('menu.maximize'),
-                restore: t('menu.restore'),
-                close: t('menu.close')
+              minimize: t('menu.minimize'),
+              maximize: t('menu.maximize'),
+              restore: t('menu.restore'),
+              close: t('menu.close')
             }}
           />
 

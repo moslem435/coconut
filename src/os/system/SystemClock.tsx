@@ -10,43 +10,79 @@ interface SystemClockProps {
 }
 
 export default function SystemClock({ className, style, showDate = false }: SystemClockProps) {
-    const [time, setTime] = useState("")
-    const [date, setDate] = useState("")
+    const [time, setTime] = useState<string>("")
+    const [date, setDate] = useState<string>("")
     const { language } = useLanguage()
 
     useEffect(() => {
-        let lastTime = ""
+        // Initial set to avoid layout shift if possible, or handle hydration
         const updateTime = () => {
             const now = new Date()
             const locale = language === 'zh' ? 'zh-CN' : 'en-US'
-            
-            const newTime = now.toLocaleTimeString(locale, { hour12: false, hour: '2-digit', minute: '2-digit' })
 
-            // Only update state if time actually changed (every minute)
-            if (newTime !== lastTime) {
-                lastTime = newTime
-                setTime(newTime)
-            }
+            // Time: 24h format
+            const newTime = now.toLocaleTimeString(locale, {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+            setTime(newTime)
 
             if (showDate) {
-                setDate(now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }))
+                // Date: Include weekday
+                const newDate = now.toLocaleDateString(locale, {
+                    month: 'short',
+                    day: 'numeric',
+                    weekday: 'short'
+                })
+                setDate(newDate)
             }
         }
+
         updateTime()
-        const timer = setInterval(updateTime, 1000)
-        return () => clearInterval(timer)
+        // Sync with seconds to update at the start of the next minute for precision
+        const now = new Date()
+        const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50
+
+        let timer: NodeJS.Timeout
+
+        const startInterval = () => {
+            updateTime()
+            timer = setInterval(updateTime, 60000)
+        }
+
+        const initialTimer = setTimeout(() => {
+            startInterval()
+        }, msUntilNextMinute)
+
+        return () => {
+            clearTimeout(initialTimer)
+            clearInterval(timer)
+        }
     }, [showDate, language])
+
+    // Prevent hydration mismatch by not rendering until client-side (time is set)
+    if (!time) return <div className={className} style={{ ...style, width: '40px' }} />
 
     if (showDate) {
         return (
-            <div className={className} style={style}>
-                <span className="font-semibold text-sm tracking-wide" style={{ color: 'var(--os-text-primary)' }}>{time}</span>
-                <span className="text-[0.625rem] opacity-80 uppercase tracking-wider" style={{ color: 'var(--os-text-muted)' }}>{date}</span>
+            <div
+                className={`flex flex-col items-center justify-center pointer-events-none ${className}`}
+                style={style}
+            >
+                <span className="text-sm font-medium tabular-nums tracking-wide text-[var(--os-text-primary)]">
+                    {time}
+                </span>
+                <span className="text-[10px] font-medium opacity-70 uppercase tracking-widest text-[var(--os-text-secondary)] mt-0.5 scale-95 origin-center">
+                    {date}
+                </span>
             </div>
         )
     }
 
     return (
-        <span className={className} style={{ ...style, color: 'var(--os-text-primary)' }}>{time}</span>
+        <span className={`text-sm font-medium tabular-nums text-[var(--os-text-primary)] ${className}`} style={style}>
+            {time}
+        </span>
     )
 }

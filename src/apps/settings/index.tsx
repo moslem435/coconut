@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
     Settings,
     Palette,
@@ -14,11 +14,28 @@ import {
     ChevronRight,
     Sun,
     Moon,
-    Languages
+    Languages,
+    Cpu,
+    Activity,
+    Wifi,
+    Copy,
+    Check,
+    Github,
+    Twitter,
+    Linkedin,
+    Code2,
+    Terminal,
+    Box,
+    Layers,
+    Zap,
+    Atom,
+    Move,
+    Hexagon,
+    Shapes
 } from 'lucide-react'
-import { useSystem } from '@/os/sdk'
+ import { useSystem } from '@/os/sdk'
+ import { Tooltip } from '@/os/ui/Tooltip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { Tooltip } from '@/os/ui/Tooltip'
 
 interface SettingCategory {
     id: string
@@ -30,6 +47,28 @@ interface SettingCategory {
 export default function SettingsApp() {
     const [activeCategory, setActiveCategory] = useState('display')
     const { t } = useLanguage()
+    
+    // About Page State
+    const sysInfo = useSystemInfo()
+    const uptime = useUptime()
+    const [devModeCount, setDevModeCount] = useState(0)
+    const [copied, setCopied] = useState(false)
+
+    const handleDevMode = () => {
+        if (devModeCount >= 5) return
+        const newCount = devModeCount + 1
+        setDevModeCount(newCount)
+        if (newCount === 5) {
+            // In a real app, this would enable a global dev mode state
+        }
+    }
+
+    const handleCopySpecs = () => {
+        const specs = `Portfolio OS v1.0\nBuild: 2026.02.05\n\nSystem Specs:\nBrowser: ${sysInfo.browser}\nResolution: ${sysInfo.resolution}\nUptime: ${uptime}`
+        navigator.clipboard.writeText(specs)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
 
     // Dynamic categories based on language
     const categories: SettingCategory[] = [
@@ -265,28 +304,72 @@ export default function SettingsApp() {
 
             case 'about':
                 return (
-                    <div className="space-y-6">
-                        <div className="text-center py-8">
+                    <div className="space-y-8 pb-8">
+                        {/* Hero Section */}
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--os-accent-dim)]/30 to-transparent border border-[var(--os-border)] p-8 text-center">
                             <motion.div
                                 initial={{ scale: 0.8, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
-                                className="inline-block p-6 rounded-2xl bg-gradient-to-br from-[var(--os-accent)]/20 to-blue-500/20 border border-[var(--os-accent)]/30 mb-6"
+                                transition={{ type: 'spring', duration: 0.8 }}
+                                className="relative z-10"
                             >
-                                <Settings size={48} className="text-[var(--os-accent)]" />
+                                <div className="inline-block p-4 rounded-2xl bg-[var(--os-bg-base)] border border-[var(--os-accent)]/30 mb-4 shadow-[0_0_30px_var(--os-accent-dim)]">
+                                    <Settings size={48} className="text-[var(--os-accent)] animate-spin-slow" style={{ animationDuration: '10s' }} />
+                                </div>
+                                <h2 className="text-3xl font-bold mb-2 tracking-tight" style={{ color: 'var(--os-text-primary)' }}>{t('start.os')}</h2>
+                                <div 
+                                    className="cursor-pointer select-none inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/20 text-[var(--os-accent)] text-xs font-medium hover:bg-[var(--os-accent)]/20 transition-colors"
+                                    onClick={handleDevMode}
+                                >
+                                    <span>v1.0.0 (Beta)</span>
+                                    <span>•</span>
+                                    <span>Build 2026.02.05</span>
+                                </div>
+                                
+                                <AnimatePresence>
+                                    {devModeCount >= 5 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="mt-4 text-sm font-bold text-green-400"
+                                        >
+                                            {t('settings.about.dev')}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </motion.div>
-                            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--os-text-primary)' }}>{t('start.os')}</h2>
-                            <p className="text-sm mb-4" style={{ color: 'var(--os-text-muted)' }}>Version 1.0.0</p>
-                            <div className="inline-block px-4 py-2 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/30 text-[var(--os-accent)] text-sm">
-                                Build 2026.02.05
-                            </div>
+                            
+                            {/* Background Glow */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[var(--os-accent)]/10 blur-[80px] rounded-full pointer-events-none" />
                         </div>
 
-                        <SettingSection title={t('settings.about.system')}>
-                            <div className="space-y-2 text-sm">
-                                <InfoRow label={t('settings.about.env')} value="Web Browser" />
-                                <InfoRow label={t('settings.about.kernel')} value="Next.js 15 + React 19" />
-                                <InfoRow label={t('settings.about.render')} value="Tw + Framer Motion" />
-                            </div>
+                        {/* System Dashboard */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <InfoCard 
+                                icon={<Activity size={18} />} 
+                                label={t('settings.about.uptime')} 
+                                value={uptime} 
+                            />
+                            <InfoCard 
+                                icon={<Monitor size={18} />} 
+                                label={t('settings.about.screen')} 
+                                value={sysInfo.resolution} 
+                            />
+                            <InfoCard 
+                                icon={<Wifi size={18} />} 
+                                label={t('settings.about.network')} 
+                                value={sysInfo.network} 
+                            />
+                             <InfoCard 
+                                icon={<Box size={18} />} 
+                                label={t('settings.about.browser')} 
+                                value={sysInfo.browser} 
+                            />
+                        </div>
+
+                        {/* Tech Stack */}
+                        <SettingSection title={t('settings.about.powered')}>
+                            <TechStackGrid />
                         </SettingSection>
                     </div>
                 )
@@ -438,4 +521,123 @@ function InfoRow({ label, value }: { label: string; value: string }) {
             <span style={{ color: 'var(--os-text-primary)' }}>{value}</span>
         </div>
     )
+}
+
+function InfoCard({ icon, label, value, subtext }: { icon: React.ReactNode, label: string, value: string, subtext?: string }) {
+    return (
+        <div className="p-4 rounded-xl border border-[var(--os-border)] bg-[var(--os-bg-panel)]/50 flex flex-col gap-2 transition-all hover:bg-[var(--os-hover-bg)] hover:scale-[1.02]">
+            <div className="flex items-center gap-2 mb-1">
+                <div className="text-[var(--os-accent)]">{icon}</div>
+                <span className="text-xs font-medium text-[var(--os-text-muted)] uppercase tracking-wider">{label}</span>
+            </div>
+            <div className="text-lg font-bold text-[var(--os-text-primary)] truncate" title={value}>{value}</div>
+            {subtext && <div className="text-xs text-[var(--os-text-secondary)]">{subtext}</div>}
+        </div>
+    )
+}
+
+function TechStackGrid() {
+    const stack = [
+        { icon: <Atom size={20} />, name: 'React 19', color: '#61DAFB' },
+        { icon: <Layers size={20} />, name: 'Next.js 16', color: '#FFFFFF' },
+        { icon: <Terminal size={20} />, name: 'TypeScript', color: '#3178C6' },
+        { icon: <Palette size={20} />, name: 'Tailwind 4', color: '#38B2AC' },
+        { icon: <Zap size={20} />, name: 'Zustand', color: '#F59E0B' },
+        { icon: <Activity size={20} />, name: 'Framer Motion', color: '#EC4899' },
+        { icon: <Hexagon size={20} />, name: 'Three.js / R3F', color: '#FFFFFF' },
+        { icon: <Move size={20} />, name: 'dnd-kit', color: '#FFFFFF' },
+        { icon: <Shapes size={20} />, name: 'Lucide Icons', color: '#FF7F50' },
+    ]
+
+    return (
+        <div className="grid grid-cols-3 gap-3">
+            {stack.map((item) => (
+                <div key={item.name} className="flex flex-col items-center justify-center p-3 rounded-lg border border-[var(--os-border)] bg-[var(--os-bg-base)] hover:bg-[var(--os-hover-bg)] transition-colors gap-2 group cursor-default">
+                     <div style={{ color: item.color }} className="group-hover:scale-110 transition-transform">
+                        {item.icon}
+                     </div>
+                     <span className="text-xs text-[var(--os-text-secondary)] text-center">{item.name}</span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function useSystemInfo() {
+    const [info, setInfo] = useState({
+        browser: 'Unknown',
+        resolution: 'Unknown',
+        network: 'Checking...'
+    })
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+
+        const nav = navigator as any
+        
+        const updateInfo = async () => {
+            // Browser & Resolution
+            const browser = nav.userAgentData?.brands?.[0] 
+                ? `${nav.userAgentData.brands[0].brand} ${nav.userAgentData.brands[0].version}`
+                : nav.userAgent.split(' ').pop()?.split('/')[0] || 'Browser'
+            
+            const resolution = `${window.screen.width} × ${window.screen.height}`
+
+            // Real Network Latency Check
+            let networkStatus = 'Offline'
+            if (nav.onLine) {
+                try {
+                    const start = performance.now()
+                    await fetch('/favicon.ico', { method: 'HEAD', cache: 'no-store' })
+                    const latency = Math.round(performance.now() - start)
+                    networkStatus = `Online (${latency}ms)`
+                } catch (e) {
+                    networkStatus = 'Online'
+                }
+            }
+
+            setInfo({
+                browser,
+                resolution,
+                network: networkStatus
+            })
+        }
+
+        updateInfo()
+        
+        // Listen for online/offline events
+        window.addEventListener('online', updateInfo)
+        window.addEventListener('offline', updateInfo)
+        
+        return () => {
+            window.removeEventListener('online', updateInfo)
+            window.removeEventListener('offline', updateInfo)
+        }
+    }, [])
+
+    return info
+}
+
+function useUptime() {
+    const [uptime, setUptime] = useState(0)
+
+    useEffect(() => {
+        // Simple session uptime
+        const startTime = Date.now()
+        
+        const interval = setInterval(() => {
+            setUptime(Math.floor((Date.now() - startTime) / 1000))
+        }, 1000)
+
+        return () => clearInterval(interval)
+    }, [])
+
+    const formatTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor((seconds % 3600) / 60)
+        const s = seconds % 60
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
+
+    return formatTime(uptime)
 }

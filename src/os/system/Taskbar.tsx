@@ -12,9 +12,13 @@ import { AnimatePresence } from 'framer-motion'
 import { WindowPreview } from './WindowPreview'
 import { toPng } from 'html-to-image'
 import { Tooltip } from '@/os/ui/Tooltip'
+import StartMenu from './StartMenu'
 
 interface TaskbarProps {
   onStartClick?: () => void
+  isStartMenuOpen: boolean
+  onCloseStartMenu: () => void
+  onShutdown?: () => void
 }
 
 import SystemClock from './SystemClock'
@@ -22,7 +26,10 @@ import QuickSettings from './QuickSettings'
 import ActionCenter from './ActionCenter'
 
 export default function Taskbar({
-  onStartClick
+  onStartClick,
+  isStartMenuOpen,
+  onCloseStartMenu,
+  onShutdown
 }: TaskbarProps) {
   const { t, language, toggleLanguage } = useLanguage()
   // Taskbar needs list of all open windows
@@ -45,6 +52,7 @@ export default function Taskbar({
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false)
   const quickSettingsRef = useRef<HTMLDivElement>(null)
   const actionCenterRef = useRef<HTMLDivElement>(null)
+  const startBtnRef = useRef<HTMLButtonElement>(null)
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const peekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -69,7 +77,7 @@ export default function Taskbar({
 
       // Check if it's open (using appId as windowId for single-instance apps)
       const win = openWindows.find(w => w.id === appId)
-      
+
       const title = appId === 'settings' ? t('start.settings') : app.title
 
       items.push({
@@ -123,21 +131,21 @@ export default function Taskbar({
   const captureSnapshot = async (id: string) => {
     const el = document.getElementById(`window-${id}`)
     if (el) {
-        try {
-            // Use lower quality/scale for performance
-            const dataUrl = await toPng(el, { 
-                cacheBust: true, 
-                pixelRatio: 0.5,
-                skipAutoScale: true,
-                style: {
-                    transform: 'none', // Reset transform to avoid capturing position offset
-                    transition: 'none'
-                }
-            })
-            setSnapshot(id, dataUrl)
-        } catch (err) {
-            console.error('Snapshot failed', err)
-        }
+      try {
+        // Use lower quality/scale for performance
+        const dataUrl = await toPng(el, {
+          cacheBust: true,
+          pixelRatio: 0.5,
+          skipAutoScale: true,
+          style: {
+            transform: 'none', // Reset transform to avoid capturing position offset
+            transition: 'none'
+          }
+        })
+        setSnapshot(id, dataUrl)
+      } catch (err) {
+        console.error('Snapshot failed', err)
+      }
     }
   }
 
@@ -151,7 +159,7 @@ export default function Taskbar({
       if (item.isActive && !item.isMinimized) {
         // Capture snapshot before minimizing
         captureSnapshot(item.id).finally(() => {
-            minimizeWindow(item.id)
+          minimizeWindow(item.id)
         })
       } else {
         focusWindow(item.id)
@@ -163,15 +171,15 @@ export default function Taskbar({
         const el = itemRefs.current[item.id]
         let taskbarPos = undefined
         if (el) {
-            const rect = el.getBoundingClientRect()
-            taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
+          const rect = el.getBoundingClientRect()
+          taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
         }
 
         const title = item.appId === 'settings' ? t('start.settings') : app.title
 
         openWindow(app.id, title, <app.component />, app.icon, {
-            ...app.defaultWindowOptions,
-            taskbarPosition: taskbarPos
+          ...app.defaultWindowOptions,
+          taskbarPosition: taskbarPos
         })
       }
     }
@@ -192,13 +200,14 @@ export default function Taskbar({
 
         {/* Start Button */}
         <Tooltip content={t('start.menu')} side="top" offset={20}>
-        <button
-          onClick={onStartClick}
-          className="h-12 w-12 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
-          style={{ backgroundColor: 'var(--os-hover-bg)' }}
-        >
-          <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
-        </button>
+          <button
+            ref={startBtnRef}
+            onClick={onStartClick}
+            className="h-12 w-12 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
+            style={{ backgroundColor: 'var(--os-hover-bg)' }}
+          >
+            <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
+          </button>
         </Tooltip>
 
         {/* Separator - Only show if there are items */}
@@ -214,139 +223,139 @@ export default function Taskbar({
             side="top"
             offset={20}
           >
-          <button
-            ref={(el) => { itemRefs.current[item.id] = el }}
-            onClick={() => handleItemClick(item)}
-            onMouseEnter={() => {
+            <button
+              ref={(el) => { itemRefs.current[item.id] = el }}
+              onClick={() => handleItemClick(item)}
+              onMouseEnter={() => {
                 setHoveredId(item.id)
-                if (item.isOpen) {
-                    // Update snapshot
-                    if (!item.isMinimized) {
-                        captureSnapshot(item.id)
-                    }
-                }
-            }}
-            onMouseLeave={() => {
+              }}
+              onMouseLeave={() => {
                 setHoveredId(null)
-                
+
                 // Clear Peek (Safety fallback)
                 if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
                 setPeekWindowId(null)
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', { 
-                windowId: item.isOpen ? item.id : undefined,
-                appId: item.appId
-              })
-            }}
-            className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)]"
-            style={{
-              backgroundColor: item.isActive && !item.isMinimized
-                ? 'var(--os-accent-dim)'
-                : undefined
-            }}
-          >
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', {
+                  windowId: item.isOpen ? item.id : undefined,
+                  appId: item.appId
+                })
+              }}
+              className="h-12 w-12 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group hover:bg-[var(--os-hover-bg)]"
+              style={{
+                backgroundColor: item.isActive && !item.isMinimized
+                  ? 'var(--os-accent-dim)'
+                  : undefined
+              }}
+            >
 
-            {/* Window Icon */}
-            {item.icon ? (() => {
-              const Icon = item.icon
-              return <Icon className="w-[1.375rem] h-[1.375rem] text-[var(--os-text-primary)]" />
-            })() : (
-              <div className="w-4 h-4 rounded-sm border flex items-center justify-center"
-                style={{ borderColor: 'var(--os-text-primary)' }}
-              >
-                <div className="w-2 h-2 rounded-[1px]" style={{ backgroundColor: 'var(--os-text-primary)' }} />
-              </div>
-            )}
+              {/* Window Icon */}
+              {item.icon ? (() => {
+                const Icon = item.icon
+                return <Icon className="w-[1.375rem] h-[1.375rem] text-[var(--os-text-primary)]" />
+              })() : (
+                <div className="w-4 h-4 rounded-sm border flex items-center justify-center"
+                  style={{ borderColor: 'var(--os-text-primary)' }}
+                >
+                  <div className="w-2 h-2 rounded-[1px]" style={{ backgroundColor: 'var(--os-text-primary)' }} />
+                </div>
+              )}
 
-            {/* Indicator Dot for Open Apps */}
-            {item.isOpen && (
-              <div className={`absolute bottom-1 w-1 h-1 rounded-full ${item.isActive && !item.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
-            )}
+              {/* Indicator Dot for Open Apps */}
+              {item.isOpen && (
+                <div className={`absolute bottom-1 w-1 h-1 rounded-full ${item.isActive && !item.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
+              )}
 
-            {/* Window Preview */}
-            <AnimatePresence>
-                  {useTaskbarPreviews && item.isOpen && hoveredId === item.id && (
-                    <WindowPreview 
-                        appId={item.appId}  
-                        title={item.title} 
-                        icon={item.icon} 
-                        isActive={item.isActive}
-                        snapshot={snapshots[item.id]} 
-                        onPeek={(shouldPeek) => {
-                             if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                             if (shouldPeek) {
-                                 // Enter peek mode (slight delay to prevent accidental triggers)
-                                 peekTimeoutRef.current = setTimeout(() => {
-                                     setPeekWindowId(item.id)
-                                 }, 200)
-                             } else {
-                                 // Exit peek mode immediately
-                                 setPeekWindowId(null)
-                             }
-                        }}
-                    />
-                  )}
-                </AnimatePresence>
-          </button>
+              {/* Window Preview */}
+              <AnimatePresence>
+                {useTaskbarPreviews && item.isOpen && hoveredId === item.id && (
+                  <WindowPreview
+                    appId={item.appId}
+                    title={item.title}
+                    icon={item.icon}
+                    isActive={item.isActive}
+                    snapshot={snapshots[item.id]}
+                    onPeek={(shouldPeek) => {
+                      if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                      if (shouldPeek) {
+                        // Enter peek mode (slight delay to prevent accidental triggers)
+                        peekTimeoutRef.current = setTimeout(() => {
+                          setPeekWindowId(item.id)
+                        }, 200)
+                      } else {
+                        // Exit peek mode immediately
+                        setPeekWindowId(null)
+                      }
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+            </button>
           </Tooltip>
         ))}
       </div>
 
       {/* Right: System Tray */}
       <div className="flex items-center gap-1.5 h-full pl-4 ml-auto relative" style={{ color: 'var(--os-text-secondary)' }}>
-        
+
         {/* Separator */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
 
         {/* Language Indicator */}
         <Tooltip content={t('settings.language')} side="top">
-        <div 
-           className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-white/5 cursor-pointer text-xs font-medium tracking-wider transition-colors"
-           onClick={toggleLanguage}
-        >
-           {language === 'en' ? 'EN' : '中'}
-        </div>
+          <div
+            className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-white/5 cursor-pointer text-xs font-medium tracking-wider transition-colors"
+            onClick={toggleLanguage}
+          >
+            {language === 'en' ? 'EN' : '中'}
+          </div>
         </Tooltip>
-        
+
         {/* Unified Status Pill */}
         <Tooltip content={t('settings.desc.appearance')} side="top">
-        <div 
-           ref={quickSettingsRef}
-           className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
-           onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
-        >
-          <Wifi className="w-4 h-4" />
-          <Volume2 className="w-4 h-4" />
-          <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
-          <Settings2 className="w-4 h-4" />
-        </div>
+          <div
+            ref={quickSettingsRef}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
+            onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
+          >
+            <Volume2 className="w-4 h-4" />
+            <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
+            <Settings2 className="w-4 h-4" />
+          </div>
         </Tooltip>
 
         {/* Clock - Action Center Trigger */}
         <Tooltip content={t('start.notifications')} side="top" offset={20}>
-        <div 
-          ref={actionCenterRef}
-          className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
-          onClick={() => setIsActionCenterOpen(!isActionCenterOpen)}
-        >
-          <SystemClock showDate />
-        </div>
+          <div
+            ref={actionCenterRef}
+            className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
+            onClick={() => setIsActionCenterOpen(!isActionCenterOpen)}
+          >
+            <SystemClock showDate />
+          </div>
         </Tooltip>
 
       </div>
 
       {/* Popups */}
-      <QuickSettings 
-        isOpen={isQuickSettingsOpen} 
-        onClose={() => setIsQuickSettingsOpen(false)} 
+      <StartMenu
+        isOpen={isStartMenuOpen}
+        onClose={onCloseStartMenu}
+        onShutdown={onShutdown}
+        toggleRef={startBtnRef}
+      />
+
+      <QuickSettings
+        isOpen={isQuickSettingsOpen}
+        onClose={() => setIsQuickSettingsOpen(false)}
         toggleRef={quickSettingsRef}
       />
 
-      <ActionCenter 
-        isOpen={isActionCenterOpen} 
-        onClose={() => setIsActionCenterOpen(false)} 
+      <ActionCenter
+        isOpen={isActionCenterOpen}
+        onClose={() => setIsActionCenterOpen(false)}
         toggleRef={actionCenterRef}
       />
     </div>

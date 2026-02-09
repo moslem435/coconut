@@ -21,7 +21,7 @@ export function WindowFrame({
         <div
             onPointerDown={onPointerDown}
             className={`
-        flex flex-col overflow-hidden transition-all duration-300 backdrop-blur-2xl
+        flex flex-col overflow-hidden transition-[backdrop-filter,background-color,transform,width,height,border-radius] duration-300 backdrop-blur-2xl
         ${isMaximized ? 'rounded-none' : 'rounded-2xl'}
         ${className}
       `}

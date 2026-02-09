@@ -12,7 +12,6 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 import Taskbar from './Taskbar'
 import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
-import StartMenu from './StartMenu'
 import Window from './Window'
 import Notifications from './Notifications'
 
@@ -51,16 +50,12 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       {/* 3. System UI Layer (Always Top) */}
 
-      {/* Start Menu - z-[250] */}
-      <StartMenu
-        isOpen={isStartMenuOpen}
-        onClose={() => setIsStartMenuOpen(false)}
-        onShutdown={onShutdown}
-      />
-
       {/* Status Bar - z-[200] */}
       <Taskbar
         onStartClick={handleStartClick}
+        isStartMenuOpen={isStartMenuOpen}
+        onCloseStartMenu={() => setIsStartMenuOpen(false)}
+        onShutdown={onShutdown}
       />
 
       {/* Context Menu */}
@@ -68,14 +63,6 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       {/* Notifications - z-[9999] defined in component */}
       <Notifications />
-
-      {/* Close Start Menu when clicking outside (Overlay) */}
-      {isStartMenuOpen && (
-        <div
-          className="fixed inset-0 z-[150]"
-          onClick={() => setIsStartMenuOpen(false)}
-        />
-      )}
     </>
   )
 }

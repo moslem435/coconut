@@ -1,5 +1,7 @@
 'use client'
 
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Terminal, Power, Settings } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -11,14 +13,55 @@ interface StartMenuProps {
     isOpen: boolean
     onClose: () => void
     onShutdown?: () => void
+    toggleRef: React.RefObject<HTMLElement>
 }
 
-export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProps) {
+export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: StartMenuProps) {
     const { useAnimations } = useSystemSettings()
     const { t } = useLanguage()
     const openWindow = useWindowStore(state => state.openWindow)
     const windows = useWindowStore(state => state.windows)
     const focusWindow = useWindowStore(state => state.focusWindow)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    const [position, setPosition] = useState<{ x: number, y: number } | null>(null)
+
+    // Close when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                isOpen &&
+                menuRef.current &&
+                !menuRef.current.contains(event.target as Node) &&
+                toggleRef.current &&
+                !toggleRef.current.contains(event.target as Node)
+            ) {
+                onClose()
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isOpen, onClose, toggleRef])
+
+    useLayoutEffect(() => {
+        if (isOpen && toggleRef.current && menuRef.current) {
+            const triggerRect = toggleRef.current.getBoundingClientRect()
+            const menuRect = menuRef.current.getBoundingClientRect()
+
+            // Center align relative to trigger
+            let x = triggerRect.left + triggerRect.width / 2 - menuRect.width / 2
+
+            // Clamp to screen edges with padding
+            const padding = 16
+            const maxX = window.innerWidth - menuRect.width - padding
+            x = Math.min(Math.max(padding, x), maxX)
+
+            // Position above trigger
+            const y = window.innerHeight - triggerRect.top + 8 // 8px gap
+
+            setPosition({ x, y })
+        }
+    }, [isOpen, toggleRef])
 
     const handleOpenSettings = () => {
         const settingsApp = APPS_REGISTRY['settings']
@@ -47,18 +90,24 @@ export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProp
         }, 300)
     }
 
-    return (
+    if (typeof document === 'undefined') return null
+
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <motion.div
+                    ref={menuRef}
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.9 }}
                     transition={{ duration: useAnimations ? 0.2 : 0, ease: 'easeOut' }}
-                    className="fixed bottom-24 left-1/2 -translate-x-1/2 w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[10001]"
+                    className="fixed w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[10001]"
                     style={{
                         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.85)',
                         border: '1px solid var(--os-border)',
+                        left: position?.x ?? 0,
+                        bottom: position?.y ?? 64, // Fallback
+                        visibility: position ? 'visible' : 'hidden'
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -85,7 +134,8 @@ export default function StartMenu({ isOpen, onClose, onShutdown }: StartMenuProp
                     </div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     )
 }
 
@@ -98,21 +148,15 @@ interface MenuItemProps {
 
 function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
     return (
-        <div
-            className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-150 hover:bg-[var(--os-hover-bg)] active:scale-[0.98]"
+        <button
             onClick={onClick}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group ${danger
+                ? 'hover:bg-red-500/10 text-red-400'
+                : 'hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)]'
+                }`}
         >
-            <Icon
-                size={18}
-                className="transition-colors"
-                style={{ color: danger ? 'var(--os-danger)' : 'var(--os-text-secondary)' }}
-            />
-            <span
-                className="text-sm font-medium transition-colors"
-                style={{ color: danger ? 'var(--os-danger)' : 'var(--os-text-primary)' }}
-            >
-                {label}
-            </span>
-        </div>
+            <Icon size={18} className={danger ? 'text-red-400' : 'text-[var(--os-text-secondary)] group-hover:text-[var(--os-text-primary)]'} />
+            <span className="text-sm font-medium">{label}</span>
+        </button>
     )
 }

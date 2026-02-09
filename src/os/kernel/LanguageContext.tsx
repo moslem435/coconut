@@ -22,7 +22,7 @@ const translations = {
     "settings.desc.account": "Profile and account information",
     "settings.desc.privacy": "Security and privacy options",
     "settings.desc.about": "System information and version",
-    
+
     // Settings Options
     "settings.theme": "Theme Mode",
     "settings.theme.light": "Light",
@@ -36,7 +36,7 @@ const translations = {
     "settings.animations": "Enable System Animations",
     "settings.previews": "Enable Taskbar Previews",
     "settings.volume": "Volume",
-    
+
     // Context Menu
     "menu.open": "Open/Focus",
     "menu.pin": "Pin to Taskbar",
@@ -52,7 +52,7 @@ const translations = {
     "menu.wallpaper": "Change Wallpaper",
     "menu.align": "Align to Grid",
     "menu.about": "About System",
-    
+
     // Messages / Notifications
     "msg.pinned": "Pinned to Taskbar",
     "msg.unpinned": "Unpinned from Taskbar",
@@ -60,7 +60,7 @@ const translations = {
     "msg.info": "Info",
     "msg.about.title": "Portfolio OS v1.0",
     "msg.about.desc": "A Web-based Operating System Simulation.",
-    
+
     // Boot Sequence
     "boot.init": "SYSTEM INITIALIZATION",
     "boot.memory": "CHECKING MEMORY...",
@@ -81,9 +81,18 @@ const translations = {
     "start.os": "Portfolio OS",
     "start.settings": "Settings",
     "start.shutdown": "Shut Down",
-    
-    // Settings App
-    "settings.display": "Display",
+
+    // Quick Settings
+    "quicksettings.title": "Quick Settings",
+    "quicksettings.theme.dark": "Dark",
+    "quicksettings.theme.light": "Light",
+    "quicksettings.effects": "Effects",
+    "quicksettings.previews": "Previews",
+
+  },
+  zh: {
+    // Settings Categories
+    "settings.display": "显示",
     "settings.appearance": "Appearance",
     "settings.sound": "Sound",
     "settings.language": "Language",
@@ -97,13 +106,13 @@ const translations = {
     "settings.desc.account": "Profile and account info",
     "settings.desc.privacy": "Security and privacy options",
     "settings.desc.about": "System info and version",
-    
+
     "settings.display.theme": "Theme Mode",
     "settings.display.light": "Light",
     "settings.display.dark": "Dark",
     "settings.display.scale": "Display Scale",
     "settings.display.scale.desc": "Adjust system font and window size scaling.",
-    
+
     "settings.appearance.wallpaper": "Desktop Wallpaper",
     "settings.appearance.accent": "Accent Color",
     "settings.appearance.effects": "Visual Effects",
@@ -111,15 +120,25 @@ const translations = {
     "settings.appearance.animations": "Enable System Animations",
     "settings.appearance.previews": "Enable Taskbar Previews",
     "settings.appearance.skipboot": "Skip Boot Sequence",
-    
+
     "settings.sound.volume": "Volume",
-    
+
     "settings.language.select": "Select Language",
-    
+
     "settings.about.system": "System Info",
     "settings.about.env": "Environment",
     "settings.about.kernel": "Kernel",
     "settings.about.render": "Render Engine",
+    "settings.about.browser": "Browser",
+    "settings.about.screen": "Screen Resolution",
+    "settings.about.cores": "CPU Cores",
+    "settings.about.memory": "Memory (Est.)",
+    "settings.about.network": "Network",
+    "settings.about.uptime": "Session Uptime",
+    "settings.about.copy": "Copy Specs",
+    "settings.about.copied": "Copied!",
+    "settings.about.dev": "Developer Mode Enabled!",
+    "settings.about.powered": "Powered By",
     "settings.dev": "Feature under development...",
 
     // Wallpaper & Colors
@@ -131,7 +150,7 @@ const translations = {
     "wallpaper.image.snow": "Snow Mountain",
     "wallpaper.image.desert": "Desert",
     "wallpaper.image.city": "City",
-    
+
     "color.cyan": "Cyan",
     "color.blue": "Blue",
     "color.purple": "Purple",
@@ -179,6 +198,16 @@ const translations = {
     "settings.about.env": "运行环境",
     "settings.about.kernel": "内核",
     "settings.about.render": "渲染引擎",
+    "settings.about.browser": "浏览器内核",
+    "settings.about.screen": "屏幕分辨率",
+    "settings.about.cores": "处理器核心",
+    "settings.about.memory": "运行内存 (预估)",
+    "settings.about.network": "网络状态",
+    "settings.about.uptime": "运行时间",
+    "settings.about.copy": "复制配置信息",
+    "settings.about.copied": "已复制!",
+    "settings.about.dev": "开发者模式已开启!",
+    "settings.about.powered": "技术栈驱动",
     "settings.dev": "功能开发中...",
     "boot.start": "启动系统",
 
@@ -214,7 +243,7 @@ const translations = {
     "menu.wallpaper": "更换壁纸",
     "menu.align": "自动排列",
     "menu.about": "关于系统",
-    
+
     // Messages / Notifications
     "msg.pinned": "已固定到任务栏",
     "msg.unpinned": "已取消固定",
@@ -222,7 +251,7 @@ const translations = {
     "msg.info": "提示",
     "msg.about.title": "Portfolio OS v1.0",
     "msg.about.desc": "一个基于 Web 技术的操作系统模拟界面。",
-    
+
     // Boot Sequence
     "boot.init": "系统初始化...",
     "boot.memory": "检查内存...",
@@ -241,7 +270,15 @@ const translations = {
     "start.visitor": "访客",
     "start.os": "Portfolio OS",
     "start.settings": "设置",
-    "start.shutdown": "关机"
+    "start.shutdown": "关机",
+
+    // Quick Settings
+    "quicksettings.title": "快速设置",
+    "quicksettings.theme.dark": "深色",
+    "quicksettings.theme.light": "浅色",
+    "quicksettings.effects": "特效",
+    "quicksettings.previews": "预览",
+
   }
 };
 
@@ -263,8 +300,8 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     if (savedLang && (savedLang === 'en' || savedLang === 'zh')) {
       setLanguage(savedLang);
     } else {
-        // Default to browser language or 'zh' since user is asking for adaptation
-        setLanguage('zh')
+      // Default to browser language or 'zh' since user is asking for adaptation
+      setLanguage('zh')
     }
   }, []);
 
