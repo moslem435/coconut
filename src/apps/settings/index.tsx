@@ -386,7 +386,7 @@ export default function SettingsApp() {
     return (
         <div className="h-full flex bg-[var(--os-bg-base)] text-[var(--os-text-primary)] transition-colors duration-300">
             {/* Sidebar */}
-            <div className="w-64 border-r border-[var(--os-border)] p-4 space-y-1 overflow-y-auto shrink-0 bg-[var(--os-bg-panel)]">
+            <div className="w-64 border-r border-[var(--os-border)] p-4 pt-14 space-y-1 overflow-y-auto shrink-0 bg-[var(--os-bg-panel)]">
                 <div className="flex items-center gap-3 px-3 py-4 mb-4">
                     <Settings size={24} className="text-[var(--os-accent)]" />
                     <span className="text-lg font-semibold">{t('start.settings')}</span>
@@ -416,7 +416,7 @@ export default function SettingsApp() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-8 overflow-y-auto">
+            <div className="flex-1 p-8 pt-16 overflow-y-auto">
                 <motion.div
                     key={activeCategory}
                     initial={{ opacity: 0, y: 10 }}
@@ -476,13 +476,13 @@ function ThemeOption({
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
     return (
-        <label className="flex items-center justify-between cursor-pointer group py-2">
+        <label className="flex items-center justify-between cursor-pointer group py-3 select-none">
             <span className="text-sm font-medium transition-colors duration-200 group-hover:text-[var(--os-text-primary)] text-[var(--os-text-secondary)]">
                 {label}
             </span>
             
             <div 
-                className="relative"
+                className="relative isolate"
                 onClick={(e) => {
                     e.preventDefault()
                     onChange(!checked)
@@ -490,11 +490,12 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
             >
                 {/* Track */}
                 <motion.div
-                    className="w-11 h-6 rounded-full transition-colors duration-300 border"
+                    className="w-[46px] h-[28px] rounded-full transition-colors duration-300"
                     style={{
-                        backgroundColor: checked ? 'var(--os-accent)' : 'var(--os-hover-bg)',
-                        borderColor: checked ? 'var(--os-accent)' : 'var(--os-border)',
-                        boxShadow: checked ? '0 0 8px var(--os-accent-dim)' : 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                        backgroundColor: checked ? 'var(--os-accent)' : 'var(--os-border-active)',
+                        boxShadow: checked 
+                            ? '0 0 12px var(--os-accent-dim)' 
+                            : 'inset 0 2px 4px rgba(0,0,0,0.05)'
                     }}
                 />
                 
@@ -502,12 +503,11 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
                 <motion.div
                     initial={false}
                     animate={{ 
-                        x: checked ? 26 : 2,
-                        scale: 1 
+                        x: checked ? 20 : 2
                     }}
-                    whileTap={{ scale: 0.9, width: 20 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="absolute top-1 left-0 w-4 h-4 rounded-full bg-white shadow-sm z-10"
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ type: 'spring', stiffness: 600, damping: 30 }}
+                    className="absolute top-[2px] left-0 w-[24px] h-[24px] rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.2)] z-10"
                 />
             </div>
         </label>

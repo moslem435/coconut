@@ -87,7 +87,7 @@ export default function RadioDeck() {
        source.connect(masterGain)
        sourceRef.current = source
     } catch (e) {
-       console.warn("CORS blocked audio visualization. Playing audio directly.", e)
+       // CORS blocked audio visualization. Playing audio directly.
        // Fallback: just play audio without visualizer connection if CORS fails
        // But usually with anonymous crossOrigin it works for FMA
     }

@@ -51,7 +51,7 @@ export function useWindowSnapshot(id: string) {
                     setSnapshot(id, dataUrl)
                     lastSnapshotTimeRef.current = Date.now()
                 } catch (err) {
-                    console.warn('Failed to capture snapshot:', err)
+                    // Fail silently
                 } finally {
                     isSnapshottingRef.current = false
                 }

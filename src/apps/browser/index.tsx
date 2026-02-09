@@ -205,7 +205,7 @@ export default function Browser() {
     // --- Render ---
 
     return (
-        <div className="flex flex-col h-full bg-[#dfe3e7] text-black font-sans select-none">
+        <div className="flex flex-col h-full bg-[#dfe3e7] text-black font-sans select-none pt-10">
             {/* Tab Bar */}
             <div className="flex items-end px-2 pt-2 gap-1 overflow-x-auto no-scrollbar">
                 <AnimatePresence initial={false}>

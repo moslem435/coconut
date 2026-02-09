@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { Folder, FileText, ChevronRight, ArrowUp, Home, HardDrive, Image as ImageIcon, Download } from 'lucide-react'
+import { Folder, FileText, ChevronRight, ArrowUp, Home, HardDrive, Image as ImageIcon, Download, StickyNote } from 'lucide-react'
 import { APPS_REGISTRY } from '@/os/registry/config'
-import TextEditor from '@/apps/file-explorer/components/TextEditor'
+import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 
 interface FileExplorerProps {
@@ -73,14 +73,14 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
                   { size: { width: 600, height: 400 } }
               )
           } else {
-              launchApp(
-                  'editor-' + item.id,
-                  item.name,
-                  <TextEditor initialContent={item.content} readOnly={true} />,
-                  FileText,
-                  { size: { width: 500, height: 400 } }
-              )
-          }
+                launchApp(
+                    'notepad-' + item.id,
+                    item.name,
+                    <Notepad fileId={item.id} />,
+                    StickyNote,
+                    { size: { width: 600, height: 450 } }
+                )
+            }
           return
       }
   }

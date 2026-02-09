@@ -13,6 +13,7 @@ export interface FileNode {
   appId?: string // For shortcuts
   createdAt: number
   updatedAt: number
+  originalParentId?: string | null // For trash restoration
 }
 
 interface FileSystemState {
@@ -21,11 +22,18 @@ interface FileSystemState {
   
   // Actions
   createItem: (parentId: string, name: string, type: FileType, content?: string, appId?: string) => string
-  deleteItem: (id: string) => void
+  deleteItem: (id: string) => void // Hard delete
   renameItem: (id: string, newName: string) => void
   getItem: (id: string) => FileNode | undefined
   getChildren: (parentId: string) => FileNode[]
   getPath: (id: string) => FileNode[]
+  
+  // New Actions
+  updateFileContent: (id: string, content: string) => void
+  moveItem: (id: string, newParentId: string) => void
+  trashItems: (ids: string[]) => void
+  restoreItems: (ids: string[]) => void
+  emptyTrash: () => void
 }
 
 // Initial File System
@@ -35,6 +43,14 @@ const INITIAL_FILES: Record<string, FileNode> = {
     id: INITIAL_ROOT_ID,
     parentId: null,
     name: 'Root',
+    type: 'folder',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'trash': {
+    id: 'trash',
+    parentId: INITIAL_ROOT_ID,
+    name: 'Trash',
     type: 'folder',
     createdAt: Date.now(),
     updatedAt: Date.now()
@@ -105,6 +121,42 @@ const INITIAL_FILES: Record<string, FileNode> = {
     name: 'Browser',
     type: 'file',
     appId: 'browser',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-terminal': {
+    id: 'shortcut-terminal',
+    parentId: 'desktop',
+    name: 'Terminal',
+    type: 'file',
+    appId: 'terminal',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-calculator': {
+    id: 'shortcut-calculator',
+    parentId: 'desktop',
+    name: 'Calculator',
+    type: 'file',
+    appId: 'calculator',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-notepad': {
+    id: 'shortcut-notepad',
+    parentId: 'desktop',
+    name: 'Notepad',
+    type: 'file',
+    appId: 'notepad',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
+  'shortcut-recycle-bin': {
+    id: 'shortcut-recycle-bin',
+    parentId: 'desktop',
+    name: 'Recycle Bin',
+    type: 'file',
+    appId: 'recycle-bin',
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -199,6 +251,80 @@ export const useFileSystemStore = create<FileSystemState>()(
         }
         
         return path
+      },
+
+      updateFileContent: (id, content) => {
+        set((state) => ({
+          files: {
+            ...state.files,
+            [id]: { ...state.files[id], content, updatedAt: Date.now() }
+          }
+        }))
+      },
+
+      moveItem: (id, newParentId) => {
+        set((state) => ({
+          files: {
+            ...state.files,
+            [id]: { ...state.files[id], parentId: newParentId, updatedAt: Date.now() }
+          }
+        }))
+      },
+
+      trashItems: (ids) => {
+        set((state) => {
+          const newFiles = { ...state.files }
+          ids.forEach(id => {
+            if (newFiles[id]) {
+              newFiles[id] = {
+                ...newFiles[id],
+                parentId: 'trash',
+                originalParentId: newFiles[id].parentId,
+                updatedAt: Date.now()
+              }
+            }
+          })
+          return { files: newFiles }
+        })
+      },
+
+      restoreItems: (ids) => {
+        set((state) => {
+          const newFiles = { ...state.files }
+          ids.forEach(id => {
+            if (newFiles[id]) {
+              const originalParent = newFiles[id].originalParentId || 'desktop'
+              // Check if original parent still exists, if not, move to desktop
+              const targetParent = newFiles[originalParent] ? originalParent : 'desktop'
+              
+              newFiles[id] = {
+                ...newFiles[id],
+                parentId: targetParent,
+                originalParentId: null,
+                updatedAt: Date.now()
+              }
+            }
+          })
+          return { files: newFiles }
+        })
+      },
+
+      emptyTrash: () => {
+        set((state) => {
+            const newFiles = { ...state.files }
+            // Find all items in trash
+            const trashItems = Object.values(newFiles).filter(f => f.parentId === 'trash')
+            
+            // Helper for recursive delete
+             const deleteRecursive = (itemId: string) => {
+                const children = Object.values(newFiles).filter(f => f.parentId === itemId)
+                children.forEach(child => deleteRecursive(child.id))
+                delete newFiles[itemId]
+            }
+
+            trashItems.forEach(item => deleteRecursive(item.id))
+            return { files: newFiles }
+        })
       }
     }),
     {

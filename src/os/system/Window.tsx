@@ -261,31 +261,33 @@ export default function Window({ id }: WindowProps) {
           }
         }}
       >
-        <WindowTitleBar
-          title={windowState.title}
-          icon={windowState.icon}
-          isActive={isActive}
-          isMaximized={windowState.isMaximized}
-          onMinimize={handleMinimize}
-          onMaximize={() => maximizeWindow(id)}
-          onClose={() => closeWindow(id)}
-          dragControls={dragControls}
-          onPointerDown={() => focusWindow(id)}
-          onHoverMinimize={captureSnapshot}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
-          }}
-          labels={{
-            minimize: t('menu.minimize'),
-            maximize: t('menu.maximize'),
-            restore: t('menu.restore'),
-            close: t('menu.close')
-          }}
-        />
+        <div className="absolute top-0 left-0 right-0 z-50">
+          <WindowTitleBar
+            title={windowState.title}
+            icon={windowState.icon}
+            isActive={isActive}
+            isMaximized={windowState.isMaximized}
+            onMinimize={handleMinimize}
+            onMaximize={() => maximizeWindow(id)}
+            onClose={() => closeWindow(id)}
+            dragControls={dragControls}
+            onPointerDown={() => focusWindow(id)}
+            onHoverMinimize={captureSnapshot}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+            }}
+            labels={{
+              minimize: t('menu.minimize'),
+              maximize: t('menu.maximize'),
+              restore: t('menu.restore'),
+              close: t('menu.close')
+            }}
+          />
+        </div>
 
-        <div className="flex-1 relative overflow-hidden bg-black">
+        <div className="flex-1 relative overflow-hidden w-full h-full">
           <AppErrorBoundary appId={id}>
             {windowState.component}
           </AppErrorBoundary>

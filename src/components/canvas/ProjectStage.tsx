@@ -29,7 +29,7 @@ export default function ProjectStage({ activeProjectIndex, selectedSubProject }:
 
   // DEBUG: Check props
   useFrame(() => {
-    // console.log("ProjectStage Render:", { isAbout, subProject: subProject?.title })
+    // Debug log removed
   })
 
   // Restore subtle hologram animation

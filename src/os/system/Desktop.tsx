@@ -12,8 +12,8 @@ import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useShallow } from 'zustand/react/shallow'
 import { Tooltip } from '@/os/ui/Tooltip'
-import { Folder, FileText, Image as ImageIcon } from 'lucide-react'
-import TextEditor from '@/apps/file-explorer/components/TextEditor'
+import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
+import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
 
@@ -170,11 +170,11 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 )
             } else {
                 launchApp(
-                    'editor-' + item.id,
+                    'notepad-' + item.id,
                     item.name,
-                    <TextEditor initialContent={item.content} readOnly={true} />,
-                    FileText,
-                    { size: { width: 500, height: 400 } }
+                    <Notepad fileId={item.id} />,
+                    StickyNote,
+                    { size: { width: 600, height: 450 } }
                 )
             }
             return
