@@ -126,7 +126,7 @@ export default function Window({ id }: WindowProps) {
       <motion.div
         id={`window-${id}`}
         ref={windowRef}
-        drag={!isResizing && !windowState.isMinimized}
+        drag={!windowState.isMinimized}
         dragControls={dragControls}
         dragListener={false}
         dragMomentum={false}

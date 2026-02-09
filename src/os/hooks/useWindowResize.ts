@@ -27,14 +27,15 @@ export function useWindowResize(
         // Don't allow resizing if maximized
         if (windowState?.isMaximized) return
 
-        setResizeState({ isResizing: true, direction })
-
         const startX = e.clientX
         const startY = e.clientY
         const startWidth = windowState.size.width
         const startHeight = windowState.size.height
         const startPosX = windowState.position.x
         const startPosY = windowState.position.y
+
+        // Track if actual resizing has started (drag threshold)
+        let hasStartedResizing = false
 
         const currentGeo = {
             w: startWidth,
@@ -46,6 +47,22 @@ export function useWindowResize(
         const onPointerMove = (moveEvent: PointerEvent) => {
             const deltaX = moveEvent.clientX - startX
             const deltaY = moveEvent.clientY - startY
+
+            // Apply drag threshold (3px) to prevent accidental resizing on click
+            if (!hasStartedResizing) {
+                if (Math.hypot(deltaX, deltaY) < 3) return
+
+                hasStartedResizing = true
+                setResizeState({ isResizing: true, direction })
+
+                // Immediately lock styles when resizing actually starts
+                if (windowRef.current) {
+                    windowRef.current.style.width = `${startWidth}px`
+                    windowRef.current.style.height = `${startHeight}px`
+                    windowRef.current.style.transform = `translateX(${startPosX}px) translateY(${startPosY}px)`
+                    windowRef.current.style.transition = 'none'
+                }
+            }
 
             let newWidth = startWidth
             let newHeight = startHeight
@@ -100,6 +117,8 @@ export function useWindowResize(
             document.removeEventListener('pointermove', onPointerMove)
             document.removeEventListener('pointerup', onPointerUp)
 
+            if (!hasStartedResizing) return
+
             // Handle Snap to Maximize
             if (direction.includes('n') && currentGeo.y <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
                 onMaximize?.()
@@ -110,6 +129,7 @@ export function useWindowResize(
                     windowRef.current.style.width = ''
                     windowRef.current.style.height = ''
                     windowRef.current.style.transform = ''
+                    windowRef.current.style.transition = ''
                 }
 
                 // Reset state
@@ -134,6 +154,7 @@ export function useWindowResize(
                 windowRef.current.style.width = ''
                 windowRef.current.style.height = ''
                 windowRef.current.style.transform = ''
+                windowRef.current.style.transition = ''
             }
 
             // Small delay to ensure React render cycle catches up before re-enabling animations
