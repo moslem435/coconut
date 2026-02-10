@@ -1,71 +1,16 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Cloud, CloudRain, Sun, CloudLightning, Wind, Thermometer, MapPin, CloudSnow, CloudFog, CloudDrizzle, Loader2, Calendar, Droplets, Eye, Gauge, Settings, LayoutTemplate, TrendingUp, Navigation, ArrowUp, ArrowDown } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Search, MapPin, Loader2, RefreshCw, AlertCircle, X, LayoutTemplate, Thermometer, Droplets, Wind, Eye, Gauge, Calendar, Bug } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { WeatherState, WeatherCachePayload, getWeatherInfo } from './utils/types'
+import { readWeatherCache, writeWeatherCache, WEATHER_CACHE_TTL } from './utils/cache'
+import { HourlyChart } from './components/HourlyChart'
+import { BentoCard } from './components/BentoCard'
+import { WindDirection } from './components/WindDirection'
 
-// Types
-interface WeatherState {
-  current: {
-    temp: number
-    code: number
-    humidity: number
-    windSpeed: number
-    pressure: number
-    visibility: number
-    feelsLike: number
-  }
-  forecast: Array<{
-    date: string
-    maxTemp: number
-    minTemp: number
-    code: number
-    precipitationProbability?: number
-  }>
-  hourly: Array<{
-    time: string
-    temp: number
-    code: number
-  }>
-  location: string
-  loading: boolean
-  error: boolean
-  lastUpdated: number | null
-  stale: boolean
-}
-
-// WMO Weather Code Interpretation (0-99)
-const getWeatherInfo = (code: number) => {
-  // Clear Sky
-  if (code === 0) return { icon: Sun, label: { en: 'Clear Sky', zh: '晴朗' }, color: 'text-yellow-400', bg: 'from-blue-400 to-blue-600' }
-  // Mainly Clear, Partly Cloudy, Overcast
-  if ([1, 2, 3].includes(code)) return { icon: Cloud, label: { en: 'Cloudy', zh: '多云' }, color: 'text-gray-200', bg: 'from-gray-400 to-gray-600' }
-  // Fog
-  if ([45, 48].includes(code)) return { icon: CloudFog, label: { en: 'Foggy', zh: '雾' }, color: 'text-gray-300', bg: 'from-gray-500 to-gray-700' }
-  // Drizzle
-  if ([51, 53, 55].includes(code)) return { icon: CloudDrizzle, label: { en: 'Drizzle', zh: '毛毛雨' }, color: 'text-blue-300', bg: 'from-blue-500 to-gray-600' }
-  // Freezing Drizzle
-  if ([56, 57].includes(code)) return { icon: CloudDrizzle, label: { en: 'Freezing Drizzle', zh: '冻雨' }, color: 'text-cyan-300', bg: 'from-cyan-600 to-blue-800' }
-  // Rain
-  if ([61, 63, 65].includes(code)) return { icon: CloudRain, label: { en: 'Rain', zh: '下雨' }, color: 'text-blue-400', bg: 'from-blue-600 to-gray-800' }
-  // Freezing Rain
-  if ([66, 67].includes(code)) return { icon: CloudRain, label: { en: 'Freezing Rain', zh: '冻雨' }, color: 'text-cyan-400', bg: 'from-cyan-700 to-blue-900' }
-  // Snow Fall
-  if ([71, 73, 75].includes(code)) return { icon: CloudSnow, label: { en: 'Snow', zh: '下雪' }, color: 'text-white', bg: 'from-blue-300 to-gray-400' }
-  // Snow Grains
-  if (code === 77) return { icon: CloudSnow, label: { en: 'Snow Grains', zh: '雪粒' }, color: 'text-white', bg: 'from-blue-300 to-gray-400' }
-  // Rain Showers
-  if ([80, 81, 82].includes(code)) return { icon: CloudRain, label: { en: 'Showers', zh: '阵雨' }, color: 'text-blue-400', bg: 'from-blue-500 to-gray-700' }
-  // Snow Showers
-  if ([85, 86].includes(code)) return { icon: CloudSnow, label: { en: 'Snow Showers', zh: '阵雪' }, color: 'text-white', bg: 'from-blue-300 to-gray-500' }
-  // Thunderstorm
-  if (code === 95) return { icon: CloudLightning, label: { en: 'Thunderstorm', zh: '雷暴' }, color: 'text-purple-400', bg: 'from-gray-700 to-purple-900' }
-  // Thunderstorm with Hail
-  if ([96, 99].includes(code)) return { icon: CloudLightning, label: { en: 'Thunderstorm', zh: '雷暴伴冰雹' }, color: 'text-purple-500', bg: 'from-gray-800 to-purple-950' }
-
-  return { icon: Sun, label: { en: 'Unknown', zh: '未知' }, color: 'text-gray-400', bg: 'from-gray-500 to-gray-700' }
-}
+import { WeatherBackground } from './components/WeatherBackground'
 
 // Default Location (Shanghai)
 const DEFAULT_LOCATION = {
@@ -74,47 +19,11 @@ const DEFAULT_LOCATION = {
   city: 'Shanghai'
 }
 
-const WEATHER_CACHE_KEY = 'weather-app-cache'
-const WEATHER_CACHE_TTL = 5 * 60 * 1000
-
-interface WeatherCachePayload {
-  current: WeatherState['current']
-  forecast: WeatherState['forecast']
-  hourly: WeatherState['hourly']
-  location: WeatherState['location']
-}
-
-interface WeatherCache {
-  timestamp: number
-  data: WeatherCachePayload
-  latitude: number
-  longitude: number
-  city: string
-}
-
-const readWeatherCache = (): WeatherCache | null => {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem(WEATHER_CACHE_KEY)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (!parsed?.timestamp || !parsed?.data) return null
-    return parsed as WeatherCache
-  } catch {
-    return null
-  }
-}
-
-const writeWeatherCache = (cache: WeatherCache) => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache))
-}
-
 export default function WeatherApp() {
   const { language } = useLanguage()
   const { showWeatherWidget, setShowWeatherWidget } = useSystemSettings()
   const [weather, setWeather] = useState<WeatherState>({
-    current: { temp: 0, code: 0, humidity: 0, windSpeed: 0, pressure: 0, visibility: 0, feelsLike: 0 },
+    current: { temp: 0, code: 0, humidity: 0, windSpeed: 0, windDirection: 0, pressure: 0, visibility: 0, feelsLike: 0, isDay: 1 },
     forecast: [],
     hourly: [],
     location: 'Loading...',
@@ -123,6 +32,33 @@ export default function WeatherApp() {
     lastUpdated: null,
     stale: false
   })
+  
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDebug, setShowDebug] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const simulateWeather = (code: number, isDay: number) => {
+    setWeather(prev => ({
+      ...prev,
+      current: {
+        ...prev.current,
+        code,
+        isDay
+      }
+    }))
+  }
+
+  const updateWind = (speed: number, direction: number) => {
+    setWeather(prev => ({
+      ...prev,
+      current: {
+        ...prev.current,
+        windSpeed: speed,
+        windDirection: direction
+      }
+    }))
+  }
 
   useEffect(() => {
     const cached = readWeatherCache()
@@ -140,10 +76,18 @@ export default function WeatherApp() {
     fetchWeatherData()
   }, [])
 
-  const fetchWeatherData = async (force = false) => {
+  useEffect(() => {
+    if (isSearching && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isSearching])
+
+  const fetchWeatherData = async (force = false, customLat?: number, customLon?: number, customCity?: string) => {
     const cached = readWeatherCache()
     const now = Date.now()
-    if (!force && cached && now - cached.timestamp < WEATHER_CACHE_TTL) {
+    
+    // Use cached if available and not forced, AND we are not searching for a new location
+    if (!force && !customLat && cached && now - cached.timestamp < WEATHER_CACHE_TTL) {
       setWeather(prev => ({
         ...prev,
         ...cached.data,
@@ -154,63 +98,68 @@ export default function WeatherApp() {
       }))
       return
     }
+
     try {
-      let latitude = cached?.latitude ?? DEFAULT_LOCATION.lat
-      let longitude = cached?.longitude ?? DEFAULT_LOCATION.lon
-      let city = cached?.city ?? DEFAULT_LOCATION.city
+      setWeather(prev => ({ ...prev, loading: true, error: false }))
 
-      // 1. Try Get Location via IP (Multi-source Fallback)
-      try {
-        const fetchLocation = async (url: string) => {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 3000)
-          const res = await fetch(url, { signal: controller.signal })
-          clearTimeout(timeoutId)
-          if (!res.ok) throw new Error(`Fetch failed: ${url}`)
-          return res.json()
-        }
+      let latitude = customLat ?? cached?.latitude ?? DEFAULT_LOCATION.lat
+      let longitude = customLon ?? cached?.longitude ?? DEFAULT_LOCATION.lon
+      let city = customCity ?? cached?.city ?? DEFAULT_LOCATION.city
 
+      // If no custom location and no cache, try auto-detect
+      if (!customLat && !cached) {
         try {
-          const locData = await fetchLocation('https://ipapi.co/json/')
-          if (locData.latitude && locData.longitude) {
-            latitude = locData.latitude
-            longitude = locData.longitude
-            city = locData.city || locData.region || city
+          const fetchLocation = async (url: string) => {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 3000)
+            const res = await fetch(url, { signal: controller.signal })
+            clearTimeout(timeoutId)
+            if (!res.ok) throw new Error(`Fetch failed: ${url}`)
+            return res.json()
           }
-        } catch (e) {
-          const locData = await fetchLocation('https://get.geojs.io/v1/ip/geo.json')
-          if (locData.latitude && locData.longitude) {
-            latitude = parseFloat(locData.latitude)
-            longitude = parseFloat(locData.longitude)
-            city = locData.city || locData.region || city
+
+          try {
+            const locData = await fetchLocation('https://ipapi.co/json/')
+            if (locData.latitude && locData.longitude) {
+              latitude = locData.latitude
+              longitude = locData.longitude
+              city = locData.city || locData.region || city
+            }
+          } catch (e) {
+            const locData = await fetchLocation('https://get.geojs.io/v1/ip/geo.json')
+            if (locData.latitude && locData.longitude) {
+              latitude = parseFloat(locData.latitude)
+              longitude = parseFloat(locData.longitude)
+              city = locData.city || locData.region || city
+            }
           }
+        } catch (locErr) {
+          console.warn('Location auto-detect failed, using default:', locErr)
         }
-      } catch (locErr) {
-        console.warn('Location auto-detect failed, using default:', locErr)
       }
 
       // 2. Get Weather via Open-Meteo
-      // Added hourly=temperature_2m,weather_code for the chart
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature,surface_pressure,visibility&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,apparent_temperature,surface_pressure,visibility,is_day&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`
       
       const weatherRes = await fetch(weatherUrl)
       if (!weatherRes.ok) throw new Error('Weather fetch failed')
       const weatherData = await weatherRes.json()
 
       // 3. Transform Data
-      // Get current hour index to slice the next 24 hours correctly
       const currentHour = new Date().getHours()
-
       const locationName = city || 'Unknown Location'
+      
       const nextData: WeatherCachePayload = {
         current: {
           temp: Math.round(weatherData.current.temperature_2m),
           code: weatherData.current.weather_code,
           humidity: weatherData.current.relative_humidity_2m,
           windSpeed: Math.round(weatherData.current.wind_speed_10m),
+          windDirection: weatherData.current.wind_direction_10m,
           pressure: Math.round(weatherData.current.surface_pressure),
           visibility: Math.round(weatherData.current.visibility / 1000), // Convert to km
-          feelsLike: Math.round(weatherData.current.apparent_temperature)
+          feelsLike: Math.round(weatherData.current.apparent_temperature),
+          isDay: weatherData.current.is_day
         },
         forecast: weatherData.daily.time.slice(1, 6).map((date: string, index: number) => ({
           date,
@@ -245,7 +194,7 @@ export default function WeatherApp() {
 
     } catch (err) {
       console.error('Weather app error:', err)
-      if (cached) {
+      if (cached && !customLat) {
         setWeather(prev => ({
           ...prev,
           ...cached.data,
@@ -260,6 +209,33 @@ export default function WeatherApp() {
     }
   }
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+
+    try {
+      setWeather(prev => ({ ...prev, loading: true }))
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=1&language=${language === 'zh' ? 'zh' : 'en'}&format=json`)
+      const data = await res.json()
+      
+      if (!data.results || data.results.length === 0) {
+        alert(language === 'zh' ? '未找到该城市' : 'City not found')
+        setWeather(prev => ({ ...prev, loading: false }))
+        return
+      }
+
+      const location = data.results[0]
+      setIsSearching(false)
+      setSearchQuery('')
+      
+      await fetchWeatherData(true, location.latitude, location.longitude, location.name)
+    } catch (err) {
+      console.error('Search failed:', err)
+      setWeather(prev => ({ ...prev, loading: false }))
+      alert(language === 'zh' ? '搜索失败' : 'Search failed')
+    }
+  }
+
   const formattedUpdated = useMemo(() => {
     if (!weather.lastUpdated) return null
     return new Date(weather.lastUpdated).toLocaleTimeString(
@@ -268,7 +244,7 @@ export default function WeatherApp() {
     )
   }, [weather.lastUpdated, language])
 
-  if (weather.loading) {
+  if (weather.loading && !weather.current.temp) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-black/90 text-white">
         <Loader2 className="animate-spin mb-4 text-blue-400" size={48} />
@@ -280,7 +256,7 @@ export default function WeatherApp() {
   if (weather.error) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-black/90 text-white p-8 text-center">
-        <CloudRain size={64} className="text-red-400 mb-4" />
+        <AlertCircle size={64} className="text-red-400 mb-4" />
         <h2 className="text-xl font-bold mb-2">{language === 'zh' ? '获取数据失败' : 'Failed to load weather'}</h2>
         <button 
           onClick={() => {
@@ -299,10 +275,83 @@ export default function WeatherApp() {
   const CurrentIcon = currentInfo.icon
 
   return (
-    <div className={`h-full w-full flex flex-col text-white bg-gradient-to-br ${currentInfo.bg} transition-all duration-1000 overflow-hidden`}>
+    <div className={`h-full w-full flex flex-col text-white relative transition-all duration-1000 overflow-hidden`}>
+      <WeatherBackground 
+          code={weather.current.code} 
+          isDay={weather.current.isDay} 
+          windSpeed={weather.current.windSpeed}
+          windDirection={weather.current.windDirection}
+        />
       
       {/* Settings Toggle */}
-      <div className="absolute top-12 right-6 z-20">
+      <div className="absolute top-12 right-6 z-20 flex gap-2">
+        <div className="relative">
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className={`flex items-center justify-center w-8 h-8 rounded-full backdrop-blur-md transition-all border border-white/10 ${showDebug ? 'bg-white/30 text-white' : 'bg-black/20 hover:bg-black/30 text-white/70'}`}
+            title="Debug"
+          >
+            <Bug size={14} />
+          </button>
+          
+          {showDebug && (
+            <div className="absolute top-full right-0 mt-2 p-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl w-48 z-50 flex flex-col gap-2 shadow-2xl">
+              <div className="text-xs font-medium text-white/50 uppercase tracking-wider mb-1">Time</div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => simulateWeather(weather.current.code, 1)}
+                  className={`flex-1 py-1 text-xs rounded border border-white/10 transition-colors ${weather.current.isDay ? 'bg-white/20 text-white' : 'bg-transparent text-white/50 hover:bg-white/10'}`}
+                >
+                  Day
+                </button>
+                <button 
+                  onClick={() => simulateWeather(weather.current.code, 0)}
+                  className={`flex-1 py-1 text-xs rounded border border-white/10 transition-colors ${!weather.current.isDay ? 'bg-white/20 text-white' : 'bg-transparent text-white/50 hover:bg-white/10'}`}
+                >
+                  Night
+                </button>
+              </div>
+
+              <div className="text-xs font-medium text-white/50 uppercase tracking-wider mt-2 mb-1">Weather</div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => simulateWeather(0, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Sunny</button>
+                <button onClick={() => simulateWeather(3, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Cloudy</button>
+                <button onClick={() => simulateWeather(61, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Rain</button>
+                <button onClick={() => simulateWeather(71, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Snow</button>
+                <button onClick={() => simulateWeather(95, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Thunder</button>
+                <button onClick={() => simulateWeather(45, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Fog</button>
+              </div>
+
+              <div className="text-xs font-medium text-white/50 uppercase tracking-wider mt-2 mb-1">Wind Speed: {weather.current.windSpeed} km/h</div>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={weather.current.windSpeed} 
+                onChange={(e) => updateWind(parseInt(e.target.value), weather.current.windDirection)}
+                className="w-full accent-white/50 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+              />
+
+              <div className="text-xs font-medium text-white/50 uppercase tracking-wider mt-2 mb-1">Wind Dir: {weather.current.windDirection}°</div>
+              <input 
+                type="range" 
+                min="0" 
+                max="360" 
+                value={weather.current.windDirection} 
+                onChange={(e) => updateWind(weather.current.windSpeed, parseInt(e.target.value))}
+                className="w-full accent-white/50 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          )}
+        </div>
+
+        <button
+           onClick={() => fetchWeatherData(true)}
+           className="flex items-center justify-center w-8 h-8 rounded-full bg-black/20 hover:bg-black/30 text-white/70 backdrop-blur-md transition-all border border-white/10"
+           title={language === 'zh' ? '刷新' : 'Refresh'}
+        >
+          <RefreshCw size={14} className={weather.loading ? 'animate-spin' : ''} />
+        </button>
         <button
           onClick={() => setShowWeatherWidget(!showWeatherWidget)}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md transition-all border border-white/10 ${
@@ -316,16 +365,53 @@ export default function WeatherApp() {
         </button>
       </div>
 
-      <div className="flex-1 p-6 md:p-8 overflow-y-auto custom-scrollbar">
+      <div id="weather-scroll-container" className="relative z-10 flex-1 p-6 md:p-8 overflow-y-auto custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-6">
           
           {/* Header Section */}
           <header className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2">
             <div>
-              <div className="flex items-center gap-2 text-white/80 mb-1">
+              <div className="flex items-center gap-2 text-white/80 mb-1 h-9">
                 <MapPin size={18} />
-                <span className="text-xl font-medium tracking-wide">{weather.location}</span>
+                
+                {isSearching ? (
+                  <form onSubmit={handleSearch} className="flex items-center">
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onBlur={() => {
+                        // Delay to allow form submission if clicking something else
+                        setTimeout(() => {
+                            if (!searchQuery) setIsSearching(false)
+                        }, 200)
+                      }}
+                      placeholder={language === 'zh' ? '输入城市名...' : 'Enter city name...'}
+                      className="bg-transparent border-b border-white/50 focus:border-white outline-none text-xl font-medium tracking-wide w-48 placeholder:text-white/30"
+                    />
+                    <button type="submit" className="ml-2 text-white/70 hover:text-white">
+                      <Search size={18} />
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsSearching(false)}
+                      className="ml-2 text-white/50 hover:text-white"
+                    >
+                      <X size={18} />
+                    </button>
+                  </form>
+                ) : (
+                  <button 
+                    onClick={() => setIsSearching(true)}
+                    className="text-xl font-medium tracking-wide hover:bg-white/10 px-2 py-1 -ml-2 rounded transition-colors flex items-center gap-2 group"
+                  >
+                    {weather.location}
+                    <Search size={14} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+                  </button>
+                )}
               </div>
+
               {formattedUpdated && (
                 <div className="text-xs text-white/50">
                   {language === 'zh' ? `更新于 ${formattedUpdated}` : `Updated ${formattedUpdated}`}
@@ -353,9 +439,9 @@ export default function WeatherApp() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
             {/* Hourly Forecast (Wide Card) */}
-            <div className="col-span-2 md:col-span-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 relative overflow-hidden group hover:bg-white/15 transition-all duration-300">
+            <div className="col-span-2 md:col-span-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 relative overflow-hidden group hover:bg-white/15 transition-all duration-300 weather-card-collision">
                <div className="flex items-center gap-2 text-white/60 mb-4 text-sm font-medium uppercase tracking-wider">
-                  <TrendingUp size={16} />
+                  <Calendar size={16} />
                   {language === 'zh' ? '24小时预报' : '24-Hour Forecast'}
                </div>
                <div className="h-32 w-full">
@@ -383,7 +469,7 @@ export default function WeatherApp() {
               title={language === 'zh' ? '风速' : 'Wind'}
               value={`${weather.current.windSpeed}`}
               unit="km/h"
-              desc={<WindDirection />}
+              desc={<WindDirection degree={weather.current.windDirection} />}
             />
             
             <BentoCard 
@@ -403,7 +489,7 @@ export default function WeatherApp() {
             />
 
              {/* 5-Day Forecast List (Spans 2 cols on mobile, 3 on desktop) */}
-             <div className="col-span-2 md:col-span-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 hover:bg-white/15 transition-all duration-300">
+             <div className="col-span-2 md:col-span-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 hover:bg-white/15 transition-all duration-300 weather-card-collision">
                <div className="flex items-center gap-2 text-white/60 mb-4 text-sm font-medium uppercase tracking-wider">
                   <Calendar size={16} />
                   {language === 'zh' ? '5天预报' : '5-Day Forecast'}
@@ -430,120 +516,6 @@ export default function WeatherApp() {
             </div>
 
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function BentoCard({ icon: Icon, title, value, unit, desc }: { icon: any, title: string, value: string, unit?: string, desc?: React.ReactNode }) {
-  return (
-    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 flex flex-col justify-between hover:bg-white/15 transition-all duration-300 group hover:scale-[1.02]">
-      <div className="flex items-center gap-2 text-white/60 mb-2 text-xs font-medium uppercase tracking-wider">
-        <Icon size={14} />
-        {title}
-      </div>
-      <div>
-        <div className="text-3xl font-light tracking-tight flex items-baseline gap-1">
-          {value}
-          {unit && <span className="text-base text-white/50 font-normal">{unit}</span>}
-        </div>
-        {desc && <div className="text-xs text-white/50 mt-1">{desc}</div>}
-      </div>
-    </div>
-  )
-}
-
-function WindDirection() {
-  return (
-    <div className="flex items-center gap-1">
-      <Navigation size={10} className="rotate-45" />
-      <span>NW</span>
-    </div>
-  )
-}
-
-function HourlyChart({ data, language }: { data: any[], language: string }) {
-  const temps = data.map(d => d.temp)
-  const max = Math.max(...temps, 10) + 2
-  const min = Math.min(...temps, 0) - 2
-  const range = max - min
-  
-  // Generate smooth bezier curve path
-  const getPath = (points: {x: number, y: number}[]) => {
-    if (points.length === 0) return ''
-    
-    // First point
-    let d = `M ${points[0].x},${points[0].y}`
-    
-    // Cubic bezier curves
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i]
-      const p1 = points[i + 1]
-      
-      // Control points
-      const cp1x = p0.x + (p1.x - p0.x) * 0.5
-      const cp1y = p0.y
-      const cp2x = p1.x - (p1.x - p0.x) * 0.5
-      const cp2y = p1.y
-      
-      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p1.x},${p1.y}`
-    }
-    
-    return d
-  }
-
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100
-    const y = 100 - ((d.temp - min) / range) * 100
-    return { x, y }
-  })
-  
-  const linePath = getPath(points)
-  const areaPath = `${linePath} L 100,100 L 0,100 Z`
-
-  return (
-    <div className="w-full h-full flex flex-col justify-end">
-      <div className="relative w-full h-20">
-        <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-          {/* Gradient Area */}
-          <defs>
-            <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="white" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="white" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d={areaPath}
-            fill="url(#tempGradient)"
-          />
-          {/* Line */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke="white"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="drop-shadow-md"
-          />
-        </svg>
-        
-        {/* Data Points Labels (Every 3 hours) */}
-        <div className="absolute top-0 left-0 w-full h-full flex justify-between items-end pointer-events-none">
-          {data.map((d, i) => {
-            if (i % 4 !== 0) return null // Show every 4th item (approx every 4 hours)
-            const date = new Date(d.time)
-            const hour = date.getHours()
-            const timeStr = `${hour}:00`
-            
-            return (
-              <div key={i} className="flex flex-col items-center pb-2 text-xs text-white/60" style={{ position: 'absolute', left: `${(i / (data.length - 1)) * 100}%`, transform: 'translateX(-50%)' }}>
-                 <span className="mb-1 font-bold text-white drop-shadow-md">{d.temp}°</span>
-                 <span className="text-[10px] opacity-60">{timeStr}</span>
-              </div>
-            )
-          })}
         </div>
       </div>
     </div>
