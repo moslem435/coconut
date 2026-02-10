@@ -31,7 +31,8 @@ import {
     Atom,
     Move,
     Hexagon,
-    Shapes
+    Shapes,
+    Loader2
 } from 'lucide-react'
  import { useSystem } from '@/os/sdk'
  import { Tooltip } from '@/os/ui/Tooltip'
@@ -44,9 +45,10 @@ interface SettingCategory {
     description: string
 }
 
-export default function SettingsApp() {
-    const [activeCategory, setActiveCategory] = useState('display')
+export default function SettingsApp({ initialCategory }: { initialCategory?: string }) {
+    const [activeCategory, setActiveCategory] = useState(initialCategory || 'display')
     const { t } = useLanguage()
+    const [isLoadingWallpaper, setIsLoadingWallpaper] = useState(false)
     
     // About Page State
     const sysInfo = useSystemInfo()
@@ -113,11 +115,30 @@ export default function SettingsApp() {
         { name: t('wallpaper.preset.stars'), type: 'preset', value: 'linear-gradient(to top, #30cfd0 0%, #330867 100%)' },
         { name: t('wallpaper.preset.neon'), type: 'preset', value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
         { name: t('wallpaper.preset.midnight'), type: 'preset', value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
-        { name: t('wallpaper.image.daily'), type: 'image', value: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop' },
+        { name: t('wallpaper.image.daily'), type: 'image', value: 'daily' },
         { name: t('wallpaper.image.snow'), type: 'image', value: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
         { name: t('wallpaper.image.desert'), type: 'image', value: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
         { name: t('wallpaper.image.city'), type: 'image', value: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
     ]
+
+    const handleWallpaperSelect = async (wp: any) => {
+        if (wp.value === 'daily') {
+            setIsLoadingWallpaper(true)
+            try {
+                const res = await fetch('/api/wallpaper')
+                const data = await res.json()
+                if (data.url) {
+                    setWallpaper({ type: 'image', value: data.url })
+                }
+            } catch (error) {
+                console.error('Failed to set daily wallpaper:', error)
+            } finally {
+                setIsLoadingWallpaper(false)
+            }
+        } else {
+            setWallpaper({ type: wp.type, value: wp.value })
+        }
+    }
 
     const renderContent = () => {
         switch (activeCategory) {
@@ -170,13 +191,18 @@ export default function SettingsApp() {
                                 {wallpaperOptions.map((wp, i) => (
                                     <button
                                         key={i}
-                                        onClick={() => setWallpaper({ type: wp.type as any, value: wp.value })}
+                                        onClick={() => handleWallpaperSelect(wp)}
+                                        disabled={isLoadingWallpaper && wp.value === 'daily'}
                                         className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${
                                             wallpaper?.value === wp.value ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-transparent hover:border-[var(--os-text-secondary)]'
                                         }`}
                                     >
                                         {wp.type === 'image' ? (
-                                            <img src={wp.value} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={wp.name} />
+                                            <img 
+                                                src={wp.value === 'daily' ? 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop' : wp.value} 
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                                alt={wp.name} 
+                                            />
                                         ) : (
                                             <div className="w-full h-full" style={{ background: wp.value }} />
                                         )}
@@ -186,6 +212,11 @@ export default function SettingsApp() {
                                         {wallpaper?.value === wp.value && (
                                             <div className="absolute top-2 right-2 w-5 h-5 bg-[var(--os-accent)] rounded-full flex items-center justify-center text-[var(--os-accent-contrast)] shadow-sm">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            </div>
+                                        )}
+                                        {isLoadingWallpaper && wp.value === 'daily' && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                                                <Loader2 className="w-6 h-6 text-white animate-spin" />
                                             </div>
                                         )}
                                     </button>

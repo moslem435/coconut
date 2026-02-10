@@ -153,6 +153,13 @@ const translations = {
     "menu.about": "About System",
     "menu.doubleclick": "Double-click to open",
     "menu.itemdeleted": "Item deleted",
+    "menu.openterminal": "Open Terminal",
+    "menu.sort": "Sort by Name",
+    "menu.personalize": "Personalize",
+    "menu.displaysettings": "Display Settings",
+    "menu.rename": "Rename",
+    "menu.rename.prompt": "Enter new name:",
+    "menu.properties": "Properties",
 
     // Messages / Notifications
     "msg.pinned": "Pinned to Taskbar",
@@ -494,6 +501,13 @@ const translations = {
     "menu.about": "关于系统",
     "menu.doubleclick": "双击以打开",
     "menu.itemdeleted": "项目已删除",
+    "menu.openterminal": "打开终端",
+    "menu.sort": "按名称排序",
+    "menu.personalize": "个性化",
+    "menu.displaysettings": "显示设置",
+    "menu.rename": "重命名",
+    "menu.rename.prompt": "输入新名称:",
+    "menu.properties": "属性",
 
     // Messages / Notifications
     "msg.pinned": "已固定到任务栏",

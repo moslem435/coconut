@@ -15,7 +15,7 @@ export const manifest: AppManifest = {
     },
   component: ContactApp,
     defaultWindowOptions: {
-        width: 900,
+        width: 800,
         height: 600,
         titleBarColor: 'dark'
     }

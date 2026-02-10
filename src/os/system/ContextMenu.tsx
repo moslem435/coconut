@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit } from 'lucide-react'
+import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -17,7 +17,7 @@ export default function SystemContextMenu() {
   const { visible, position, type, data, hideMenu } = useContextMenuStore()
   const { addNotification } = useNotificationStore()
   const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore()
-  const { createItem, deleteItem } = useFileSystemStore()
+  const { createItem, deleteItem, getItem } = useFileSystemStore()
   const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -48,10 +48,10 @@ export default function SystemContextMenu() {
   // But we still need to listen for trigger events in other components
   // This component now acts as the VIEW only.
 
-  const handleOpenSettings = () => {
+  const handleOpenSettings = (categoryId = 'display') => {
     const app = APPS_REGISTRY['settings']
     if (app) {
-      openWindow(app.id, t('start.settings'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+      openWindow(app.id, t('start.settings'), <app.component initialCategory={categoryId} />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
     }
     hideMenu()
   }
@@ -164,24 +164,48 @@ export default function SystemContextMenu() {
             label: t('menu.open'),
             icon: ExternalLink,
             action: () => {
-              // We rely on Desktop.tsx handleDoubleClick logic usually, but here we can force it
-              // or just let the user double click. 
-              // For now, let's implement a generic open if possible, or just trigger the same logic as double click
-              // Since we don't have access to handleDoubleClick here easily without passing it, 
-              // we might need to duplicate some logic or expose a global 'openItem' action.
-              // However, for simplicity, we can just say "Open" and maybe trigger a custom event or just use window store if it's an app.
-
               if (data?.appId) {
                 const app = APPS_REGISTRY[data.appId]
                 if (app) openWindow(app.id, t(`app.${app.id}`), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
               } else if (data?.id) {
-                // For files/folders, we might need to dispatch an event or use a store action if we had one.
-                // Ideally, Desktop should handle this. 
-                // But since we are in a separate component, let's just show a notification for now or try to launch if it's a known type.
                 addNotification({ type: 'info', message: 'Double-click to open' })
               }
               hideMenu()
             }
+          },
+          {
+             label: t('menu.rename'),
+             icon: FileEdit,
+             action: () => {
+                if (data?.id) {
+                   const file = useFileSystemStore.getState().getItem(data.id)
+                   if (file) {
+                        const newName = prompt(t('menu.rename.prompt') || 'Enter new name:', file.name)
+                        if (newName && newName !== file.name) {
+                            useFileSystemStore.getState().renameItem(data.id, newName)
+                        }
+                   }
+                }
+                hideMenu()
+             }
+          },
+          {
+             label: t('menu.properties'),
+             icon: FileText,
+             action: () => {
+                if (data?.id) {
+                    const file = useFileSystemStore.getState().getItem(data.id)
+                    if (file) {
+                        addNotification({ 
+                            type: 'info', 
+                            title: t('menu.properties'),
+                            message: `${t('common.name')}: ${file.name}\n${t('common.type')}: ${file.type}\nID: ${file.id}`,
+                            duration: 5000
+                        })
+                    }
+                }
+                hideMenu()
+             }
           },
           { type: 'separator' },
           {
@@ -195,6 +219,61 @@ export default function SystemContextMenu() {
               }
               hideMenu()
             }
+          }
+        ]
+
+      case 'explorer-background':
+        return [
+          {
+            label: t('menu.refresh'),
+            icon: RefreshCw,
+            action: () => {
+                // In a real app, this might re-fetch. Here it's a no-op or just visual.
+                hideMenu()
+            }
+          },
+          { type: 'separator' },
+          {
+            label: t('menu.newfolder'),
+            icon: FolderPlus,
+            action: () => {
+                if (data?.pathId) {
+                    createItem(data.pathId, 'New Folder', 'folder')
+                }
+                hideMenu()
+            }
+          },
+          {
+              label: t('menu.openterminal'),
+              icon: Terminal,
+              action: () => {
+                  const app = APPS_REGISTRY['terminal']
+                  if (app) {
+                      // Pass initial path to terminal if supported
+                      // For now, just open terminal
+                      openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                  }
+                  hideMenu()
+              }
+          },
+          { type: 'separator' },
+          {
+             label: t('menu.properties'),
+             icon: FileText,
+             action: () => {
+                if (data?.pathId) {
+                    const folder = getItem(data.pathId)
+                    if (folder) {
+                        addNotification({ 
+                            type: 'info', 
+                            title: t('menu.properties'),
+                            message: `${t('common.name')}: ${folder.name}\n${t('common.type')}: ${folder.type}\nID: ${folder.id}`,
+                            duration: 5000
+                        })
+                    }
+                }
+                hideMenu()
+             }
           }
         ]
 
@@ -236,17 +315,38 @@ export default function SystemContextMenu() {
             }
           },
           {
-            label: t('menu.wallpaper'),
-            icon: Image,
-            action: handleOpenSettings
+              label: t('menu.openterminal'),
+              icon: Terminal,
+              action: () => {
+                  const app = APPS_REGISTRY['terminal']
+                  if (app) openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                  hideMenu()
+              }
+          },
+          { type: 'separator' },
+          {
+            label: t('menu.sort'),
+            icon: ArrowDownAZ,
+            action: () => {
+               // Simple name sort re-organization
+               const desktopItems = useFileSystemStore.getState().getChildren('desktop')
+               // Sort by name
+               desktopItems.sort((a, b) => a.name.localeCompare(b.name))
+               
+               const scaleFactor = displayScale / 100
+               const currentGridSize = GRID_SIZE * scaleFactor
+               const currentGridPadding = GRID_PADDING * scaleFactor
+               const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
+               
+               organizeIcons(desktopItems.map(i => i.id), maxRows, currentGridSize, currentGridPadding)
+               hideMenu()
+            }
           },
           {
             label: t('menu.align'),
             icon: Grid3X3,
             action: () => {
               // Re-calculate grid parameters (matching Desktop.tsx logic)
-              const GRID_SIZE = 90
-              const GRID_PADDING = 24
               const scaleFactor = displayScale / 100
               const currentGridSize = GRID_SIZE * scaleFactor
               const currentGridPadding = GRID_PADDING * scaleFactor
@@ -256,7 +356,19 @@ export default function SystemContextMenu() {
               const itemIds = desktopItems.map(i => i.id)
 
               organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
+              hideMenu()
             }
+          },
+          { type: 'separator' },
+          {
+            label: t('menu.personalize'),
+            icon: Palette,
+            action: () => handleOpenSettings('appearance')
+          },
+          {
+             label: t('menu.displaysettings'),
+             icon: Monitor,
+             action: () => handleOpenSettings('display')
           },
           { type: 'separator' },
           {
@@ -309,36 +421,37 @@ export default function SystemContextMenu() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: useAnimations ? 0.1 : 0 }}
-          className="fixed z-[20000] min-w-[200px] bg-[var(--os-bg-panel)]/95 backdrop-blur-xl border border-[var(--os-border)] shadow-2xl rounded-xl py-1.5 overflow-hidden select-none"
+          className="fixed z-[20000] min-w-[220px] bg-[#1e1e1e]/85 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl py-1.5 overflow-hidden select-none font-sans"
           style={getMenuStyle()}
           onContextMenu={(e) => e.preventDefault()}
         >
           {menuItems.map((item, index) => {
             if (item.type === 'separator') {
-              return <div key={index} className="h-px bg-[var(--os-border)] my-1.5 mx-2" />
+              return <div key={index} className="h-px bg-white/10 my-1 mx-3" />
             }
 
             const Icon = item.icon
 
             return (
-              <button
-                key={index}
-                onClick={() => {
-                  if (item.action) item.action()
-                  hideMenu()
-                }}
-                className={`w-full text-left px-3 py-1.5 flex items-center justify-between text-sm transition-colors relative group
-                  ${item.danger
-                    ? 'text-red-500 hover:bg-red-500/10'
-                    : 'text-[var(--os-text-primary)] hover:bg-[var(--os-accent)] hover:text-[var(--os-accent-contrast)]'
-                  }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  {Icon && <Icon size={16} className={item.danger ? '' : "opacity-70 group-hover:opacity-100"} />}
-                  <span>{item.label}</span>
-                </div>
-                {item.checked && <Check size={14} />}
-              </button>
+              <div className="px-1" key={index}>
+                <button
+                  onClick={() => {
+                    if (item.action) item.action()
+                    hideMenu()
+                  }}
+                  className={`w-full text-left px-3 py-2 flex items-center justify-between text-[13px] font-medium transition-all rounded-lg group
+                    ${item.danger
+                      ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+                      : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {Icon && <Icon size={15} className={item.danger ? 'opacity-90' : "opacity-70 group-hover:opacity-100 transition-opacity"} />}
+                    <span>{item.label}</span>
+                  </div>
+                  {item.checked && <Check size={14} className="opacity-80" />}
+                </button>
+              </div>
             )
           })}
         </motion.div>

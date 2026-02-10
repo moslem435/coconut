@@ -17,8 +17,8 @@ export const manifest: AppManifest = {
     },
     component: RecycleBin,
     defaultWindowOptions: {
-        width: 700,
-        height: 500,
+        width: 900,
+        height: 600,
         titleBarColor: 'dark'
     }
 }

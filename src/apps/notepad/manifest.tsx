@@ -13,8 +13,8 @@ export const manifest: AppManifest = {
     },
     component: Notepad,
     defaultWindowOptions: {
-        width: 600,
-        height: 400,
+        width: 800,
+        height: 600,
         titleBarColor: 'dark'
     }
 }

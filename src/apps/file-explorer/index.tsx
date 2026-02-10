@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { Folder, FileText, ChevronRight, ArrowUp, Home, HardDrive, Image as ImageIcon, Download, StickyNote } from 'lucide-react'
+import { Folder, FileText, ChevronRight, ArrowUp, Home, HardDrive, Image as ImageIcon, Download, StickyNote, LayoutGrid, List as ListIcon } from 'lucide-react'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 import { AppIcon } from '@/os/ui/AppIcon'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 
 // Helper: Get translated display name
 const getDisplayName = (node: FileNode, t: (key: string) => string) => {
@@ -42,8 +43,10 @@ interface FileExplorerProps {
 
 export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps) {
   const [currentPathId, setCurrentPathId] = useState(initialPath)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const { files, getChildren, getPath } = useFileSystemStore()
   const { launchApp, focusWindow, windows } = useWindowStore()
+  const { showMenu } = useContextMenuStore()
   const { t } = useLanguage()
   
   // Update path if initialPath changes (optional, but good for linking)
@@ -122,8 +125,20 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     }
   }
 
+  const handleBackgroundContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      showMenu(e.clientX, e.clientY, 'explorer-background', { pathId: currentPathId })
+  }
+
+  const handleItemContextMenu = (e: React.MouseEvent, id: string) => {
+      e.preventDefault()
+      e.stopPropagation()
+      showMenu(e.clientX, e.clientY, 'desktop-item', { id })
+  }
+
   return (
-    <div className="h-full flex flex-col bg-[var(--os-bg-base)] text-[var(--os-text-primary)]">
+    <div className="h-full flex flex-col bg-[var(--os-bg-base)] text-[var(--os-text-primary)]" onContextMenu={handleBackgroundContextMenu}>
       {/* Toolbar / Address Bar */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-4 border-b border-[var(--os-border)]">
         <div className="flex gap-1">
@@ -151,6 +166,24 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
              </div>
            ))}
         </div>
+
+        {/* View Switcher */}
+        <div className="flex bg-[var(--os-bg-secondary)] rounded border border-[var(--os-border)] p-0.5">
+            <button 
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white/10 text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]'}`}
+                title="Grid View"
+            >
+                <LayoutGrid size={16} />
+            </button>
+            <button 
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white/10 text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]'}`}
+                title="List View"
+            >
+                <ListIcon size={16} />
+            </button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -172,16 +205,38 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
                 <span className="text-sm">{t('explorer.empty')}</span>
              </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-4">
-              {children.map(child => (
-                <FileItem 
-                  key={child.id} 
-                  node={child} 
-                  onDoubleClick={() => handleDoubleClick(child.id)} 
-                  t={t}
-                />
-              ))}
-            </div>
+            viewMode === 'grid' ? (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-4">
+                {children.map(child => (
+                    <FileItem 
+                    key={child.id} 
+                    node={child} 
+                    onDoubleClick={() => handleDoubleClick(child.id)} 
+                    onContextMenu={(e) => handleItemContextMenu(e, child.id)}
+                    t={t}
+                    />
+                ))}
+                </div>
+            ) : (
+                <div className="flex flex-col">
+                    {/* List Header */}
+                    <div className="flex items-center px-4 py-2 text-xs text-[var(--os-text-muted)] border-b border-[var(--os-border)] select-none sticky top-0 bg-[var(--os-bg-base)] z-10">
+                        <div className="w-8 shrink-0"></div>
+                        <div className="flex-1 min-w-[200px]">{t('common.name')}</div>
+                        <div className="w-32 hidden sm:block">{t('common.type')}</div>
+                    </div>
+                    {/* List Items */}
+                    {children.map(child => (
+                        <FileListItem 
+                            key={child.id} 
+                            node={child} 
+                            onDoubleClick={() => handleDoubleClick(child.id)} 
+                            onContextMenu={(e) => handleItemContextMenu(e, child.id)}
+                            t={t}
+                        />
+                    ))}
+                </div>
+            )
           )}
         </div>
       </div>
@@ -201,7 +256,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }: any) {
   )
 }
 
-function FileItem({ node, onDoubleClick, t }: { node: FileNode, onDoubleClick: () => void, t: (key: string) => string }) {
+function FileItem({ node, onDoubleClick, onContextMenu, t }: { node: FileNode, onDoubleClick: () => void, onContextMenu: (e: React.MouseEvent) => void, t: (key: string) => string }) {
    // Determine Icon Properties
    const manifest = node.appId ? APPS_REGISTRY[node.appId] : undefined
    let Icon = FileText
@@ -229,6 +284,7 @@ function FileItem({ node, onDoubleClick, t }: { node: FileNode, onDoubleClick: (
    return (
      <button 
        onDoubleClick={onDoubleClick}
+       onContextMenu={onContextMenu}
        className="group flex flex-col items-center gap-2 p-2 rounded hover:bg-white/5 focus:bg-white/10 outline-none transition-colors text-center cursor-default"
      >
        <AppIcon 
@@ -242,3 +298,46 @@ function FileItem({ node, onDoubleClick, t }: { node: FileNode, onDoubleClick: (
      </button>
    )
 }
+
+function FileListItem({ node, onDoubleClick, onContextMenu, t }: { node: FileNode, onDoubleClick: () => void, onContextMenu: (e: React.MouseEvent) => void, t: (key: string) => string }) {
+    // Determine Icon Properties
+    const manifest = node.appId ? APPS_REGISTRY[node.appId] : undefined
+    let Icon = FileText
+    let color = 'text-blue-400'
+ 
+    if (manifest) {
+        Icon = manifest.icon
+        // Use manifest color if available, or default
+    } else if (node.type === 'folder') {
+        Icon = Folder
+        color = 'text-yellow-400'
+    } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(node.name)) {
+        Icon = ImageIcon
+        color = 'text-purple-400'
+    } else if (/\.(txt|md|json)$/i.test(node.name)) {
+        Icon = StickyNote
+        color = 'text-yellow-500'
+    } else {
+        color = 'text-slate-400'
+    }
+ 
+    const displayName = getDisplayName(node, t)
+ 
+    return (
+      <div 
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+        className="flex items-center px-4 py-2 hover:bg-white/5 cursor-default group border-b border-[var(--os-border)]/50 last:border-0"
+      >
+        <div className="w-8 shrink-0 flex justify-center">
+            {manifest ? (
+                 <AppIcon manifest={manifest} size={20} className="drop-shadow-sm" />
+            ) : (
+                <Icon size={20} className={color} />
+            )}
+        </div>
+        <div className="flex-1 min-w-[200px] text-sm truncate select-none">{displayName}</div>
+        <div className="w-32 hidden sm:block text-xs text-[var(--os-text-muted)] select-none capitalize">{node.type}</div>
+      </div>
+    )
+ }

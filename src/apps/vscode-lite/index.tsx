@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
-import { Folder, FileCode, ChevronRight, ChevronDown, Search, Menu, X, Save, Play } from 'lucide-react'
+import { Folder, FileCode, ChevronRight, ChevronDown, Search, Menu, X, Save, Play, Terminal as TerminalIcon } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { TerminalCore } from '@/os/components/TerminalCore'
+import { FilePickerDialog } from '@/os/ui/dialogs/FilePickerDialog'
 
 // --- Syntax Highlighting Helper (Simple Regex Based) ---
 const highlightCode = (code: string, lang: string) => {
@@ -43,6 +45,8 @@ export default function VSCodeLite() {
   const [openFiles, setOpenFiles] = useState<string[]>([])
   const [content, setContent] = useState('')
   const [unsavedChanges, setUnsavedChanges] = useState<Record<string, string>>({}) // fileId -> content
+  const [showTerminal, setShowTerminal] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const { t } = useLanguage()
 
   // Sidebar state
@@ -104,6 +108,19 @@ export default function VSCodeLite() {
     }
   }
 
+  const handleOpenFile = () => {
+      setPickerOpen(true)
+  }
+
+  const handleFilePickerConfirm = (pathOrId: string, name?: string) => {
+      // Logic to open file
+      const file = getItem(pathOrId)
+      if (file && file.type === 'file') {
+          handleFileClick(pathOrId)
+      }
+      setPickerOpen(false)
+  }
+
   // File Tree Recursive Component
   const FileTreeItem = ({ id, depth = 0 }: { id: string, depth?: number }) => {
     const item = files[id]
@@ -149,19 +166,22 @@ export default function VSCodeLite() {
       {/* Top Bar (Menu & Actions) */}
       <div className="h-8 bg-[#3c3c3c] flex items-center px-2 text-xs select-none justify-between">
          <div className="flex gap-4">
-             <Menu size={14} />
-             <span>{t('vscode.file')}</span>
-             <span>{t('vscode.edit')}</span>
-             <span>{t('vscode.selection')}</span>
-             <span>{t('vscode.view')}</span>
-             <span>{t('vscode.go')}</span>
-             <span>{t('vscode.run')}</span>
-             <span>{t('vscode.terminal')}</span>
-             <span>{t('vscode.help')}</span>
+             <Menu size={14} className="cursor-pointer" />
+             <span className="cursor-pointer hover:text-white" onClick={handleOpenFile}>{t('vscode.file')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.edit')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.selection')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.view')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.go')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.run')}</span>
+             <span className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(!showTerminal)}>{t('vscode.terminal')}</span>
+             <span className="cursor-pointer hover:text-white">{t('vscode.help')}</span>
          </div>
          <div className="flex gap-2">
             <button onClick={handleSave} className="hover:text-white" title={t('vscode.save')}>
                 <Save size={14} />
+            </button>
+            <button onClick={() => setShowTerminal(!showTerminal)} className={`hover:text-white ${showTerminal ? 'text-blue-400' : ''}`} title={t('vscode.terminal')}>
+                <TerminalIcon size={14} />
             </button>
             <button className="hover:text-green-400" title={t('vscode.runcode')}>
                 <Play size={14} />
@@ -260,6 +280,23 @@ export default function VSCodeLite() {
                     </div>
                 </div>
             )}
+
+            {/* Terminal Panel */}
+            {showTerminal && (
+                <div className="h-48 border-t border-[#3c3c3c] bg-[#1e1e1e] flex flex-col">
+                     <div className="flex items-center justify-between px-2 py-1 bg-[#252526] text-xs uppercase tracking-wider text-gray-400 select-none">
+                         <div className="flex gap-4">
+                             <span className="text-white font-bold border-b border-white cursor-pointer">{t('vscode.terminal')}</span>
+                             <span className="cursor-pointer hover:text-white">{t('vscode.output')}</span>
+                             <span className="cursor-pointer hover:text-white">{t('vscode.problems')}</span>
+                         </div>
+                         <div className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(false)}>
+                             <X size={12} />
+                         </div>
+                     </div>
+                     <TerminalCore className="flex-1 p-2 text-xs" style={{ backgroundColor: '#1e1e1e' }} initialWelcome={false} />
+                </div>
+            )}
         </div>
       </div>
       
@@ -276,6 +313,14 @@ export default function VSCodeLite() {
              <span className="hover:bg-white/20 px-1 cursor-pointer">{t('vscode.prettier')}</span>
           </div>
       </div>
+
+      <FilePickerDialog
+        isOpen={pickerOpen}
+        mode="open"
+        onConfirm={handleFilePickerConfirm}
+        onCancel={() => setPickerOpen(false)}
+        initialPath="root"
+      />
     </div>
   )
 }

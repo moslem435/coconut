@@ -14,6 +14,7 @@ interface WindowTitleBarProps {
     isDefaultTitle?: boolean
     isActive: boolean
     isMaximized: boolean
+    isResizable?: boolean
     onMinimize: () => void
     onMaximize: () => void
     onClose: () => void
@@ -37,6 +38,7 @@ export function WindowTitleBar({
     isDefaultTitle,
     isActive,
     isMaximized,
+    isResizable = true,
     onMinimize,
     onMaximize,
     onClose,
@@ -78,7 +80,7 @@ export function WindowTitleBar({
             onContextMenu={onContextMenu}
             onDoubleClick={(e) => {
                 e.preventDefault()
-                onMaximize()
+                if (isResizable) onMaximize()
             }}
             className="h-10 flex items-center justify-between px-3 select-none shrink-0 cursor-grab active:cursor-grabbing"
             style={{
@@ -122,6 +124,7 @@ export function WindowTitleBar({
                 </Tooltip>
 
                 {/* Maximize/Restore */}
+                {isResizable && (
                 <Tooltip content={isMaximized ? labels.restore : labels.maximize} side="bottom">
                     <button
                         onClick={onMaximize}
@@ -141,6 +144,7 @@ export function WindowTitleBar({
                         )}
                     </button>
                 </Tooltip>
+                )}
 
                 {/* Close */}
                 <Tooltip content={labels.close} side="bottom">

@@ -13,7 +13,7 @@ export const manifest: AppManifest = {
     },
     component: Terminal,
     defaultWindowOptions: {
-        size: { width: 800, height: 500 },
-        taskbarPosition: { x: 0, y: 0 }
+        width: 900,
+        height: 600
     }
 }

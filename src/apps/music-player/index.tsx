@@ -11,6 +11,10 @@ import {
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 
+import { Visualizer } from './components/Visualizer'
+import { Equalizer } from './components/Equalizer'
+import { useAudioSystem } from './hooks/useAudioSystem'
+
 // Real Sample Data (SoundHelix)
 const INITIAL_TRACKS = [
   {
@@ -169,13 +173,14 @@ const formatTime = (seconds: number) => {
 export default function MusicPlayer() {
   const { t } = useLanguage()
 
-  const MY_PLAYLISTS = [
-    t('music.playlist.favorites'),
-    t('music.playlist.coding'),
-    t('music.playlist.gym'),
-    t('music.playlist.chill'),
-    t('music.playlist.new')
-  ]
+  // Playlist State
+  interface Playlist {
+    id: string
+    name: string
+    tracks: any[]
+  }
+
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
 
   // State
   const [playlist, setPlaylist] = useState(INITIAL_TRACKS)
@@ -194,13 +199,18 @@ export default function MusicPlayer() {
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off')
   const [isShuffled, setIsShuffled] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [contextMenu, setContextMenu] = useState<{x: number, y: number, trackId: string} | null>(null)
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, track: any} | null>(null)
 
   // iTunes Search State
   const [onlineTracks, setOnlineTracks] = useState<any[]>([])
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
 
+  // EQ State
+  const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
+  const EQ_FREQUENCIES = [60, 170, 310, 600, 1000, 3000, 6000]
+
   const audioRef = useRef<HTMLAudioElement>(null)
+  const { analyser, setFilterGain } = useAudioSystem(audioRef)
   const currentTrack = playlist[currentTrackIndex] || playlist[0]
 
   // Persistence
@@ -215,6 +225,7 @@ export default function MusicPlayer() {
         if (parsed.currentTrackIndex) setCurrentTrackIndex(parsed.currentTrackIndex)
         if (parsed.repeatMode) setRepeatMode(parsed.repeatMode)
         if (parsed.isShuffled) setIsShuffled(parsed.isShuffled)
+        if (parsed.playlists) setPlaylists(parsed.playlists)
       } catch (e) { console.error("Failed to load state", e) }
     }
   }, [])
@@ -226,9 +237,52 @@ export default function MusicPlayer() {
       playlist: playlist.length > INITIAL_TRACKS.length ? playlist : undefined,
       currentTrackIndex,
       repeatMode,
-      isShuffled
+      isShuffled,
+      playlists
     }))
-  }, [liked, volume, playlist, currentTrackIndex, repeatMode, isShuffled])
+  }, [liked, volume, playlist, currentTrackIndex, repeatMode, isShuffled, playlists])
+
+  // Playlist Management
+  const handleCreatePlaylist = () => {
+    const name = prompt('Enter playlist name:')
+    if (name) {
+      const newPlaylist: Playlist = {
+        id: `playlist-${Date.now()}`,
+        name,
+        tracks: []
+      }
+      setPlaylists(prev => [...prev, newPlaylist])
+      setActiveTab(newPlaylist.id)
+    }
+  }
+
+  const handleDeletePlaylist = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm('Delete this playlist?')) {
+      setPlaylists(prev => prev.filter(p => p.id !== id))
+      if (activeTab === id) setActiveTab('recommend')
+    }
+  }
+
+  const addToPlaylist = (playlistId: string, track: any) => {
+    setPlaylists(prev => prev.map(p => {
+      if (p.id === playlistId) {
+        if (p.tracks.find(t => t.id === track.id)) return p
+        return { ...p, tracks: [...p.tracks, track] }
+      }
+      return p
+    }))
+    setContextMenu(null)
+  }
+
+  const removeFromPlaylist = (playlistId: string, trackId: string) => {
+    setPlaylists(prev => prev.map(p => {
+      if (p.id === playlistId) {
+        return { ...p, tracks: p.tracks.filter(t => t.id !== trackId) }
+      }
+      return p
+    }))
+  }
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -298,6 +352,14 @@ export default function MusicPlayer() {
   const togglePlay = () => setIsPlaying(prev => !prev)
   const toggleShuffle = () => setIsShuffled(prev => !prev)
   const toggleRepeat = () => setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off')
+
+  // EQ Change Handler
+  const handleEqChange = (index: number, value: number) => {
+      const newGains = [...eqGains]
+      newGains[index] = value
+      setEqGains(newGains)
+      setFilterGain(index, value)
+  }
   
   const getNextIndex = () => {
     if (isShuffled) {
@@ -505,6 +567,7 @@ export default function MusicPlayer() {
              <SidebarItem icon={Disc} label={t('music.hall')} id="hall" />
              <SidebarItem icon={MonitorSpeaker} label={t('music.video')} id="video" />
              <SidebarItem icon={Layers} label={t('music.radio')} id="radio" />
+             <SidebarItem icon={Sliders} label={t('music.eq')} id="eq" />
           </div>
 
           <div className="px-5 text-xs text-gray-500 font-medium mb-2">{t('music.my')}</div>
@@ -514,17 +577,27 @@ export default function MusicPlayer() {
              <SidebarItem icon={Download} label={t('music.local')} id="local" />
           </div>
 
-          <div className="px-5 text-xs text-gray-500 font-medium mb-2 flex justify-between items-center group cursor-pointer">
+          <div className="px-5 text-xs text-gray-500 font-medium mb-2 flex justify-between items-center group cursor-pointer" onClick={handleCreatePlaylist}>
             <span>{t('music.playlists')}</span>
-            <span className="opacity-0 group-hover:opacity-100 text-lg leading-none">+</span>
+            <span className="opacity-0 group-hover:opacity-100 text-lg leading-none hover:text-white transition-colors">+</span>
           </div>
           <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
-            {MY_PLAYLISTS.map((pl, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#2a2a2a] cursor-pointer text-sm text-gray-400 hover:text-white transition-colors">
+            {playlists.map((pl) => (
+                <div 
+                  key={pl.id} 
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#2a2a2a] cursor-pointer text-sm transition-colors group relative ${activeTab === pl.id ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white'}`}
+                  onClick={() => setActiveTab(pl.id)}
+                >
                     <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center shrink-0">
                         <ListMusic size={14} />
                     </div>
-                    <span className="truncate">{pl}</span>
+                    <span className="truncate flex-1">{pl.name}</span>
+                    <button 
+                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
+                      onClick={(e) => handleDeletePlaylist(pl.id, e)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                 </div>
             ))}
           </div>
@@ -656,10 +729,10 @@ export default function MusicPlayer() {
               </div>
             )}
 
-            {(activeTab === 'hall' || activeTab === 'likes' || activeTab === 'local') && (
+            {(activeTab === 'hall' || activeTab === 'likes' || activeTab === 'local' || activeTab.startsWith('playlist-')) && (
                <div className="flex flex-col">
                   <h1 className="text-2xl font-bold mb-6">
-                    {activeTab === 'hall' ? 'Music Hall' : activeTab === 'likes' ? 'Liked Songs' : 'Local Files'}
+                    {activeTab === 'hall' ? 'Music Hall' : activeTab === 'likes' ? 'Liked Songs' : activeTab === 'local' ? 'Local Files' : playlists.find(p => p.id === activeTab)?.name || 'Playlist'}
                   </h1>
 
                   {activeTab === 'local' && playlist.filter(t => t.isLocal).length === 0 && (
@@ -670,21 +743,24 @@ export default function MusicPlayer() {
                   )}
 
                   <div className="flex flex-col">
-                    {playlist.filter(t => {
-                      if (activeTab === 'likes' && !liked[t.id]) return false
-                      if (activeTab === 'local' && !t.isLocal) return false
-                      if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false // Keep hall clean with initial tracks
-                      return true
-                    }).map((track, i) => {
+                    {(activeTab.startsWith('playlist-') 
+                        ? (playlists.find(p => p.id === activeTab)?.tracks || [])
+                        : playlist.filter(t => {
+                            if (activeTab === 'likes' && !liked[t.id]) return false
+                            if (activeTab === 'local' && !t.isLocal) return false
+                            if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false
+                            return true
+                          })
+                    ).map((track, i) => {
                       const realIndex = playlist.findIndex(p => p.id === track.id)
-                      const isCurrent = currentTrackIndex === realIndex
+                      const isCurrent = currentTrackIndex === realIndex && realIndex !== -1
                       return (
-                        <div key={track.id} 
+                        <div key={`${track.id}-${i}`} 
                           className={`flex items-center gap-4 p-3 rounded-md hover:bg-[#2a2a2a] group cursor-pointer ${isCurrent ? 'bg-[#2a2a2a]' : ''}`}
                           onClick={() => playTrack(track)}
                           onContextMenu={(e) => {
                             e.preventDefault()
-                            setContextMenu({ x: e.clientX, y: e.clientY, trackId: track.id })
+                            setContextMenu({ x: e.clientX, y: e.clientY, track })
                           }}
                         >
                           <div className="w-6 text-center text-sm text-gray-500">
@@ -714,19 +790,43 @@ export default function MusicPlayer() {
                           >
                              <Heart size={16} fill={liked[track.id] ? "currentColor" : "none"} />
                           </button>
+                          {activeTab.startsWith('playlist-') && (
+                              <button 
+                                className="p-2 hover:bg-white/10 rounded-full text-gray-500 opacity-0 group-hover:opacity-100 hover:text-red-400"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    removeFromPlaylist(activeTab, track.id)
+                                }}
+                                title="Remove from Playlist"
+                              >
+                                 <Trash2 size={16} />
+                              </button>
+                          )}
                         </div>
                       )
                     })}
-                    {playlist.filter(t => {
-                      if (activeTab === 'likes' && !liked[t.id]) return false
-                      if (activeTab === 'local' && !t.isLocal) return false
-                      if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false
-                      return true
-                    }).length === 0 && activeTab !== 'local' && (
+                    {(activeTab.startsWith('playlist-') 
+                        ? (playlists.find(p => p.id === activeTab)?.tracks.length === 0)
+                        : (playlist.filter(t => {
+                            if (activeTab === 'likes' && !liked[t.id]) return false
+                            if (activeTab === 'local' && !t.isLocal) return false
+                            if (activeTab === 'hall' && (t.isLocal || t.isOnline)) return false
+                            return true
+                          }).length === 0)
+                    ) && activeTab !== 'local' && (
                         <div className="text-gray-500 text-center py-20">No tracks found</div>
                     )}
                   </div>
                </div>
+            )}
+
+            {activeTab === 'eq' && (
+              <div className="flex flex-col h-full">
+                <h1 className="text-2xl font-bold mb-6">{t('music.eq')}</h1>
+                <div className="flex-1 bg-[#2a2a2a]/50 rounded-xl border border-white/5 p-8 flex items-center justify-center">
+                   <Equalizer frequencies={EQ_FREQUENCIES} gains={eqGains} onChange={handleEqChange} />
+                </div>
+              </div>
             )}
 
             {(activeTab === 'video' || activeTab === 'radio' || activeTab === 'recent') && (
@@ -868,9 +968,14 @@ export default function MusicPlayer() {
             {/* Overlay Content */}
             <div className="flex-1 flex items-center justify-center gap-12 px-12 z-10">
               
-              {/* Left: Album Art */}
+              {/* Left: Album Art & Visualizer */}
               <div className="w-[400px] h-[400px] shrink-0 relative flex items-center justify-center">
-                 <div className={`w-full h-full rounded-full bg-black shadow-2xl flex items-center justify-center border-8 border-[#1a1a1a] ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
+                 {/* Visualizer Background */}
+                 <div className="absolute inset-0 scale-150 opacity-30">
+                    <Visualizer analyser={analyser} isPlaying={isPlaying} />
+                 </div>
+
+                 <div className={`w-full h-full rounded-full bg-black shadow-2xl flex items-center justify-center border-8 border-[#1a1a1a] z-10 ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
                     <div className="w-[70%] h-[70%] rounded-full overflow-hidden relative">
                        <img src={currentTrack.cover} className="w-full h-full object-cover" />
                     </div>
@@ -948,29 +1053,38 @@ export default function MusicPlayer() {
                 className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2"
                 onClick={(e) => {
                     e.stopPropagation()
-                    const track = playlist.find(t => t.id === contextMenu.trackId)
-                    if (track) playTrack(track)
+                    playTrack(contextMenu.track)
                     setContextMenu(null)
                 }}
              >
                 <Play size={14} /> Play
              </button>
-             <button 
-                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2"
-                onClick={(e) => {
-                    e.stopPropagation()
-                    // Add to queue logic could go here
-                    setContextMenu(null)
-                }}
-             >
-                <ListMusic size={14} /> Add to Queue
-             </button>
+             
+             {playlists.length > 0 && (
+                <>
+                    <div className="h-[1px] bg-[#333] my-1" />
+                    <div className="px-4 py-1 text-xs text-gray-500 font-medium">Add to Playlist</div>
+                    {playlists.map(pl => (
+                        <button 
+                            key={pl.id}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2 pl-6"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                addToPlaylist(pl.id, contextMenu.track)
+                            }}
+                        >
+                            <ListMusic size={12} /> {pl.name}
+                        </button>
+                    ))}
+                </>
+             )}
+             
              <div className="h-[1px] bg-[#333] my-1" />
              <button 
                 className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-[#333] hover:text-red-300 flex items-center gap-2"
                 onClick={(e) => {
                     e.stopPropagation()
-                    handleDeleteTrack(contextMenu.trackId)
+                    handleDeleteTrack(contextMenu.track.id)
                 }}
              >
                 <Trash2 size={14} /> Delete

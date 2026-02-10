@@ -21,6 +21,7 @@ export interface WindowState {
     component: ReactNode
     titleBarColor?: 'light' | 'dark' | 'auto'
     isDefaultTitle?: boolean
+    isResizable?: boolean
 }
 
 interface WindowStore {
@@ -32,7 +33,7 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean }) => void
     launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
@@ -75,8 +76,8 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         const newZ = maxZIndex + 1
 
         // Calculate centered position
-        const windowWidth = options?.size?.width ?? 800
-        const windowHeight = options?.size?.height ?? 600
+        const windowWidth = options?.width ?? options?.size?.width ?? 800
+        const windowHeight = options?.height ?? options?.size?.height ?? 600
         const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
         const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080
         const centeredX = Math.max(0, (screenWidth - windowWidth) / 2)
@@ -89,14 +90,15 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             isMinimized: false,
             isMaximized: options?.isMaximized ?? false,
             position: { x: centeredX, y: centeredY },
-            size: options?.size ?? { width: 800, height: 600 },
+            size: options?.size ?? { width: windowWidth, height: windowHeight },
             zIndex: newZ,
             component,
             icon,
             appId: options?.appId,
             taskbarPosition: options?.taskbarPosition,
             titleBarColor: options?.titleBarColor,
-            isDefaultTitle: options?.isDefaultTitle
+            isDefaultTitle: options?.isDefaultTitle,
+            isResizable: options?.isResizable
         }
 
         set(state => ({

@@ -17,8 +17,8 @@ export const manifest: AppManifest = {
     },
     component: FileExplorerApp,
     defaultWindowOptions: {
-        width: 800,
-        height: 500,
+        width: 900,
+        height: 600,
         isResizable: true,
         titleBarColor: 'auto'
     }

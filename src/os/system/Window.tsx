@@ -10,6 +10,7 @@ import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
 import { SYSTEM_CONSTANTS } from '@/os/config/constants'
 import { useWindowResize } from '@/os/hooks/useWindowResize'
 import { useWindowSnapshot } from '@/os/hooks/useWindowSnapshot'
+import { WindowContext } from '@/os/kernel/WindowContext'
 
 interface WindowProps {
   id: string
@@ -269,6 +270,7 @@ export default function Window({ id }: WindowProps) {
             isDefaultTitle={windowState.isDefaultTitle}
             isActive={isActive}
             isMaximized={windowState.isMaximized}
+            isResizable={windowState.isResizable !== false}
             colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}
             onMinimize={handleMinimize}
             onMaximize={() => maximizeWindow(id)}
@@ -291,16 +293,18 @@ export default function Window({ id }: WindowProps) {
         </div>
 
         <div className="flex-1 relative overflow-hidden w-full h-full">
-          <AppErrorBoundary appId={id}>
-            {windowState.component}
-          </AppErrorBoundary>
+          <WindowContext.Provider value={id}>
+            <AppErrorBoundary appId={id}>
+              {windowState.component}
+            </AppErrorBoundary>
+          </WindowContext.Provider>
 
           {/* Transparent Overlay to capture events during resize/drag over iframes */}
           {(isResizing || isDragging) && (
             <div className="absolute inset-0 z-[100] bg-transparent" />
           )}
 
-          {!windowState.isMaximized && (
+          {!windowState.isMaximized && windowState.isResizable !== false && (
             <>
               {/* Resize Handles */}
               <div onPointerDown={(e) => handleResizeStart(e, 'nw')} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" />

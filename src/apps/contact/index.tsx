@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Send, Trash2, File, Plus, Search, Star, Paperclip, MoreHorizontal, User, Reply, Forward, AlertCircle } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 
 // Types
 type Folder = 'inbox' | 'sent' | 'drafts' | 'trash'
@@ -83,51 +84,74 @@ If this wasn't you, well... it's a simulation, so don't worry about it.
 export default function ContactApp() {
   const [activeFolder, setActiveFolder] = useState<Folder>('inbox')
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
-  const [selectedId, setSelectedId] = useState<string | null>(INITIAL_MESSAGES[0].id)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isComposing, setIsComposing] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const { t } = useLanguage()
+  const { addNotification } = useNotificationStore()
+  
+  // Mobile responsive helper
+  const showList = !selectedId && !isComposing
+  const showContent = selectedId || isComposing
+  const currentMessages = messages
+    .filter(m => {
+        if (!searchQuery) return m.folder === activeFolder
+        const q = searchQuery.toLowerCase()
+        return m.subject.toLowerCase().includes(q) || 
+               m.from.toLowerCase().includes(q) || 
+               m.content.toLowerCase().includes(q)
+    })
 
-  // Filter messages
-  const currentMessages = messages.filter(m => m.folder === activeFolder)
   const selectedMessage = messages.find(m => m.id === selectedId)
 
   // Compose State
   const [composeData, setComposeData] = useState({ to: 'dev@yume.me', subject: '', content: '' })
 
   const handleSend = () => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      folder: 'sent',
-      from: 'Visitor',
-      to: composeData.to,
-      subject: composeData.subject || t('contact.no_subject'),
-      preview: composeData.content.substring(0, 50) + '...',
-      content: composeData.content,
-      date: t('contact.just_now'),
-      read: true,
-      starred: false,
-      avatar: 'ME'
-    }
-    
-    setMessages(prev => [newMessage, ...prev])
-    setIsComposing(false)
-    setActiveFolder('sent')
-    setSelectedId(newMessage.id)
-    setComposeData({ to: 'dev@yume.me', subject: '', content: '' })
-    soundManager.playClick()
+    setIsSending(true)
+    setTimeout(() => {
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          folder: 'sent',
+          from: 'Visitor',
+          to: composeData.to,
+          subject: composeData.subject || t('contact.no_subject'),
+          preview: composeData.content.substring(0, 50) + '...',
+          content: composeData.content,
+          date: t('contact.just_now'),
+          read: true,
+          starred: false,
+          avatar: 'ME'
+        }
+        
+        setMessages(prev => [newMessage, ...prev])
+        setIsComposing(false)
+        setActiveFolder('sent')
+        setSelectedId(newMessage.id)
+        setComposeData({ to: 'dev@yume.me', subject: '', content: '' })
+        soundManager.playClick()
+        addNotification({
+            type: 'success',
+            title: t('contact.sent'),
+            message: `Message sent to ${newMessage.to}`
+        })
+        setIsSending(false)
+    }, 1500)
   }
 
   return (
-    <div className="h-full w-full flex bg-[#f5f5f5] text-[#333] pt-8 font-sans">
+    <div className="h-full w-full flex bg-[#f5f5f5] text-[#333] pt-8 font-sans overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-[#e5e5e5] border-r border-[#d4d4d4] flex flex-col">
-        <div className="p-4">
+      <div className="w-16 md:w-64 bg-[#e5e5e5] border-r border-[#d4d4d4] flex flex-col shrink-0 transition-all duration-300">
+        <div className="p-4 flex justify-center md:justify-start">
           <button 
             onClick={() => setIsComposing(true)}
-            className="w-full bg-[#0078d4] hover:bg-[#106ebe] text-white py-2 px-4 rounded shadow-sm flex items-center justify-center gap-2 font-medium transition-colors"
+            className="w-full bg-[#0078d4] hover:bg-[#106ebe] text-white py-2 px-2 md:px-4 rounded shadow-sm flex items-center justify-center gap-2 font-medium transition-colors"
+            title={t('contact.new')}
           >
             <Plus size={18} />
-            {t('contact.new')}
+            <span className="hidden md:inline">{t('contact.new')}</span>
           </button>
         </div>
 
@@ -140,15 +164,21 @@ export default function ContactApp() {
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveFolder(item.id as Folder)}
-              className={`w-full flex items-center justify-between px-6 py-2 text-sm ${activeFolder === item.id ? 'bg-[#cce8ff] text-[#0078d4] font-medium' : 'text-[#666] hover:bg-[#dcdcdc]'}`}
+              onClick={() => {
+                  setActiveFolder(item.id as Folder)
+                  setSearchQuery('')
+                  setSelectedId(null)
+                  setIsComposing(false)
+              }}
+              className={`w-full flex items-center justify-center md:justify-between px-2 md:px-6 py-2 text-sm ${activeFolder === item.id ? 'bg-[#cce8ff] text-[#0078d4] font-medium' : 'text-[#666] hover:bg-[#dcdcdc]'}`}
+              title={item.label}
             >
               <div className="flex items-center gap-3">
                 <item.icon size={16} />
-                <span>{item.label}</span>
+                <span className="hidden md:inline">{item.label}</span>
               </div>
               {item.count > 0 && (
-                <span className="text-xs bg-[#0078d4] text-white px-1.5 rounded-full">{item.count}</span>
+                <span className="text-xs bg-[#0078d4] text-white px-1.5 rounded-full absolute md:static top-2 right-2 md:top-auto md:right-auto">{item.count}</span>
               )}
             </button>
           ))}
@@ -156,13 +186,15 @@ export default function ContactApp() {
       </div>
 
       {/* Message List */}
-      <div className="w-80 bg-white border-r border-[#e5e5e5] flex flex-col">
+      <div className={`bg-white border-r border-[#e5e5e5] flex flex-col shrink-0 w-full md:w-80 h-full ${showContent ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 border-b border-[#e5e5e5]">
           <div className="relative">
             <Search className="absolute left-2 top-2 text-[#999]" size={14} />
             <input 
               type="text" 
               placeholder={t('contact.search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#f0f0f0] border-none rounded pl-8 py-1.5 text-sm focus:ring-1 focus:ring-[#0078d4] outline-none"
             />
           </div>
@@ -175,6 +207,30 @@ export default function ContactApp() {
               </div>
               {t('contact.empty')}
             </div>
+          ) : searchQuery ? (
+             (['inbox', 'sent', 'drafts', 'trash'] as Folder[]).map(folder => {
+                 const folderMsgs = currentMessages.filter(m => m.folder === folder)
+                 if (folderMsgs.length === 0) return null
+                 return (
+                     <div key={folder}>
+                         <div className="bg-gray-100 px-4 py-1 text-xs font-bold uppercase text-gray-500 sticky top-0 border-b border-[#e5e5e5]">{t(`contact.${folder}`)}</div>
+                         {folderMsgs.map((msg) => (
+                              <div
+                                key={msg.id}
+                                onClick={() => setSelectedId(msg.id)}
+                                className={`p-4 border-b border-[#f0f0f0] cursor-pointer hover:bg-[#f9f9f9] ${selectedId === msg.id ? 'bg-[#eff6fc] border-l-4 border-l-[#0078d4]' : 'border-l-4 border-l-transparent'}`}
+                              >
+                                <div className="flex justify-between items-start mb-1">
+                                  <span className={`text-sm truncate ${!msg.read ? 'font-bold text-black' : 'text-[#333]'}`}>{msg.from}</span>
+                                  <span className="text-xs text-[#888] whitespace-nowrap ml-2">{msg.date}</span>
+                                </div>
+                                <div className={`text-sm mb-1 truncate ${!msg.read ? 'font-semibold text-[#0078d4]' : 'text-[#555]'}`}>{msg.subjectKey ? t(msg.subjectKey) : msg.subject}</div>
+                                <div className="text-xs text-[#777] line-clamp-2">{msg.previewKey ? t(msg.previewKey) : msg.preview}</div>
+                              </div>
+                         ))}
+                     </div>
+                 )
+             })
           ) : (
             currentMessages.map((msg) => (
               <div
@@ -195,11 +251,16 @@ export default function ContactApp() {
       </div>
 
       {/* Reading Pane / Compose */}
-      <div className="flex-1 bg-white flex flex-col min-w-0">
+      <div className={`flex-1 bg-white flex flex-col min-w-0 ${!showContent ? 'hidden md:flex' : 'flex'}`}>
         {isComposing ? (
           <div className="flex-1 flex flex-col">
             <div className="p-4 border-b border-[#e5e5e5] flex items-center justify-between">
-              <span className="font-semibold text-sm">{t('contact.new')}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsComposing(false)} className="md:hidden p-1 -ml-2 text-[#666]">
+                    <Reply size={20} className="rotate-180" />
+                </button>
+                <span className="font-semibold text-sm">{t('contact.new')}</span>
+              </div>
               <button onClick={() => setIsComposing(false)}><AlertCircle size={16} className="text-[#999] hover:text-[#333]" /></button>
             </div>
             <div className="p-4 space-y-4">
@@ -242,9 +303,11 @@ export default function ContactApp() {
                 </button>
                 <button 
                   onClick={handleSend}
-                  className="px-4 py-2 bg-[#0078d4] hover:bg-[#106ebe] text-white text-sm rounded flex items-center gap-2 shadow-sm"
+                  disabled={isSending}
+                  className={`px-4 py-2 bg-[#0078d4] hover:bg-[#106ebe] text-white text-sm rounded flex items-center gap-2 shadow-sm ${isSending ? 'opacity-70 cursor-wait' : ''}`}
                 >
-                  <Send size={14} /> {t('contact.send')}
+                  {isSending ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={14} />} 
+                  {isSending ? 'Sending...' : t('contact.send')}
                 </button>
               </div>
             </div>
@@ -254,8 +317,13 @@ export default function ContactApp() {
             {/* Message Header */}
             <div className="p-6 border-b border-[#e5e5e5]">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-semibold text-[#222]">{selectedMessage.subjectKey ? t(selectedMessage.subjectKey) : selectedMessage.subject}</h2>
-                <div className="flex gap-2 text-[#666]">
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setSelectedId(null)} className="md:hidden p-1 -ml-2 text-[#666]">
+                        <Reply size={20} className="rotate-180" />
+                    </button>
+                    <h2 className="text-xl font-semibold text-[#222] line-clamp-2">{selectedMessage.subjectKey ? t(selectedMessage.subjectKey) : selectedMessage.subject}</h2>
+                </div>
+                <div className="flex gap-2 text-[#666] shrink-0">
                   <button className="p-2 hover:bg-[#f0f0f0] rounded" title="Reply"><Reply size={18} /></button>
                   <button className="p-2 hover:bg-[#f0f0f0] rounded" title="Forward"><Forward size={18} /></button>
                   <button className="p-2 hover:bg-[#f0f0f0] rounded" title="Delete"><Trash2 size={18} /></button>

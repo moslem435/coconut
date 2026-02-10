@@ -257,7 +257,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     return (
         <>
             <div
-                className="fixed inset-0 font-mono overflow-hidden select-none cursor-default z-0"
+                className="fixed inset-0 font-sans overflow-hidden select-none cursor-default z-0"
                 style={{
                     backgroundColor: 'var(--os-bg-base)',
                     color: 'var(--os-text-primary)'

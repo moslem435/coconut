@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { DATA } from '@/lib/data'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useSystemStore } from '@/os/kernel/useSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
@@ -14,6 +15,7 @@ import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
 import Window from './Window'
 import Notifications from './Notifications'
+import GlobalShortcuts from './GlobalShortcuts'
 
 interface ShellProps {
   onShutdown?: () => void
@@ -25,18 +27,20 @@ export default function Shell({ onShutdown }: ShellProps) {
   // Shell will only re-render when a window is added or removed.
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
-  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false)
+  const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()
 
   const handleStartClick = () => {
-    setIsStartMenuOpen(!isStartMenuOpen)
+    toggleStartMenu()
   }
 
   return (
     <>
+      <GlobalShortcuts />
+      
       {/* 1. Desktop Layer (Always Present) */}
       <div className="fixed inset-0 z-0">
         <Desktop
-          onToggleMenu={() => setIsStartMenuOpen(!isStartMenuOpen)}
+          onToggleMenu={toggleStartMenu}
         />
       </div>
 
@@ -54,7 +58,7 @@ export default function Shell({ onShutdown }: ShellProps) {
       <Taskbar
         onStartClick={handleStartClick}
         isStartMenuOpen={isStartMenuOpen}
-        onCloseStartMenu={() => setIsStartMenuOpen(false)}
+        onCloseStartMenu={() => setStartMenuOpen(false)}
         onShutdown={onShutdown}
       />
 
