@@ -8,7 +8,8 @@ export const manifest: AppManifest = {
     icon: TerminalSquare,
     theme: {
         backgroundColor: '#333333',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#e5e7eb' // Gray-200
     },
     component: Terminal,
     defaultWindowOptions: {

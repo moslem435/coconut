@@ -8,7 +8,8 @@ export const manifest: AppManifest = {
     icon: StickyNote,
     theme: {
         backgroundColor: '#eab308',
-        iconColor: '#000000'
+        iconColor: '#000000',
+        lineColor: '#facc15' // Yellow-400
     },
     component: Notepad,
     defaultWindowOptions: {

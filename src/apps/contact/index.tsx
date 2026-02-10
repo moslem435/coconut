@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Send, Trash2, File, Plus, Search, Star, Paperclip, MoreHorizontal, User, Reply, Forward, AlertCircle } from 'lucide-react'
 import { soundManager } from '@/lib/sound'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 // Types
 type Folder = 'inbox' | 'sent' | 'drafts' | 'trash'
@@ -14,8 +15,11 @@ interface Message {
   from: string
   to: string
   subject: string
+  subjectKey?: string
   preview: string
+  previewKey?: string
   content: string
+  contentKey?: string
   date: string
   read: boolean
   starred: boolean
@@ -30,7 +34,9 @@ const INITIAL_MESSAGES: Message[] = [
     from: 'Yume',
     to: 'Visitor',
     subject: 'Welcome to Portfolio OS',
+    subjectKey: 'contact.welcome.subject',
     preview: 'Thanks for visiting my digital workspace...',
+    previewKey: 'contact.welcome.preview',
     content: `Hi there,
 
 Welcome to Portfolio OS! This system was built to demonstrate advanced frontend capabilities using React, Next.js, and Three.js.
@@ -42,6 +48,7 @@ If you'd like to get in touch, just hit "Reply" or compose a new message.
 Best regards,
 Yume
 Full Stack Engineer`,
+    contentKey: 'contact.welcome.content',
     date: '10:42 AM',
     read: false,
     starred: true,
@@ -53,7 +60,9 @@ Full Stack Engineer`,
     from: 'System Admin',
     to: 'Visitor',
     subject: 'Security Alert: Login Detected',
+    subjectKey: 'contact.security.subject',
     preview: 'New login detected from your current location...',
+    previewKey: 'contact.security.preview',
     content: `New login session initialized.
     
 Device: Web Browser
@@ -63,6 +72,7 @@ IP: 127.0.0.1
 If this wasn't you, well... it's a simulation, so don't worry about it.
 
 - SysAdmin`,
+    contentKey: 'contact.security.content',
     date: 'Yesterday',
     read: true,
     starred: false,
@@ -75,6 +85,7 @@ export default function ContactApp() {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [selectedId, setSelectedId] = useState<string | null>(INITIAL_MESSAGES[0].id)
   const [isComposing, setIsComposing] = useState(false)
+  const { t } = useLanguage()
 
   // Filter messages
   const currentMessages = messages.filter(m => m.folder === activeFolder)
@@ -89,10 +100,10 @@ export default function ContactApp() {
       folder: 'sent',
       from: 'Visitor',
       to: composeData.to,
-      subject: composeData.subject || '(No Subject)',
+      subject: composeData.subject || t('contact.no_subject'),
       preview: composeData.content.substring(0, 50) + '...',
       content: composeData.content,
-      date: 'Just now',
+      date: t('contact.just_now'),
       read: true,
       starred: false,
       avatar: 'ME'
@@ -116,16 +127,16 @@ export default function ContactApp() {
             className="w-full bg-[#0078d4] hover:bg-[#106ebe] text-white py-2 px-4 rounded shadow-sm flex items-center justify-center gap-2 font-medium transition-colors"
           >
             <Plus size={18} />
-            New Message
+            {t('contact.new')}
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2">
           {[
-            { id: 'inbox', icon: Mail, label: 'Inbox', count: messages.filter(m => m.folder === 'inbox' && !m.read).length },
-            { id: 'sent', icon: Send, label: 'Sent Items', count: 0 },
-            { id: 'drafts', icon: File, label: 'Drafts', count: 0 },
-            { id: 'trash', icon: Trash2, label: 'Trash', count: 0 },
+            { id: 'inbox', icon: Mail, label: t('contact.inbox'), count: messages.filter(m => m.folder === 'inbox' && !m.read).length },
+            { id: 'sent', icon: Send, label: t('contact.sent'), count: 0 },
+            { id: 'drafts', icon: File, label: t('contact.drafts'), count: 0 },
+            { id: 'trash', icon: Trash2, label: t('contact.trash'), count: 0 },
           ].map((item) => (
             <button
               key={item.id}
@@ -151,7 +162,7 @@ export default function ContactApp() {
             <Search className="absolute left-2 top-2 text-[#999]" size={14} />
             <input 
               type="text" 
-              placeholder="Search" 
+              placeholder={t('contact.search')}
               className="w-full bg-[#f0f0f0] border-none rounded pl-8 py-1.5 text-sm focus:ring-1 focus:ring-[#0078d4] outline-none"
             />
           </div>
@@ -162,7 +173,7 @@ export default function ContactApp() {
               <div className="w-12 h-12 bg-[#f0f0f0] rounded-full flex items-center justify-center mb-3">
                 <Mail size={24} className="opacity-50" />
               </div>
-              Nothing here yet
+              {t('contact.empty')}
             </div>
           ) : (
             currentMessages.map((msg) => (
@@ -175,8 +186,8 @@ export default function ContactApp() {
                   <span className={`text-sm truncate ${!msg.read ? 'font-bold text-black' : 'text-[#333]'}`}>{msg.from}</span>
                   <span className="text-xs text-[#888] whitespace-nowrap ml-2">{msg.date}</span>
                 </div>
-                <div className={`text-sm mb-1 truncate ${!msg.read ? 'font-semibold text-[#0078d4]' : 'text-[#555]'}`}>{msg.subject}</div>
-                <div className="text-xs text-[#777] line-clamp-2">{msg.preview}</div>
+                <div className={`text-sm mb-1 truncate ${!msg.read ? 'font-semibold text-[#0078d4]' : 'text-[#555]'}`}>{msg.subjectKey ? t(msg.subjectKey) : msg.subject}</div>
+                <div className="text-xs text-[#777] line-clamp-2">{msg.previewKey ? t(msg.previewKey) : msg.preview}</div>
               </div>
             ))
           )}
@@ -188,12 +199,12 @@ export default function ContactApp() {
         {isComposing ? (
           <div className="flex-1 flex flex-col">
             <div className="p-4 border-b border-[#e5e5e5] flex items-center justify-between">
-              <span className="font-semibold text-sm">New Message</span>
+              <span className="font-semibold text-sm">{t('contact.new')}</span>
               <button onClick={() => setIsComposing(false)}><AlertCircle size={16} className="text-[#999] hover:text-[#333]" /></button>
             </div>
             <div className="p-4 space-y-4">
               <div className="flex items-center gap-2 border-b border-[#e5e5e5] pb-2">
-                <span className="text-[#777] text-sm w-10">To:</span>
+                <span className="text-[#777] text-sm w-10">{t('contact.to')}</span>
                 <input 
                   value={composeData.to}
                   onChange={(e) => setComposeData({...composeData, to: e.target.value})}
@@ -201,12 +212,12 @@ export default function ContactApp() {
                 />
               </div>
               <div className="flex items-center gap-2 border-b border-[#e5e5e5] pb-2">
-                <span className="text-[#777] text-sm w-10">Subj:</span>
+                <span className="text-[#777] text-sm w-10">{t('contact.subj')}</span>
                 <input 
                   value={composeData.subject}
                   onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
                   className="flex-1 outline-none text-sm"
-                  placeholder="Subject"
+                  placeholder={t('contact.subject')}
                   autoFocus
                 />
               </div>
@@ -214,7 +225,7 @@ export default function ContactApp() {
                 value={composeData.content}
                 onChange={(e) => setComposeData({...composeData, content: e.target.value})}
                 className="w-full h-64 resize-none outline-none text-sm mt-4 font-sans"
-                placeholder="Type your message here..."
+                placeholder={t('contact.type')}
               />
             </div>
             <div className="p-4 border-t border-[#e5e5e5] flex justify-between items-center bg-[#f9f9f9]">
@@ -227,13 +238,13 @@ export default function ContactApp() {
                   onClick={() => setIsComposing(false)}
                   className="px-4 py-2 text-sm text-[#666] hover:bg-[#e5e5e5] rounded"
                 >
-                  Discard
+                  {t('contact.discard')}
                 </button>
                 <button 
                   onClick={handleSend}
                   className="px-4 py-2 bg-[#0078d4] hover:bg-[#106ebe] text-white text-sm rounded flex items-center gap-2 shadow-sm"
                 >
-                  <Send size={14} /> Send
+                  <Send size={14} /> {t('contact.send')}
                 </button>
               </div>
             </div>
@@ -243,7 +254,7 @@ export default function ContactApp() {
             {/* Message Header */}
             <div className="p-6 border-b border-[#e5e5e5]">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-semibold text-[#222]">{selectedMessage.subject}</h2>
+                <h2 className="text-xl font-semibold text-[#222]">{selectedMessage.subjectKey ? t(selectedMessage.subjectKey) : selectedMessage.subject}</h2>
                 <div className="flex gap-2 text-[#666]">
                   <button className="p-2 hover:bg-[#f0f0f0] rounded" title="Reply"><Reply size={18} /></button>
                   <button className="p-2 hover:bg-[#f0f0f0] rounded" title="Forward"><Forward size={18} /></button>
@@ -256,7 +267,7 @@ export default function ContactApp() {
                 </div>
                 <div>
                   <div className="font-semibold text-sm text-[#222]">{selectedMessage.from}</div>
-                  <div className="text-xs text-[#777]">To: {selectedMessage.to}</div>
+                  <div className="text-xs text-[#777]">{t('contact.to')} {selectedMessage.to}</div>
                 </div>
                 <div className="ml-auto text-xs text-[#777]">{selectedMessage.date}</div>
               </div>
@@ -264,7 +275,7 @@ export default function ContactApp() {
             {/* Message Body */}
             <div className="flex-1 p-8 overflow-y-auto">
               <div className="max-w-3xl text-[#333] text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                {selectedMessage.content}
+                {selectedMessage.contentKey ? t(selectedMessage.contentKey) : selectedMessage.content}
               </div>
             </div>
           </>
@@ -272,7 +283,7 @@ export default function ContactApp() {
           <div className="flex-1 flex items-center justify-center text-[#999]">
              <div className="text-center">
                <Mail size={48} className="mx-auto mb-4 opacity-20" />
-               <p>Select an item to read</p>
+               <p>{t('contact.select')}</p>
              </div>
           </div>
         )}

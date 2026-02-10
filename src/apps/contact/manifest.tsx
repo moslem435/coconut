@@ -9,9 +9,10 @@ export const manifest: AppManifest = {
   title: 'Contact',
   icon: Phone,
   theme: {
-      backgroundColor: '#22c55e',
-      iconColor: '#ffffff'
-  },
+        backgroundColor: '#22c55e',
+        iconColor: '#ffffff',
+        lineColor: '#4ade80' // Green-400
+    },
   component: ContactApp,
     defaultWindowOptions: {
         width: 900,

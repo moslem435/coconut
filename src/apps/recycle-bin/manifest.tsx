@@ -12,7 +12,8 @@ export const manifest: AppManifest = {
     icon: Trash2,
     theme: {
         backgroundColor: '#71717a',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#a1a1aa' // Zinc-400
     },
     component: RecycleBin,
     defaultWindowOptions: {

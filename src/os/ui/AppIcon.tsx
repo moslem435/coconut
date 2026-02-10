@@ -38,23 +38,21 @@ export function AppIcon({
     const theme = manifest?.theme || {
         backgroundColor: '#3b82f6', // blue-500 default
         iconColor: '#ffffff'
+        // No default lineColor to allow fallback to backgroundColor prop
     }
 
     const finalBg = backgroundColor || theme.backgroundColor
     const finalIconColor = theme.iconColor
+    // Use lineColor if available, otherwise fallback to backgroundColor (brand color)
+    // Priority: theme.lineColor (manifest) > backgroundColor (prop override) > theme.backgroundColor
+    const finalLineColor = theme.lineColor || backgroundColor || theme.backgroundColor
 
-    // Force line mode if system setting is 'line'
-    // But allow override if background is explicitly set to false? 
-    // Actually, if system is 'line', we generally want NO background.
-    // However, if we are in 'line' mode, we might want to ensure the icon is visible.
-    // The existing logic for background=false uses finalBg as the icon color, which is perfect.
-    
     const showBackground = background && iconTheme === 'filled'
 
     if (showBackground) {
         return (
             <div 
-                className={`flex items-center justify-center rounded-xl shadow-sm transition-transform ${className}`}
+                className={`flex items-center justify-center rounded-xl shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95 ${className}`}
                 style={{
                     width: size,
                     height: size,
@@ -67,11 +65,27 @@ export function AppIcon({
         )
     }
 
+    // Line Mode Optimization
+    // Adjust stroke width based on size for better legibility
+    const dynamicStrokeWidth = size >= 48 ? 1.5 : 2
+
     return (
-        <Icon 
-            size={size} 
-            className={className} 
-            style={{ color: finalBg }} // Without background, use the brand color for the icon itself
-        />
+        <div 
+            className={`flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95 ${className}`}
+            style={{ 
+                width: size, 
+                height: size 
+            }}
+        >
+            <Icon 
+                size={size} 
+                strokeWidth={dynamicStrokeWidth}
+                style={{ 
+                    color: finalLineColor,
+                    // Add subtle drop shadow for contrast against varied wallpapers
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' 
+                }} 
+            />
+        </div>
     )
 }

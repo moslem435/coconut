@@ -5,10 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Grid, Maximize2, X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 export default function PhotoGallery() {
   const { files, getChildren } = useFileSystemStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { t } = useLanguage()
+
+  const getDisplayName = (file: any) => {
+    const key = `gallery.image.${file.id}`
+    const translated = t(key)
+    return translated === key ? file.name : translated
+  }
 
   // Get images from Pictures folder
   // In a real scenario, we'd filter by mime type, but here we assume everything in Pictures is an image
@@ -44,8 +52,8 @@ export default function PhotoGallery() {
       {/* Header / Toolbar */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-white/10 bg-[#111]/90 backdrop-blur z-10">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">Library</span>
-          <span className="text-xs text-white/40">{images.length} items</span>
+          <span className="font-semibold text-sm">{t('gallery.library')}</span>
+          <span className="text-xs text-white/40">{images.length} {t('gallery.items')}</span>
         </div>
         <div className="flex gap-2">
            {/* Toolbar actions could go here */}
@@ -57,7 +65,7 @@ export default function PhotoGallery() {
         {images.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-white/30">
             <ImageIcon size={48} className="mb-4 opacity-50" />
-            <p>No photos found in /Pictures</p>
+            <p>{t('gallery.empty')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -72,13 +80,13 @@ export default function PhotoGallery() {
                 {img.content?.startsWith('http') ? (
                   <img 
                     src={img.content} 
-                    alt={img.name} 
+                    alt={getDisplayName(img)} 
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-white/5 to-white/10">
                     <ImageIcon className="text-white/20 mb-2" />
-                    <span className="text-xs text-white/40 truncate w-full text-center px-2">{img.name}</span>
+                    <span className="text-xs text-white/40 truncate w-full text-center px-2">{getDisplayName(img)}</span>
                   </div>
                 )}
                 
@@ -136,17 +144,17 @@ export default function PhotoGallery() {
                {images[selectedIndex]?.content?.startsWith('http') ? (
                   <img 
                     src={images[selectedIndex].content} 
-                    alt={images[selectedIndex].name} 
+                    alt={getDisplayName(images[selectedIndex])} 
                     className="max-w-full max-h-[80vh] object-contain" 
                   />
                ) : (
                   <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[#222]">
                     <ImageIcon size={64} className="text-white/20 mb-4" />
-                    <span className="text-xl text-white/40">{images[selectedIndex]?.name}</span>
+                    <span className="text-xl text-white/40">{getDisplayName(images[selectedIndex])}</span>
                   </div>
                )}
                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                  <p className="text-white font-medium">{images[selectedIndex]?.name}</p>
+                  <p className="text-white font-medium">{getDisplayName(images[selectedIndex])}</p>
                </div>
             </motion.div>
           </motion.div>

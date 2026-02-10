@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { Folder, FileCode, ChevronRight, ChevronDown, Search, Menu, X, Save, Play } from 'lucide-react'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 // --- Syntax Highlighting Helper (Simple Regex Based) ---
 const highlightCode = (code: string, lang: string) => {
@@ -42,6 +43,7 @@ export default function VSCodeLite() {
   const [openFiles, setOpenFiles] = useState<string[]>([])
   const [content, setContent] = useState('')
   const [unsavedChanges, setUnsavedChanges] = useState<Record<string, string>>({}) // fileId -> content
+  const { t } = useLanguage()
 
   // Sidebar state
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ [rootId]: true })
@@ -148,20 +150,20 @@ export default function VSCodeLite() {
       <div className="h-8 bg-[#3c3c3c] flex items-center px-2 text-xs select-none justify-between">
          <div className="flex gap-4">
              <Menu size={14} />
-             <span>File</span>
-             <span>Edit</span>
-             <span>Selection</span>
-             <span>View</span>
-             <span>Go</span>
-             <span>Run</span>
-             <span>Terminal</span>
-             <span>Help</span>
+             <span>{t('vscode.file')}</span>
+             <span>{t('vscode.edit')}</span>
+             <span>{t('vscode.selection')}</span>
+             <span>{t('vscode.view')}</span>
+             <span>{t('vscode.go')}</span>
+             <span>{t('vscode.run')}</span>
+             <span>{t('vscode.terminal')}</span>
+             <span>{t('vscode.help')}</span>
          </div>
          <div className="flex gap-2">
-            <button onClick={handleSave} className="hover:text-white" title="Save (Ctrl+S)">
+            <button onClick={handleSave} className="hover:text-white" title={t('vscode.save')}>
                 <Save size={14} />
             </button>
-            <button className="hover:text-green-400" title="Run Code">
+            <button className="hover:text-green-400" title={t('vscode.runcode')}>
                 <Play size={14} />
             </button>
          </div>
@@ -170,7 +172,7 @@ export default function VSCodeLite() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <div className="w-60 bg-[#252526] flex flex-col border-r border-[#1e1e1e]">
-            <div className="text-xs font-bold p-2 uppercase tracking-wider text-gray-500">Explorer</div>
+            <div className="text-xs font-bold p-2 uppercase tracking-wider text-gray-500">{t('vscode.explorer')}</div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <FileTreeItem id={rootId} />
             </div>
@@ -194,7 +196,7 @@ export default function VSCodeLite() {
                             `}
                         >
                             <FileCode size={14} className={isActive ? 'text-yellow-400' : 'text-gray-500'} />
-                            <span className="truncate flex-1">{file?.name || 'Deleted'}</span>
+                            <span className="truncate flex-1">{file?.name || t('vscode.deleted')}</span>
                             <div 
                                 onClick={(e) => handleCloseFile(e, fid)}
                                 className={`opacity-0 group-hover:opacity-100 p-0.5 rounded-md hover:bg-gray-600 ${isDirty ? 'opacity-100' : ''}`}
@@ -250,11 +252,11 @@ export default function VSCodeLite() {
                 </div>
             ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-gray-600 select-none">
-                    <div className="text-6xl mb-4 font-thin">VS Code Lite</div>
-                    <div className="text-sm">Select a file to start coding</div>
+                    <div className="text-6xl mb-4 font-thin">{t('vscode.welcome')}</div>
+                    <div className="text-sm">{t('vscode.start')}</div>
                     <div className="mt-8 text-xs flex flex-col gap-2">
-                        <div className="flex gap-2"><span>Show All Commands</span><span className="bg-[#333] px-1 rounded">Ctrl+Shift+P</span></div>
-                        <div className="flex gap-2"><span>Go to File</span><span className="bg-[#333] px-1 rounded">Ctrl+P</span></div>
+                        <div className="flex gap-2"><span>{t('vscode.commands')}</span><span className="bg-[#333] px-1 rounded">Ctrl+Shift+P</span></div>
+                        <div className="flex gap-2"><span>{t('vscode.gofile')}</span><span className="bg-[#333] px-1 rounded">Ctrl+P</span></div>
                     </div>
                 </div>
             )}
@@ -268,10 +270,10 @@ export default function VSCodeLite() {
             <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-white flex items-center justify-center text-[8px]">!</div> 0</div>
           </div>
           <div className="flex gap-4">
-             {activeFileId && <span>Ln {content.substr(0, 0).split('\n').length}, Col 1</span>} 
-             <span>UTF-8</span>
-             <span>TypeScript React</span>
-             <span className="hover:bg-white/20 px-1 cursor-pointer">Prettier</span>
+             {activeFileId && <span>{t('vscode.ln')} {content.substring(0, content.length).split('\n').length}, {t('vscode.col')} 1</span>} 
+             <span>{t('vscode.utf8')}</span>
+             <span>{t('vscode.lang')}</span>
+             <span className="hover:bg-white/20 px-1 cursor-pointer">{t('vscode.prettier')}</span>
           </div>
       </div>
     </div>

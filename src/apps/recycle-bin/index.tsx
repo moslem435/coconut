@@ -3,11 +3,13 @@ import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { Trash2, RotateCcw, Ban, FileText, Folder, Image as ImageIcon, StickyNote } from 'lucide-react'
 import { AppIcon } from '@/os/ui/AppIcon'
 import { APPS_REGISTRY } from '@/os/registry/config'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 const RecycleBin: React.FC = () => {
   const [deletedFiles, setDeletedFiles] = useState<FileNode[]>([])
   const { files, restoreItems, emptyTrash } = useFileSystemStore()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const { t } = useLanguage()
 
   // Sync deleted files from store
   useEffect(() => {
@@ -33,10 +35,19 @@ const RecycleBin: React.FC = () => {
   }
 
   const handleEmpty = () => {
-    if (confirm('Are you sure you want to permanently delete all items in the Recycle Bin?')) {
+    if (confirm(t('recycle.confirm'))) {
       emptyTrash()
       setSelectedIds(new Set())
     }
+  }
+
+  const getDisplayName = (node?: FileNode) => {
+      if (!node) return t('recycle.unknown')
+      if (node.appId) return t(`app.${node.appId}`)
+      if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(node.id)) {
+          return t(`explorer.${node.id}`)
+      }
+      return node.name
   }
 
   return (
@@ -48,7 +59,7 @@ const RecycleBin: React.FC = () => {
           disabled={deletedFiles.length === 0}
           className="px-3 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-700 flex items-center gap-2 text-sm disabled:opacity-50"
         >
-          <Ban size={16} /> Empty Bin
+          <Ban size={16} /> {t('recycle.empty')}
         </button>
         <div className="w-px h-6 bg-gray-300 mx-2" />
         <button 
@@ -56,10 +67,10 @@ const RecycleBin: React.FC = () => {
           disabled={selectedIds.size === 0}
           className="px-3 py-1.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 flex items-center gap-2 text-sm disabled:opacity-50"
         >
-          <RotateCcw size={16} /> Restore Selected
+          <RotateCcw size={16} /> {t('recycle.restore')}
         </button>
         <div className="flex-1" />
-        <span className="text-gray-500 text-sm">{deletedFiles.length} items</span>
+        <span className="text-gray-500 text-sm">{deletedFiles.length} {t('recycle.items')}</span>
       </div>
 
       {/* Content Area */}
@@ -70,7 +81,7 @@ const RecycleBin: React.FC = () => {
         {deletedFiles.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-400">
             <Trash2 size={48} className="mb-4 opacity-20" />
-            <p>Recycle Bin is empty</p>
+            <p>{t('recycle.empty.msg')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-4">
@@ -116,10 +127,10 @@ const RecycleBin: React.FC = () => {
                     className="mb-2 drop-shadow-sm"
                 />
                 <div className="text-xs text-center break-all px-1 line-clamp-2">
-                  {file.name}
+                  {getDisplayName(file)}
                 </div>
                 <div className="text-[10px] text-gray-400 mt-1">
-                   From: {files[file.originalParentId || '']?.name || 'Unknown'}
+                   {t('recycle.from')} {getDisplayName(files[file.originalParentId || ''])}
                 </div>
               </div>
             )})}

@@ -51,7 +51,7 @@ export default function SystemContextMenu() {
   const handleOpenSettings = () => {
     const app = APPS_REGISTRY['settings']
     if (app) {
-      openWindow(app.id, t('start.settings'), <app.component />, app.icon, app.defaultWindowOptions)
+      openWindow(app.id, t('start.settings'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
     }
     hideMenu()
   }
@@ -91,8 +91,8 @@ export default function SystemContextMenu() {
                 // Launch App
                 const app = APPS_REGISTRY[data.appId]
                 if (app) {
-                  const title = app.id === 'settings' ? t('start.settings') : app.title
-                  openWindow(app.id, title, <app.component />, app.icon, app.defaultWindowOptions)
+                  const title = app.id === 'settings' ? t('start.settings') : t(`app.${app.id}`)
+                  openWindow(app.id, title, <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                 }
               }
             }
@@ -173,7 +173,7 @@ export default function SystemContextMenu() {
 
               if (data?.appId) {
                 const app = APPS_REGISTRY[data.appId]
-                if (app) openWindow(app.id, app.title, <app.component />, app.icon, app.defaultWindowOptions)
+                if (app) openWindow(app.id, t(`app.${app.id}`), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
               } else if (data?.id) {
                 // For files/folders, we might need to dispatch an event or use a store action if we had one.
                 // Ideally, Desktop should handle this. 

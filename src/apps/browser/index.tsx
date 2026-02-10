@@ -12,6 +12,7 @@ import {
     ExternalLink
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 // --- Types ---
 
@@ -69,9 +70,10 @@ const formatUrl = (input: string): string => {
 
 export default function Browser() {
     // --- State ---
+    const { t } = useLanguage()
     const [tabs, setTabs] = useState<Tab[]>([{
         id: generateId(),
-        title: 'New Tab',
+        title: t('browser.newtab'),
         url: HOME_URL,
         history: [HOME_URL],
         historyIndex: 0,
@@ -94,7 +96,7 @@ export default function Browser() {
     const handleNewTab = () => {
         const newTab: Tab = {
             id: generateId(),
-            title: 'New Tab',
+            title: t('browser.newtab'),
             url: HOME_URL,
             history: [HOME_URL],
             historyIndex: 0,
@@ -115,7 +117,7 @@ export default function Browser() {
                 historyIndex: 0,
                 isLoading: true,
                 inputUrl: HOME_URL,
-                title: 'New Tab'
+                title: t('browser.newtab')
             })
             return
         }
@@ -194,7 +196,7 @@ export default function Browser() {
             history: newHistory,
             historyIndex: newHistory.length - 1,
             isLoading: true,
-            title: 'New Tab'
+            title: t('browser.newtab')
         })
     }
 
@@ -226,7 +228,7 @@ export default function Browser() {
                             onClick={() => setActiveTabId(tab.id)}
                         >
                             <Globe size={14} className={tab.id === activeTabId ? 'text-blue-500' : 'text-gray-400'} />
-                            <span className="flex-1 truncate font-medium">{tab.title || 'Loading...'}</span>
+                            <span className="flex-1 truncate font-medium">{tab.title || t('browser.loading')}</span>
                             <button 
                                 onClick={(e) => handleCloseTab(e, tab.id)}
                                 className={`
@@ -260,6 +262,7 @@ export default function Browser() {
                         onClick={handleGoBack} 
                         disabled={activeTab.historyIndex <= 0}
                         className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                        title={t('browser.back')}
                     >
                         <ArrowLeft size={16} />
                     </button>
@@ -267,18 +270,21 @@ export default function Browser() {
                         onClick={handleGoForward}
                         disabled={activeTab.historyIndex >= activeTab.history.length - 1}
                         className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                        title={t('browser.forward')}
                     >
                         <ArrowRight size={16} />
                     </button>
                     <button 
                         onClick={handleRefresh} 
                         className={`p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors ${activeTab.isLoading ? 'animate-spin' : ''}`}
+                        title={t('browser.refresh')}
                     >
                         <RotateCw size={16} />
                     </button>
                     <button 
                         onClick={handleHome}
                         className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+                        title={t('browser.home')}
                     >
                         <Home size={16} />
                     </button>
@@ -291,18 +297,17 @@ export default function Browser() {
                         value={activeTab.inputUrl}
                         onChange={(e) => updateTab(activeTabId, { inputUrl: e.target.value })}
                         onFocus={(e) => e.target.select()}
-                        placeholder="Search Google or type a URL"
+                        placeholder={t('browser.search')}
                     />
                 </form>
 
                 <a 
-                    href={activeTab.url}
-                    target="_blank"
+                    href={activeTab.url} 
+                    target="_blank" 
                     rel="noopener noreferrer"
-                    className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors tooltip-trigger"
-                    title="Open in real browser"
+                    className="text-blue-500 hover:underline text-sm"
                 >
-                    <ExternalLink size={16} />
+                    {t('browser.real')}
                 </a>
             </div>
 
@@ -332,7 +337,7 @@ export default function Browser() {
                             onLoad={() => handleIframeLoad(tab.id)}
                             onError={() => handleIframeLoad(tab.id)} // Stop loading spinner on error too
                             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-presentation"
-                            title={`Browser Tab ${tab.title}`}
+                            title={`${t('browser.tab')} ${tab.title}`}
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         />
                     </div>

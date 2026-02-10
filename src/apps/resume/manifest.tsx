@@ -10,7 +10,8 @@ export const manifest: AppManifest = {
     icon: FileText,
     theme: {
         backgroundColor: '#10b981',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#34d399' // Emerald-400
     },
     component: ResumeApp,
   defaultWindowOptions: {

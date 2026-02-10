@@ -9,6 +9,7 @@ import {
   RefreshCw, Layers, MonitorSpeaker, ChevronUp, ChevronDown, Maximize2,
   Trash2, Plus
 } from 'lucide-react'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 // Real Sample Data (SoundHelix)
 const INITIAL_TRACKS = [
@@ -158,14 +159,6 @@ const INITIAL_TRACKS = [
   }
 ]
 
-const MY_PLAYLISTS = [
-  "My 2025 Favorites",
-  "Late Night Coding",
-  "Gym Motivation",
-  "Chill Vibes",
-  "New Playlist 1"
-]
-
 const formatTime = (seconds: number) => {
   if (isNaN(seconds)) return "0:00"
   const mins = Math.floor(seconds / 60)
@@ -174,6 +167,16 @@ const formatTime = (seconds: number) => {
 }
 
 export default function MusicPlayer() {
+  const { t } = useLanguage()
+
+  const MY_PLAYLISTS = [
+    t('music.playlist.favorites'),
+    t('music.playlist.coding'),
+    t('music.playlist.gym'),
+    t('music.playlist.chill'),
+    t('music.playlist.new')
+  ]
+
   // State
   const [playlist, setPlaylist] = useState(INITIAL_TRACKS)
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
@@ -354,8 +357,8 @@ export default function MusicPlayer() {
         const newTracks = files.map(f => ({
             id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             title: f.name.replace(/\.[^/.]+$/, ""),
-            artist: 'Local File',
-            album: 'Uploads',
+            artist: t('music.localfile'),
+            album: t('music.uploads'),
             cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop',
             url: URL.createObjectURL(f),
             duration: 0,
@@ -471,7 +474,7 @@ export default function MusicPlayer() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 bg-emerald-500/20 backdrop-blur-sm border-4 border-emerald-500 border-dashed m-4 rounded-xl flex items-center justify-center pointer-events-none"
           >
-            <div className="text-3xl font-bold text-white drop-shadow-md">Drop audio files here to play</div>
+            <div className="text-3xl font-bold text-white drop-shadow-md">{t('music.drop')}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -493,26 +496,26 @@ export default function MusicPlayer() {
             </div>
             <div className="flex flex-col">
                <span className="text-sm font-bold text-white">Yume</span>
-               <span className="text-[10px] text-emerald-400 border border-emerald-400/30 px-1 rounded-sm w-fit">SVIP 7</span>
+               <span className="text-[10px] text-emerald-400 border border-emerald-400/30 px-1 rounded-sm w-fit">{t('music.vip')}</span>
             </div>
           </div>
 
           <div className="flex flex-col gap-1 px-3 mb-6">
-             <SidebarItem icon={LayoutGrid} label="Recommend" id="recommend" />
-             <SidebarItem icon={Disc} label="Music Hall" id="hall" />
-             <SidebarItem icon={MonitorSpeaker} label="Video" id="video" />
-             <SidebarItem icon={Layers} label="Radio" id="radio" />
+             <SidebarItem icon={LayoutGrid} label={t('music.recommend')} id="recommend" />
+             <SidebarItem icon={Disc} label={t('music.hall')} id="hall" />
+             <SidebarItem icon={MonitorSpeaker} label={t('music.video')} id="video" />
+             <SidebarItem icon={Layers} label={t('music.radio')} id="radio" />
           </div>
 
-          <div className="px-5 text-xs text-gray-500 font-medium mb-2">MY MUSIC</div>
+          <div className="px-5 text-xs text-gray-500 font-medium mb-2">{t('music.my')}</div>
           <div className="flex flex-col gap-1 px-3 mb-6">
-             <SidebarItem icon={Heart} label="Likes" id="likes" count={Object.values(liked).filter(Boolean).length} />
-             <SidebarItem icon={Clock} label="Recent" id="recent" count="12" />
-             <SidebarItem icon={Download} label="Local" id="local" />
+             <SidebarItem icon={Heart} label={t('music.likes')} id="likes" count={Object.values(liked).filter(Boolean).length} />
+             <SidebarItem icon={Clock} label={t('music.recent')} id="recent" count="12" />
+             <SidebarItem icon={Download} label={t('music.local')} id="local" />
           </div>
 
           <div className="px-5 text-xs text-gray-500 font-medium mb-2 flex justify-between items-center group cursor-pointer">
-            <span>CREATED PLAYLISTS</span>
+            <span>{t('music.playlists')}</span>
             <span className="opacity-0 group-hover:opacity-100 text-lg leading-none">+</span>
           </div>
           <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
@@ -550,7 +553,7 @@ export default function MusicPlayer() {
                           setSearchQuery(e.target.value)
                           if (e.target.value) setActiveTab('hall')
                         }}
-                        placeholder="Search music..." 
+                        placeholder={t('music.search')}
                         className="bg-[#2a2a2a] text-sm text-white rounded-full pl-10 pr-4 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
                     />
                 </div>
@@ -568,15 +571,15 @@ export default function MusicPlayer() {
             {activeTab === 'recommend' && (
               <>
                 <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    Hi Yume <span className="text-lg font-normal text-gray-500">Recommended for you</span>
+                    {t('start.visitor')} <span className="text-lg font-normal text-gray-500">{t('music.recommend')}</span>
                 </h1>
 
                 {/* Hero Banner */}
                 <div className="w-full h-48 rounded-xl bg-gradient-to-r from-emerald-900/40 to-black relative overflow-hidden mb-8 group cursor-pointer border border-white/5" onClick={() => playTrack(INITIAL_TRACKS[0])}>
                     <div className="absolute inset-0 flex items-center p-8">
                         <div className="relative z-10">
-                            <div className="text-emerald-400 font-medium mb-2 tracking-wider text-sm">DAILY MIX</div>
-                            <h2 className="text-3xl font-bold text-white mb-4 w-2/3 leading-tight">Fresh tracks curated for your coding session</h2>
+                            <div className="text-emerald-400 font-medium mb-2 tracking-wider text-sm">{t('music.daily')}</div>
+                            <h2 className="text-3xl font-bold text-white mb-4 w-2/3 leading-tight">{t('music.fresh')}</h2>
                             <button className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center hover:scale-105 transition-transform text-black">
                                 <Play size={20} fill="currentColor" className="ml-1" />
                             </button>
@@ -592,8 +595,8 @@ export default function MusicPlayer() {
                 {/* Grid Section */}
                 <div className="mb-8">
                     <div className="flex justify-between items-end mb-4">
-                        <h3 className="text-lg font-bold text-white">Your Playlist</h3>
-                        <button className="text-xs text-gray-500 hover:text-white transition-colors">Show All &gt;</button>
+                        <h3 className="text-lg font-bold text-white">{t('music.your_playlist')}</h3>
+                        <button className="text-xs text-gray-500 hover:text-white transition-colors">{t('music.show_all')}</button>
                     </div>
                     
                     <div className="grid grid-cols-5 gap-5">

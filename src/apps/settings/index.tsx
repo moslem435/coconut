@@ -64,7 +64,7 @@ export default function SettingsApp() {
     }
 
     const handleCopySpecs = () => {
-        const specs = `FolioOS v1.0\nBuild: 2026.02.05\n\nSystem Specs:\nBrowser: ${sysInfo.browser}\nResolution: ${sysInfo.resolution}\nUptime: ${uptime}`
+        const specs = `${t('specs.os')} v1.0\n${t('specs.build')}: 2026.02.05\n\n${t('settings.specs.title')}\n${t('specs.browser')}: ${sysInfo.browser}\n${t('specs.resolution')}: ${sysInfo.resolution}\n${t('specs.uptime')}: ${uptime}`
         navigator.clipboard.writeText(specs)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)

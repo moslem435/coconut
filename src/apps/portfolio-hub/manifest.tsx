@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic'
-import { Terminal } from 'lucide-react'
+import { Briefcase } from 'lucide-react'
 import { AppManifest } from '@/os/registry/types'
 import PortfolioSplashScreen from './SplashScreen'
 
@@ -9,12 +9,13 @@ const PortfolioApp = dynamic(() => import('./index'), {
 
 export const manifest: AppManifest = {
     id: 'portfolio-hub',
-    title: 'PORTFOLIO_HUB',
-    icon: Terminal,
+    title: 'Portfolio Hub',
+    icon: Briefcase,
     // iconUrl: removed for flat style
     theme: {
         backgroundColor: '#171717',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#ffffff'
     },
     component: PortfolioApp,
     splashScreen: PortfolioSplashScreen,

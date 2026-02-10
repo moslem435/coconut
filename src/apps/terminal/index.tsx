@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
 
 interface TerminalHistory {
@@ -9,9 +10,10 @@ interface TerminalHistory {
 }
 
 const Terminal: React.FC = () => {
+  const { t } = useLanguage()
   const [history, setHistory] = useState<TerminalHistory[]>([
-    { type: 'output', content: 'Welcome to FolioOS Terminal' },
-    { type: 'output', content: 'Type "help" to see available commands.' },
+    { type: 'output', content: t('terminal.welcome') },
+    { type: 'output', content: t('terminal.help') },
   ])
   const [input, setInput] = useState('')
   const [currentDirId, setCurrentDirId] = useState('root')
@@ -20,6 +22,34 @@ const Terminal: React.FC = () => {
   const bottomRef = useRef<HTMLDivElement>(null)
   
   const { files, rootId, getChildren, getItem, getPath } = useFileSystemStore()
+
+  // Helper: Get translated display name
+  const getDisplayName = (node: FileNode) => {
+    // 1. App Shortcut
+    if (node.appId) return t(`app.${node.appId}`)
+    
+    // 2. System Folders / Special IDs
+    if (node.id === 'recycle-bin' || node.id === 'trash') return t('app.recycle-bin')
+    if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(node.id)) {
+      return t(`explorer.${node.id}`)
+    }
+
+    // 3. Specific Files/Folders (mapped to translation keys)
+    const idToKeyMap: Record<string, string> = {
+      'welcome-txt': 'file.welcome',
+      'about-md': 'file.about',
+      'code-1': 'file.code.hello',
+      'code-2': 'file.code.component',
+      'music': 'folder.music',
+      'code': 'folder.code'
+    }
+    
+    if (idToKeyMap[node.id]) {
+      return t(idToKeyMap[node.id])
+    }
+
+    return node.name
+  }
 
   // Scroll to bottom on history change
   useEffect(() => {
@@ -66,7 +96,7 @@ const Terminal: React.FC = () => {
     // Let's construct it: /Desktop/Documents
     const pathStr = pathNodes
       .slice(1) // Skip Root node
-      .map(n => n.name)
+      .map(n => getDisplayName(n))
       .join('/')
     return '/' + pathStr
   }
@@ -86,7 +116,7 @@ const Terminal: React.FC = () => {
 
     switch (cmd) {
       case 'help':
-        newHistory.push({ type: 'output', content: 'Available commands:\n  help      Show this help message\n  clear     Clear terminal history\n  ls        List directory contents\n  cd [dir]  Change directory\n  cat [file] Read file content\n  echo [txt] Print text\n  pwd       Print working directory\n  whoami    Show current user\n  date      Show current date' })
+        newHistory.push({ type: 'output', content: t('terminal.help.desc') })
         break
       
       case 'clear':
@@ -98,7 +128,7 @@ const Terminal: React.FC = () => {
         break
 
       case 'whoami':
-        newHistory.push({ type: 'output', content: 'guest' })
+        newHistory.push({ type: 'output', content: t('terminal.guest') })
         break
 
       case 'date':
@@ -112,15 +142,16 @@ const Terminal: React.FC = () => {
       case 'ls': {
         const targetId = args.length > 0 ? resolvePath(args[0]) : currentDirId
         if (!targetId) {
-          newHistory.push({ type: 'output', content: `ls: cannot access '${args[0]}': No such file or directory` })
+          newHistory.push({ type: 'output', content: `${t('terminal.ls.error')} '${args[0]}': ${t('terminal.cd.error')}` })
         } else {
           const item = getItem(targetId)
           if (item?.type === 'file') {
-             newHistory.push({ type: 'output', content: item.name })
+             newHistory.push({ type: 'output', content: getDisplayName(item) })
           } else {
             const children = getChildren(targetId)
             const list = children.map(c => {
-              return c.type === 'folder' ? c.name + '/' : c.name
+              const name = getDisplayName(c)
+              return c.type === 'folder' ? name + '/' : name
             }).join('  ')
             newHistory.push({ type: 'output', content: list })
           }
@@ -137,11 +168,11 @@ const Terminal: React.FC = () => {
         }
         const targetId = resolvePath(argStr)
         if (!targetId) {
-           newHistory.push({ type: 'output', content: `cd: ${argStr}: No such file or directory` })
+           newHistory.push({ type: 'output', content: `${t('terminal.cd.error')}: ${argStr}` })
         } else {
           const item = getItem(targetId)
           if (item?.type !== 'folder') {
-             newHistory.push({ type: 'output', content: `cd: ${argStr}: Not a directory` })
+             newHistory.push({ type: 'output', content: `${t('terminal.cd.notdir')}: ${argStr}` })
           } else {
             setCurrentDirId(targetId)
             setCwdPath(getDisplayPath(targetId))
@@ -152,16 +183,16 @@ const Terminal: React.FC = () => {
 
       case 'cat': {
         if (!argStr) {
-           newHistory.push({ type: 'output', content: 'cat: missing operand' })
+           newHistory.push({ type: 'output', content: t('terminal.cat.missing') })
            break
         }
         const targetId = resolvePath(argStr)
         if (!targetId) {
-           newHistory.push({ type: 'output', content: `cat: ${argStr}: No such file or directory` })
+           newHistory.push({ type: 'output', content: `${t('terminal.cat.error')}: ${argStr}` })
         } else {
            const item = getItem(targetId)
            if (item?.type === 'folder') {
-             newHistory.push({ type: 'output', content: `cat: ${argStr}: Is a directory` })
+             newHistory.push({ type: 'output', content: `${t('terminal.cat.isdir')}: ${argStr}` })
            } else {
              newHistory.push({ type: 'output', content: item?.content || '' })
            }
@@ -170,7 +201,7 @@ const Terminal: React.FC = () => {
       }
 
       default:
-        newHistory.push({ type: 'output', content: `${cmd}: command not found` })
+        newHistory.push({ type: 'output', content: `${cmd}: ${t('terminal.notfound')}` })
     }
 
     setHistory(newHistory)
@@ -193,7 +224,7 @@ const Terminal: React.FC = () => {
           <div key={i} className="mb-1 whitespace-pre-wrap break-all">
             {entry.type === 'input' ? (
               <div className="flex">
-                <span className="text-green-500 mr-2">guest@system:{entry.cwd}$</span>
+                <span className="text-green-500 mr-2">{t('terminal.guest')}@system:{entry.cwd}$</span>
                 <span>{entry.content}</span>
               </div>
             ) : (

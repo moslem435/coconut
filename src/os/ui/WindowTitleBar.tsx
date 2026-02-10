@@ -5,11 +5,13 @@ import { X, Minus, Maximize2, Minimize2 } from 'lucide-react'
 import { AppIcon } from '@/os/ui/AppIcon'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { Tooltip } from '@/os/ui/Tooltip'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 interface WindowTitleBarProps {
     title: string
     icon?: React.ComponentType<any>
     appId?: string
+    isDefaultTitle?: boolean
     isActive: boolean
     isMaximized: boolean
     onMinimize: () => void
@@ -32,6 +34,7 @@ export function WindowTitleBar({
     title,
     icon: Icon,
     appId,
+    isDefaultTitle,
     isActive,
     isMaximized,
     onMinimize,
@@ -49,6 +52,8 @@ export function WindowTitleBar({
         close: 'Close'
     }
 }: WindowTitleBarProps) {
+    const { t } = useLanguage()
+
     // Determine colors based on colorMode
     // colorMode = 'dark' means dark text (for light backgrounds)
     // colorMode = 'light' or undefined means light text (for dark backgrounds - default)
@@ -61,6 +66,8 @@ export function WindowTitleBar({
     const buttonHoverBg = isDarkText ? 'rgba(0,0,0,0.1)' : 'var(--os-hover-bg)'
 
     const manifest = appId ? APPS_REGISTRY[appId] : undefined
+    
+    const displayTitle = isDefaultTitle && appId ? t(`app.${appId}`) : title
 
     return (
         <div
@@ -90,7 +97,7 @@ export function WindowTitleBar({
                     className="text-sm font-medium tracking-wide transition-colors"
                     style={{ color: isActive ? activeTextColor : inactiveTextColor }}
                 >
-                    {title}
+                    {displayTitle}
                 </span>
             </div>
 

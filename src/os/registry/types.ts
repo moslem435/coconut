@@ -10,6 +10,8 @@ export interface AppManifest {
     theme?: {
         backgroundColor: string
         iconColor: string
+        /** Optional color override for Line/Classic mode. Defaults to backgroundColor if not set. */
+        lineColor?: string
     }
     component: ComponentType<any>
     /** Optional splash screen component, rendered before window opens */

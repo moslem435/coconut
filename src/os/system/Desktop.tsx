@@ -10,6 +10,7 @@ import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useShallow } from 'zustand/react/shallow'
 import { Tooltip } from '@/os/ui/Tooltip'
 import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
@@ -33,6 +34,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     // Context Menu
     const showMenu = useContextMenuStore(state => state.showMenu)
+    const { t } = useLanguage()
 
     // Actions - stable
     const openWindow = useWindowStore(state => state.openWindow)
@@ -48,6 +50,33 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore()
     const { getChildren } = useFileSystemStore()
     const desktopItems = getChildren('desktop')
+
+    const getDisplayName = (item: FileNode) => {
+        // 1. App Shortcut
+        if (item.appId) return t(`app.${item.appId}`)
+        
+        // 2. System Folders / Special IDs
+        if (item.id === 'recycle-bin' || item.id === 'trash') return t('app.recycle-bin')
+        if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(item.id)) {
+            return t(`explorer.${item.id}`)
+        }
+
+        // 3. Specific Files/Folders (mapped to translation keys)
+        const idToKeyMap: Record<string, string> = {
+            'welcome-txt': 'file.welcome',
+            'about-md': 'file.about',
+            'code-1': 'file.code.hello',
+            'code-2': 'file.code.component',
+            'music': 'folder.music',
+            'code': 'folder.code'
+        }
+        
+        if (idToKeyMap[item.id]) {
+            return t(idToKeyMap[item.id])
+        }
+
+        return item.name
+    }
 
     const isDragging = useRef(false)
     const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
@@ -136,7 +165,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     app.title,
                     <app.component />,
                     app.icon,
-                    app.defaultWindowOptions
+                    { ...app.defaultWindowOptions, isDefaultTitle: true }
                 )
             }
             return
@@ -190,7 +219,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 splashingApp.title,
                 <splashingApp.component />,
                 splashingApp.icon,
-                splashingApp.defaultWindowOptions
+                { ...splashingApp.defaultWindowOptions, isDefaultTitle: true }
             )
             setSplashingApp(null)
         }
@@ -367,7 +396,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                 `} style={{
                                         textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                                     }}>
-                                    {item.name}
+                                    {getDisplayName(item)}
                                 </span>
 
                                 {/* Selection Indicator */}

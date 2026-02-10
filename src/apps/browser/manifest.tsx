@@ -8,7 +8,8 @@ export const manifest: AppManifest = {
     icon: Chrome,
     theme: {
         backgroundColor: '#0ea5e9',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#38bdf8' // Sky-400
     },
     component: Browser,
     defaultWindowOptions: {

@@ -9,9 +9,10 @@ export const manifest: AppManifest = {
   title: 'Photos',
   icon: Image,
   theme: {
-      backgroundColor: '#8b5cf6',
-      iconColor: '#ffffff'
-  },
+        backgroundColor: '#8b5cf6',
+        iconColor: '#ffffff',
+        lineColor: '#a78bfa' // Violet-400
+    },
   component: PhotoGallery,
   defaultWindowOptions: {
     width: 800,

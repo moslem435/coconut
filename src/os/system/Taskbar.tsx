@@ -81,7 +81,7 @@ export default function Taskbar({
       // Check if it's open (using appId as windowId for single-instance apps)
       const win = openWindows.find(w => w.id === appId)
 
-      const title = appId === 'settings' ? t('start.settings') : app.title
+      const title = t(`app.${appId}`)
 
       items.push({
         id: appId,
@@ -104,7 +104,7 @@ export default function Taskbar({
       items.push({
         id: win.id,
         appId: win.id, // Assuming window id is app id
-        title: win.title,
+        title: win.isDefaultTitle ? t(`app.${win.appId}`) : win.title,
         icon: win.icon,
         isOpen: true,
         isMinimized: win.isMinimized,
@@ -123,7 +123,7 @@ export default function Taskbar({
       items.push({
         id: appId,
         appId: appId,
-        title: app.title,
+        title: t(`app.${appId}`),
         icon: app.icon,
         isOpen: false,
         isMinimized: false,
@@ -179,11 +179,12 @@ export default function Taskbar({
           taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
         }
 
-        const title = item.appId === 'settings' ? t('start.settings') : app.title
+        const title = t(`app.${item.appId}`)
 
         launchApp(app.id, title, <app.component />, app.icon, {
           ...app.defaultWindowOptions,
-          taskbarPosition: taskbarPos
+          taskbarPosition: taskbarPos,
+          isDefaultTitle: true
         })
       }
     }

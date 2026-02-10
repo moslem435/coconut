@@ -12,7 +12,8 @@ export const manifest: AppManifest = {
     icon: Settings,
     theme: {
         backgroundColor: '#475569',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#94a3b8' // Slate 400
     },
     component: SettingsApp,
     defaultWindowOptions: {

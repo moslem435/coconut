@@ -9,9 +9,10 @@ export const manifest: AppManifest = {
   title: 'VS Code',
   icon: Code2,
   theme: {
-      backgroundColor: '#4f46e5',
-      iconColor: '#ffffff'
-  },
+        backgroundColor: '#4f46e5',
+        iconColor: '#ffffff',
+        lineColor: '#818cf8' // Indigo-400
+    },
   component: VSCodeLite,
   defaultWindowOptions: {
     width: 900,

@@ -8,7 +8,8 @@ export const manifest: AppManifest = {
     icon: CalculatorIcon,
     theme: {
         backgroundColor: '#f97316',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#fb923c' // Orange-400
     },
     component: Calculator,
     defaultWindowOptions: {

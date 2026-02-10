@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { Save, FilePlus, FolderOpen } from 'lucide-react'
 
 interface NotepadProps {
@@ -12,6 +13,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
   const [status, setStatus] = useState('')
   
   const { getItem, updateFileContent, createItem } = useFileSystemStore()
+  const { t } = useLanguage()
 
   // Load content if fileId is provided
   useEffect(() => {
@@ -27,7 +29,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
   const handleSave = () => {
     if (currentFileId) {
       updateFileContent(currentFileId, content)
-      setStatus('Saved!')
+      setStatus(t('notepad.saved'))
       setTimeout(() => setStatus(''), 2000)
     } else {
       handleSaveAs()
@@ -37,11 +39,11 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
   const handleSaveAs = () => {
     // Simple implementation: Create a new file on Desktop
     // In a real OS, this would open a File Picker dialog
-    const name = prompt('Enter file name (e.g., notes.txt):', 'Untitled.txt')
+    const name = prompt(t('notepad.prompt'), t('notepad.untitled'))
     if (name) {
       const newId = createItem('desktop', name, 'file', content)
       setCurrentFileId(newId)
-      setStatus(`Saved to Desktop as ${name}`)
+      setStatus(`${t('notepad.savedto')} ${name}`)
       setTimeout(() => setStatus(''), 2000)
     }
   }
@@ -49,7 +51,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
   const handleNew = () => {
     setContent('')
     setCurrentFileId(null)
-    setStatus('New File')
+    setStatus(t('notepad.newfile'))
   }
 
   // Keyboard shortcut for Save (Ctrl+S)
@@ -65,10 +67,10 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
       {/* Menu Bar */}
       <div className="flex items-center gap-2 p-1 border-b border-gray-300/50 text-sm bg-white/50">
         <button onClick={handleNew} className="p-1 hover:bg-gray-200 rounded flex items-center gap-1">
-          <FilePlus size={16} /> New
+          <FilePlus size={16} /> {t('notepad.new')}
         </button>
         <button onClick={handleSave} className="p-1 hover:bg-gray-200 rounded flex items-center gap-1">
-          <Save size={16} /> Save
+          <Save size={16} /> {t('notepad.save')}
         </button>
         <div className="flex-1" />
         <span className="text-gray-500 text-xs px-2">{status}</span>
@@ -80,7 +82,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         spellCheck={false}
-        placeholder="Start typing..."
+        placeholder={t('notepad.placeholder')}
         autoFocus
       />
     </div>

@@ -20,6 +20,7 @@ export interface WindowState {
     appId?: string
     component: ReactNode
     titleBarColor?: 'light' | 'dark' | 'auto'
+    isDefaultTitle?: boolean
 }
 
 interface WindowStore {
@@ -31,7 +32,7 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; isMaximized?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean }) => void
     launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
@@ -94,7 +95,8 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             icon,
             appId: options?.appId,
             taskbarPosition: options?.taskbarPosition,
-            titleBarColor: options?.titleBarColor
+            titleBarColor: options?.titleBarColor,
+            isDefaultTitle: options?.isDefaultTitle
         }
 
         set(state => ({

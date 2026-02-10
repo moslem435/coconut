@@ -9,9 +9,10 @@ export const manifest: AppManifest = {
   title: 'Music',
   icon: Music,
   theme: {
-      backgroundColor: '#f43f5e',
-      iconColor: '#ffffff'
-  },
+        backgroundColor: '#f43f5e',
+        iconColor: '#ffffff',
+        lineColor: '#fb7185' // Rose-400
+    },
   component: MusicPlayer,
   defaultWindowOptions: {
     width: 380,

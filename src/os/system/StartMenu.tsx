@@ -83,10 +83,10 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
         } else {
             launchApp(
                 app.id,
-                app.title,
+                t(`app.${app.id}`),
                 <app.component />,
                 app.icon,
-                app.defaultWindowOptions
+                { ...app.defaultWindowOptions, isDefaultTitle: true }
             )
         }
         onClose()
@@ -143,7 +143,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                             <MenuItem
                                 key={app.id}
                                 manifest={app}
-                                label={app.title}
+                                label={t(`app.${app.id}`)}
                                 onClick={() => handleLaunchApp(app.id)}
                             />
                         ))}

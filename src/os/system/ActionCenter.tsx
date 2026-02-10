@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Bell, Trash2, CheckCircle, AlertTriangle, AlertCircle, Info } from 'lucide-react'
 import { useNotificationStore, Notification } from '@/os/kernel/useNotificationStore'
 import CalendarWidget from './CalendarWidget'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 import { Tooltip } from '@/os/ui/Tooltip'
 
 interface ActionCenterProps {
@@ -16,6 +17,7 @@ interface ActionCenterProps {
 
 export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCenterProps) {
   const { history, clearHistory } = useNotificationStore()
+  const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close when clicking outside
@@ -95,10 +97,10 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
             <div className="p-4 border-b border-[var(--os-border)] flex items-center justify-between bg-white/5">
               <div className="flex items-center gap-2">
                 <Bell size={16} className="text-[var(--os-accent)]" />
-                <h3 className="font-semibold text-sm">Notifications</h3>
+                <h3 className="font-semibold text-sm">{t('action.notifications')}</h3>
               </div>
               {history.length > 0 && (
-                <Tooltip content="Clear All" side="left">
+                <Tooltip content={t('action.clear')} side="left">
                   <button
                     onClick={clearHistory}
                     className="p-1.5 text-[var(--os-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -113,7 +115,7 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
               {history.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-[var(--os-text-muted)] opacity-50">
                   <Bell size={32} className="mb-2" />
-                  <p className="text-xs">No new notifications</p>
+                  <p className="text-xs">{t('action.empty')}</p>
                 </div>
               ) : (
                 history.map((n) => (
@@ -138,6 +140,7 @@ export default function ActionCenter({ isOpen, onClose, toggleRef }: ActionCente
 
 
 function HistoryItem({ notification }: { notification: Notification }) {
+  const { t } = useLanguage()
   const getIcon = () => {
     switch (notification.type) {
       case 'success': return <CheckCircle size={16} className="text-green-400" />
@@ -158,7 +161,7 @@ function HistoryItem({ notification }: { notification: Notification }) {
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start mb-0.5">
           <span className="font-semibold text-xs text-[var(--os-text-primary)] truncate pr-2">
-            {notification.title || 'System Notification'}
+            {notification.title || t('action.system')}
           </span>
           <span className="text-[10px] text-[var(--os-text-muted)] whitespace-nowrap">{timeString}</span>
         </div>

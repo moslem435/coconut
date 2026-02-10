@@ -6,6 +6,35 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 import { AppIcon } from '@/os/ui/AppIcon'
+import { useLanguage } from '@/os/kernel/LanguageContext'
+
+// Helper: Get translated display name
+const getDisplayName = (node: FileNode, t: (key: string) => string) => {
+  // 1. App Shortcut
+  if (node.appId) return t(`app.${node.appId}`)
+  
+  // 2. System Folders / Special IDs
+  if (node.id === 'recycle-bin' || node.id === 'trash') return t('app.recycle-bin')
+  if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(node.id)) {
+      return t(`explorer.${node.id}`)
+  }
+
+  // 3. Specific Files/Folders (mapped to translation keys)
+  const idToKeyMap: Record<string, string> = {
+      'welcome-txt': 'file.welcome',
+      'about-md': 'file.about',
+      'code-1': 'file.code.hello',
+      'code-2': 'file.code.component',
+      'music': 'folder.music',
+      'code': 'folder.code'
+  }
+  
+  if (idToKeyMap[node.id]) {
+      return t(idToKeyMap[node.id])
+  }
+
+  return node.name
+}
 
 interface FileExplorerProps {
     initialPath?: string
@@ -15,6 +44,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const [currentPathId, setCurrentPathId] = useState(initialPath)
   const { files, getChildren, getPath } = useFileSystemStore()
   const { launchApp, focusWindow, windows } = useWindowStore()
+  const { t } = useLanguage()
   
   // Update path if initialPath changes (optional, but good for linking)
   useEffect(() => {
@@ -47,10 +77,10 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
           launchApp(
               app.id,
-              app.title,
+              t(`app.${app.id}`),
               <app.component />,
               app.icon,
-              app.defaultWindowOptions
+              { ...app.defaultWindowOptions, isDefaultTitle: true }
           )
           return
       }
@@ -116,7 +146,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
                   onClick={() => handleNavigate(node.id)}
                   className="hover:bg-white/10 px-1 rounded transition-colors truncate max-w-[150px]"
                 >
-                  {node.name}
+                  {getDisplayName(node, t)}
                 </button>
              </div>
            ))}
@@ -126,12 +156,12 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <div className="w-48 shrink-0 border-r border-[var(--os-border)] flex flex-col p-2 gap-1 bg-[var(--os-bg-secondary)]/30">
-           <SidebarItem icon={HardDrive} label="Root" active={currentPathId === 'root'} onClick={() => handleNavigate('root')} />
+           <SidebarItem icon={HardDrive} label={t('explorer.root')} active={currentPathId === 'root'} onClick={() => handleNavigate('root')} />
            <div className="h-px bg-[var(--os-border)] my-1" />
-           <SidebarItem icon={Folder} label="Desktop" active={currentPathId === 'desktop'} onClick={() => handleNavigate('desktop')} />
-           <SidebarItem icon={FileText} label="Documents" active={currentPathId === 'documents'} onClick={() => handleNavigate('documents')} />
-           <SidebarItem icon={ImageIcon} label="Pictures" active={currentPathId === 'pictures'} onClick={() => handleNavigate('pictures')} />
-           <SidebarItem icon={Download} label="Downloads" active={currentPathId === 'downloads'} onClick={() => handleNavigate('downloads')} />
+           <SidebarItem icon={Folder} label={t('explorer.desktop')} active={currentPathId === 'desktop'} onClick={() => handleNavigate('desktop')} />
+           <SidebarItem icon={FileText} label={t('explorer.documents')} active={currentPathId === 'documents'} onClick={() => handleNavigate('documents')} />
+           <SidebarItem icon={ImageIcon} label={t('explorer.pictures')} active={currentPathId === 'pictures'} onClick={() => handleNavigate('pictures')} />
+           <SidebarItem icon={Download} label={t('explorer.downloads')} active={currentPathId === 'downloads'} onClick={() => handleNavigate('downloads')} />
         </div>
 
         {/* Main Content */}
@@ -139,7 +169,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           {children.length === 0 ? (
              <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
                 <Folder size={48} strokeWidth={1} className="mb-2 opacity-20" />
-                <span className="text-sm">This folder is empty</span>
+                <span className="text-sm">{t('explorer.empty')}</span>
              </div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-4">
@@ -148,6 +178,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
                   key={child.id} 
                   node={child} 
                   onDoubleClick={() => handleDoubleClick(child.id)} 
+                  t={t}
                 />
               ))}
             </div>
@@ -170,7 +201,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }: any) {
   )
 }
 
-function FileItem({ node, onDoubleClick }: { node: FileNode, onDoubleClick: () => void }) {
+function FileItem({ node, onDoubleClick, t }: { node: FileNode, onDoubleClick: () => void, t: (key: string) => string }) {
    // Determine Icon Properties
    const manifest = node.appId ? APPS_REGISTRY[node.appId] : undefined
    let Icon = FileText
@@ -193,6 +224,8 @@ function FileItem({ node, onDoubleClick }: { node: FileNode, onDoubleClick: () =
        backgroundColor = '#94a3b8' // slate-400
    }
 
+   const displayName = getDisplayName(node, t)
+
    return (
      <button 
        onDoubleClick={onDoubleClick}
@@ -205,7 +238,7 @@ function FileItem({ node, onDoubleClick }: { node: FileNode, onDoubleClick: () =
           backgroundColor={backgroundColor}
           className="drop-shadow-sm group-hover:scale-105 transition-transform"
        />
-       <span className="text-xs truncate w-full px-1 select-none">{node.name}</span>
+       <span className="text-xs truncate w-full px-1 select-none">{displayName}</span>
      </button>
    )
 }

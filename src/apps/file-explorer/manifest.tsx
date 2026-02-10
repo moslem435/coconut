@@ -12,7 +12,8 @@ export const manifest: AppManifest = {
     icon: Folder,
     theme: {
         backgroundColor: '#3b82f6',
-        iconColor: '#ffffff'
+        iconColor: '#ffffff',
+        lineColor: '#60a5fa' // Blue-400
     },
     component: FileExplorerApp,
     defaultWindowOptions: {

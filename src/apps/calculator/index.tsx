@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import { useLanguage } from '@/os/kernel/LanguageContext'
 
 const Calculator: React.FC = () => {
   const [display, setDisplay] = useState('0')
   const [equation, setEquation] = useState('')
   const [isNewNumber, setIsNewNumber] = useState(true)
+  const { t } = useLanguage()
 
   const handleNumber = (num: string) => {
     if (isNewNumber) {
@@ -27,7 +29,7 @@ const Calculator: React.FC = () => {
       setEquation('')
       setIsNewNumber(true)
     } catch (e) {
-      setDisplay('Error')
+      setDisplay(t('calculator.error'))
     }
   }
 
@@ -38,7 +40,7 @@ const Calculator: React.FC = () => {
   }
 
   const buttons = [
-    { label: 'C', onClick: handleClear, className: 'col-span-2 bg-red-500 hover:bg-red-600 text-white' },
+    { label: t('calculator.clear'), onClick: handleClear, className: 'col-span-2 bg-red-500 hover:bg-red-600 text-white' },
     { label: '/', onClick: () => handleOperator('/'), className: 'bg-orange-500 hover:bg-orange-600 text-white' },
     { label: '*', onClick: () => handleOperator('*'), className: 'bg-orange-500 hover:bg-orange-600 text-white' },
     { label: '7', onClick: () => handleNumber('7') },
