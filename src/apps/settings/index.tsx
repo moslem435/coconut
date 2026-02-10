@@ -34,8 +34,8 @@ import {
     Shapes,
     Loader2
 } from 'lucide-react'
- import { useSystem } from '@/os/sdk'
- import { Tooltip } from '@/os/ui/Tooltip'
+import { useSystem } from '@/os/sdk'
+import { Tooltip } from '@/os/ui/Tooltip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 
 interface SettingCategory {
@@ -49,7 +49,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
     const [activeCategory, setActiveCategory] = useState(initialCategory || 'display')
     const { t } = useLanguage()
     const [isLoadingWallpaper, setIsLoadingWallpaper] = useState(false)
-    
+
     // About Page State
     const sysInfo = useSystemInfo()
     const uptime = useUptime()
@@ -193,15 +193,14 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                         key={i}
                                         onClick={() => handleWallpaperSelect(wp)}
                                         disabled={isLoadingWallpaper && wp.value === 'daily'}
-                                        className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${
-                                            wallpaper?.value === wp.value ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-transparent hover:border-[var(--os-text-secondary)]'
-                                        }`}
+                                        className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${wallpaper?.value === wp.value ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-transparent hover:border-[var(--os-text-secondary)]'
+                                            }`}
                                     >
                                         {wp.type === 'image' ? (
-                                            <img 
-                                                src={wp.value === 'daily' ? 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop' : wp.value} 
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                                                alt={wp.name} 
+                                            <img
+                                                src={wp.value === 'daily' ? 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop' : wp.value}
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                                alt={wp.name}
                                             />
                                         ) : (
                                             <div className="w-full h-full" style={{ background: wp.value }} />
@@ -211,7 +210,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                         </div>
                                         {wallpaper?.value === wp.value && (
                                             <div className="absolute top-2 right-2 w-5 h-5 bg-[var(--os-accent)] rounded-full flex items-center justify-center text-[var(--os-accent-contrast)] shadow-sm">
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                             </div>
                                         )}
                                         {isLoadingWallpaper && wp.value === 'daily' && (
@@ -366,7 +365,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                     <Settings size={48} className="text-[var(--os-accent)] animate-spin-slow" style={{ animationDuration: '10s' }} />
                                 </div>
                                 <h2 className="text-3xl font-bold mb-2 tracking-tight" style={{ color: 'var(--os-text-primary)' }}>{t('start.os')}</h2>
-                                <div 
+                                <div
                                     className="cursor-pointer select-none inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/20 text-[var(--os-accent)] text-xs font-medium hover:bg-[var(--os-accent)]/20 transition-colors"
                                     onClick={handleDevMode}
                                 >
@@ -374,7 +373,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                     <span>•</span>
                                     <span>Build 2026.02.05</span>
                                 </div>
-                                
+
                                 <AnimatePresence>
                                     {devModeCount >= 5 && (
                                         <motion.div
@@ -387,32 +386,32 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                     )}
                                 </AnimatePresence>
                             </motion.div>
-                            
+
                             {/* Background Glow */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[var(--os-accent)]/10 blur-[80px] rounded-full pointer-events-none" />
                         </div>
 
                         {/* System Dashboard */}
                         <div className="grid grid-cols-2 gap-3">
-                            <InfoCard 
-                                icon={<Activity size={18} />} 
-                                label={t('settings.about.uptime')} 
-                                value={uptime} 
+                            <InfoCard
+                                icon={<Activity size={18} />}
+                                label={t('settings.about.uptime')}
+                                value={uptime}
                             />
-                            <InfoCard 
-                                icon={<Monitor size={18} />} 
-                                label={t('settings.about.screen')} 
-                                value={sysInfo.resolution} 
+                            <InfoCard
+                                icon={<Monitor size={18} />}
+                                label={t('settings.about.screen')}
+                                value={sysInfo.resolution}
                             />
-                            <InfoCard 
-                                icon={<Wifi size={18} />} 
-                                label={t('settings.about.network')} 
-                                value={sysInfo.network} 
+                            <InfoCard
+                                icon={<Wifi size={18} />}
+                                label={t('settings.about.network')}
+                                value={sysInfo.network}
                             />
-                             <InfoCard 
-                                icon={<Box size={18} />} 
-                                label={t('settings.about.browser')} 
-                                value={sysInfo.browser} 
+                            <InfoCard
+                                icon={<Box size={18} />}
+                                label={t('settings.about.browser')}
+                                value={sysInfo.browser}
                             />
                         </div>
 
@@ -446,20 +445,20 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                     const isActive = activeCategory === cat.id
                     return (
                         <button
-                                key={cat.id}
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left group ${isActive ? '' : 'hover:bg-[var(--os-hover-bg)] hover:translate-x-1'}`}
-                                style={{
-                                    backgroundColor: isActive ? 'var(--os-accent-dim)' : undefined,
-                                    color: isActive ? 'var(--os-accent)' : 'var(--os-text-secondary)'
-                                }}
-                            >
-                                <Icon size={18} className="group-hover:text-[var(--os-text-primary)]" />
-                                <span className="text-sm group-hover:text-[var(--os-text-primary)]">{cat.label}</span>
-                                {isActive && (
-                                    <ChevronRight size={14} className="ml-auto" />
-                                )}
-                            </button>
+                            key={cat.id}
+                            onClick={() => setActiveCategory(cat.id)}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left group ${isActive ? '' : 'hover:bg-[var(--os-hover-bg)] hover:translate-x-1'}`}
+                            style={{
+                                backgroundColor: isActive ? 'var(--os-accent-dim)' : undefined,
+                                color: isActive ? 'var(--os-accent)' : 'var(--os-text-secondary)'
+                            }}
+                        >
+                            <Icon size={18} className="group-hover:text-[var(--os-text-primary)]" />
+                            <span className="text-sm group-hover:text-[var(--os-text-primary)]">{cat.label}</span>
+                            {isActive && (
+                                <ChevronRight size={14} className="ml-auto" />
+                            )}
+                        </button>
                     )
                 })}
             </div>
@@ -529,8 +528,8 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
             <span className="text-sm font-medium transition-colors duration-200 group-hover:text-[var(--os-text-primary)] text-[var(--os-text-secondary)]">
                 {label}
             </span>
-            
-            <div 
+
+            <div
                 className="relative isolate"
                 onClick={(e) => {
                     e.preventDefault()
@@ -542,16 +541,16 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
                     className="w-[46px] h-[28px] rounded-full transition-colors duration-300"
                     style={{
                         backgroundColor: checked ? 'var(--os-accent)' : 'var(--os-border-active)',
-                        boxShadow: checked 
-                            ? '0 0 12px var(--os-accent-dim)' 
+                        boxShadow: checked
+                            ? '0 0 12px var(--os-accent-dim)'
                             : 'inset 0 2px 4px rgba(0,0,0,0.05)'
                     }}
                 />
-                
+
                 {/* Knob */}
                 <motion.div
                     initial={false}
-                    animate={{ 
+                    animate={{
                         x: checked ? 20 : 2
                     }}
                     whileTap={{ scale: 0.9 }}
@@ -602,10 +601,10 @@ function TechStackGrid() {
         <div className="grid grid-cols-3 gap-3">
             {stack.map((item) => (
                 <div key={item.name} className="flex flex-col items-center justify-center p-3 rounded-lg border border-[var(--os-border)] bg-[var(--os-bg-base)] hover:bg-[var(--os-hover-bg)] transition-colors gap-2 group cursor-default">
-                     <div style={{ color: item.color }} className="group-hover:scale-110 transition-transform">
+                    <div style={{ color: item.color }} className="group-hover:scale-110 transition-transform">
                         {item.icon}
-                     </div>
-                     <span className="text-xs text-[var(--os-text-secondary)] text-center">{item.name}</span>
+                    </div>
+                    <span className="text-xs text-[var(--os-text-secondary)] text-center">{item.name}</span>
                 </div>
             ))}
         </div>
@@ -623,13 +622,13 @@ function useSystemInfo() {
         if (typeof window === 'undefined') return
 
         const nav = navigator as any
-        
+
         const updateInfo = async () => {
             // Browser & Resolution
-            const browser = nav.userAgentData?.brands?.[0] 
+            const browser = nav.userAgentData?.brands?.[0]
                 ? `${nav.userAgentData.brands[0].brand} ${nav.userAgentData.brands[0].version}`
                 : nav.userAgent.split(' ').pop()?.split('/')[0] || 'Browser'
-            
+
             const resolution = `${window.screen.width} × ${window.screen.height}`
 
             // Real Network Latency Check
@@ -653,11 +652,11 @@ function useSystemInfo() {
         }
 
         updateInfo()
-        
+
         // Listen for online/offline events
         window.addEventListener('online', updateInfo)
         window.addEventListener('offline', updateInfo)
-        
+
         return () => {
             window.removeEventListener('online', updateInfo)
             window.removeEventListener('offline', updateInfo)
@@ -673,7 +672,7 @@ function useUptime() {
     useEffect(() => {
         // Simple session uptime
         const startTime = Date.now()
-        
+
         const interval = setInterval(() => {
             setUptime(Math.floor((Date.now() - startTime) / 1000))
         }, 1000)

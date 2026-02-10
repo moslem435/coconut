@@ -7,7 +7,7 @@ import {
   ListMusic, Volume2, MoreHorizontal, ChevronLeft, ChevronRight, 
   Search, Download, Clock, Disc, Mic2, LayoutGrid, Settings, 
   RefreshCw, Layers, MonitorSpeaker, ChevronUp, ChevronDown, Maximize2,
-  Trash2, Plus
+  Trash2, Plus, Sliders
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 

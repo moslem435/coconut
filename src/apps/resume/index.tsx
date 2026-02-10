@@ -55,7 +55,7 @@ export default function ResumeApp() {
   }
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#1e1e1e] text-[#d4d4d4] pt-8">
+    <div className="h-full w-full flex flex-col bg-[#1e1e1e] text-[#d4d4d4] pt-10">
       {/* Toolbar */}
       <div className="h-12 border-b border-[#333] bg-[#252526] flex items-center justify-between px-4 select-none">
         <div className="flex items-center gap-4">

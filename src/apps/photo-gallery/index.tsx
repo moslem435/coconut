@@ -48,7 +48,7 @@ export default function PhotoGallery() {
   }
 
   return (
-    <div className="h-full w-full bg-[#111] text-white flex flex-col pt-8">
+    <div className="h-full w-full bg-[#111] text-white flex flex-col pt-10">
       {/* Header / Toolbar */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-white/10 bg-[#111]/90 backdrop-blur z-10">
         <div className="flex items-center gap-2">

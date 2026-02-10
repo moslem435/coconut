@@ -228,6 +228,10 @@ const translations = {
     // Calculator
     "calculator.error": "Error",
     "calculator.clear": "C",
+    "calc.standard": "Standard",
+    "calc.scientific": "Scientific",
+    "calc.history": "History",
+    "calc.no_history": "No History",
 
     // Contact
     "contact.new": "New Message",
@@ -255,6 +259,7 @@ const translations = {
 
     // Music Player
     "music.recommend": "Recommended for you",
+    "music.eq": "Equalizer",
     "music.hall": "Music Hall",
     "music.video": "Video",
     "music.radio": "Radio",
@@ -324,6 +329,10 @@ const translations = {
     "explorer.pictures": "Pictures",
     "explorer.downloads": "Downloads",
     "explorer.empty": "This folder is empty",
+
+    // Common
+    "common.name": "Name",
+    "common.type": "Type",
 
     // Resume Content
     "resume.name": "YUME",
@@ -549,6 +558,7 @@ const translations = {
 
     // Notepad
     "notepad.new": "新建",
+    "notepad.opened": "文件已打开",
     "notepad.save": "保存",
     "notepad.saved": "已保存!",
     "notepad.newfile": "新建文件",
@@ -617,6 +627,10 @@ const translations = {
     // Calculator
     "calculator.error": "错误",
     "calculator.clear": "C",
+    "calc.standard": "标准",
+    "calc.scientific": "科学",
+    "calc.history": "历史记录",
+    "calc.no_history": "暂无历史记录",
 
     // Contact
     "contact.new": "新建消息",
@@ -713,6 +727,10 @@ const translations = {
     "explorer.pictures": "图片",
     "explorer.downloads": "下载",
     "explorer.empty": "此文件夹为空",
+
+    // Common
+    "common.name": "名称",
+    "common.type": "类型",
   }
 };
 

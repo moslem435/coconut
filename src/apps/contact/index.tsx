@@ -140,9 +140,10 @@ export default function ContactApp() {
     }, 1500)
   }
 
+  // Main Layout
   return (
-    <div className="h-full w-full flex bg-[#f5f5f5] text-[#333] pt-8 font-sans overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-full bg-[#f3f2f1] font-sans text-[#201f1e] overflow-hidden select-none pt-10">
+      {/* Sidebar (Folders) */}
       <div className="w-16 md:w-64 bg-[#e5e5e5] border-r border-[#d4d4d4] flex flex-col shrink-0 transition-all duration-300">
         <div className="p-4 flex justify-center md:justify-start">
           <button 

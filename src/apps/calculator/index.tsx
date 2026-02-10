@@ -91,7 +91,7 @@ const Calculator: React.FC = () => {
   const funcBtnClass = `${commonBtnClass} bg-gray-600 hover:bg-gray-500 text-gray-100 text-base`
 
   return (
-    <div className="h-full w-full bg-[#202020] flex text-white relative font-sans select-none pt-8">
+    <div className="h-full w-full bg-[#202020] flex text-white relative font-sans select-none pt-10">
       
       {/* Main Calculator */}
       <div className="flex-1 flex flex-col p-4 max-w-full">

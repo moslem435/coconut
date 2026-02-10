@@ -138,7 +138,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   }
 
   return (
-    <div className="h-full flex flex-col bg-[var(--os-bg-base)] text-[var(--os-text-primary)]" onContextMenu={handleBackgroundContextMenu}>
+    <div className="h-full flex flex-col bg-[var(--os-bg-base)] text-[var(--os-text-primary)] pt-10" onContextMenu={handleBackgroundContextMenu}>
       {/* Toolbar / Address Bar */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-4 border-b border-[var(--os-border)]">
         <div className="flex gap-1">

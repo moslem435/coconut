@@ -1,5 +1,4 @@
 import React from 'react'
-import { Sliders } from 'lucide-react'
 
 interface EqualizerProps {
   frequencies: number[]
