@@ -25,6 +25,8 @@ interface WeatherState {
   location: string
   loading: boolean
   error: boolean
+  lastUpdated: number | null
+  stale: boolean
 }
 
 // WMO Weather Code Interpretation (0-99)
@@ -66,6 +68,41 @@ const DEFAULT_LOCATION = {
   city: 'Shanghai'
 }
 
+const WEATHER_CACHE_KEY = 'weather-widget-cache'
+const WEATHER_CACHE_TTL = 5 * 60 * 1000
+
+interface WeatherCachePayload {
+  current: WeatherState['current']
+  forecast: WeatherState['forecast']
+  location: WeatherState['location']
+}
+
+interface WeatherCache {
+  timestamp: number
+  data: WeatherCachePayload
+  latitude: number
+  longitude: number
+  city: string
+}
+
+const readWeatherCache = (): WeatherCache | null => {
+  if (typeof window === 'undefined') return null
+  const raw = localStorage.getItem(WEATHER_CACHE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed?.timestamp || !parsed?.data) return null
+    return parsed as WeatherCache
+  } catch {
+    return null
+  }
+}
+
+const writeWeatherCache = (cache: WeatherCache) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache))
+}
+
 interface WeatherWidgetProps {
   dragConstraintsRef?: React.RefObject<HTMLDivElement>
 }
@@ -80,19 +117,46 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
     forecast: [],
     location: 'Loading...',
     loading: true,
-    error: false
+    error: false,
+    lastUpdated: null,
+    stale: false
   })
 
   useEffect(() => {
     setMounted(true)
+    const cached = readWeatherCache()
+    if (cached) {
+      const isStale = Date.now() - cached.timestamp > WEATHER_CACHE_TTL
+      setWeather(prev => ({
+        ...prev,
+        ...cached.data,
+        loading: false,
+        error: false,
+        lastUpdated: cached.timestamp,
+        stale: isStale
+      }))
+    }
     fetchWeatherData()
   }, [])
 
-  const fetchWeatherData = async () => {
+  const fetchWeatherData = async (force = false) => {
+    const cached = readWeatherCache()
+    const now = Date.now()
+    if (!force && cached && now - cached.timestamp < WEATHER_CACHE_TTL) {
+      setWeather(prev => ({
+        ...prev,
+        ...cached.data,
+        loading: false,
+        error: false,
+        lastUpdated: cached.timestamp,
+        stale: false
+      }))
+      return
+    }
     try {
-      let latitude = DEFAULT_LOCATION.lat
-      let longitude = DEFAULT_LOCATION.lon
-      let city = DEFAULT_LOCATION.city
+      let latitude = cached?.latitude ?? DEFAULT_LOCATION.lat
+      let longitude = cached?.longitude ?? DEFAULT_LOCATION.lon
+      let city = cached?.city ?? DEFAULT_LOCATION.city
 
       // 1. Try Get Location via IP (Multi-source Fallback)
       try {
@@ -137,7 +201,8 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
       const weatherData = await weatherRes.json()
 
       // 3. Transform Data
-      setWeather({
+      const locationName = city || 'Unknown Location'
+      const nextData: WeatherCachePayload = {
         current: {
           temp: Math.round(weatherData.current.temperature_2m),
           code: weatherData.current.weather_code,
@@ -150,14 +215,38 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
           minTemp: Math.round(weatherData.daily.temperature_2m_min[index + 1]),
           code: weatherData.daily.weather_code[index + 1]
         })),
-        location: city || 'Unknown Location',
+        location: locationName
+      }
+
+      const updatedAt = Date.now()
+      setWeather({
+        ...nextData,
         loading: false,
-        error: false
+        error: false,
+        lastUpdated: updatedAt,
+        stale: false
+      })
+      writeWeatherCache({
+        timestamp: updatedAt,
+        data: nextData,
+        latitude,
+        longitude,
+        city: locationName
       })
 
     } catch (err) {
       console.error('Weather widget error:', err)
-      // If critical error, maybe try fallback weather or show simple error
+      if (cached) {
+        setWeather(prev => ({
+          ...prev,
+          ...cached.data,
+          loading: false,
+          error: false,
+          lastUpdated: cached.timestamp,
+          stale: true
+        }))
+        return
+      }
       setWeather(prev => ({ ...prev, loading: false, error: true }))
     }
   }
@@ -175,7 +264,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
 
   // Error State
   if (weather.error) {
-    return null // Hide on error to not clutter UI
+    return null
   }
 
   const currentInfo = getWeatherInfo(weather.current.code)
@@ -192,7 +281,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
         e.preventDefault()
         e.stopPropagation()
         showMenu(e.clientX, e.clientY, 'weather-widget', {
-          onRefresh: fetchWeatherData
+          onRefresh: () => fetchWeatherData(true)
         })
       }}
       onDoubleClick={(e) => {
@@ -226,6 +315,14 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
             <span className="text-xs text-white/50">
               {new Date().toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </span>
+            {weather.lastUpdated && (
+              <span className="text-[10px] text-white/40">
+                {language === 'zh'
+                  ? `更新于 ${new Date(weather.lastUpdated).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+                  : `Updated ${new Date(weather.lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
+                {weather.stale ? (language === 'zh' ? ' · 离线' : ' · Offline') : ''}
+              </span>
+            )}
           </div>
           <div className="p-2 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors">
              <CurrentIcon size={32} className={currentInfo.color} />

@@ -31,6 +31,8 @@ interface WeatherState {
   location: string
   loading: boolean
   error: boolean
+  lastUpdated: number | null
+  stale: boolean
 }
 
 // WMO Weather Code Interpretation (0-99)
@@ -72,6 +74,42 @@ const DEFAULT_LOCATION = {
   city: 'Shanghai'
 }
 
+const WEATHER_CACHE_KEY = 'weather-app-cache'
+const WEATHER_CACHE_TTL = 5 * 60 * 1000
+
+interface WeatherCachePayload {
+  current: WeatherState['current']
+  forecast: WeatherState['forecast']
+  hourly: WeatherState['hourly']
+  location: WeatherState['location']
+}
+
+interface WeatherCache {
+  timestamp: number
+  data: WeatherCachePayload
+  latitude: number
+  longitude: number
+  city: string
+}
+
+const readWeatherCache = (): WeatherCache | null => {
+  if (typeof window === 'undefined') return null
+  const raw = localStorage.getItem(WEATHER_CACHE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed?.timestamp || !parsed?.data) return null
+    return parsed as WeatherCache
+  } catch {
+    return null
+  }
+}
+
+const writeWeatherCache = (cache: WeatherCache) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache))
+}
+
 export default function WeatherApp() {
   const { language } = useLanguage()
   const { showWeatherWidget, setShowWeatherWidget } = useSystemSettings()
@@ -81,18 +119,45 @@ export default function WeatherApp() {
     hourly: [],
     location: 'Loading...',
     loading: true,
-    error: false
+    error: false,
+    lastUpdated: null,
+    stale: false
   })
 
   useEffect(() => {
+    const cached = readWeatherCache()
+    if (cached) {
+      const isStale = Date.now() - cached.timestamp > WEATHER_CACHE_TTL
+      setWeather(prev => ({
+        ...prev,
+        ...cached.data,
+        loading: false,
+        error: false,
+        lastUpdated: cached.timestamp,
+        stale: isStale
+      }))
+    }
     fetchWeatherData()
   }, [])
 
-  const fetchWeatherData = async () => {
+  const fetchWeatherData = async (force = false) => {
+    const cached = readWeatherCache()
+    const now = Date.now()
+    if (!force && cached && now - cached.timestamp < WEATHER_CACHE_TTL) {
+      setWeather(prev => ({
+        ...prev,
+        ...cached.data,
+        loading: false,
+        error: false,
+        lastUpdated: cached.timestamp,
+        stale: false
+      }))
+      return
+    }
     try {
-      let latitude = DEFAULT_LOCATION.lat
-      let longitude = DEFAULT_LOCATION.lon
-      let city = DEFAULT_LOCATION.city
+      let latitude = cached?.latitude ?? DEFAULT_LOCATION.lat
+      let longitude = cached?.longitude ?? DEFAULT_LOCATION.lon
+      let city = cached?.city ?? DEFAULT_LOCATION.city
 
       // 1. Try Get Location via IP (Multi-source Fallback)
       try {
@@ -135,8 +200,9 @@ export default function WeatherApp() {
       // 3. Transform Data
       // Get current hour index to slice the next 24 hours correctly
       const currentHour = new Date().getHours()
-      
-      setWeather({
+
+      const locationName = city || 'Unknown Location'
+      const nextData: WeatherCachePayload = {
         current: {
           temp: Math.round(weatherData.current.temperature_2m),
           code: weatherData.current.weather_code,
@@ -158,16 +224,49 @@ export default function WeatherApp() {
           temp: Math.round(weatherData.hourly.temperature_2m[currentHour + index]),
           code: weatherData.hourly.weather_code[currentHour + index]
         })),
-        location: city || 'Unknown Location',
+        location: locationName
+      }
+
+      const updatedAt = Date.now()
+      setWeather({
+        ...nextData,
         loading: false,
-        error: false
+        error: false,
+        lastUpdated: updatedAt,
+        stale: false
+      })
+      writeWeatherCache({
+        timestamp: updatedAt,
+        data: nextData,
+        latitude,
+        longitude,
+        city: locationName
       })
 
     } catch (err) {
       console.error('Weather app error:', err)
+      if (cached) {
+        setWeather(prev => ({
+          ...prev,
+          ...cached.data,
+          loading: false,
+          error: false,
+          lastUpdated: cached.timestamp,
+          stale: true
+        }))
+        return
+      }
       setWeather(prev => ({ ...prev, loading: false, error: true }))
     }
   }
+
+  const formattedUpdated = useMemo(() => {
+    if (!weather.lastUpdated) return null
+    return new Date(weather.lastUpdated).toLocaleTimeString(
+      language === 'zh' ? 'zh-CN' : 'en-US',
+      { hour: '2-digit', minute: '2-digit' }
+    )
+  }, [weather.lastUpdated, language])
 
   if (weather.loading) {
     return (
@@ -186,7 +285,7 @@ export default function WeatherApp() {
         <button 
           onClick={() => {
             setWeather(prev => ({ ...prev, loading: true, error: false }))
-            fetchWeatherData()
+            fetchWeatherData(true)
           }}
           className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
         >
@@ -227,6 +326,12 @@ export default function WeatherApp() {
                 <MapPin size={18} />
                 <span className="text-xl font-medium tracking-wide">{weather.location}</span>
               </div>
+              {formattedUpdated && (
+                <div className="text-xs text-white/50">
+                  {language === 'zh' ? `更新于 ${formattedUpdated}` : `Updated ${formattedUpdated}`}
+                  {weather.stale ? (language === 'zh' ? ' · 离线' : ' · Offline') : ''}
+                </div>
+              )}
               <div className="flex items-end gap-4">
                 <h1 className="text-8xl md:text-9xl font-thin tracking-tighter leading-none">
                   {weather.current.temp}°

@@ -337,8 +337,6 @@ export default function Window({ id }: WindowProps) {
               if (windowState.isMaximized) {
                 dragControls.start(e)
               } else {
-                setIsGhostDragging(true)
-                setIsDragging(true)
                 ghostDragControls.start(e)
               }
             }}
@@ -388,4 +386,3 @@ export default function Window({ id }: WindowProps) {
     </>
   )
 }
-
