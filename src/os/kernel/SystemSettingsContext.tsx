@@ -21,6 +21,7 @@ export interface SystemSettings {
     volume: number
     isMuted: boolean
     snapToGrid: boolean
+    showWeatherWidget: boolean
     pinnedAppIds: string[]
     wallpaper: Wallpaper
 }
@@ -38,6 +39,7 @@ interface SystemSettingsContextType extends SystemSettings {
     setMuted: (muted: boolean) => void
     toggleMute: () => void
     setSnapToGrid: (enable: boolean) => void
+    setShowWeatherWidget: (enable: boolean) => void
     pinApp: (appId: string) => void
     unpinApp: (appId: string) => void
     setWallpaper: (wallpaper: Wallpaper) => void
@@ -57,6 +59,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     volume: 75,
     isMuted: false,
     snapToGrid: true,
+    showWeatherWidget: true,
     pinnedAppIds: ['portfolio-hub', 'browser'], // Default pinned apps
     wallpaper: {
         type: 'preset',
@@ -154,6 +157,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     const setMuted = (muted: boolean) => setSettings(p => ({ ...p, isMuted: muted }))
     const toggleMute = () => setSettings(p => ({ ...p, isMuted: !p.isMuted }))
     const setSnapToGrid = (enable: boolean) => setSettings(p => ({ ...p, snapToGrid: enable }))
+    const setShowWeatherWidget = (enable: boolean) => setSettings(p => ({ ...p, showWeatherWidget: enable }))
     
     const pinApp = (appId: string) => setSettings(p => {
         if (p.pinnedAppIds.includes(appId)) return p
@@ -182,8 +186,9 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             setMuted,
             toggleMute,
             setSnapToGrid,
-            pinApp,
-            unpinApp,
+        setShowWeatherWidget,
+        pinApp,
+        unpinApp,
             setWallpaper
         }}>
             {children}

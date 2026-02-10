@@ -15,10 +15,10 @@ export const manifest: AppManifest = {
     },
   component: MusicPlayer,
   defaultWindowOptions: {
-    width: 400,
+    width: 900,
     height: 650,
     isResizable: true,
     isMaximized: false,
-    titleBarColor: 'light'
+    titleBarColor: 'auto'
   }
 }

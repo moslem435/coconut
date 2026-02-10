@@ -174,13 +174,19 @@ function MenuItem({ manifest, icon: Icon, label, onClick, danger }: MenuItemProp
                 : 'hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)]'
                 }`}
         >
-            <AppIcon 
-                manifest={manifest} 
-                icon={Icon} 
-                size={32} 
-                background={!!manifest}
-                className={danger ? 'text-red-400' : undefined}
-            />
+            {manifest ? (
+                <AppIcon 
+                    manifest={manifest} 
+                    icon={Icon} 
+                    size={32} 
+                    background={true}
+                    className={danger ? 'text-red-400' : undefined}
+                />
+            ) : (
+                <div className="w-8 h-8 flex items-center justify-center">
+                    <Icon size={20} strokeWidth={2} />
+                </div>
+            )}
             <span className="text-sm font-medium">{label}</span>
         </button>
     )

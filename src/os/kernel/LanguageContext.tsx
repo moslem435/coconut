@@ -20,6 +20,7 @@ const translations = {
     "app.recycle-bin": "Recycle Bin",
     "app.resume": "Resume",
     "app.terminal": "Terminal",
+    "app.weather": "Weather",
     "app.vscode-lite": "VS Code",
 
     // Boot Sequence
@@ -381,6 +382,7 @@ const translations = {
     "app.recycle-bin": "回收站",
     "app.resume": "简历",
     "app.terminal": "终端",
+    "app.weather": "天气",
     "app.vscode-lite": "VS Code",
 
     // Boot Sequence

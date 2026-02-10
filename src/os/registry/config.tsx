@@ -11,6 +11,7 @@ import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
 import { manifest as ResumeManifest } from '@/apps/resume/manifest'
 import { manifest as ContactManifest } from '@/apps/contact/manifest'
 import { manifest as MusicPlayerManifest } from '@/apps/music-player/manifest'
+import { manifest as WeatherManifest } from '@/apps/weather/manifest'
 import { manifest as VSCodeLiteManifest } from '@/apps/vscode-lite/manifest'
 
 // Re-export for compatibility
@@ -29,6 +30,7 @@ export const APPS_REGISTRY: Record<string, AppManifest> = {
   [ResumeManifest.id]: ResumeManifest,
   [ContactManifest.id]: ContactManifest,
   [MusicPlayerManifest.id]: MusicPlayerManifest,
+  [WeatherManifest.id]: WeatherManifest,
   [VSCodeLiteManifest.id]: VSCodeLiteManifest,
 }
 

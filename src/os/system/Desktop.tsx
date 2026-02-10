@@ -16,6 +16,7 @@ import { Tooltip } from '@/os/ui/Tooltip'
 import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
+import WeatherWidget from '@/os/system/WeatherWidget'
 import { AppIcon } from '@/os/ui/AppIcon'
 import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
 
@@ -25,7 +26,7 @@ interface DesktopProps {
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
-    const { snapToGrid, wallpaper, useAnimations, displayScale } = useSystemSettings()
+    const { snapToGrid, wallpaper, useAnimations, displayScale, showWeatherWidget } = useSystemSettings()
 
     // Derived Grid Settings
     const scaleFactor = displayScale / 100
@@ -84,6 +85,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     // Splash screen state: which app is currently splashing
     const [splashingApp, setSplashingApp] = useState<AppManifest | null>(null)
     const [mounted, setMounted] = useState(false)
+    const desktopRef = useRef<HTMLDivElement>(null)
 
     // Initialize icon positions if empty
     useEffect(() => {
@@ -257,6 +259,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     return (
         <>
             <div
+                ref={desktopRef}
                 className="fixed inset-0 font-sans overflow-hidden select-none cursor-default z-0"
                 style={{
                     backgroundColor: 'var(--os-bg-base)',
@@ -292,6 +295,9 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
                 {/* Ambient Overlay */}
                 <div className="absolute inset-0 pointer-events-none bg-black/10" />
+
+                {/* Weather Widget */}
+                {showWeatherWidget && <WeatherWidget dragConstraintsRef={desktopRef} />}
 
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">

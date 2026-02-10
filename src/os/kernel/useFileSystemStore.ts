@@ -205,6 +205,15 @@ const INITIAL_FILES: Record<string, FileNode> = {
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
+  'shortcut-weather': {
+    id: 'shortcut-weather',
+    parentId: 'desktop',
+    name: 'Weather',
+    type: 'file',
+    appId: 'weather',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
   // Sample Folders
   'music': {
     id: 'music',
