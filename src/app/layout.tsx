@@ -11,7 +11,7 @@ const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron' })
 const rajdhani = Rajdhani({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-rajdhani' })
 
 export const metadata: Metadata = {
-  title: 'CYBERPUNK_PORTFOLIO_V1',
+  title: 'FolioOS',
   description: 'Interactive 3D Portfolio Experience',
 }
 

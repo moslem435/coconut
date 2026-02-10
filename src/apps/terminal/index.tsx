@@ -10,7 +10,7 @@ interface TerminalHistory {
 
 const Terminal: React.FC = () => {
   const [history, setHistory] = useState<TerminalHistory[]>([
-    { type: 'output', content: 'Welcome to Portfolio OS Terminal' },
+    { type: 'output', content: 'Welcome to FolioOS Terminal' },
     { type: 'output', content: 'Type "help" to see available commands.' },
   ])
   const [input, setInput] = useState('')

@@ -64,7 +64,7 @@ export default function SettingsApp() {
     }
 
     const handleCopySpecs = () => {
-        const specs = `Portfolio OS v1.0\nBuild: 2026.02.05\n\nSystem Specs:\nBrowser: ${sysInfo.browser}\nResolution: ${sysInfo.resolution}\nUptime: ${uptime}`
+        const specs = `FolioOS v1.0\nBuild: 2026.02.05\n\nSystem Specs:\nBrowser: ${sysInfo.browser}\nResolution: ${sysInfo.resolution}\nUptime: ${uptime}`
         navigator.clipboard.writeText(specs)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)

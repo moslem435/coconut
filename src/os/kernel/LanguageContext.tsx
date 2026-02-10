@@ -255,7 +255,7 @@ const translations = {
     "msg.unpinned": "已取消固定",
     "msg.folder.impl": "新建文件夹功能尚未实现 (模拟)",
     "msg.info": "提示",
-    "msg.about.title": "Portfolio OS v1.0",
+    "msg.about.title": "FolioOS v1.0",
     "msg.about.desc": "一个基于 Web 技术的操作系统模拟界面。",
 
     // Boot Sequence
@@ -274,7 +274,7 @@ const translations = {
 
     // Start Menu
     "start.visitor": "访客",
-    "start.os": "Portfolio OS",
+    "start.os": "FolioOS",
     "start.settings": "设置",
     "start.shutdown": "关机",
 
