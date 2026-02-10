@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { Cloud, CloudRain, Sun, CloudLightning, Wind, Thermometer, MapPin, CloudSnow, CloudFog, CloudDrizzle, Loader2 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
 // Types
@@ -72,6 +73,7 @@ interface WeatherWidgetProps {
 export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps) {
   const { language } = useLanguage()
   const { launchApp } = useWindowStore()
+  const { showMenu } = useContextMenuStore()
   const [mounted, setMounted] = useState(false)
   const [weather, setWeather] = useState<WeatherState>({
     current: { temp: 0, code: 0, humidity: 0, windSpeed: 0 },
@@ -186,6 +188,13 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
       dragElastic={0.1}
       dragMomentum={false}
       whileDrag={{ cursor: 'grabbing', scale: 1.02 }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        showMenu(e.clientX, e.clientY, 'weather-widget', {
+          onRefresh: fetchWeatherData
+        })
+      }}
       onDoubleClick={(e) => {
         e.stopPropagation()
         const app = APPS_REGISTRY['weather']

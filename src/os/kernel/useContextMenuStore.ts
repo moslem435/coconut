@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type MenuType = 'desktop' | 'taskbar-icon' | 'window-titlebar' | 'default'
+export type MenuType = 'desktop' | 'taskbar-icon' | 'window-titlebar' | 'desktop-item' | 'explorer-background' | 'weather-widget' | 'default'
 
 interface ContextMenuState {
     visible: boolean

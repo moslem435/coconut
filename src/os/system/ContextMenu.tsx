@@ -21,7 +21,7 @@ export default function SystemContextMenu() {
   const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations, displayScale } = useSystemSettings()
+  const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations, displayScale, setShowWeatherWidget } = useSystemSettings()
   const { openWindow, closeWindow, minimizeWindow, maximizeWindow, updateWindowPosition, updateWindowSize } = useWindowStore()
 
   // Handle outside click
@@ -155,6 +155,28 @@ export default function SystemContextMenu() {
             icon: X,
             danger: true,
             action: () => closeWindow(data.windowId)
+          }
+        ]
+
+      case 'weather-widget':
+        return [
+          {
+            label: t('menu.refresh') || 'Refresh',
+            icon: RefreshCw,
+            action: () => {
+              if (data?.onRefresh) data.onRefresh()
+              hideMenu()
+            }
+          },
+          { type: 'separator' },
+          {
+            label: t('menu.close') || 'Close',
+            icon: X,
+            danger: true,
+            action: () => {
+              setShowWeatherWidget(false)
+              hideMenu()
+            }
           }
         ]
 
@@ -449,7 +471,7 @@ export default function SystemContextMenu() {
                     {Icon && <Icon size={15} className={item.danger ? 'opacity-90' : "opacity-70 group-hover:opacity-100 transition-opacity"} />}
                     <span>{item.label}</span>
                   </div>
-                  {item.checked && <Check size={14} className="opacity-80" />}
+                  {(item as any).checked && <Check size={14} className="opacity-80" />}
                 </button>
               </div>
             )
