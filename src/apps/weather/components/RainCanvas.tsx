@@ -79,6 +79,7 @@ export function RainCanvas({ intensity, layer = 'front', windSpeed = 0, windDire
       canvas.width = canvasRect.width
       canvas.height = canvasRect.height
       updateRects()
+      initDrops()
     }
 
     const updateRects = () => {
@@ -107,19 +108,39 @@ export function RainCanvas({ intensity, layer = 'front', windSpeed = 0, windDire
 
     // Initialize drops
     const initDrops = () => {
-      // Adjust count based on layer
-      const baseCount = intensity === 'light' ? 100 : 300
+      if (!canvas) return
+      
+      // Calculate count based on area to maintain consistent density
+      // Base density: approx 1 drop per X pixels
+      // 100 drops for say 400x600 (240,000 px) -> 1 drop per 2400 px
+      const area = canvas.width * canvas.height
+      const densityFactor = intensity === 'light' ? 3500 : 1500
+      let baseCount = Math.floor(area / densityFactor)
+      
+      // Clamp count to reasonable limits to prevent performance issues on huge screens
+      // or too few drops on tiny screens
+      baseCount = Math.max(20, Math.min(baseCount, 1500))
+
       const count = layer === 'back' ? baseCount * 0.6 : baseCount * 0.4
       
-      dropsRef.current = Array.from({ length: count }).map(() => ({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        length: Math.random() * 20 + 10,
-        // Back layer drops are slower to simulate distance
-        speed: (Math.random() * 10 + 15) * (layer === 'back' ? 0.7 : 1),
-        // Back layer drops are less opaque
-        opacity: (Math.random() * 0.3 + 0.1) * (layer === 'back' ? 0.5 : 1)
-      }))
+      // If we already have drops, try to reuse/adjust array to avoid full reset flicker
+      if (dropsRef.current.length !== Math.floor(count)) {
+         dropsRef.current = Array.from({ length: count }).map(() => {
+          // Adjust speed based on intensity
+          const baseSpeed = intensity === 'light' ? 12 : 25
+          const speedVar = intensity === 'light' ? 5 : 10
+          
+          return {
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            length: Math.random() * 20 + 10,
+            // Back layer drops are slower to simulate distance
+            speed: (Math.random() * speedVar + baseSpeed) * (layer === 'back' ? 0.7 : 1),
+            // Back layer drops are less opaque
+            opacity: (Math.random() * 0.3 + 0.1) * (layer === 'back' ? 0.5 : 1)
+          }
+        })
+      }
     }
 
     const animate = () => {

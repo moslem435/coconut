@@ -316,10 +316,10 @@ export default function WeatherApp() {
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => simulateWeather(0, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Sunny</button>
                 <button onClick={() => simulateWeather(3, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Cloudy</button>
-                <button onClick={() => simulateWeather(61, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Rain</button>
-                <button onClick={() => simulateWeather(71, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Snow</button>
+                <button onClick={() => simulateWeather(53, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Light Rain</button>
+                <button onClick={() => simulateWeather(65, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Heavy Rain</button>
                 <button onClick={() => simulateWeather(95, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Thunder</button>
-                <button onClick={() => simulateWeather(45, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Fog</button>
+                <button onClick={() => simulateWeather(71, weather.current.isDay)} className="py-1 text-xs rounded border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white transition-colors">Snow</button>
               </div>
 
               <div className="text-xs font-medium text-white/50 uppercase tracking-wider mt-2 mb-1">Wind Speed: {weather.current.windSpeed} km/h</div>
@@ -444,7 +444,7 @@ export default function WeatherApp() {
                   <Calendar size={16} />
                   {language === 'zh' ? '24小时预报' : '24-Hour Forecast'}
                </div>
-               <div className="h-32 w-full">
+               <div className="h-52 w-full -ml-2">
                  <HourlyChart data={weather.hourly} language={language} />
                </div>
             </div>
