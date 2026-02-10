@@ -50,6 +50,8 @@ export default function Window({ id }: WindowProps) {
   const { captureSnapshot } = useWindowSnapshot(id)
 
   const dragControls = useDragControls()
+  const ghostDragControls = useDragControls()
+  const [isGhostDragging, setIsGhostDragging] = useState(false)
 
   if (!windowState || !windowState.isOpen) return null
 
@@ -124,10 +126,64 @@ export default function Window({ id }: WindowProps) {
         />
       )}
 
+      {/* Ghost Window for Dragging */}
+      <motion.div
+        drag
+        dragControls={ghostDragControls}
+        dragListener={false}
+        dragMomentum={false}
+        dragElastic={0.05}
+        initial={false}
+        animate={{
+          x: targetX,
+          y: targetY,
+          width: windowState.size.width,
+          height: windowState.size.height,
+          opacity: isGhostDragging ? 1 : 0,
+        }}
+        style={{
+          position: 'fixed',
+          zIndex: 6000,
+          pointerEvents: isGhostDragging ? 'auto' : 'none',
+          border: '2px dashed var(--os-accent)',
+          backgroundColor: 'var(--os-accent-glow)',
+          boxShadow: '0 0 30px var(--os-accent-dim)',
+          borderRadius: '0.75rem',
+        }}
+        onDragStart={() => {
+            setIsDragging(true)
+            setIsGhostDragging(true)
+        }}
+        onDrag={(_, info) => {
+            const currentY = windowState.position.y + info.offset.y
+            if (currentY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
+                setShowSnapPreview(true)
+            } else {
+                setShowSnapPreview(false)
+            }
+        }}
+        onDragEnd={(_, info) => {
+            setIsDragging(false)
+            setIsGhostDragging(false)
+            setShowSnapPreview(false)
+            
+            const newY = windowState.position.y + info.offset.y
+            
+            if (newY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
+                maximizeWindow(id)
+            } else {
+                updateWindowPosition(id, {
+                    x: windowState.position.x + info.offset.x,
+                    y: Math.max(0, newY)
+                })
+            }
+        }}
+      />
+
       <motion.div
         id={`window-${id}`}
         ref={windowRef}
-        drag={!windowState.isMinimized}
+        drag={windowState.isMaximized}
         dragControls={dragControls}
         dragListener={false}
         dragMomentum={false}
@@ -275,8 +331,17 @@ export default function Window({ id }: WindowProps) {
             onMinimize={handleMinimize}
             onMaximize={() => maximizeWindow(id)}
             onClose={() => closeWindow(id)}
-            dragControls={dragControls}
-            onPointerDown={() => focusWindow(id)}
+            dragControls={undefined}
+            onPointerDown={(e) => {
+              focusWindow(id)
+              if (windowState.isMaximized) {
+                dragControls.start(e)
+              } else {
+                setIsGhostDragging(true)
+                setIsDragging(true)
+                ghostDragControls.start(e)
+              }
+            }}
             onHoverMinimize={captureSnapshot}
             onContextMenu={(e) => {
               e.preventDefault()

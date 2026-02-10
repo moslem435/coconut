@@ -9,6 +9,7 @@ import { GlitchMode } from 'postprocessing'
 import * as THREE from 'three'
 import ProjectStage from './ProjectStage'
 import { PROJECTS } from '@/lib/data'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 
 interface SceneProps {
   activeProjectIndex: number
@@ -65,6 +66,7 @@ function MovingSpot({ color }: { color: string }) {
 export default function Scene({ activeProjectIndex, isPortalActive, onPortalComplete, selectedSubProject }: SceneProps) {
   const project = PROJECTS[activeProjectIndex] || PROJECTS[0]
   const [glitchActive, setGlitchActive] = useState(false)
+  const { useAnimations } = useSystemSettings()
 
   // Trigger glitch on project change
   useEffect(() => {
@@ -108,11 +110,12 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
 
         {/* Environment: Space / Void */}
         <Environment preset="city" blur={1} />
-        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+        <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
         <Sparkles count={50} scale={12} size={2} speed={0.4} opacity={0.5} color="white" />
 
         {/* Post Processing Effects - Restored */}
-        <EffectComposer>
+        {useAnimations && (
+        <EffectComposer multisampling={0}>
            <ChromaticAberration 
              offset={new Vector2(0.002, 0.002)}
              radialModulation={false}
@@ -134,6 +137,7 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
               ratio={0.85}
             />
         </EffectComposer>
+        )}
       </Canvas>
     </div>
   )

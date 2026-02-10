@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText } from 'lucide-react'
+import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText, Minus } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -135,7 +135,7 @@ export default function SystemContextMenu() {
           },
           {
             label: t('menu.minimize'),
-            icon: MinusIcon,
+            icon: Minus,
             action: () => minimizeWindow(data.windowId)
           },
           { type: 'separator' },

@@ -41,9 +41,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const openWindow = useWindowStore(state => state.openWindow)
     const launchApp = useWindowStore(state => state.launchApp)
     const focusWindow = useWindowStore(state => state.focusWindow)
-    // Granular subscription for window status checks
-    const windows = useWindowStore(useShallow(state => state.windows))
-
+    
     // Selection State
     const [selectedIcons, setSelectedIcons] = useState<string[]>([])
 
@@ -147,10 +145,11 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         const item = desktopItems.find(i => i.id === id)
         if (!item) return
 
-        // 1. If it's an app shortcut
+        // 1. App Shortcut
         if (item.appId) {
             // Check if window already exists and is open
-            if (windows[item.appId]?.isOpen) {
+            const isWindowOpen = useWindowStore.getState().windows[item.appId]?.isOpen
+            if (isWindowOpen) {
                 focusWindow(item.appId)
                 return
             }

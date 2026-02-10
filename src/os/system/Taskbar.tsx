@@ -1,18 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
-import { Wifi, Battery, Volume2, Command, Settings2 } from 'lucide-react'
-import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useState, useRef, useMemo } from 'react'
+import { Volume2, Command, Settings2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
-import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { APPS_REGISTRY } from '@/os/registry/config'
-import { AnimatePresence } from 'framer-motion'
-import { WindowPreview } from './WindowPreview'
 import { Tooltip } from '@/os/ui/Tooltip'
 import StartMenu from './StartMenu'
-import { AppIcon } from '@/os/ui/AppIcon'
+import { TaskbarItem } from './TaskbarItem'
+
+import SystemClock from './SystemClock'
+import QuickSettings from './QuickSettings'
+import ActionCenter from './ActionCenter'
 
 interface TaskbarProps {
   onStartClick?: () => void
@@ -21,10 +21,6 @@ interface TaskbarProps {
   onShutdown?: () => void
 }
 
-import SystemClock from './SystemClock'
-import QuickSettings from './QuickSettings'
-import ActionCenter from './ActionCenter'
-
 export default function Taskbar({
   onStartClick,
   isStartMenuOpen,
@@ -32,23 +28,17 @@ export default function Taskbar({
   onShutdown
 }: TaskbarProps) {
   const { t, language, toggleLanguage } = useLanguage()
-  // Taskbar needs list of all open windows
-  const openWindows = useWindowStore(useShallow(state =>
-    Object.values(state.windows).filter(w => w.isOpen)
-  ))
-  const activeWindowId = useWindowStore(state => state.activeWindowId)
-  const snapshots = useWindowStore(state => state.snapshots)
-  const launchingAppIds = useWindowStore(state => state.launchingAppIds)
-  const { pinnedAppIds, useTaskbarPreviews } = useSystemSettings()
-
-  // Actions
-  const openWindow = useWindowStore(state => state.openWindow)
-  const focusWindow = useWindowStore(state => state.focusWindow)
-  const minimizeWindow = useWindowStore(state => state.minimizeWindow)
-  const updateTaskbarPosition = useWindowStore(state => state.updateTaskbarPosition)
-  const setSnapshot = useWindowStore(state => state.setSnapshot)
-  const setPeekWindowId = useWindowStore(state => state.setPeekWindowId)
-  const launchApp = useWindowStore(state => state.launchApp)
+  
+  // Taskbar needs list of all open window IDs/AppIDs
+  // We use useShallow with a composite key string to avoid re-renders when other window properties change
+  const openWindowsStrings = useWindowStore(
+    useShallow(state => Object.values(state.windows)
+      .filter(w => w.isOpen)
+      .map(w => `${w.id}|${w.appId || ''}`))
+  )
+  
+  const launchingAppIds = useWindowStore(useShallow(state => state.launchingAppIds))
+  const { pinnedAppIds } = useSystemSettings()
 
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false)
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false)
@@ -56,139 +46,37 @@ export default function Taskbar({
   const actionCenterRef = useRef<HTMLDivElement>(null)
   const startBtnRef = useRef<HTMLButtonElement>(null)
 
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const peekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-
   // Merge pinned apps and open windows
+  // Result is a list of { id, appId }
   const taskbarItems = useMemo(() => {
-    const items: Array<{
-      id: string // appId or windowId
-      appId: string
-      title: string
-      icon: any
-      isOpen: boolean
-      isMinimized: boolean
-      isActive: boolean
-      isLoading?: boolean
-    }> = []
+    const items: Array<{ id: string, appId: string }> = []
+    const addedIds = new Set<string>()
 
     // 1. Add Pinned Apps first
     pinnedAppIds.forEach(appId => {
-      const app = APPS_REGISTRY[appId]
-      if (!app) return
-
-      // Check if it's open (using appId as windowId for single-instance apps)
-      const win = openWindows.find(w => w.id === appId)
-
-      const title = t(`app.${appId}`)
-
-      items.push({
-        id: appId,
-        appId: appId,
-        title: title,
-        icon: app.icon,
-        isOpen: !!win,
-        isMinimized: win?.isMinimized ?? false,
-        isActive: activeWindowId === appId,
-        isLoading: launchingAppIds.includes(appId)
-      })
+      items.push({ id: appId, appId: appId })
+      addedIds.add(appId)
     })
 
     // 2. Add remaining Open Windows that aren't pinned
-    openWindows.forEach(win => {
-      // If already added via pinned list, skip
-      if (pinnedAppIds.includes(win.id)) return
-
-      const app = APPS_REGISTRY[win.id]
-      items.push({
-        id: win.id,
-        appId: win.id, // Assuming window id is app id
-        title: win.isDefaultTitle ? t(`app.${win.appId}`) : win.title,
-        icon: win.icon,
-        isOpen: true,
-        isMinimized: win.isMinimized,
-        isActive: activeWindowId === win.id
-      })
+    openWindowsStrings.forEach(str => {
+      const [id, appId] = str.split('|')
+      // If the window ID is already added (e.g. it's a pinned app that is open), skip
+      if (addedIds.has(id)) return
+      
+      items.push({ id, appId: appId || id }) // Fallback to id if appId is empty
+      addedIds.add(id)
     })
 
-    // 3. Add Launching Apps (that are not pinned and not open yet)
+    // 3. Add Launching Apps
     launchingAppIds.forEach(appId => {
-      // If already in items (pinned or open), we handled it above
-      if (items.some(i => i.appId === appId)) return
-
-      const app = APPS_REGISTRY[appId]
-      if (!app) return
-
-      items.push({
-        id: appId,
-        appId: appId,
-        title: t(`app.${appId}`),
-        icon: app.icon,
-        isOpen: false,
-        isMinimized: false,
-        isActive: false,
-        isLoading: true
-      })
+      if (addedIds.has(appId)) return
+      items.push({ id: appId, appId })
+      addedIds.add(appId)
     })
 
     return items
-  }, [openWindows, pinnedAppIds, activeWindowId, launchingAppIds])
-
-  // Update taskbar positions after render
-  useLayoutEffect(() => {
-    // Only update position for open windows (pinned-only apps don't have windows yet)
-    // But we need to track position for minimize animation target
-    taskbarItems.forEach(item => {
-      const el = itemRefs.current[item.id]
-      if (el) {
-        const rect = el.getBoundingClientRect()
-        // Update position in window store for minimize animation
-        // Even if window isn't open, we update it so when it opens it knows where to go? 
-        // Actually only open windows need this.
-        if (item.isOpen) {
-          updateTaskbarPosition(item.id, { x: rect.left + rect.width / 2, y: rect.top })
-        }
-      }
-    })
-  }, [taskbarItems, updateTaskbarPosition])
-
-
-  const handleItemClick = (item: typeof taskbarItems[0]) => {
-    // Close preview immediately on click
-    setHoveredId(null)
-    setPeekWindowId(null)
-    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-
-    if (item.isOpen) {
-      if (item.isActive && !item.isMinimized) {
-        minimizeWindow(item.id)
-      } else {
-        focusWindow(item.id)
-      }
-    } else {
-      if (item.isLoading) return
-
-      // Launch App
-      const app = APPS_REGISTRY[item.appId]
-      if (app) {
-        const el = itemRefs.current[item.id]
-        let taskbarPos = undefined
-        if (el) {
-          const rect = el.getBoundingClientRect()
-          taskbarPos = { x: rect.left + rect.width / 2, y: rect.top }
-        }
-
-        const title = t(`app.${item.appId}`)
-
-        launchApp(app.id, title, <app.component />, app.icon, {
-          ...app.defaultWindowOptions,
-          taskbarPosition: taskbarPos,
-          isDefaultTitle: true
-        })
-      }
-    }
-  }
+  }, [openWindowsStrings, pinnedAppIds, launchingAppIds])
 
   return (
     <div
@@ -201,7 +89,6 @@ export default function Taskbar({
         WebkitBackdropFilter: 'blur(40px) saturate(150%)'
       }}
     >
-
       {/* Left: Start & Taskbar Items */}
       <div className="flex items-center gap-2 h-full py-2">
 
@@ -222,88 +109,14 @@ export default function Taskbar({
           <div className="w-px h-5 bg-[var(--os-border)] opacity-50" />
         )}
 
-        {/* Window List - Icon Only for Dock Look */}
+        {/* Window List */}
         {taskbarItems.map((item) => (
-          <Tooltip
-            key={item.id}
-            content={(!useTaskbarPreviews || !item.isOpen) ? item.title : null}
-            side="top"
-            offset={20}
-          >
-            <button
-              ref={(el) => { itemRefs.current[item.id] = el }}
-              onClick={() => handleItemClick(item)}
-              onMouseEnter={() => {
-                setHoveredId(item.id)
-              }}
-              onMouseLeave={() => {
-                setHoveredId(null)
-
-                // Clear Peek (Safety fallback)
-                if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                setPeekWindowId(null)
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', {
-                  windowId: item.isOpen ? item.id : undefined,
-                  appId: item.appId
-                })
-              }}
-              className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group ${item.isLoading ? 'animate-pulse cursor-wait' : ''
-                }`}
-              style={{
-                backgroundColor: item.isActive && !item.isMinimized
-                  ? 'var(--os-accent-dim)' // Keep this for active indicator background if needed, but AppIcon has its own bg
-                  : undefined
-              }}
-            >
-
-              {/* Window Icon */}
-              <AppIcon
-                  manifest={APPS_REGISTRY[item.appId]}
-                  icon={item.icon}
-                  size={32}
-                  className="drop-shadow-sm"
-              />
-
-              {/* Indicator Dot for Open Apps */}
-              {item.isOpen && (
-                <div className={`absolute -bottom-1.5 w-1 h-1 rounded-full ${item.isActive && !item.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
-              )}
-
-              {/* Window Preview */}
-              <AnimatePresence>
-                {useTaskbarPreviews && item.isOpen && hoveredId === item.id && (
-                  <WindowPreview
-                    appId={item.appId}
-                    title={item.title}
-                    icon={item.icon}
-                    isActive={item.isActive}
-                    snapshot={snapshots[item.id]}
-                    onPeek={(shouldPeek) => {
-                      if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                      if (shouldPeek) {
-                        // Enter peek mode (slight delay to prevent accidental triggers)
-                        peekTimeoutRef.current = setTimeout(() => {
-                          setPeekWindowId(item.id)
-                        }, 200)
-                      } else {
-                        // Exit peek mode immediately
-                        setPeekWindowId(null)
-                      }
-                    }}
-                  />
-                )}
-              </AnimatePresence>
-            </button>
-          </Tooltip>
+           <TaskbarItem key={item.id} id={item.id} appId={item.appId} />
         ))}
       </div>
 
       {/* Right: System Tray */}
       <div className="flex items-center gap-1.5 h-full pl-4 ml-auto relative" style={{ color: 'var(--os-text-secondary)' }}>
-
         {/* Separator */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
 
@@ -340,7 +153,6 @@ export default function Taskbar({
             <SystemClock showDate />
           </div>
         </Tooltip>
-
       </div>
 
       {/* Popups */}
@@ -354,13 +166,13 @@ export default function Taskbar({
       <QuickSettings
         isOpen={isQuickSettingsOpen}
         onClose={() => setIsQuickSettingsOpen(false)}
-        toggleRef={quickSettingsRef}
+        toggleRef={quickSettingsRef as React.RefObject<HTMLDivElement>}
       />
 
       <ActionCenter
         isOpen={isActionCenterOpen}
         onClose={() => setIsActionCenterOpen(false)}
-        toggleRef={actionCenterRef}
+        toggleRef={actionCenterRef as React.RefObject<HTMLDivElement>}
       />
     </div>
   )
