@@ -11,6 +11,7 @@
  */
 
 import { IFileSystem, FileStat } from './IFileSystem'
+import { get, set, del, entries } from 'idb-keyval'
 
 export class NativeDriver implements IFileSystem {
     private rootHandle: FileSystemDirectoryHandle
@@ -18,6 +19,33 @@ export class NativeDriver implements IFileSystem {
     constructor(rootHandle: FileSystemDirectoryHandle) {
         this.rootHandle = rootHandle
     }
+
+    // --- Persistence Static Methods ---
+
+    static async persistMount(id: string, handle: FileSystemDirectoryHandle) {
+        await set(`mount-${id}`, handle)
+    }
+
+    static async removeMount(id: string) {
+        await del(`mount-${id}`)
+    }
+
+    static async restoreMounts(): Promise<Map<string, FileSystemDirectoryHandle>> {
+        const mounts = new Map<string, FileSystemDirectoryHandle>()
+        const allEntries = await entries()
+        
+        for (const [key, value] of allEntries) {
+            if (typeof key === 'string' && key.startsWith('mount-') && value instanceof FileSystemDirectoryHandle) {
+                const id = key.replace('mount-', '')
+                // Note: We cannot verify permission here without user gesture.
+                // We just return the handle. The UI must handle 'permission denied' later.
+                mounts.set(id, value)
+            }
+        }
+        return mounts
+    }
+
+    // --- Core File System Methods ---
 
     /**
      * Resolves a path string to a handle.
@@ -204,7 +232,8 @@ export class NativeDriver implements IFileSystem {
             atime: Date.now(), // Not available
             ctime: Date.now(), // Not available
             isDirectory: false,
-            isFile: true
+            isFile: true,
+            mimeType: file.type || undefined
         }
     }
 

@@ -29,10 +29,11 @@ export default function Shell({ onShutdown }: ShellProps) {
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
   // VFS Sync
-  const { syncToOPFS } = useFileSystemStore()
+  const { syncToOPFS, initialize } = useFileSystemStore()
 
   useEffect(() => {
     syncToOPFS().catch(console.error)
+    initialize().catch(console.error)
   }, []) // Run once on startup
 
   const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()

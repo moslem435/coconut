@@ -158,6 +158,7 @@ const translations = {
     "menu.rename": "Rename",
     "menu.rename.prompt": "Enter new name:",
     "menu.properties": "Properties",
+    "menu.download": "Download",
 
     // Messages / Notifications
     "msg.pinned": "Pinned to Taskbar",
@@ -298,10 +299,15 @@ const translations = {
 
     // File Explorer
     "explorer.root": "Root",
+    "explorer.this_system": "THIS SYSTEM",
+    "explorer.mounted_drives": "MOUNTED DRIVES",
+    "explorer.cloud": "CLOUD",
     "explorer.desktop": "Desktop",
     "explorer.documents": "Documents",
-    "explorer.pictures": "Pictures",
     "explorer.downloads": "Downloads",
+    "explorer.pictures": "Pictures",
+    "explorer.music": "Music",
+    "common.search": "Search",
     "explorer.empty": "This folder is empty",
 
     // Common
@@ -457,6 +463,7 @@ const translations = {
     "menu.rename": "重命名",
     "menu.rename.prompt": "输入新名称:",
     "menu.properties": "属性",
+    "menu.download": "下载",
 
     // Messages / Notifications
     "msg.pinned": "已固定到任务栏",
@@ -630,11 +637,16 @@ const translations = {
 
     // File Explorer
     "explorer.root": "根目录",
+    "explorer.this_system": "此系统",
+    "explorer.mounted_drives": "挂载盘",
+    "explorer.cloud": "云盘",
     "explorer.desktop": "桌面",
     "explorer.documents": "文档",
-    "explorer.pictures": "图片",
     "explorer.downloads": "下载",
+    "explorer.pictures": "图片",
+    "explorer.music": "音乐",
     "explorer.empty": "此文件夹为空",
+    "common.search": "搜索",
 
     // Common
     "common.name": "名称",

@@ -44,6 +44,12 @@ interface FileSystemState {
 
   // Sync
   syncToOPFS: () => Promise<void>
+  initialize: () => Promise<void>
+
+  // Clipboard
+  clipboard: { items: string[], op: 'copy' | 'cut' | null }
+  setClipboard: (items: string[], op: 'copy' | 'cut') => void
+  pasteItems: (targetFolderId: string) => Promise<void>
 
   // New Actions
   mountLocalFolder: () => Promise<void>
@@ -348,7 +354,11 @@ export const useFileSystemStore = create<FileSystemState>()(
           const mountPath = fs.mount(handle)
           const mountId = mountPath.split('/').pop()!
 
-          // 2. Add to Store State
+          // 2. Persist Handle
+          const { NativeDriver } = await import('@/os/kernel/filesystem/NativeDriver')
+          await NativeDriver.persistMount(mountId, handle)
+
+          // 3. Add to Store State
           const mountNode: FileNode = {
             id: mountId,
             parentId: 'root',
@@ -375,6 +385,39 @@ export const useFileSystemStore = create<FileSystemState>()(
           if (error.name !== 'AbortError') {
             console.error('Failed to mount folder:', error)
           }
+        }
+      },
+
+      initialize: async () => {
+        try {
+           const { NativeDriver } = await import('@/os/kernel/filesystem/NativeDriver')
+           const mounts = await NativeDriver.restoreMounts()
+
+           // Mount each restored handle
+           mounts.forEach((handle, id) => {
+               fs.mount(handle, id)
+               
+               // Add to State
+               const newNode: FileNode = {
+                    id: id,
+                    parentId: 'root',
+                    name: handle.name,
+                    type: 'folder',
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    icon: 'hard-drive',
+                    isMount: true
+               }
+               
+               set(state => {
+                   if (state.files[id]) return state // Already exists
+                   return {
+                       files: { ...state.files, [id]: newNode }
+                   }
+               })
+           })
+        } catch (e) {
+            console.error('Failed to restore mounts:', e)
         }
       },
 
@@ -686,6 +729,63 @@ export const useFileSystemStore = create<FileSystemState>()(
         }
         console.log('VFS -> OPFS Sync Complete')
         set({ isLoading: false })
+      },
+
+      // Clipboard Implementation
+      clipboard: { items: [], op: null },
+      setClipboard: (items, op) => set({ clipboard: { items, op } }),
+
+      pasteItems: async (targetFolderId) => {
+        const { clipboard, files, createItem, moveItem } = get()
+        if (!clipboard.op || clipboard.items.length === 0) return
+
+        const targetFolder = files[targetFolderId]
+        if (!targetFolder || targetFolder.type !== 'folder') return
+
+        for (const itemId of clipboard.items) {
+          const item = files[itemId]
+          if (!item) continue
+
+          // Check for name collision and generate new name if needed
+          let newName = item.name
+          let counter = 1
+          while (Object.values(files).some(f => 
+            f.parentId === targetFolderId && f.name === newName && f.id !== itemId
+          )) {
+            const nameParts = item.name.split('.')
+            if (nameParts.length > 1) {
+              const ext = nameParts.pop()
+              newName = `${nameParts.join('.')} (${counter}).${ext}`
+            } else {
+              newName = `${item.name} (${counter})`
+            }
+            counter++
+          }
+
+          if (clipboard.op === 'cut') {
+             // For cut, we just move and rename if needed
+             if (newName !== item.name) {
+               await get().renameItem(itemId, newName)
+             }
+             await moveItem(itemId, targetFolderId)
+          } else {
+            // For copy, we create a new item
+            // Note: Deep copy for folders is not implemented yet, simpler for files
+            // For now, we only support copying files or empty folders
+            await createItem(
+              targetFolderId,
+              newName,
+              item.type,
+              item.content,
+              item.appId
+            )
+          }
+        }
+
+        // Clear clipboard after cut
+        if (clipboard.op === 'cut') {
+          set({ clipboard: { items: [], op: null } })
+        }
       }
     }),
     {

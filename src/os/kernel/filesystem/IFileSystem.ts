@@ -16,6 +16,7 @@ export interface FileStat {
     ctime: number;
     isDirectory: boolean;
     isFile: boolean;
+    mimeType?: string;
 }
 
 export interface IFileSystem {

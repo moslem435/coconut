@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText, Minus } from 'lucide-react'
+import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText, Minus, Download } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
@@ -224,6 +224,27 @@ export default function SystemContextMenu() {
                   if (newName && newName !== file.name) {
                     useFileSystemStore.getState().renameItem(data.id, newName).catch(console.error)
                   }
+                }
+              }
+              hideMenu()
+            }
+          },
+          {
+            label: t('menu.download'),
+            icon: Download,
+            action: () => {
+              if (data?.id) {
+                const file = useFileSystemStore.getState().getItem(data.id)
+                if (file && file.type === 'file' && file.content) {
+                  const blob = new Blob([file.content], { type: 'text/plain' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = file.name
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
                 }
               }
               hideMenu()

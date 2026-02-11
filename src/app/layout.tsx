@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Roboto, Orbitron, Rajdhani } from 'next/font/google'
 import './globals.css'
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { SiteProtection } from '@/os/system/SiteProtection'
 import { LanguageProvider } from "@/os/kernel/LanguageContext"
 

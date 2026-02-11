@@ -41,8 +41,8 @@ export class FileSystemClient implements IFileSystem {
      * Mount a native directory handle.
      * Returns the mount path (e.g., "/mnt/native-123")
      */
-    mount(handle: FileSystemDirectoryHandle): string {
-        const id = crypto.randomUUID();
+    mount(handle: FileSystemDirectoryHandle, forcedId?: string): string {
+        const id = forcedId || crypto.randomUUID();
         const driver = new NativeDriver(handle);
         this.mounts.set(id, driver);
         return `/mnt/${id}`;
