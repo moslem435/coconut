@@ -83,7 +83,93 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     // Splash screen state: which app is currently splashing
     const [splashingApp, setSplashingApp] = useState<AppManifest | null>(null)
     const [mounted, setMounted] = useState(false)
+    const [isLayoutReady, setIsLayoutReady] = useState(false)
     const desktopRef = useRef<HTMLDivElement>(null)
+
+    // Helper to get transition styles
+    const getTransitionStyle = (type: string, isVisible: boolean) => {
+        const base = {
+            transition: 'all 1000ms cubic-bezier(0.4, 0, 0.2, 1)',
+            opacity: isVisible ? 1 : 0,
+        }
+        
+        if (isVisible) {
+            return { ...base, transform: 'none', filter: 'none' }
+        }
+        
+        switch (type) {
+            case 'zoom-in': return { ...base, transform: 'scale(1.1)' }
+            case 'zoom-out': return { ...base, transform: 'scale(0.95)' }
+            case 'blur': return { ...base, filter: 'blur(10px)', transform: 'scale(1.05)' }
+            default: return base // fade
+        }
+    }
+
+    // Wallpaper Loading State
+    const [loadedWallpaper, setLoadedWallpaper] = useState<string | null>(null)
+    const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null)
+    const [isWallpaperLoading, setIsWallpaperLoading] = useState(false)
+    const [transitionType, setTransitionType] = useState('fade')
+    
+    // Track current wallpaper request to handle race conditions
+    const currentWallpaperRef = useRef<string | null>(null)
+    const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Handle Wallpaper Preloading and Transition
+    useEffect(() => {
+        if (!wallpaper) return
+
+        // Update ref immediately
+        currentWallpaperRef.current = wallpaper.value
+
+        // Clear any pending transition timeout
+        if (transitionTimeoutRef.current) {
+            clearTimeout(transitionTimeoutRef.current)
+            transitionTimeoutRef.current = null
+        }
+
+        if (wallpaper.type === 'image') {
+            // If we are already displaying this wallpaper as the loaded one, 
+            // and it's not loading, we might just need to ensure active is synced eventually.
+            // But if user switches back and forth, we should respect the new request.
+            // Only skip if both loaded and active are already this wallpaper.
+            if (loadedWallpaper === wallpaper.value && activeWallpaper === wallpaper.value) return
+
+            // Randomize transition effect
+            const transitions = ['fade', 'zoom-in', 'zoom-out', 'blur']
+            setTransitionType(transitions[Math.floor(Math.random() * transitions.length)])
+
+            setIsWallpaperLoading(true)
+            const img = new Image()
+            img.src = wallpaper.value
+            
+            img.onload = () => {
+                // Check if this is still the requested wallpaper
+                if (currentWallpaperRef.current !== wallpaper.value) return
+
+                setLoadedWallpaper(wallpaper.value)
+                setIsWallpaperLoading(false)
+                
+                // Update active wallpaper after a short delay to allow fade transition
+                transitionTimeoutRef.current = setTimeout(() => {
+                    if (currentWallpaperRef.current === wallpaper.value) {
+                        setActiveWallpaper(wallpaper.value)
+                    }
+                }, 1000)
+            }
+            
+            img.onerror = () => {
+                if (currentWallpaperRef.current === wallpaper.value) {
+                    setIsWallpaperLoading(false)
+                }
+            }
+        } else {
+            // For presets/video/colors, update immediately
+            setLoadedWallpaper(null)
+            setActiveWallpaper(wallpaper.value)
+            setIsWallpaperLoading(false)
+        }
+    }, [wallpaper]) // Run when wallpaper changes
 
     // Initialize icon positions if empty
     useEffect(() => {
@@ -101,6 +187,8 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         if (Object.keys(iconPositions).length === 0 || hasMissingPositions) {
             organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
         }
+        
+        setIsLayoutReady(true)
     }, []) // Run once on mount
 
     // Handle Scale Changes
@@ -281,10 +369,26 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         playsInline
                     />
                 ) : wallpaper?.type === 'image' ? (
-                    <div
-                        className="absolute inset-0 pointer-events-none transition-all duration-1000 bg-cover bg-center bg-no-repeat"
-                        style={{ backgroundImage: `url(${wallpaper.value})` }}
-                    />
+                    <>
+                        {/* Previous Wallpaper (Background Layer) */}
+                        <div 
+                            className="absolute inset-0 transition-all duration-1000 bg-cover bg-center bg-no-repeat"
+                            style={{ 
+                                backgroundImage: `url(${activeWallpaper})`,
+                                opacity: 1,
+                                backgroundColor: !activeWallpaper ? 'var(--os-bg-base)' : undefined
+                            }} 
+                        />
+                        
+                        {/* New Wallpaper (Foreground Layer - Fades In) */}
+                        <div
+                            className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
+                            style={{ 
+                                backgroundImage: `url(${loadedWallpaper})`,
+                                ...getTransitionStyle(transitionType, !isWallpaperLoading && loadedWallpaper === wallpaper.value)
+                            }}
+                        />
+                    </>
                 ) : (
                     <div
                         className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
@@ -300,7 +404,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">
-                    {desktopItems.map((item) => {
+                    {isLayoutReady && desktopItems.map((item) => {
                         const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
                         const isSelected = selectedIcons.includes(item.id)
 

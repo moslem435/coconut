@@ -4,33 +4,15 @@ import dynamic from 'next/dynamic'
 import { Suspense, useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Shell from '@/os/system/Shell'
-import BootSequence from '@/os/system/BootSequence'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 
 export default function Home() {
-  const [hasBooted, setHasBooted] = useState(false)
+  const [hasBooted, setHasBooted] = useState(true)
   const [isShuttingDown, setIsShuttingDown] = useState(false)
   const { skipBootSequence } = useSystemSettings()
 
   const closeAllWindows = useWindowStore(state => state.closeAllWindows)
-
-  // Auto-login / Skip Boot Check
-  useEffect(() => {
-    // Check session storage for "already booted in this session"
-    const sessionBoot = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cloud-os-booted') : null
-    
-    if (skipBootSequence || sessionBoot === 'true') {
-        setHasBooted(true)
-    }
-  }, [skipBootSequence])
-
-  const handleBootComplete = useCallback(() => {
-    setHasBooted(true)
-    if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('cloud-os-booted', 'true')
-    }
-  }, [])
 
   const handleShutdown = useCallback(() => {
     setIsShuttingDown(true)
@@ -38,12 +20,8 @@ export default function Home() {
     closeAllWindows?.()
     // Wait for shutdown animation, then reset to boot screen
     setTimeout(() => {
-      setHasBooted(false)
-      setIsShuttingDown(false)
-      // Clear session boot flag on shutdown
-      if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem('cloud-os-booted')
-      }
+      // Just reload page to restart
+      window.location.reload()
     }, 1000)
   }, [closeAllWindows])
 
@@ -69,18 +47,13 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Boot Screen Overlay */}
-      {!hasBooted && !isShuttingDown && (
-        <BootSequence onComplete={handleBootComplete} />
-      )}
-
-      {/* Main Content - Fades in after boot */}
-      {hasBooted && !isShuttingDown && (
+      {/* Main Content */}
+      {!isShuttingDown && (
         <motion.div
           className="h-full w-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <Shell onShutdown={handleShutdown} />
         </motion.div>

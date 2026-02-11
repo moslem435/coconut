@@ -133,15 +133,6 @@ const INITIAL_FILES: Record<string, FileNode> = {
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
-  'shortcut-calculator': {
-    id: 'shortcut-calculator',
-    parentId: 'desktop',
-    name: 'Calculator',
-    type: 'file',
-    appId: 'calculator',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
   'shortcut-notepad': {
     id: 'shortcut-notepad',
     parentId: 'desktop',

@@ -30,6 +30,7 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
 
   const { language, toggleLanguage, t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
+  const [activeControl, setActiveControl] = useState<'volume' | 'scale'>('volume')
 
   // Close when clicking outside
   useEffect(() => {
@@ -106,7 +107,9 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
           {/* Header */}
           <div className="flex justify-between items-center mb-4 px-1">
             <h3 className="font-semibold text-sm tracking-wide">{t('quicksettings.title')}</h3>
-            <div className="text-xs text-[var(--os-text-muted)]">{Math.round(volume)}%</div>
+            <div className="text-xs text-[var(--os-text-muted)]">
+              {activeControl === 'volume' ? `${Math.round(volume)}%` : `${Math.round(displayScale)}%`}
+            </div>
           </div>
 
           {/* Sliders Section */}
@@ -127,7 +130,10 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
                   min="0"
                   max="100"
                   value={isMuted ? 0 : volume}
-                  onChange={(e) => setVolume(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    setVolume(parseInt(e.target.value))
+                    setActiveControl('volume')
+                  }}
                   className="w-full h-1.5 bg-[var(--os-border)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-[var(--os-accent)] [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
                 />
               </div>
@@ -147,7 +153,10 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
                   max="125"
                   step="5"
                   value={displayScale}
-                  onChange={(e) => setDisplayScale(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    setDisplayScale(parseInt(e.target.value))
+                    setActiveControl('scale')
+                  }}
                   className="w-full h-1.5 bg-[var(--os-border)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-[var(--os-text-secondary)] [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
                 />
               </div>

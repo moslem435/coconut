@@ -11,7 +11,6 @@ const translations = {
     "app.portfolio-hub": "Portfolio Hub",
     "app.settings": "Settings",
     "app.browser": "Browser",
-    "app.calculator": "Calculator",
     "app.contact": "Contact",
     "app.file-explorer": "File Explorer",
     "app.music-player": "Music Player",

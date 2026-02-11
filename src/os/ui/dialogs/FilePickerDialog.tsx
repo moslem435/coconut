@@ -24,7 +24,7 @@ export function FilePickerDialog({
     onConfirm,
     onCancel
 }: FilePickerDialogProps) {
-    const { fileSystem, getItem, getFolderContents } = useFileSystemStore()
+    const { getItem, getChildren } = useFileSystemStore()
     const { t } = useLanguage()
     
     const [currentPath, setCurrentPath] = useState(initialPath)
@@ -45,7 +45,7 @@ export function FilePickerDialog({
     if (!isOpen) return null
 
     const currentFolder = getItem(currentPath)
-    const contents = getFolderContents(currentPath)
+    const contents = getChildren(currentPath)
     
     // Filter files based on extensions
     const filteredContents = contents.filter(item => {

@@ -4,7 +4,6 @@ import { manifest as SettingsManifest } from '@/apps/settings/manifest'
 import { manifest as FileExplorerManifest } from '@/apps/file-explorer/manifest'
 import { manifest as BrowserManifest } from '@/apps/browser/manifest'
 import { manifest as TerminalManifest } from '@/apps/terminal/manifest'
-import { manifest as CalculatorManifest } from '@/apps/calculator/manifest'
 import { manifest as NotepadManifest } from '@/apps/notepad/manifest'
 import { manifest as RecycleBinManifest } from '@/apps/recycle-bin/manifest'
 import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
@@ -23,7 +22,6 @@ export const APPS_REGISTRY: Record<string, AppManifest> = {
   [FileExplorerManifest.id]: FileExplorerManifest,
   [BrowserManifest.id]: BrowserManifest,
   [TerminalManifest.id]: TerminalManifest,
-  [CalculatorManifest.id]: CalculatorManifest,
   [NotepadManifest.id]: NotepadManifest,
   [RecycleBinManifest.id]: RecycleBinManifest,
   [PhotoGalleryManifest.id]: PhotoGalleryManifest,
