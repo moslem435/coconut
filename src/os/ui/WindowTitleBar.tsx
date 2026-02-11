@@ -109,15 +109,12 @@ export function WindowTitleBar({
                 <Tooltip content={labels.minimize} side="bottom">
                     <button
                         onClick={onMinimize}
-                        onMouseEnter={onHoverMinimize}
                         aria-label={labels.minimize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 active:scale-90 hover:bg-[var(--hover-bg)]"
                         style={{ 
                             color: buttonColor,
                             '--hover-bg': buttonHoverBg
                         } as React.CSSProperties}
-                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverBg)}
-                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                         <Minus size={16} />
                     </button>
@@ -129,13 +126,11 @@ export function WindowTitleBar({
                     <button
                         onClick={onMaximize}
                         aria-label={isMaximized ? labels.restore : labels.maximize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 active:scale-90 hover:bg-[var(--hover-bg)]"
                         style={{ 
                             color: buttonColor,
                             '--hover-bg': buttonHoverBg
                         } as React.CSSProperties}
-                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverBg)}
-                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                         {isMaximized ? (
                             <Minimize2 size={16} />
@@ -151,7 +146,7 @@ export function WindowTitleBar({
                     <button
                         onClick={onClose}
                         aria-label={labels.close}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 hover:bg-red-500 hover:text-white active:scale-90"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 hover:bg-red-500 hover:text-white active:scale-90"
                         style={{ color: buttonColor }}
                     >
                         <X size={16} />

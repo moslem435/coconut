@@ -69,6 +69,13 @@ export function Tooltip({
     setIsVisible(false)
   }
 
+  const handleClick = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    setIsVisible(false)
+  }
+
   // Update position on scroll or resize if visible
   useEffect(() => {
     if (isVisible) {
@@ -87,6 +94,7 @@ export function Tooltip({
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onClickCapture={handleClick}
         className={`inline-flex ${className}`} // inline-flex to not break layout
       >
         {children}
