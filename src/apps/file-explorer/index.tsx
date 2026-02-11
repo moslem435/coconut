@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useFileSelection } from '@/os/hooks/useFileSelection'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -7,8 +8,9 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
-import { Eye, Upload, FolderPlus } from 'lucide-react'
+import { StickyNote, Eye, Upload, FolderPlus } from 'lucide-react'
 import PreviewContainer from './preview/PreviewContainer'
+import Notepad from '@/apps/notepad'
 import Fuse from 'fuse.js'
 
 // Components
@@ -34,7 +36,6 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortConfig, setSortConfig] = useState<{ field: SortField, order: SortOrder }>({ field: 'name', order: 'asc' })
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [batchProgress, setBatchProgress] = useState<{
     isOpen: boolean
@@ -118,6 +119,9 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     return fuse.search(searchQuery).map(result => result.item)
   }, [sortedChildren, searchQuery])
 
+  // Selection Hook
+  const { selectedIds, setSelectedIds, handleSelect, clearSelection } = useFileSelection(filteredChildren)
+
   // Keyboard Shortcuts (Extended)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -128,11 +132,11 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         switch (e.key.toLowerCase()) {
           case 'a':
             e.preventDefault()
-            setSelectedIds(children.map(c => c.id))
+            setSelectedIds(filteredChildren.map(c => c.id))
             break
           case 'd':
             e.preventDefault()
-            setSelectedIds([])
+            clearSelection()
             break
           case 'c':
             e.preventDefault()
@@ -206,7 +210,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       setHistoryIndex(newHistory.length - 1)
       
       setCurrentPathId(id)
-      setSelectedIds([]) // Clear selection on navigate
+      clearSelection() // Clear selection on navigate
     }
   }
 
@@ -215,7 +219,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       const newIndex = historyIndex - 1
       setHistoryIndex(newIndex)
       setCurrentPathId(history[newIndex])
-      setSelectedIds([])
+      clearSelection()
     }
   }
 
@@ -224,7 +228,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       const newIndex = historyIndex + 1
       setHistoryIndex(newIndex)
       setCurrentPathId(history[newIndex])
-      setSelectedIds([])
+      clearSelection()
     }
   }
 
@@ -269,26 +273,27 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     }
 
     if (item.type === 'file') {
-      launchApp(
-        'preview-' + item.id,
-        item.name,
-        <PreviewContainer fileId={item.id} />,
-        Eye,
-        { size: { width: 800, height: 600 } }
-      )
-      return
-    }
-  }
+      const isText = /\.(txt|md|json|js|jsx|ts|tsx|css|html|log|xml|ini|conf|gitignore|env)$/i.test(item.name)
+      const isImage = /\.(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(item.name)
 
-  const handleSelect = (id: string, multi: boolean) => {
-    if (!id) {
-      setSelectedIds([])
+      if (isText && !isImage) {
+         launchApp(
+          'notepad-' + item.id,
+          item.name,
+          <Notepad fileId={item.id} />,
+          StickyNote,
+          { size: { width: 600, height: 450 } }
+        )
+      } else {
+        launchApp(
+          'preview-' + item.id,
+          item.name,
+          <PreviewContainer fileId={item.id} />,
+          Eye,
+          { size: { width: 800, height: 600 } }
+        )
+      }
       return
-    }
-    if (multi) {
-      setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-    } else {
-      setSelectedIds([id])
     }
   }
 

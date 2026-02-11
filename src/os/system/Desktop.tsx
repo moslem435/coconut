@@ -13,14 +13,14 @@ import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useShallow } from 'zustand/react/shallow'
-import { Tooltip } from '@/os/ui/Tooltip'
-import { RenameInput } from '@/os/ui/RenameInput'
-import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
+import { Image as ImageIcon, StickyNote } from 'lucide-react'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 import WeatherWidget from '@/os/system/WeatherWidget'
-import { AppIcon } from '@/os/ui/AppIcon'
 import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
+import { useFileSelection } from '@/os/hooks/useFileSelection'
+import { FileGridItem } from '@/os/ui/file/FileGridItem'
+import { cn } from '@/lib/utils'
 
 interface DesktopProps {
     onToggleMenu: () => void
@@ -44,8 +44,16 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const launchApp = useWindowStore(useShallow(state => state.launchApp))
     const focusWindow = useWindowStore(useShallow(state => state.focusWindow))
 
+    const isLoading = useFileSystemStore(state => state.isLoading)
+    const files = useFileSystemStore(state => state.files)
+
+    const desktopItems = useMemo(() =>
+        Object.values(files).filter(f => f.parentId === 'desktop'),
+        [files]
+    )
+
     // Selection State
-    const [selectedIcons, setSelectedIcons] = useState<string[]>([])
+    const { selectedIds: selectedIcons, handleSelect, clearSelection, setSelectedIds: setSelectedIcons } = useFileSelection(desktopItems)
 
     // Desktop Store
     const { renamingId, setRenamingId } = useUIStore()
@@ -58,41 +66,6 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             organizeIcons: state.organizeIcons
         }))
     )
-
-    const isLoading = useFileSystemStore(state => state.isLoading)
-    const files = useFileSystemStore(state => state.files)
-
-    const desktopItems = useMemo(() =>
-        Object.values(files).filter(f => f.parentId === 'desktop'),
-        [files]
-    )
-
-    const getDisplayName = (item: FileNode) => {
-        // 1. App Shortcut
-        if (item.appId) return t(`app.${item.appId}`)
-
-        // 2. System Folders / Special IDs
-        if (item.id === 'recycle-bin' || item.id === 'trash') return t('app.recycle-bin')
-        if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(item.id)) {
-            return t(`explorer.${item.id}`)
-        }
-
-        // 3. Specific Files/Folders (mapped to translation keys)
-        const idToKeyMap: Record<string, string> = {
-            'welcome-txt': 'file.welcome',
-            'about-md': 'file.about',
-            'code-1': 'file.code.hello',
-            'code-2': 'file.code.component',
-            'music': 'folder.music',
-            'code': 'folder.code'
-        }
-
-        if (idToKeyMap[item.id]) {
-            return t(idToKeyMap[item.id])
-        }
-
-        return item.name
-    }
 
     const isDragging = useRef(false)
     const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
@@ -216,16 +189,30 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             ? Math.floor((window.innerHeight - 150) / currentGridSize)
             : 6
 
-        // If no positions stored (first run), or some items are missing positions, organize them
+        // Check if any items are missing positions
         const itemIds = desktopItems.map(i => i.id)
-        const hasMissingPositions = itemIds.some(id => !iconPositions[id])
+        const missingPositionIds = itemIds.filter(id => !iconPositions[id])
 
-        if (Object.keys(iconPositions).length === 0 || hasMissingPositions) {
+        // 1. If NO positions exist at all (first run), organize everything
+        if (Object.keys(iconPositions).length === 0) {
             organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
+        } 
+        // 2. If SOME items are missing positions (newly added files), assign them free spots
+        else if (missingPositionIds.length > 0) {
+            let newPositions = { ...iconPositions }
+            
+            missingPositionIds.forEach(id => {
+                // Find a free spot for this new item
+                // Start searching from (0,0) or last used position could be better, but (0,0) is safe
+                const pos = findFreePosition(GRID_PADDING, GRID_PADDING, id, newPositions, currentGridSize, currentGridPadding)
+                newPositions[id] = pos
+            })
+            
+            setIconPositions(newPositions)
         }
 
         setIsLayoutReady(true)
-    }, []) // Run once on mount
+    }, [desktopItems, iconPositions]) // Run when desktopItems changes (e.g. new file created)
 
     // Handle Scale Changes
     useEffect(() => {
@@ -244,21 +231,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             return
         }
 
-        // Multi-select modifiers
-        if (e.ctrlKey || e.metaKey) {
-            setSelectedIcons(prev =>
-                prev.includes(id)
-                    ? prev.filter(i => i !== id)
-                    : [...prev, id]
-            )
-        } else if (e.shiftKey) {
-            setSelectedIcons(prev =>
-                prev.includes(id) ? prev : [...prev, id]
-            )
-        } else {
-            // Single select
-            setSelectedIcons([id])
-        }
+        handleSelect(id, e)
     }
 
     const handleDoubleClick = (id: string) => {
@@ -351,23 +324,50 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     }
 
     const handleDragEnd = (id: string, x: number, y: number) => {
-        // We need the current positions to check for collisions
         const currentPositions = iconPositions
+        const initialPos = currentPositions[id] || { x: GRID_PADDING, y: GRID_PADDING }
+        
+        // Calculate delta
+        const deltaX = x - initialPos.x
+        const deltaY = y - initialPos.y
 
-        let newPos: IconPosition
-        if (snapToGrid) {
-            // Find free position that doesn't overlap with others
-            newPos = findFreePosition(x, y, id, currentPositions, currentGridSize, currentGridPadding)
-        } else {
-            // Free placement mode - just use the position directly
-            newPos = { x: Math.max(0, x), y: Math.max(0, y) }
-        }
+        // Determine which items to move
+        // If the dragged item is selected, move all selected items.
+        // Otherwise, just move the dragged item.
+        const itemsToMove = selectedIcons.includes(id) ? selectedIcons : [id]
+        
+        // Create a copy of positions to update
+        let newPositions = { ...currentPositions }
+        
+        itemsToMove.forEach(movingId => {
+            const oldPos = currentPositions[movingId] || { x: GRID_PADDING, y: GRID_PADDING }
+            
+            // Apply delta
+            let targetX = oldPos.x + deltaX
+            let targetY = oldPos.y + deltaY
+            
+            // For the primary dragged item, use the exact drop coordinates
+            if (movingId === id) {
+                targetX = x
+                targetY = y
+            }
 
-        // Update with full state to avoid data loss
-        setIconPositions({
-            ...currentPositions,
-            [id]: newPos
+            let finalPos: IconPosition
+            if (snapToGrid) {
+                // Find free position that doesn't overlap with others
+                // We pass newPositions so it takes into account other items we just moved (if any)
+                // or existing items.
+                finalPos = findFreePosition(targetX, targetY, movingId, newPositions, currentGridSize, currentGridPadding)
+            } else {
+                // Free placement mode
+                finalPos = { x: Math.max(0, targetX), y: Math.max(0, targetY) }
+            }
+            
+            newPositions[movingId] = finalPos
         })
+
+        // Update with full state
+        setIconPositions(newPositions)
     }
 
     // Render splash screen via portal
@@ -388,7 +388,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     backgroundColor: 'var(--os-bg-base)',
                     color: 'var(--os-text-primary)'
                 }}
-                onClick={() => setSelectedIcons([])}
+                onClick={clearSelection}
                 onContextMenu={(e) => {
                     e.preventDefault()
                     showMenu(e.clientX, e.clientY, 'desktop')
@@ -450,28 +450,6 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
                         const isSelected = selectedIcons.includes(item.id)
 
-                        // Determine Icon Properties
-                        const manifest = item.appId ? APPS_REGISTRY[item.appId] : undefined
-                        let Icon = FileText
-                        let backgroundColor = '#3b82f6' // Default blue
-
-                        if (manifest) {
-                            Icon = manifest.icon
-                            backgroundColor = manifest.theme?.backgroundColor || '#3b82f6'
-                        } else if (item.type === 'folder') {
-                            Icon = Folder
-                            backgroundColor = '#facc15' // yellow-400
-                        } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
-                            Icon = ImageIcon
-                            backgroundColor = '#a855f7' // purple-500
-                        } else if (/\.(txt|md|json)$/i.test(item.name)) {
-                            Icon = StickyNote
-                            backgroundColor = '#eab308' // yellow-500
-                        } else {
-                            // Default file
-                            backgroundColor = '#94a3b8' // slate-400
-                        }
-
                         return (
                             <motion.div
                                 key={item.id}
@@ -493,7 +471,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                             setDragPreview(preview)
                                         }
                                     }
-                                    // Multi-drag support logic could go here
+                                    // Multi-drag visualization is handled by Framer Motion (visual only for dragged item currently)
                                 }}
                                 onDragEnd={(e, info) => {
                                     // Small delay to prevent click event triggering
@@ -516,64 +494,37 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     x: { duration: isDragging.current ? 0 : undefined },
                                     y: { duration: isDragging.current ? 0 : undefined }
                                 }}
-                                className={`absolute flex flex-col items-center justify-center gap-1 p-2 rounded w-[90px] group
-                                    ${isSelected ? 'bg-white/10 ring-1 ring-white/20 backdrop-blur-sm' : 'hover:bg-white/5'}
-                                `}
                                 style={{
                                     width: currentGridSize,
                                     height: currentGridSize,
-                                    zIndex: isDragging.current ? 50 : 1
-                                }}
-                                onClick={(e) => handleIconClick(item.id, e)}
-                                onDoubleClick={() => handleDoubleClick(item.id)}
-                                onContextMenu={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
+                                    zIndex: isDragging.current ? 50 : 1,
+                                    position: 'absolute'
                                 }}
                             >
-                                <AppIcon
-                                    manifest={manifest}
-                                    icon={Icon}
-                                    size={48 * scaleFactor}
-                                    backgroundColor={backgroundColor}
-                                    className={`drop-shadow-md transition-transform duration-200 ${isSelected ? 'scale-105' : ''}`}
+                                <FileGridItem
+                                    item={item}
+                                    selected={isSelected}
+                                    renaming={renamingId === item.id}
+                                    onRename={(newName) => {
+                                        if (newName && newName !== item.name) {
+                                            renameItem(item.id, newName).catch(console.error)
+                                        }
+                                        setRenamingId(null)
+                                    }}
+                                    onCancelRename={() => setRenamingId(null)}
+                                    className={cn(
+                                        "w-full h-full p-2 rounded-lg transition-colors",
+                                        isSelected ? "bg-white/20 ring-1 ring-white/30 backdrop-blur-sm" : "hover:bg-white/10"
+                                    )}
+                                    iconSize={48 * scaleFactor}
+                                    onClick={(e) => handleIconClick(item.id, e)}
+                                    onDoubleClick={() => handleDoubleClick(item.id)}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
+                                    }}
                                 />
-
-                                {renamingId === item.id ? (
-                                        <div 
-                                            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 flex justify-center" 
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{ minWidth: '88px' }}
-                                        >
-                                            <RenameInput
-                                                initialValue={item.name}
-                                                className="text-center text-xs rounded px-1 py-0.5"
-                                                onComplete={(newName) => {
-                                                    if (newName && newName !== item.name) {
-                                                        renameItem(item.id, newName).catch(console.error)
-                                                    }
-                                                    setRenamingId(null)
-                                                }}
-                                                onCancel={() => setRenamingId(null)}
-                                            />
-                                        </div>
-                                    ) : (
-                                    <span className={`
-                                        text-[11px] text-center leading-tight break-words px-1 rounded
-                                        ${isSelected ? 'text-white font-medium' : 'text-gray-100/90'}
-                                        ${scaleFactor > 1.2 ? 'text-sm' : ''}
-                                    `} style={{
-                                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                                        }}>
-                                        {getDisplayName(item)}
-                                    </span>
-                                )}
-
-                                {/* Selection Indicator */}
-                                {isSelected && (
-                                    <div className="absolute inset-0 rounded border border-white/20 pointer-events-none" />
-                                )}
                             </motion.div>
                         )
                     })}

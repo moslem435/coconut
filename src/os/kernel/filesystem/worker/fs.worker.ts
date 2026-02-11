@@ -21,30 +21,64 @@ self.onmessage = async (e: MessageEvent) => {
         switch (type) {
             case 'readFile': {
                 const handle = await getFileHandle(root, path);
-                const accessHandle = await handle.createSyncAccessHandle();
-                const fileSize = accessHandle.getSize();
-                const buffer = new Uint8Array(fileSize);
-                accessHandle.read(buffer, { at: 0 });
-                accessHandle.close();
-                result = buffer;
+                // Use standard getFile for read if possible to avoid lock
+                // createSyncAccessHandle locks the file exclusively
+                try {
+                    const file = await handle.getFile();
+                    const buffer = await file.arrayBuffer();
+                    result = new Uint8Array(buffer);
+                } catch (readError) {
+                     // Fallback to sync handle if getFile fails for some reason (rare for read)
+                     // or if we strictly need synchronous behavior (but we are in async worker)
+                     const accessHandle = await handle.createSyncAccessHandle();
+                     try {
+                        const fileSize = accessHandle.getSize();
+                        const buffer = new Uint8Array(fileSize);
+                        accessHandle.read(buffer, { at: 0 });
+                        result = buffer;
+                     } finally {
+                        accessHandle.close();
+                     }
+                }
                 break;
             }
 
             case 'writeFile': {
                 const handle = await getFileHandle(root, path, true);
-                const accessHandle = await handle.createSyncAccessHandle();
+                // Try-catch around createSyncAccessHandle to handle locks
+                try {
+                    const accessHandle = await handle.createSyncAccessHandle();
+                    try {
+                        let data: Uint8Array;
+                        if (typeof content === 'string') {
+                            data = new TextEncoder().encode(content);
+                        } else {
+                            data = content;
+                        }
 
-                let data: Uint8Array;
-                if (typeof content === 'string') {
-                    data = new TextEncoder().encode(content);
-                } else {
-                    data = content;
+                        accessHandle.truncate(0);
+                        accessHandle.write(data, { at: 0 });
+                        accessHandle.flush();
+                    } finally {
+                        accessHandle.close();
+                    }
+                } catch (lockError: any) {
+                    // If locked, try standard writable (stream) which might queue
+                    if (lockError.name === 'NoModificationAllowedError' || lockError.message.includes('Access Handle')) {
+                        const writable = await handle.createWritable();
+                        try {
+                             if (typeof content === 'string') {
+                                await writable.write(content);
+                            } else {
+                                await writable.write(content);
+                            }
+                        } finally {
+                            await writable.close();
+                        }
+                    } else {
+                        throw lockError;
+                    }
                 }
-
-                accessHandle.truncate(0);
-                accessHandle.write(data, { at: 0 });
-                accessHandle.flush();
-                accessHandle.close();
                 break;
             }
 
