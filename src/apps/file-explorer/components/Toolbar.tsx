@@ -1,19 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
   ArrowLeft, ArrowRight, ArrowUp, RotateCw, Search, 
-  LayoutGrid, List as ListIcon, ChevronRight, Home, HardDrive, Upload, FolderPlus
+  LayoutGrid, List as ListIcon, ChevronRight, Home, Upload, FolderPlus,
+  ArrowDownWideNarrow, Check
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
 import { cn } from '@/lib/utils'
+import { SortField, SortOrder } from '../index'
 
 interface ToolbarProps {
   currentPath: FileNode[]
   onNavigate: (id: string) => void
   onUp: () => void
+  onBack: () => void
+  onForward: () => void
+  canGoBack: boolean
+  canGoForward: boolean
   onRefresh: () => void
   viewMode: 'grid' | 'list'
   onViewModeChange: (mode: 'grid' | 'list') => void
+  sortConfig: { field: SortField, order: SortOrder }
+  onSortChange: (field: SortField) => void
   canGoUp: boolean
   searchQuery: string
   onSearchChange: (query: string) => void
@@ -22,13 +30,15 @@ interface ToolbarProps {
 }
 
 export default function Toolbar({ 
-  currentPath, onNavigate, onUp, onRefresh, 
-  viewMode, onViewModeChange, canGoUp,
+  currentPath, onNavigate, onUp, onBack, onForward,
+  canGoBack, canGoForward, onRefresh, 
+  viewMode, onViewModeChange, sortConfig, onSortChange, canGoUp,
   searchQuery, onSearchChange, onUpload, onNewFolder
 }: ToolbarProps) {
   const { t } = useLanguage()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
 
   // Focus search on Ctrl+F
   useEffect(() => {
@@ -42,12 +52,29 @@ export default function Toolbar({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Close sort menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isSortMenuOpen && !(e.target as Element).closest('.sort-menu-container')) {
+        setIsSortMenuOpen(false)
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    return () => window.removeEventListener('mousedown', handleClickOutside)
+  }, [isSortMenuOpen])
+
   // Helper to get display name
   const getDisplayName = (node: FileNode) => {
     if (node.id === 'root') return t('explorer.root') || 'Root'
-    // Simple translation fallback for now, ideally passed from parent or context
     return node.name
   }
+
+  const sortOptions: { label: string, value: SortField }[] = [
+    { label: t('common.name') || 'Name', value: 'name' },
+    { label: t('common.date') || 'Date', value: 'date' },
+    { label: t('common.type') || 'Type', value: 'type' },
+    { label: t('common.size') || 'Size', value: 'size' },
+  ]
 
   return (
     <div className="h-12 flex items-center gap-3 px-4 border-b border-white/5 bg-[rgba(var(--os-bg-panel-rgb),0.5)] backdrop-blur-md shrink-0">
@@ -55,17 +82,36 @@ export default function Toolbar({
       {/* Navigation Controls */}
       <div className="flex items-center gap-1 text-white/70">
         <button 
+          onClick={onBack}
+          disabled={!canGoBack}
+          className="p-1.5 rounded-md hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          title="Back (Alt+Left)"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <button 
+          onClick={onForward}
+          disabled={!canGoForward}
+          className="p-1.5 rounded-md hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          title="Forward (Alt+Right)"
+        >
+          <ArrowRight size={16} />
+        </button>
+        <button 
           onClick={onUp}
           disabled={!canGoUp}
           className="p-1.5 rounded-md hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          title="Up"
         >
           <ArrowUp size={16} />
         </button>
-        {/* Placeholder for Back/Forward history */}
+        
         <div className="w-px h-4 bg-white/10 mx-1" />
+        
         <button 
           onClick={onRefresh}
           className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+          title="Refresh"
         >
           <RotateCw size={14} />
         </button>
@@ -135,28 +181,66 @@ export default function Toolbar({
         />
       </div>
 
-      {/* View Switcher */}
-      <div className="flex bg-black/20 rounded-md p-0.5 border border-white/5">
-        <button
-          onClick={() => onViewModeChange('grid')}
-          className={cn(
-            "p-1.5 rounded transition-all",
-            viewMode === 'grid' ? "bg-white/10 text-white shadow-sm" : "text-white/50 hover:text-white/80"
+      {/* View Switcher & Sort */}
+      <div className="flex items-center gap-2">
+        <div className="flex bg-black/20 rounded-md p-0.5 border border-white/5">
+          <button
+            onClick={() => onViewModeChange('grid')}
+            className={cn(
+              "p-1.5 rounded transition-all",
+              viewMode === 'grid' ? "bg-white/10 text-white shadow-sm" : "text-white/50 hover:text-white/80"
+            )}
+            title="Grid View"
+          >
+            <LayoutGrid size={14} />
+          </button>
+          <button
+            onClick={() => onViewModeChange('list')}
+            className={cn(
+              "p-1.5 rounded transition-all",
+              viewMode === 'list' ? "bg-white/10 text-white shadow-sm" : "text-white/50 hover:text-white/80"
+            )}
+            title="List View"
+          >
+            <ListIcon size={14} />
+          </button>
+        </div>
+
+        {/* Sort Menu */}
+        <div className="relative sort-menu-container">
+          <button
+            onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+            className={cn(
+              "p-1.5 rounded-md hover:bg-white/10 transition-colors text-white/70 hover:text-white",
+              isSortMenuOpen && "bg-white/10 text-white"
+            )}
+            title="Sort Options"
+          >
+            <ArrowDownWideNarrow size={16} />
+          </button>
+
+          {isSortMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-32 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+              {sortOptions.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    onSortChange(option.value)
+                    setIsSortMenuOpen(false)
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <span>{option.label}</span>
+                  {sortConfig.field === option.value && (
+                    <div className="flex items-center text-white/60">
+                      {sortConfig.order === 'asc' ? <ArrowUp size={10} /> : <ArrowDownWideNarrow size={10} className="rotate-180" />}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
-          title="Grid View"
-        >
-          <LayoutGrid size={14} />
-        </button>
-        <button
-          onClick={() => onViewModeChange('list')}
-          className={cn(
-            "p-1.5 rounded transition-all",
-            viewMode === 'list' ? "bg-white/10 text-white shadow-sm" : "text-white/50 hover:text-white/80"
-          )}
-          title="List View"
-        >
-          <ListIcon size={14} />
-        </button>
+        </div>
       </div>
 
     </div>

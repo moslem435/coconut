@@ -15,6 +15,7 @@ import { RenameInput } from '@/os/ui/RenameInput'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AppIcon } from '@/os/ui/AppIcon'
+import { SortField, SortOrder } from '../index'
 
 interface FileListProps {
   items: FileNode[]
@@ -25,10 +26,9 @@ interface FileListProps {
   selectedIds: string[]
   onSelect: (id: string, multi: boolean) => void
   onDrop?: (draggedIds: string[], targetId: string) => void
+  sortConfig: { field: SortField, order: SortOrder }
+  onSortChange: (field: SortField) => void
 }
-
-type SortField = 'name' | 'date' | 'type' | 'size'
-type SortOrder = 'asc' | 'desc'
 
 // Helper to get file icon and theme
 const getFileIconAndTheme = (node: FileNode) => {
@@ -305,54 +305,13 @@ const formatTime = (timestamp: number) => {
 
 export default function FileList({ 
   items, viewMode, onNavigate, onDoubleClick, onContextMenu, 
-  selectedIds, onSelect, onDrop
+  selectedIds, onSelect, onDrop, sortConfig, onSortChange
 }: FileListProps) {
   const { t } = useLanguage()
   const { renamingId, setRenamingId } = useUIStore()
   const { renameItem } = useFileSystemStore()
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
   const [draggedIds, setDraggedIds] = useState<string[]>([])
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('asc')
-    }
-  }
-
-  const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
-      let comparison = 0
-      switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name)
-          break
-        case 'date':
-          comparison = a.updatedAt - b.updatedAt
-          break
-        case 'type':
-          if (a.type === b.type) {
-             const extA = a.name.split('.').pop() || ''
-             const extB = b.name.split('.').pop() || ''
-             comparison = extA.localeCompare(extB)
-          } else {
-            comparison = a.type === 'folder' ? -1 : 1
-          }
-          break
-        case 'size':
-           // Folders don't have size usually, treat as 0 or separate
-           const sizeA = (a.content?.length || 0)
-           const sizeB = (b.content?.length || 0)
-           comparison = sizeA - sizeB
-           break
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-  }, [items, sortField, sortOrder])
 
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -404,23 +363,43 @@ export default function FileList({
 
   // List virtualizer
   const listVirtualizer = useVirtualizer({
-    count: sortedItems.length,
+    count: items.length,
     getScrollElement: () => listParentRef.current,
     estimateSize: () => 36,
     overscan: 10,
   })
 
+  // Empty State
+  if (items.length === 0) {
+    return (
+      <div 
+        className="h-full flex flex-col items-center justify-center text-white/20 select-none"
+        onClick={() => onSelect('', false)}
+      >
+        <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4">
+          <Folder size={48} strokeWidth={1.5} className="opacity-50" />
+        </div>
+        <span className="text-sm font-medium">{t('explorer.empty') || 'This folder is empty'}</span>
+      </div>
+    )
+  }
+
   // Grid view - simple non-virtualized
   if (viewMode === 'grid') {
     return (
       <div 
-        className="h-full overflow-y-auto pb-20"
+        className="h-full overflow-y-auto pb-20 custom-scrollbar"
         onClick={() => onSelect('', false)}
       >
         <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2 p-4">
-          {sortedItems.map(node => {
+          {items.map(node => {
             const { Icon, backgroundColor, useAppIcon, manifest } = getFileIconAndTheme(node)
             const isSelected = selectedIds.includes(node.id)
+            
+            // Check for thumbnail
+            const ext = node.name.split('.').pop()?.toLowerCase()
+            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext || '')
+            const thumbnail = isImage && node.content && (node.content.startsWith('http') || node.content.startsWith('data:')) ? node.content : null
             
             return (
               <div
@@ -438,7 +417,7 @@ export default function FileList({
                   "group flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 border border-transparent cursor-default",
                   isSelected 
                     ? "bg-blue-500/20 border-blue-500/30 shadow-inner" 
-                    : "hover:bg-white/5 hover:border-white/5",
+                    : "",
                   dropTargetId === node.id && "bg-green-500/20 border-green-500/30",
                   draggedIds.includes(node.id) && "opacity-50"
                 )}
@@ -449,9 +428,18 @@ export default function FileList({
                     size={48}
                     className="drop-shadow-md"
                   />
+                ) : thumbnail ? (
+                  <div className="w-12 h-12 flex items-center justify-center rounded-lg overflow-hidden shadow-sm bg-black/20">
+                    <img 
+                      src={thumbnail} 
+                      alt={node.name}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                    />
+                  </div>
                 ) : (
                   <div 
-                    className="flex items-center justify-center rounded-xl shadow-md transition-transform duration-200 group-hover:scale-105"
+                    className="flex items-center justify-center rounded-xl shadow-md transition-transform duration-200"
                     style={{
                       width: 48,
                       height: 48,
@@ -479,7 +467,7 @@ export default function FileList({
                     onCancel={() => setRenamingId(null)}
                   />
                 ) : (
-                  <span className="text-xs text-center text-white/80 line-clamp-2 break-all w-full px-1 group-hover:text-white">
+                  <span className="text-xs text-center text-white/80 line-clamp-2 break-all w-full px-1">
                     {node.name}
                   </span>
                 )}
@@ -503,31 +491,31 @@ export default function FileList({
       <div className="flex items-center px-4 py-2 text-xs font-medium text-white/40 border-b border-white/5 select-none shrink-0">
         <div 
           className="flex-[2] min-w-[200px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
-          onClick={() => handleSort('name')}
+          onClick={() => onSortChange('name')}
         >
           {t('common.name') || 'Name'}
-          {sortField === 'name' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'name' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
         <div 
           className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
-          onClick={() => handleSort('date')}
+          onClick={() => onSortChange('date')}
         >
           {t('common.date') || 'Date'}
-          {sortField === 'date' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'date' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
         <div 
           className="flex-1 min-w-[80px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
-          onClick={() => handleSort('type')}
+          onClick={() => onSortChange('type')}
         >
           {t('common.type') || 'Type'}
-          {sortField === 'type' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'type' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
         <div 
           className="w-[80px] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-white transition-colors"
-          onClick={() => handleSort('size')}
+          onClick={() => onSortChange('size')}
         >
           {t('common.size') || 'Size'}
-          {sortField === 'size' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'size' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
       </div>
 
@@ -541,9 +529,14 @@ export default function FileList({
           }}
         >
           {virtualItems.map((virtualItem) => {
-            const node = sortedItems[virtualItem.index]
+            const node = items[virtualItem.index]
             const { Icon, backgroundColor, useAppIcon, manifest } = getFileIconAndTheme(node)
             const isSelected = selectedIds.includes(node.id)
+
+            // Check for thumbnail
+            const ext = node.name.split('.').pop()?.toLowerCase()
+            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext || '')
+            const thumbnail = isImage && node.content && (node.content.startsWith('http') || node.content.startsWith('data:')) ? node.content : null
 
             return (
               <div
@@ -570,7 +563,7 @@ export default function FileList({
                   "flex items-center px-3 py-1.5 rounded-md text-sm text-white/80 transition-colors cursor-default group",
                   isSelected 
                     ? "bg-blue-500/20" 
-                    : "hover:bg-white/5 odd:bg-white/[0.02]",
+                    : "odd:bg-white/[0.02]",
                   dropTargetId === node.id && "bg-green-500/20 border border-green-500/30",
                   draggedIds.includes(node.id) && "opacity-50"
                 )}
@@ -582,6 +575,15 @@ export default function FileList({
                       size={20}
                       className="shrink-0"
                     />
+                  ) : thumbnail ? (
+                    <div className="w-5 h-5 flex items-center justify-center rounded overflow-hidden bg-black/20 shrink-0">
+                      <img 
+                        src={thumbnail} 
+                        alt={node.name}
+                        className="w-full h-full object-cover"
+                        draggable={false}
+                      />
+                    </div>
                   ) : (
                     <div 
                       className="flex items-center justify-center rounded-md shrink-0"

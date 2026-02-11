@@ -18,6 +18,7 @@ export interface FileNode {
   icon?: string // Custom icon (e.g. for mounted drives)
   isMount?: boolean
   needsPermission?: boolean
+  size?: number
 }
 
 interface FileSystemState {
@@ -585,7 +586,7 @@ export const useFileSystemStore = create<FileSystemState>()(
                   newFiles[existingNode.id] = {
                     ...existingNode,
                     updatedAt: stats.mtime,
-                    // size: stats.size // TODO: Add size to FileNode if needed
+                    size: stats.size
                   }
                   hasChanges = true
                 }
@@ -600,6 +601,7 @@ export const useFileSystemStore = create<FileSystemState>()(
                   type: stats.isDirectory ? 'folder' : 'file',
                   createdAt: stats.ctime,
                   updatedAt: stats.mtime,
+                  size: stats.size,
                   content: undefined,
                   // Mark children of mounts as inside a mount too (optional, but helpful for logic)
                   isMount: false // It's inside a mount, but not a mount point itself

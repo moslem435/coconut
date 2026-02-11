@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
+import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
@@ -23,10 +23,17 @@ interface FileExplorerProps {
   initialPath?: string
 }
 
+export type SortField = 'name' | 'date' | 'type' | 'size'
+export type SortOrder = 'asc' | 'desc'
+
 export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps) {
   // State
   const [currentPathId, setCurrentPathId] = useState(initialPath)
+  const [history, setHistory] = useState<string[]>([initialPath])
+  const [historyIndex, setHistoryIndex] = useState(0)
+  
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [sortConfig, setSortConfig] = useState<{ field: SortField, order: SortOrder }>({ field: 'name', order: 'asc' })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [batchProgress, setBatchProgress] = useState<{
@@ -54,7 +61,11 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   // Effects
   useEffect(() => {
-    if (initialPath) setCurrentPathId(initialPath)
+    if (initialPath) {
+      setCurrentPathId(initialPath)
+      setHistory([initialPath])
+      setHistoryIndex(0)
+    }
   }, [initialPath])
 
   useEffect(() => {
@@ -63,17 +74,49 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   // Search with Fuse.js
   const children = getChildren(currentPathId)
-  const filteredChildren = useMemo(() => {
-    if (!searchQuery.trim()) return children
+  
+  // Sorting Logic
+  const sortedChildren = useMemo(() => {
+    const items = [...children]
+    return items.sort((a, b) => {
+      let comparison = 0
+      switch (sortConfig.field) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'date':
+          comparison = a.updatedAt - b.updatedAt
+          break
+        case 'type':
+          if (a.type === b.type) {
+             const extA = a.name.split('.').pop() || ''
+             const extB = b.name.split('.').pop() || ''
+             comparison = extA.localeCompare(extB)
+          } else {
+            comparison = a.type === 'folder' ? -1 : 1
+          }
+          break
+        case 'size':
+           const sizeA = a.size ?? (a.content?.length || 0)
+           const sizeB = b.size ?? (b.content?.length || 0)
+           comparison = sizeA - sizeB
+           break
+      }
+      return sortConfig.order === 'asc' ? comparison : -comparison
+    })
+  }, [children, sortConfig])
 
-    const fuse = new Fuse(children, {
+  const filteredChildren = useMemo(() => {
+    if (!searchQuery.trim()) return sortedChildren
+
+    const fuse = new Fuse(sortedChildren, {
       keys: ['name'],
       threshold: 0.3,
       includeScore: true
     })
 
     return fuse.search(searchQuery).map(result => result.item)
-  }, [children, searchQuery])
+  }, [sortedChildren, searchQuery])
 
   // Keyboard Shortcuts (Extended)
   useEffect(() => {
@@ -127,7 +170,9 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
             }
             break
           case 'Backspace':
-            handleUp()
+            handleUp() // Or handleBack? Windows Explorer does Up on Backspace usually, or Back. Let's stick to Up for now or switch to Back.
+            // Modern browsers use Alt+Left for Back. Backspace is often mapped to Back in old managers, but Up in some.
+            // Let's keep Up for Backspace as it was.
             break
         }
       }
@@ -137,7 +182,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedIds, currentPathId, children, setClipboard, pasteItems, loadFolderContent, t])
 
-  // Handlers
+  // Navigation Handlers
   const handleNavigate = async (id: string) => {
     if (files[id]?.type === 'folder') {
       const targetPath = useFileSystemStore.getState().resolvePath(id)
@@ -146,13 +191,40 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       if (!needsPermission) {
         const granted = await fs.requestPermission(targetPath)
         if (!granted) {
-          alert(t('explorer.permission_denied') || 'Permission denied')
+          useDialogStore.getState().openAlert(
+            t('explorer.permission_denied') || 'Permission denied',
+            'error'
+          )
           return
         }
       }
       
+      // Update History
+      const newHistory = history.slice(0, historyIndex + 1)
+      newHistory.push(id)
+      setHistory(newHistory)
+      setHistoryIndex(newHistory.length - 1)
+      
       setCurrentPathId(id)
       setSelectedIds([]) // Clear selection on navigate
+    }
+  }
+
+  const handleBack = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setCurrentPathId(history[newIndex])
+      setSelectedIds([])
+    }
+  }
+
+  const handleForward = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      setCurrentPathId(history[newIndex])
+      setSelectedIds([])
     }
   }
 
@@ -165,6 +237,13 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   const handleRefresh = () => {
     loadFolderContent(currentPathId)
+  }
+
+  const handleSortChange = (field: SortField) => {
+    setSortConfig(prev => ({
+      field,
+      order: prev.field === field && prev.order === 'asc' ? 'desc' : 'asc'
+    }))
   }
 
   const handleDoubleClick = (id: string) => {
@@ -333,9 +412,20 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
         try {
           const file = files[i]
-          const content = await file.arrayBuffer()
-          const textContent = new TextDecoder().decode(content)
-          await createItem(currentPathId, file.name, 'file', textContent)
+          let content = ''
+          
+          // Check if file is an image
+          if (file.type.startsWith('image/')) {
+            content = await new Promise((resolve) => {
+              const reader = new FileReader()
+              reader.onloadend = () => resolve(reader.result as string)
+              reader.readAsDataURL(file)
+            })
+          } else {
+            content = await file.text()
+          }
+
+          await createItem(currentPathId, file.name, 'file', content)
           
           setBatchProgress(prev => ({
             ...prev,
@@ -418,9 +508,15 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         currentPath={path}
         onNavigate={handleNavigate}
         onUp={handleUp}
+        onBack={handleBack}
+        onForward={handleForward}
+        canGoBack={historyIndex > 0}
+        canGoForward={historyIndex < history.length - 1}
         onRefresh={handleRefresh}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        sortConfig={sortConfig}
+        onSortChange={handleSortChange}
         canGoUp={!!currentFolder.parentId}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -452,6 +548,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
             <FileList 
               items={filteredChildren}
               viewMode={viewMode}
+              sortConfig={sortConfig}
+              onSortChange={handleSortChange}
               onNavigate={handleNavigate}
               onDoubleClick={handleDoubleClick}
               onContextMenu={handleItemContextMenu}
