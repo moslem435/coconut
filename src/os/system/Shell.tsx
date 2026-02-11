@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DATA } from '@/lib/data'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemStore } from '@/os/kernel/useSystemStore'
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
@@ -27,6 +28,13 @@ export default function Shell({ onShutdown }: ShellProps) {
   // Shell will only re-render when a window is added or removed.
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
+  // VFS Sync
+  const { syncToOPFS } = useFileSystemStore()
+
+  useEffect(() => {
+    syncToOPFS().catch(console.error)
+  }, []) // Run once on startup
+
   const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()
 
   const handleStartClick = () => {
@@ -36,7 +44,7 @@ export default function Shell({ onShutdown }: ShellProps) {
   return (
     <>
       <GlobalShortcuts />
-      
+
       {/* 1. Desktop Layer (Always Present) */}
       <div className="fixed inset-0 z-0">
         <Desktop

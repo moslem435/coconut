@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { APPS_REGISTRY } from '@/os/registry/config'
@@ -26,7 +26,7 @@ interface DesktopProps {
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
-    const { snapToGrid, wallpaper, useAnimations, displayScale, showWeatherWidget } = useSystemSettings()
+    const { snapToGrid, wallpaper, useAnimations, displayScale, showWeatherWidget, isSettingsLoaded } = useSystemSettings()
 
     // Derived Grid Settings
     const scaleFactor = displayScale / 100
@@ -41,7 +41,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const openWindow = useWindowStore(useShallow(state => state.openWindow))
     const launchApp = useWindowStore(useShallow(state => state.launchApp))
     const focusWindow = useWindowStore(useShallow(state => state.focusWindow))
-    
+
     // Selection State
     const [selectedIcons, setSelectedIcons] = useState<string[]>([])
 
@@ -54,16 +54,19 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             organizeIcons: state.organizeIcons
         }))
     )
-    
-    // Optimized: Only subscribe to files on the desktop
-    const desktopItems = useFileSystemStore(
-        useShallow(state => Object.values(state.files).filter(f => f.parentId === 'desktop'))
+
+    const isLoading = useFileSystemStore(state => state.isLoading)
+    const files = useFileSystemStore(state => state.files)
+
+    const desktopItems = useMemo(() =>
+        Object.values(files).filter(f => f.parentId === 'desktop'),
+        [files]
     )
 
     const getDisplayName = (item: FileNode) => {
         // 1. App Shortcut
         if (item.appId) return t(`app.${item.appId}`)
-        
+
         // 2. System Folders / Special IDs
         if (item.id === 'recycle-bin' || item.id === 'trash') return t('app.recycle-bin')
         if (['root', 'desktop', 'documents', 'pictures', 'downloads'].includes(item.id)) {
@@ -79,7 +82,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             'music': 'folder.music',
             'code': 'folder.code'
         }
-        
+
         if (idToKeyMap[item.id]) {
             return t(idToKeyMap[item.id])
         }
@@ -96,17 +99,23 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const [isLayoutReady, setIsLayoutReady] = useState(false)
     const desktopRef = useRef<HTMLDivElement>(null)
 
+    // Initial Fade In
+    const [isDesktopVisible, setIsDesktopVisible] = useState(false)
+    useEffect(() => {
+        setIsDesktopVisible(true)
+    }, [])
+
     // Helper to get transition styles
     const getTransitionStyle = (type: string, isVisible: boolean) => {
         const base = {
             transition: 'all 1000ms cubic-bezier(0.4, 0, 0.2, 1)',
             opacity: isVisible ? 1 : 0,
         }
-        
+
         if (isVisible) {
             return { ...base, transform: 'none', filter: 'none' }
         }
-        
+
         switch (type) {
             case 'zoom-in': return { ...base, transform: 'scale(1.1)' }
             case 'zoom-out': return { ...base, transform: 'scale(0.95)' }
@@ -117,16 +126,19 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
     // Wallpaper Loading State
     const [loadedWallpaper, setLoadedWallpaper] = useState<string | null>(null)
-    const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null)
+    const [activeWallpaper, setActiveWallpaper] = useState<string | null>(wallpaper?.value || null)
     const [isWallpaperLoading, setIsWallpaperLoading] = useState(false)
     const [transitionType, setTransitionType] = useState('fade')
-    
+
     // Track current wallpaper request to handle race conditions
-    const currentWallpaperRef = useRef<string | null>(null)
+    const currentWallpaperRef = useRef<string | null>(wallpaper?.value || null)
     const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    // Force immediate load for the first image wallpaper to prevent "default -> image" flash/delay
+    const isFirstImageLoad = useRef(true)
 
     // Handle Wallpaper Preloading and Transition
     useEffect(() => {
+        // Wait for wallpaper
         if (!wallpaper) return
 
         // Update ref immediately
@@ -139,6 +151,16 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         }
 
         if (wallpaper.type === 'image') {
+            // OPTIMIZATION: If this is the first image load (boot/refresh), show immediately.
+            // This handles cases where activeWallpaper might have been briefly set to default gradient.
+            if (isFirstImageLoad.current) {
+                isFirstImageLoad.current = false
+                setActiveWallpaper(wallpaper.value)
+                setLoadedWallpaper(null)
+                setIsWallpaperLoading(false)
+                return
+            }
+
             // If we are already displaying this wallpaper as the loaded one, 
             // and it's not loading, we might just need to ensure active is synced eventually.
             // But if user switches back and forth, we should respect the new request.
@@ -152,14 +174,14 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             setIsWallpaperLoading(true)
             const img = new Image()
             img.src = wallpaper.value
-            
+
             img.onload = () => {
                 // Check if this is still the requested wallpaper
                 if (currentWallpaperRef.current !== wallpaper.value) return
 
                 setLoadedWallpaper(wallpaper.value)
                 setIsWallpaperLoading(false)
-                
+
                 // Update active wallpaper after a short delay to allow fade transition
                 transitionTimeoutRef.current = setTimeout(() => {
                     if (currentWallpaperRef.current === wallpaper.value) {
@@ -167,7 +189,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     }
                 }, 1000)
             }
-            
+
             img.onerror = () => {
                 if (currentWallpaperRef.current === wallpaper.value) {
                     setIsWallpaperLoading(false)
@@ -179,7 +201,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             setActiveWallpaper(wallpaper.value)
             setIsWallpaperLoading(false)
         }
-    }, [wallpaper]) // Run when wallpaper changes
+    }, [wallpaper, isSettingsLoaded, activeWallpaper]) // Run when wallpaper changes
 
     // Initialize icon positions if empty
     useEffect(() => {
@@ -197,7 +219,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
         if (Object.keys(iconPositions).length === 0 || hasMissingPositions) {
             organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
         }
-        
+
         setIsLayoutReady(true)
     }, []) // Run once on mount
 
@@ -368,6 +390,12 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                     showMenu(e.clientX, e.clientY, 'desktop')
                 }}
             >
+                {/* Global Fade In Container */}
+                <div 
+                    className="absolute inset-0 transition-opacity duration-1000 ease-out"
+                    style={{ opacity: isDesktopVisible ? 1 : 0 }}
+                >
+
                 {/* Background Wallpaper */}
                 {wallpaper?.type === 'video' ? (
                     <video
@@ -381,19 +409,19 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 ) : wallpaper?.type === 'image' ? (
                     <>
                         {/* Previous Wallpaper (Background Layer) */}
-                        <div 
+                        <div
                             className="absolute inset-0 transition-all duration-1000 bg-cover bg-center bg-no-repeat"
-                            style={{ 
+                            style={{
                                 backgroundImage: `url(${activeWallpaper})`,
                                 opacity: 1,
                                 backgroundColor: !activeWallpaper ? 'var(--os-bg-base)' : undefined
-                            }} 
+                            }}
                         />
-                        
+
                         {/* New Wallpaper (Foreground Layer - Fades In) */}
                         <div
                             className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
-                            style={{ 
+                            style={{
                                 backgroundImage: `url(${loadedWallpaper})`,
                                 ...getTransitionStyle(transitionType, !isWallpaperLoading && loadedWallpaper === wallpaper.value)
                             }}
@@ -414,7 +442,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
 
                 {/* Desktop Area */}
                 <div className="absolute inset-0 top-6 bottom-24">
-                    {isLayoutReady && desktopItems.map((item) => {
+                    {!isLoading && isLayoutReady && desktopItems.map((item) => {
                         const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
                         const isSelected = selectedIcons.includes(item.id)
 
@@ -500,7 +528,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
                                 }}
                             >
-                                <AppIcon 
+                                <AppIcon
                                     manifest={manifest}
                                     icon={Icon}
                                     size={48 * scaleFactor}
@@ -539,6 +567,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         />
                     )}
                 </div>
+                </div> {/* End Global Fade In Container */}
             </div>
             {splashPortal}
         </>

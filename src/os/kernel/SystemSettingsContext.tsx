@@ -43,6 +43,7 @@ interface SystemSettingsContextType extends SystemSettings {
     pinApp: (appId: string) => void
     unpinApp: (appId: string) => void
     setWallpaper: (wallpaper: Wallpaper) => void
+    isSettingsLoaded: boolean
 }
 
 const SystemSettingsContext = createContext<SystemSettingsContextType | undefined>(undefined)
@@ -70,6 +71,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
 export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     // Initialize state from localStorage if available, otherwise defaults
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS)
+    const [isSettingsLoaded, setIsSettingsLoaded] = useState(false)
 
     // Load settings on mount
     useEffect(() => {
@@ -81,19 +83,22 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
                 console.error('Failed to parse settings', e)
             }
         }
+        setIsSettingsLoaded(true)
     }, [])
 
     // Save settings on change
     useEffect(() => {
-        localStorage.setItem('cloud-os-settings', JSON.stringify(settings))
-    }, [settings])
+        if (isSettingsLoaded) {
+            localStorage.setItem('cloud-os-settings', JSON.stringify(settings))
+        }
+    }, [settings, isSettingsLoaded])
 
     // Apply Theme
     useEffect(() => {
         const root = document.documentElement
         root.dataset.theme = settings.theme
         root.dataset.transparency = settings.useTransparency.toString()
-        
+
         // Remove class manipulation as we now use data-theme
         if (settings.theme === 'dark') {
             root.classList.add('dark')
@@ -128,7 +133,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
         }
 
         // Removed: Hardcoded theme color injections (moved to globals.css)
-        
+
     }, [settings.accentColor])
 
     // Apply Display Scale
@@ -158,7 +163,7 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
     const toggleMute = () => setSettings(p => ({ ...p, isMuted: !p.isMuted }))
     const setSnapToGrid = (enable: boolean) => setSettings(p => ({ ...p, snapToGrid: enable }))
     const setShowWeatherWidget = (enable: boolean) => setSettings(p => ({ ...p, showWeatherWidget: enable }))
-    
+
     const pinApp = (appId: string) => setSettings(p => {
         if (p.pinnedAppIds.includes(appId)) return p
         return { ...p, pinnedAppIds: [...p.pinnedAppIds, appId] }
@@ -186,10 +191,11 @@ export function SystemSettingsProvider({ children }: { children: ReactNode }) {
             setMuted,
             toggleMute,
             setSnapToGrid,
-        setShowWeatherWidget,
-        pinApp,
-        unpinApp,
-            setWallpaper
+            setShowWeatherWidget,
+            pinApp,
+            unpinApp,
+            setWallpaper,
+            isSettingsLoaded
         }}>
             {children}
         </SystemSettingsContext.Provider>

@@ -116,9 +116,9 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
         { name: t('wallpaper.preset.neon'), type: 'preset', value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
         { name: t('wallpaper.preset.midnight'), type: 'preset', value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
         { name: t('wallpaper.image.daily'), type: 'image', value: 'daily' },
-        { name: t('wallpaper.image.snow'), type: 'image', value: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
-        { name: t('wallpaper.image.desert'), type: 'image', value: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
-        { name: t('wallpaper.image.city'), type: 'image', value: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+        { name: t('wallpaper.image.snow'), type: 'image', value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
+        { name: t('wallpaper.image.desert'), type: 'image', value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
+        { name: t('wallpaper.image.city'), type: 'image', value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
     ]
 
     const handleWallpaperSelect = async (wp: any) => {
@@ -198,7 +198,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
                                     >
                                         {wp.type === 'image' ? (
                                             <img
-                                                src={wp.value === 'daily' ? 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop' : wp.value}
+                                                src={wp.value === 'daily' ? '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop') : wp.value}
                                                 className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                                 alt={wp.name}
                                             />

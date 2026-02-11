@@ -24,6 +24,7 @@ export function useSystem() {
 
     return {
         // State
+        isLoaded: settings.isSettingsLoaded,
         theme: settings.theme,
         accentColor: settings.accentColor,
         useTransparency: settings.useTransparency,
@@ -31,6 +32,7 @@ export function useSystem() {
         useTaskbarPreviews: settings.useTaskbarPreviews,
         iconTheme: settings.iconTheme,
         displayScale: settings.displayScale,
+        skipBootSequence: settings.skipBootSequence,
         wallpaper: settings.wallpaper,
 
         isMuted: settings.isMuted,
@@ -43,6 +45,7 @@ export function useSystem() {
         setUseTransparency: settings.setUseTransparency,
         setUseAnimations: settings.setUseAnimations,
         setUseTaskbarPreviews: settings.setUseTaskbarPreviews,
+        setSkipBootSequence: settings.setSkipBootSequence,
         setIconTheme: settings.setIconTheme,
         setDisplayScale: settings.setDisplayScale,
         setWallpaper: settings.setWallpaper,

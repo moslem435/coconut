@@ -214,38 +214,38 @@ export default function SystemContextMenu() {
             }
           },
           {
-             label: t('menu.rename'),
-             icon: FileEdit,
-             action: () => {
-                if (data?.id) {
-                   const file = useFileSystemStore.getState().getItem(data.id)
-                   if (file) {
-                        const newName = prompt(t('menu.rename.prompt') || 'Enter new name:', file.name)
-                        if (newName && newName !== file.name) {
-                            useFileSystemStore.getState().renameItem(data.id, newName)
-                        }
-                   }
+            label: t('menu.rename'),
+            icon: FileEdit,
+            action: () => {
+              if (data?.id) {
+                const file = useFileSystemStore.getState().getItem(data.id)
+                if (file) {
+                  const newName = prompt(t('menu.rename.prompt') || 'Enter new name:', file.name)
+                  if (newName && newName !== file.name) {
+                    useFileSystemStore.getState().renameItem(data.id, newName).catch(console.error)
+                  }
                 }
-                hideMenu()
-             }
+              }
+              hideMenu()
+            }
           },
           {
-             label: t('menu.properties'),
-             icon: FileText,
-             action: () => {
-                if (data?.id) {
-                    const file = useFileSystemStore.getState().getItem(data.id)
-                    if (file) {
-                        addNotification({ 
-                            type: 'info', 
-                            title: t('menu.properties'),
-                            message: `${t('common.name')}: ${file.name}\n${t('common.type')}: ${file.type}\nID: ${file.id}`,
-                            duration: 5000
-                        })
-                    }
+            label: t('menu.properties'),
+            icon: FileText,
+            action: () => {
+              if (data?.id) {
+                const file = useFileSystemStore.getState().getItem(data.id)
+                if (file) {
+                  addNotification({
+                    type: 'info',
+                    title: t('menu.properties'),
+                    message: `${t('common.name')}: ${file.name}\n${t('common.type')}: ${file.type}\nID: ${file.id}`,
+                    duration: 5000
+                  })
                 }
-                hideMenu()
-             }
+              }
+              hideMenu()
+            }
           },
           { type: 'separator' },
           {
@@ -254,7 +254,8 @@ export default function SystemContextMenu() {
             danger: true,
             action: () => {
               if (data?.id) {
-                deleteItem(data.id)
+                // Fire and forget
+                deleteItem(data.id).catch(console.error)
                 addNotification({ type: 'success', message: 'Item deleted' })
               }
               hideMenu()
@@ -268,8 +269,8 @@ export default function SystemContextMenu() {
             label: t('menu.refresh'),
             icon: RefreshCw,
             action: () => {
-                // In a real app, this might re-fetch. Here it's a no-op or just visual.
-                hideMenu()
+              // In a real app, this might re-fetch. Here it's a no-op or just visual.
+              hideMenu()
             }
           },
           { type: 'separator' },
@@ -277,43 +278,43 @@ export default function SystemContextMenu() {
             label: t('menu.newfolder'),
             icon: FolderPlus,
             action: () => {
-                if (data?.pathId) {
-                    createItem(data.pathId, 'New Folder', 'folder')
-                }
-                hideMenu()
+              if (data?.pathId) {
+                createItem(data.pathId, 'New Folder', 'folder').catch(console.error)
+              }
+              hideMenu()
             }
           },
           {
-              label: t('menu.openterminal'),
-              icon: Terminal,
-              action: () => {
-                  const app = APPS_REGISTRY['terminal']
-                  if (app) {
-                      // Pass initial path to terminal if supported
-                      // For now, just open terminal
-                      openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
-                  }
-                  hideMenu()
+            label: t('menu.openterminal'),
+            icon: Terminal,
+            action: () => {
+              const app = APPS_REGISTRY['terminal']
+              if (app) {
+                // Pass initial path to terminal if supported
+                // For now, just open terminal
+                openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
               }
+              hideMenu()
+            }
           },
           { type: 'separator' },
           {
-             label: t('menu.properties'),
-             icon: FileText,
-             action: () => {
-                if (data?.pathId) {
-                    const folder = getItem(data.pathId)
-                    if (folder) {
-                        addNotification({ 
-                            type: 'info', 
-                            title: t('menu.properties'),
-                            message: `${t('common.name')}: ${folder.name}\n${t('common.type')}: ${folder.type}\nID: ${folder.id}`,
-                            duration: 5000
-                        })
-                    }
+            label: t('menu.properties'),
+            icon: FileText,
+            action: () => {
+              if (data?.pathId) {
+                const folder = getItem(data.pathId)
+                if (folder) {
+                  addNotification({
+                    type: 'info',
+                    title: t('menu.properties'),
+                    message: `${t('common.name')}: ${folder.name}\n${t('common.type')}: ${folder.type}\nID: ${folder.id}`,
+                    duration: 5000
+                  })
                 }
-                hideMenu()
-             }
+              }
+              hideMenu()
+            }
           }
         ]
 
@@ -330,8 +331,8 @@ export default function SystemContextMenu() {
             label: t('menu.newfolder'),
             icon: FolderPlus,
             action: () => {
-                const id = createItem('desktop', 'New Folder', 'folder')
-                
+              // Create item returns Promise<string> with the new ID
+              createItem('desktop', 'New Folder', 'folder').then((id) => {
                 // Calculate position based on where user clicked
                 const scaleFactor = displayScale / 100
                 const currentGridSize = GRID_SIZE * scaleFactor
@@ -342,44 +343,46 @@ export default function SystemContextMenu() {
                 const startY = position?.y || currentGridPadding
 
                 const pos = findFreePosition(
-                    startX, 
-                    startY, 
-                    id, 
-                    iconPositions, 
-                    currentGridSize, 
-                    currentGridPadding
+                  startX,
+                  startY,
+                  id,
+                  iconPositions,
+                  currentGridSize,
+                  currentGridPadding
                 )
 
                 updateIconPosition(id, pos)
-                hideMenu()
+              }).catch(console.error)
+
+              hideMenu()
             }
           },
           {
-              label: t('menu.openterminal'),
-              icon: Terminal,
-              action: () => {
-                  const app = APPS_REGISTRY['terminal']
-                  if (app) openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
-                  hideMenu()
-              }
+            label: t('menu.openterminal'),
+            icon: Terminal,
+            action: () => {
+              const app = APPS_REGISTRY['terminal']
+              if (app) openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+              hideMenu()
+            }
           },
           { type: 'separator' },
           {
             label: t('menu.sort'),
             icon: ArrowDownAZ,
             action: () => {
-               // Simple name sort re-organization
-               const desktopItems = useFileSystemStore.getState().getChildren('desktop')
-               // Sort by name
-               desktopItems.sort((a, b) => a.name.localeCompare(b.name))
-               
-               const scaleFactor = displayScale / 100
-               const currentGridSize = GRID_SIZE * scaleFactor
-               const currentGridPadding = GRID_PADDING * scaleFactor
-               const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
-               
-               organizeIcons(desktopItems.map(i => i.id), maxRows, currentGridSize, currentGridPadding)
-               hideMenu()
+              // Simple name sort re-organization
+              const desktopItems = useFileSystemStore.getState().getChildren('desktop')
+              // Sort by name
+              desktopItems.sort((a, b) => a.name.localeCompare(b.name))
+
+              const scaleFactor = displayScale / 100
+              const currentGridSize = GRID_SIZE * scaleFactor
+              const currentGridPadding = GRID_PADDING * scaleFactor
+              const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
+
+              organizeIcons(desktopItems.map(i => i.id), maxRows, currentGridSize, currentGridPadding)
+              hideMenu()
             }
           },
           {
@@ -406,9 +409,9 @@ export default function SystemContextMenu() {
             action: () => handleOpenSettings('appearance')
           },
           {
-             label: t('menu.displaysettings'),
-             icon: Monitor,
-             action: () => handleOpenSettings('display')
+            label: t('menu.displaysettings'),
+            icon: Monitor,
+            action: () => handleOpenSettings('display')
           },
           { type: 'separator' },
           {

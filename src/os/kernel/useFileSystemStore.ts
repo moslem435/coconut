@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { v4 as uuidv4 } from 'uuid'
+import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 
 export type FileType = 'file' | 'folder'
 
@@ -14,26 +15,39 @@ export interface FileNode {
   createdAt: number
   updatedAt: number
   originalParentId?: string | null // For trash restoration
+  icon?: string // Custom icon (e.g. for mounted drives)
+  isMount?: boolean
 }
 
 interface FileSystemState {
   files: Record<string, FileNode>
   rootId: string
-  
+  isLoading: boolean
+
+  // Helpers
+  resolvePath: (id: string) => string
+
   // Actions
-  createItem: (parentId: string, name: string, type: FileType, content?: string, appId?: string) => string
-  deleteItem: (id: string) => void // Hard delete
-  renameItem: (id: string, newName: string) => void
+  createItem: (parentId: string, name: string, type: FileType, content?: string, appId?: string) => Promise<string>
+  deleteItem: (id: string) => Promise<void> // Hard delete
+  renameItem: (id: string, newName: string) => Promise<void>
   getItem: (id: string) => FileNode | undefined
   getChildren: (parentId: string) => FileNode[]
   getPath: (id: string) => FileNode[]
-  
+
   // New Actions
-  updateFileContent: (id: string, content: string) => void
-  moveItem: (id: string, newParentId: string) => void
+  updateFileContent: (id: string, content: string) => Promise<void>
+  moveItem: (id: string, newParentId: string) => Promise<void>
   trashItems: (ids: string[]) => void
   restoreItems: (ids: string[]) => void
   emptyTrash: () => void
+
+  // Sync
+  syncToOPFS: () => Promise<void>
+
+  // New Actions
+  mountLocalFolder: () => Promise<void>
+  loadFolderContent: (folderId: string) => Promise<void>
 }
 
 // Initial File System
@@ -304,8 +318,67 @@ export const useFileSystemStore = create<FileSystemState>()(
     (set, get) => ({
       files: INITIAL_FILES,
       rootId: INITIAL_ROOT_ID,
+      isLoading: true,
 
-      createItem: (parentId, name, type, content, appId) => {
+      resolvePath: (id: string) => {
+        const state = get()
+        const node = state.files[id]
+        if (!node) return ''
+        if (id === state.rootId) return '/'
+
+        const pathNodes = state.getPath(id)
+        
+        // Check if path contains a mount point
+        const mountIndex = pathNodes.findIndex(n => n.isMount)
+        if (mountIndex !== -1) {
+           const mountNode = pathNodes[mountIndex]
+           const relativePath = pathNodes.slice(mountIndex + 1).map(n => n.name).join('/')
+           return `/mnt/${mountNode.id}${relativePath ? '/' + relativePath : ''}`
+        }
+
+        return '/' + pathNodes.slice(1).map(n => n.name).join('/')
+      },
+      // --- Mount Operations ---
+      mountLocalFolder: async () => {
+        try {
+          // @ts-ignore - showDirectoryPicker missing in TS
+          const handle = await window.showDirectoryPicker()
+
+          // 1. Mount in FS Client
+          const mountPath = fs.mount(handle)
+          const mountId = mountPath.split('/').pop()!
+
+          // 2. Add to Store State
+          const mountNode: FileNode = {
+            id: mountId,
+            parentId: 'root',
+            name: handle.name,
+            type: 'folder',
+            content: undefined,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            appId: undefined,
+            // Mark as external mount for UI differentiation
+            icon: 'hard-drive',
+            isMount: true
+          }
+
+          set(state => {
+            const newFiles = { ...state.files }
+            // Add mount node
+            newFiles[mountId] = mountNode
+            // No need to update parent 'children' array as we use a flat list with parentId pointers
+            return { files: newFiles }
+          })
+
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            console.error('Failed to mount folder:', error)
+          }
+        }
+      },
+
+      createItem: async (parentId, name, type, content, appId) => {
         const id = uuidv4()
         const newItem: FileNode = {
           id,
@@ -317,18 +390,33 @@ export const useFileSystemStore = create<FileSystemState>()(
           createdAt: Date.now(),
           updatedAt: Date.now()
         }
-        
+
+        // 1. Optimistic UI Update
         set((state) => ({
           files: { ...state.files, [id]: newItem }
         }))
-        
+
+        // 2. Write to OPFS
+        try {
+          const fullPath = get().resolvePath(id)
+          if (type === 'folder') {
+            await fs.mkdir(fullPath)
+          } else {
+            await fs.writeFile(fullPath, content || '')
+          }
+        } catch (error) {
+          console.error('Failed to sync createItem to OPFS:', error)
+        }
+
         return id
       },
 
-      deleteItem: (id) => {
+      deleteItem: async (id) => {
+        const path = get().resolvePath(id)
+
         set((state) => {
           const newFiles = { ...state.files }
-          
+
           // Recursive delete helper
           const deleteRecursive = (itemId: string) => {
             // Find children
@@ -336,19 +424,41 @@ export const useFileSystemStore = create<FileSystemState>()(
             children.forEach(child => deleteRecursive(child.id))
             delete newFiles[itemId]
           }
-          
+
           deleteRecursive(id)
           return { files: newFiles }
         })
+
+        // OPFS Delete
+        try {
+          if (path && path !== '/') {
+            await fs.unlink(path, true)
+          }
+        } catch (e) {
+          console.error('OPFS Delete Failed', e)
+        }
       },
 
-      renameItem: (id, newName) => {
+      renameItem: async (id, newName) => {
+        const oldPath = get().resolvePath(id)
+
         set((state) => ({
           files: {
             ...state.files,
             [id]: { ...state.files[id], name: newName, updatedAt: Date.now() }
           }
         }))
+
+        // OPFS Rename
+        const newPath = get().resolvePath(id)
+
+        try {
+          if (oldPath && newPath) {
+            await fs.rename(oldPath, newPath)
+          }
+        } catch (e) {
+          console.error('OPFS Rename Failed', e)
+        }
       },
 
       getItem: (id) => get().files[id],
@@ -361,32 +471,121 @@ export const useFileSystemStore = create<FileSystemState>()(
         const files = get().files
         const path: FileNode[] = []
         let current = files[id]
-        
+
         while (current) {
           path.unshift(current)
           if (!current.parentId) break
           current = files[current.parentId]
         }
-        
+
         return path
       },
 
-      updateFileContent: (id, content) => {
+      // Load children for a folder (especially mounted ones)
+      loadFolderContent: async (folderId: string) => {
+        const folder = get().files[folderId]
+        if (!folder || folder.type !== 'folder') return
+
+        // Only process mounted folders (or folders inside mounts)
+        const state = get()
+        const fullPath = state.resolvePath(folderId)
+        console.log(`[loadFolderContent] Loading content for ${folderId}, path: ${fullPath}`)
+        if (!fullPath || !fullPath.startsWith('/mnt/')) {
+          console.log(`[loadFolderContent] Skipping non-mount path: ${fullPath}`)
+          return
+        }
+
+        try {
+          // Only set loading if empty? Or always? Let's avoid flicker if populated.
+          if (state.getChildren(folderId).length === 0) {
+            set({ isLoading: true })
+          }
+
+          console.log(`[loadFolderContent] Calling fs.readdir(${fullPath})`)
+          const childrenNames = await fs.readdir(fullPath)
+          console.log(`[loadFolderContent] fs.readdir returned:`, childrenNames)
+
+          // Check current children in state
+          const currentChildren = Object.values(get().files).filter(f => f.parentId === folderId)
+          const currentNames = new Set(currentChildren.map(c => c.name))
+
+          const newFiles = { ...get().files }
+          let hasChanges = false
+
+          // 1. Add new files
+          for (const name of childrenNames) {
+            if (!currentNames.has(name)) {
+              const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+              console.log(`[loadFolderContent] Found new item: ${name}, Path: ${childPath}`)
+
+              try {
+                const stats = await fs.stat(childPath)
+                const childId = uuidv4()
+                console.log(`[loadFolderContent] Adding item ${name} with ID ${childId}`)
+
+                newFiles[childId] = {
+                  id: childId,
+                  parentId: folderId,
+                  name,
+                  type: stats.isDirectory ? 'folder' : 'file',
+                  createdAt: stats.ctime,
+                  updatedAt: stats.mtime,
+                  content: undefined
+                }
+                hasChanges = true
+              } catch (err) {
+                console.warn(`Failed to stat child ${childPath}`, err)
+              }
+            }
+          }
+
+          // 2. Remove deleted files (optional, but good for sync)
+          // ... for now let's just add new ones to be safe and simple
+
+          if (hasChanges) {
+            console.log(`[loadFolderContent] Updating state with ${Object.keys(newFiles).length} files`)
+            set({ files: newFiles })
+          } else {
+            console.log(`[loadFolderContent] No changes detected`)
+          }
+        } catch (e) {
+          console.error("Failed to load folder content:", e)
+        } finally {
+          set({ isLoading: false })
+        }
+      },
+
+      updateFileContent: async (id, content) => {
+        // 1. Memory
         set((state) => ({
           files: {
             ...state.files,
             [id]: { ...state.files[id], content, updatedAt: Date.now() }
           }
         }))
+
+        // 2. OPFS
+        const path = get().resolvePath(id)
+        if (path) {
+          await fs.writeFile(path, content)
+        }
       },
 
-      moveItem: (id, newParentId) => {
+      moveItem: async (id, newParentId) => {
+        const oldPath = get().resolvePath(id)
+
         set((state) => ({
           files: {
             ...state.files,
             [id]: { ...state.files[id], parentId: newParentId, updatedAt: Date.now() }
           }
         }))
+
+        const newPath = get().resolvePath(id)
+
+        if (oldPath && newPath) {
+          await fs.rename(oldPath, newPath)
+        }
       },
 
       trashItems: (ids) => {
@@ -414,7 +613,7 @@ export const useFileSystemStore = create<FileSystemState>()(
               const originalParent = newFiles[id].originalParentId || 'desktop'
               // Check if original parent still exists, if not, move to desktop
               const targetParent = newFiles[originalParent] ? originalParent : 'desktop'
-              
+
               newFiles[id] = {
                 ...newFiles[id],
                 parentId: targetParent,
@@ -429,20 +628,64 @@ export const useFileSystemStore = create<FileSystemState>()(
 
       emptyTrash: () => {
         set((state) => {
-            const newFiles = { ...state.files }
-            // Find all items in trash
-            const trashItems = Object.values(newFiles).filter(f => f.parentId === 'trash')
-            
-            // Helper for recursive delete
-             const deleteRecursive = (itemId: string) => {
-                const children = Object.values(newFiles).filter(f => f.parentId === itemId)
-                children.forEach(child => deleteRecursive(child.id))
-                delete newFiles[itemId]
-            }
+          const newFiles = { ...state.files }
+          // Find all items in trash
+          const trashItems = Object.values(newFiles).filter(f => f.parentId === 'trash')
 
-            trashItems.forEach(item => deleteRecursive(item.id))
-            return { files: newFiles }
+          // Helper for recursive delete
+          const deleteRecursive = (itemId: string) => {
+            const children = Object.values(newFiles).filter(f => f.parentId === itemId)
+            children.forEach(child => deleteRecursive(child.id))
+            delete newFiles[itemId]
+          }
+
+          trashItems.forEach(item => deleteRecursive(item.id))
+          return { files: newFiles }
         })
+      },
+
+      syncToOPFS: async () => {
+        set({ isLoading: true })
+        const state = get()
+        const files = Object.values(state.files)
+
+        console.log('Starting VFS -> OPFS Sync...')
+
+        // Sort files to ensure folders are created before files
+        const sortedFiles = files.sort((a, b) => {
+          if (a.type === 'folder' && b.type !== 'folder') return -1
+          if (a.type !== 'folder' && b.type === 'folder') return 1
+          return 0
+        })
+
+        for (const node of sortedFiles) {
+          if (node.id === 'root' || node.id === 'trash') continue;
+
+          const path = state.resolvePath(node.id)
+          if (!path) continue
+          
+          // Skip mounted paths - they are already persisted on the native FS
+          // and we don't want to overwrite them with potentially empty content
+          if (path.startsWith('/mnt/')) continue
+
+          try {
+            if (node.type === 'folder') {
+              await fs.mkdir(path, true)
+            } else {
+              // Ensure parent directory exists for file
+              const parentPath = path.substring(0, path.lastIndexOf('/'))
+              if (parentPath && parentPath !== '/') {
+                await fs.mkdir(parentPath, true)
+              }
+
+              await fs.writeFile(path, node.content || '')
+            }
+          } catch (err) {
+            console.warn(`Sync failed for ${path}`, err)
+          }
+        }
+        console.log('VFS -> OPFS Sync Complete')
+        set({ isLoading: false })
       }
     }),
     {

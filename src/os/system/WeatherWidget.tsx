@@ -297,13 +297,19 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
           )
         }
       }}
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.5, duration: 0.5 }}
-      className="absolute top-6 right-6 z-10 flex flex-col items-end pointer-events-auto cursor-grab"
+      initial={{ opacity: 0, y: -20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 0.5, duration: 0.5, type: "spring", stiffness: 100, damping: 20 }}
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}
+      className="absolute top-6 right-6 z-10 flex flex-col items-end pointer-events-auto cursor-grab rounded-2xl overflow-hidden"
     >
-      {/* Main Card */}
-      <div className="bg-black/20 backdrop-blur-md border border-white/10 rounded-2xl p-4 w-64 text-white hover:bg-black/30 transition-colors group">
+      {/* Main Card Content */}
+      <div className="p-4 w-64 text-white hover:bg-white/5 transition-colors group">
         
         {/* Header: Location & Status */}
         <div className="flex justify-between items-start mb-4">
