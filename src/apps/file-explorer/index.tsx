@@ -45,7 +45,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const [currentPathId, setCurrentPathId] = useState(initialPath)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const { files, getChildren, getPath } = useFileSystemStore()
-  const { launchApp, focusWindow, windows } = useWindowStore()
+  const launchApp = useWindowStore(state => state.launchApp)
+  const focusWindow = useWindowStore(state => state.focusWindow)
   const { showMenu } = useContextMenuStore()
   const { t } = useLanguage()
   
@@ -70,7 +71,9 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
       // 1. If it's an app shortcut
       if (item.appId) {
-          if (windows[item.appId]?.isOpen) {
+          // Check if window is open using getState()
+          const isWindowOpen = useWindowStore.getState().windows[item.appId]?.isOpen
+          if (isWindowOpen) {
               focusWindow(item.appId)
               return
           }

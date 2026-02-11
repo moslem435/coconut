@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCw, Monitor, Settings, Info, Grid3X3, Check, X, Minimize2, Maximize2, ArrowLeftToLine, ArrowRightToLine, ExternalLink, FolderPlus, Image, Trash2, FileEdit, Terminal, ArrowDownAZ, Palette, FileText, Minus } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -14,15 +15,32 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 import { findFreePosition, GRID_SIZE, GRID_PADDING } from '@/os/utils/grid'
 
 export default function SystemContextMenu() {
-  const { visible, position, type, data, hideMenu } = useContextMenuStore()
+  const { visible, position, type, data, hideMenu } = useContextMenuStore(useShallow(state => ({
+    visible: state.visible,
+    position: state.position,
+    type: state.type,
+    data: state.data,
+    hideMenu: state.hideMenu
+  })))
   const { addNotification } = useNotificationStore()
-  const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore()
+  const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore(useShallow(state => ({
+    organizeIcons: state.organizeIcons,
+    iconPositions: state.iconPositions,
+    updateIconPosition: state.updateIconPosition
+  })))
   const { createItem, deleteItem, getItem } = useFileSystemStore()
   const { t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { snapToGrid, setSnapToGrid, pinnedAppIds, pinApp, unpinApp, useAnimations, displayScale, setShowWeatherWidget } = useSystemSettings()
-  const { openWindow, closeWindow, minimizeWindow, maximizeWindow, updateWindowPosition, updateWindowSize } = useWindowStore()
+  const { openWindow, closeWindow, minimizeWindow, maximizeWindow, updateWindowPosition, updateWindowSize } = useWindowStore(useShallow(state => ({
+    openWindow: state.openWindow,
+    closeWindow: state.closeWindow, // Assuming closeWindow exists in WindowState, checking file...
+    minimizeWindow: state.minimizeWindow, // Assuming minimizeWindow exists
+    maximizeWindow: state.maximizeWindow,
+    updateWindowPosition: state.updateWindowPosition,
+    updateWindowSize: state.updateWindowSize
+  })))
 
   // Handle outside click
   useEffect(() => {

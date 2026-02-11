@@ -23,7 +23,6 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
     const { t } = useLanguage()
     const openWindow = useWindowStore(state => state.openWindow)
     const launchApp = useWindowStore(state => state.launchApp)
-    const windows = useWindowStore(state => state.windows)
     const focusWindow = useWindowStore(state => state.focusWindow)
     const menuRef = useRef<HTMLDivElement>(null)
 
@@ -78,7 +77,10 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
         const app = APPS_REGISTRY[appId]
         if (!app) return
 
-        if (windows[appId]?.isOpen) {
+        // Check if window is open using getState() to avoid subscription
+        const isWindowOpen = useWindowStore.getState().windows[appId]?.isOpen
+
+        if (isWindowOpen) {
             focusWindow(appId)
         } else {
             launchApp(

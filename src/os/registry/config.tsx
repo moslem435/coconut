@@ -7,8 +7,6 @@ import { manifest as TerminalManifest } from '@/apps/terminal/manifest'
 import { manifest as NotepadManifest } from '@/apps/notepad/manifest'
 import { manifest as RecycleBinManifest } from '@/apps/recycle-bin/manifest'
 import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
-import { manifest as ResumeManifest } from '@/apps/resume/manifest'
-import { manifest as ContactManifest } from '@/apps/contact/manifest'
 import { manifest as MusicPlayerManifest } from '@/apps/music-player/manifest'
 import { manifest as WeatherManifest } from '@/apps/weather/manifest'
 import { manifest as VSCodeLiteManifest } from '@/apps/vscode-lite/manifest'
@@ -25,8 +23,6 @@ export const APPS_REGISTRY: Record<string, AppManifest> = {
   [NotepadManifest.id]: NotepadManifest,
   [RecycleBinManifest.id]: RecycleBinManifest,
   [PhotoGalleryManifest.id]: PhotoGalleryManifest,
-  [ResumeManifest.id]: ResumeManifest,
-  [ContactManifest.id]: ContactManifest,
   [MusicPlayerManifest.id]: MusicPlayerManifest,
   [WeatherManifest.id]: WeatherManifest,
   [VSCodeLiteManifest.id]: VSCodeLiteManifest,

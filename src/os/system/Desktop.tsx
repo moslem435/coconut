@@ -34,21 +34,31 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const currentGridPadding = GRID_PADDING * scaleFactor
 
     // Context Menu
-    const showMenu = useContextMenuStore(state => state.showMenu)
+    const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
     const { t } = useLanguage()
 
     // Actions - stable
-    const openWindow = useWindowStore(state => state.openWindow)
-    const launchApp = useWindowStore(state => state.launchApp)
-    const focusWindow = useWindowStore(state => state.focusWindow)
+    const openWindow = useWindowStore(useShallow(state => state.openWindow))
+    const launchApp = useWindowStore(useShallow(state => state.launchApp))
+    const focusWindow = useWindowStore(useShallow(state => state.focusWindow))
     
     // Selection State
     const [selectedIcons, setSelectedIcons] = useState<string[]>([])
 
     // Desktop Store
-    const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore()
-    const { getChildren } = useFileSystemStore()
-    const desktopItems = getChildren('desktop')
+    const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore(
+        useShallow(state => ({
+            iconPositions: state.iconPositions,
+            setIconPositions: state.setIconPositions,
+            updateIconPosition: state.updateIconPosition,
+            organizeIcons: state.organizeIcons
+        }))
+    )
+    
+    // Optimized: Only subscribe to files on the desktop
+    const desktopItems = useFileSystemStore(
+        useShallow(state => Object.values(state.files).filter(f => f.parentId === 'desktop'))
+    )
 
     const getDisplayName = (item: FileNode) => {
         // 1. App Shortcut

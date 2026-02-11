@@ -160,24 +160,6 @@ const INITIAL_FILES: Record<string, FileNode> = {
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
-  'shortcut-resume': {
-    id: 'shortcut-resume',
-    parentId: 'desktop',
-    name: 'Resume',
-    type: 'file',
-    appId: 'resume',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  'shortcut-contact': {
-    id: 'shortcut-contact',
-    parentId: 'desktop',
-    name: 'Contact Me',
-    type: 'file',
-    appId: 'contact',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
   'shortcut-music': {
     id: 'shortcut-music',
     parentId: 'desktop',
