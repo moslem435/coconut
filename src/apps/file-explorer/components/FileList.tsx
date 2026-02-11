@@ -7,6 +7,9 @@ import {
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useUIStore } from '@/os/kernel/useUIStore'
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
+import { RenameInput } from '@/os/ui/RenameInput'
 
 interface FileListProps {
   items: FileNode[]
@@ -53,6 +56,8 @@ export default function FileList({
   selectedIds, onSelect 
 }: FileListProps) {
   const { t } = useLanguage()
+  const { renamingId, setRenamingId } = useUIStore()
+  const { renameItem } = useFileSystemStore()
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
@@ -136,9 +141,24 @@ export default function FileList({
                   fillOpacity={0.2}
                 />
               </div>
-              <span className="text-xs text-center text-white/80 line-clamp-2 break-all w-full px-1 group-hover:text-white">
-                {node.name}
-              </span>
+              
+              {renamingId === node.id ? (
+                <RenameInput
+                  initialValue={node.name}
+                  className="w-full text-center text-xs rounded px-1"
+                  onComplete={(newName) => {
+                    if (newName && newName !== node.name) {
+                      renameItem(node.id, newName).catch(console.error)
+                    }
+                    setRenamingId(null)
+                  }}
+                  onCancel={() => setRenamingId(null)}
+                />
+              ) : (
+                <span className="text-xs text-center text-white/80 line-clamp-2 break-all w-full px-1 group-hover:text-white">
+                  {node.name}
+                </span>
+              )}
             </div>
           )
         })}
@@ -165,7 +185,7 @@ export default function FileList({
           className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => handleSort('date')}
         >
-          Date
+          {t('common.date') || 'Date'}
           {sortField === 'date' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
         <div 
@@ -179,7 +199,7 @@ export default function FileList({
           className="w-[80px] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => handleSort('size')}
         >
-          Size
+          {t('common.size') || 'Size'}
           {sortField === 'size' && (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
         </div>
       </div>
@@ -211,7 +231,21 @@ export default function FileList({
                     node.type === 'folder' ? "text-yellow-400 fill-yellow-400/20" : "text-blue-400"
                   )} 
                 />
-                <span className="truncate">{node.name}</span>
+                {renamingId === node.id ? (
+                  <RenameInput
+                    initialValue={node.name}
+                    className="w-full text-sm rounded px-1 py-0.5"
+                    onComplete={(newName) => {
+                      if (newName && newName !== node.name) {
+                        renameItem(node.id, newName).catch(console.error)
+                      }
+                      setRenamingId(null)
+                    }}
+                    onCancel={() => setRenamingId(null)}
+                  />
+                ) : (
+                  <span className="truncate">{node.name}</span>
+                )}
               </div>
               <div className="flex-1 min-w-[100px] text-xs text-white/40">
                 {formatTime(node.updatedAt)}

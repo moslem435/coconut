@@ -158,6 +158,7 @@ const translations = {
     "menu.rename": "Rename",
     "menu.rename.prompt": "Enter new name:",
     "menu.properties": "Properties",
+    "menu.delete": "Delete",
     "menu.download": "Download",
 
     // Messages / Notifications
@@ -192,6 +193,7 @@ const translations = {
 
     // Notepad
     "notepad.new": "New",
+    "notepad.opened": "File opened",
     "notepad.save": "Save",
     "notepad.saved": "Saved!",
     "notepad.newfile": "New File",
@@ -296,6 +298,8 @@ const translations = {
     "vscode.utf8": "UTF-8",
     "vscode.lang": "TypeScript React",
     "vscode.prettier": "Prettier",
+    "vscode.output": "Output",
+    "vscode.problems": "Problems",
 
     // File Explorer
     "explorer.root": "Root",
@@ -307,12 +311,19 @@ const translations = {
     "explorer.downloads": "Downloads",
     "explorer.pictures": "Pictures",
     "explorer.music": "Music",
+    "explorer.delete_confirm": "Are you sure you want to delete these items?",
+    "explorer.permission_denied": "Permission denied",
     "common.search": "Search",
     "explorer.empty": "This folder is empty",
 
     // Common
     "common.name": "Name",
     "common.type": "Type",
+    "common.date": "Date",
+    "common.size": "Size",
+    "common.ok": "OK",
+    "common.cancel": "Cancel",
+    "common.confirm": "Confirm",
   },
   zh: {
     // App Titles
@@ -463,6 +474,7 @@ const translations = {
     "menu.rename": "重命名",
     "menu.rename.prompt": "输入新名称:",
     "menu.properties": "属性",
+    "menu.delete": "删除",
     "menu.download": "下载",
 
     // Messages / Notifications
@@ -573,6 +585,7 @@ const translations = {
 
     // Music Player
     "music.recommend": "推荐",
+    "music.eq": "均衡器",
     "music.hall": "音乐馆",
     "music.video": "视频",
     "music.radio": "电台",
@@ -634,6 +647,8 @@ const translations = {
     "vscode.utf8": "UTF-8",
     "vscode.lang": "TypeScript React",
     "vscode.prettier": "Prettier",
+    "vscode.output": "输出",
+    "vscode.problems": "问题",
 
     // File Explorer
     "explorer.root": "根目录",
@@ -645,12 +660,19 @@ const translations = {
     "explorer.downloads": "下载",
     "explorer.pictures": "图片",
     "explorer.music": "音乐",
+    "explorer.delete_confirm": "确定要删除这些项目吗？",
+    "explorer.permission_denied": "访问被拒绝",
     "explorer.empty": "此文件夹为空",
     "common.search": "搜索",
 
     // Common
     "common.name": "名称",
     "common.type": "类型",
+    "common.date": "日期",
+    "common.size": "大小",
+    "common.ok": "确定",
+    "common.cancel": "取消",
+    "common.confirm": "确认",
   }
 };
 

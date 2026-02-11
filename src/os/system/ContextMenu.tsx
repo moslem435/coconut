@@ -9,6 +9,8 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore, MenuType } from '@/os/kernel/useContextMenuStore'
 import { useNotificationStore } from '@/os/kernel/useNotificationStore'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
+import { useUIStore } from '@/os/kernel/useUIStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
@@ -217,16 +219,10 @@ export default function SystemContextMenu() {
             label: t('menu.rename'),
             icon: FileEdit,
             action: () => {
-              if (data?.id) {
-                const file = useFileSystemStore.getState().getItem(data.id)
-                if (file) {
-                  const newName = prompt(t('menu.rename.prompt') || 'Enter new name:', file.name)
-                  if (newName && newName !== file.name) {
-                    useFileSystemStore.getState().renameItem(data.id, newName).catch(console.error)
-                  }
-                }
-              }
               hideMenu()
+              if (data?.id) {
+                useUIStore.getState().setRenamingId(data.id)
+              }
             }
           },
           {

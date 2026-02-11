@@ -8,11 +8,13 @@ import { AppManifest } from '@/os/registry/types'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
+import { useUIStore } from '@/os/kernel/useUIStore'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useShallow } from 'zustand/react/shallow'
 import { Tooltip } from '@/os/ui/Tooltip'
+import { RenameInput } from '@/os/ui/RenameInput'
 import { Folder, FileText, Image as ImageIcon, StickyNote } from 'lucide-react'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
@@ -46,6 +48,8 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const [selectedIcons, setSelectedIcons] = useState<string[]>([])
 
     // Desktop Store
+    const { renamingId, setRenamingId } = useUIStore()
+    const { renameItem } = useFileSystemStore()
     const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore(
         useShallow(state => ({
             iconPositions: state.iconPositions,
@@ -471,7 +475,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                         return (
                             <motion.div
                                 key={item.id}
-                                drag
+                                drag={renamingId !== item.id}
                                 dragMomentum={false}
                                 dragElastic={0}
                                 onDragStart={(e) => {
@@ -536,15 +540,35 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                                     className={`drop-shadow-md transition-transform duration-200 ${isSelected ? 'scale-105' : ''}`}
                                 />
 
-                                <span className={`
-                                    text-[11px] text-center leading-tight break-words px-1 rounded
-                                    ${isSelected ? 'text-white font-medium' : 'text-gray-100/90'}
-                                    ${scaleFactor > 1.2 ? 'text-sm' : ''}
-                                `} style={{
-                                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                                    }}>
-                                    {getDisplayName(item)}
-                                </span>
+                                {renamingId === item.id ? (
+                                        <div 
+                                            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 flex justify-center" 
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ minWidth: '88px' }}
+                                        >
+                                            <RenameInput
+                                                initialValue={item.name}
+                                                className="text-center text-xs rounded px-1 py-0.5"
+                                                onComplete={(newName) => {
+                                                    if (newName && newName !== item.name) {
+                                                        renameItem(item.id, newName).catch(console.error)
+                                                    }
+                                                    setRenamingId(null)
+                                                }}
+                                                onCancel={() => setRenamingId(null)}
+                                            />
+                                        </div>
+                                    ) : (
+                                    <span className={`
+                                        text-[11px] text-center leading-tight break-words px-1 rounded
+                                        ${isSelected ? 'text-white font-medium' : 'text-gray-100/90'}
+                                        ${scaleFactor > 1.2 ? 'text-sm' : ''}
+                                    `} style={{
+                                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                        }}>
+                                        {getDisplayName(item)}
+                                    </span>
+                                )}
 
                                 {/* Selection Indicator */}
                                 {isSelected && (

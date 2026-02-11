@@ -17,6 +17,7 @@ import Desktop from './Desktop'
 import Window from './Window'
 import Notifications from './Notifications'
 import GlobalShortcuts from './GlobalShortcuts'
+import GlobalDialogs from './GlobalDialogs'
 
 interface ShellProps {
   onShutdown?: () => void
@@ -76,6 +77,9 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       {/* Notifications - z-[9999] defined in component */}
       <Notifications />
+
+      {/* Global Dialogs - z-[99999] */}
+      <GlobalDialogs />
     </>
   )
 }
