@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { 
   ArrowLeft, ArrowRight, ArrowUp, RotateCw, Search, 
-  LayoutGrid, List as ListIcon, ChevronRight, Home, HardDrive 
+  LayoutGrid, List as ListIcon, ChevronRight, Home, HardDrive, Upload, FolderPlus
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
@@ -15,14 +15,32 @@ interface ToolbarProps {
   viewMode: 'grid' | 'list'
   onViewModeChange: (mode: 'grid' | 'list') => void
   canGoUp: boolean
+  searchQuery: string
+  onSearchChange: (query: string) => void
+  onUpload?: () => void
+  onNewFolder?: () => void
 }
 
 export default function Toolbar({ 
   currentPath, onNavigate, onUp, onRefresh, 
-  viewMode, onViewModeChange, canGoUp 
+  viewMode, onViewModeChange, canGoUp,
+  searchQuery, onSearchChange, onUpload, onNewFolder
 }: ToolbarProps) {
   const { t } = useLanguage()
-  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Focus search on Ctrl+F
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Helper to get display name
   const getDisplayName = (node: FileNode) => {
@@ -79,11 +97,41 @@ export default function Toolbar({
       <div className="relative w-48 group">
         <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-white/60 transition-colors" />
         <input 
+          ref={searchInputRef}
           type="text" 
-          placeholder={t('common.search') || "Search"}
+          placeholder={t('common.search') || "Search (Ctrl+F)"}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => onSearchChange(e.target.value)}
           className="w-full bg-black/20 border border-white/5 rounded-md py-1.5 pl-8 pr-3 text-sm text-white/90 placeholder:text-white/30 focus:outline-none focus:bg-black/40 focus:border-white/20 transition-all"
+        />
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onNewFolder}
+          className="p-1.5 rounded-md hover:bg-white/10 transition-colors text-white/70 hover:text-white"
+          title="New Folder (Ctrl+N)"
+        >
+          <FolderPlus size={16} />
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="p-1.5 rounded-md hover:bg-white/10 transition-colors text-white/70 hover:text-white"
+          title="Upload Files"
+        >
+          <Upload size={16} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && onUpload) {
+              onUpload()
+            }
+          }}
         />
       </div>
 

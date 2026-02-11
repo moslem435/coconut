@@ -1,7 +1,7 @@
 import React from 'react'
-import { 
-  Home, Monitor, FileText, Image, Download, 
-  HardDrive, Cloud, Star, ChevronRight, Disc, Plus
+import {
+  Home, Monitor, FileText, Image, Download,
+  HardDrive, Cloud, Star, ChevronRight, Disc, Plus, AlertTriangle
 } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
@@ -28,25 +28,30 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
   // Group 2: Mounted Drives
   const mounts = Object.values(files).filter(node => node.isMount)
 
-  const SidebarItem = ({ id, icon: Icon, label, isActive, onClick }: any) => (
+  const SidebarItem = ({ id, icon: Icon, label, isActive, onClick, node }: any) => (
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200 group",
-        isActive 
-          ? "bg-white/10 text-white font-medium shadow-sm" 
+        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200 group relative",
+        isActive
+          ? "bg-white/10 text-white font-medium shadow-sm"
           : "text-white/70 hover:bg-white/5 hover:text-white"
       )}
     >
       <Icon size={16} className={cn("opacity-80 group-hover:opacity-100", isActive && "text-blue-400 opacity-100")} />
-      <span className="truncate">{label}</span>
+      <span className="truncate flex-1 text-left">{label}</span>
+      {/* Permission Warning */}
+      {/* @ts-ignore - needsPermission added in store but type might not be inferred here yet in some setups */}
+      {node?.needsPermission && (
+        <AlertTriangle size={12} className="text-amber-400 animate-pulse" />
+      )}
     </button>
   )
 
   return (
     <div className="w-56 flex flex-col h-full bg-[rgba(var(--os-bg-panel-rgb),0.3)] backdrop-blur-xl border-r border-white/5 pt-4 pb-4 select-none">
       <div className="flex-1 overflow-y-auto px-3 space-y-6 custom-scrollbar">
-        
+
         {/* This System Section */}
         <div>
           <h3 className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -91,6 +96,9 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
                   icon={HardDrive}
                   label={node.name}
                   isActive={currentPathId === node.id}
+                  // Pass node to component to check permission
+                  // @ts-ignore
+                  node={node}
                   onClick={() => onNavigate(node.id)}
                 />
               ))
@@ -114,7 +122,7 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
         </div>
 
       </div>
-      
+
       {/* Storage Indicator (Optional) */}
       <div className="mt-auto px-4 py-4 border-t border-white/5">
         <div className="flex items-center gap-2 text-xs text-white/50 mb-1">

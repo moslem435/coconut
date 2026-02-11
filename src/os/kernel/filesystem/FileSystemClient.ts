@@ -161,27 +161,54 @@ export class FileSystemClient implements IFileSystem {
     }
 
     async rename(oldPath: string, newPath: string): Promise<void> {
-        // Renaming across filesystems (e.g. OPFS -> Native) is complex (move = copy + delete)
-        // For now we assume rename stays within same driver.
-
         const isOldMount = oldPath.startsWith('/mnt/');
         const isNewMount = newPath.startsWith('/mnt/');
 
-        if (isOldMount !== isNewMount) {
-            throw new Error('Cross-filesystem move not supported yet');
+        // Same driver - use optimized native move
+        if (isOldMount === isNewMount) {
+            return this.route<void>(
+                oldPath,
+                'rename',
+                (d, p) => {
+                    // We need to resolve newPath relative to the driver ROOT too
+                    const matchNew = newPath.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
+                    const relativeNew = matchNew ? (matchNew[2] || '/') : newPath;
+                    return d.rename(p, relativeNew);
+                },
+                { oldPath, newPath }
+            );
         }
 
-        return this.route<void>(
-            oldPath,
-            'rename',
-            (d, p) => {
-                // We need to resolve newPath relative to the driver ROOT too
-                const matchNew = newPath.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-                const relativeNew = matchNew ? (matchNew[2] || '/') : newPath;
-                return d.rename(p, relativeNew);
-            },
-            { oldPath, newPath }
-        );
+        // Cross-driver move: Copy + Delete
+        console.log(`[FileSystem] Cross-driver move detected: ${oldPath} -> ${newPath}`);
+        try {
+            await this.copy(oldPath, newPath);
+            await this.unlink(oldPath, true);
+        } catch (error) {
+            console.error('[FileSystem] Cross-driver move failed:', error);
+            throw new Error(`Failed to move file across filesystems: ${error}`);
+        }
+    }
+
+    /**
+     * Recursive copy helper for cross-driver operations
+     */
+    private async copy(source: string, dest: string): Promise<void> {
+        const stats = await this.stat(source);
+
+        if (stats.isDirectory) {
+            await this.mkdir(dest, true);
+            const children = await this.readdir(source);
+
+            for (const child of children) {
+                const childSource = source.endsWith('/') ? `${source}${child}` : `${source}/${child}`;
+                const childDest = dest.endsWith('/') ? `${dest}${child}` : `${dest}/${child}`;
+                await this.copy(childSource, childDest);
+            }
+        } else {
+            const content = await this.readFile(source);
+            await this.writeFile(dest, content);
+        }
     }
 
     /**

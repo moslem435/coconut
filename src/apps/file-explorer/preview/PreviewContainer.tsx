@@ -8,15 +8,17 @@ import { ImagePreviewProvider } from './ImagePreviewProvider'
 import { TextPreviewProvider } from './TextPreviewProvider'
 import { VideoPreviewProvider } from './VideoPreviewProvider'
 import { DocPreviewProvider } from './DocPreviewProvider'
+import { CodePreviewProvider } from './CodePreviewProvider'
 import { DefaultPreviewProvider } from './DefaultPreviewProvider'
 
 // Initialize Registry (Idempotent-ish)
 // In a real app, this might be in a system boot script
 const registerAll = () => {
     PreviewService.register(ImagePreviewProvider)
-    PreviewService.register(TextPreviewProvider)
     PreviewService.register(VideoPreviewProvider)
     PreviewService.register(DocPreviewProvider)
+    PreviewService.register(CodePreviewProvider)
+    PreviewService.register(TextPreviewProvider)
     PreviewService.register(DefaultPreviewProvider)
 }
 registerAll()

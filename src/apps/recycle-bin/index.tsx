@@ -4,6 +4,7 @@ import { Trash2, RotateCcw, Ban, FileText, Folder, Image as ImageIcon, StickyNot
 import { AppIcon } from '@/os/ui/AppIcon'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { soundManager } from '@/lib/sound'
 
@@ -37,8 +38,9 @@ const RecycleBin: React.FC = () => {
     setSelectedIds(new Set())
   }
 
-  const handleEmpty = () => {
-    if (confirm(t('recycle.confirm'))) {
+  const handleEmpty = async () => {
+    const confirmed = await useDialogStore.getState().openConfirm(t('recycle.confirm'))
+    if (confirmed) {
       soundManager.playClick()
       emptyTrash()
       setSelectedIds(new Set())

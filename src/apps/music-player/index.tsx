@@ -10,6 +10,7 @@ import {
   Trash2, Plus, Sliders
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 
 import { Visualizer } from './components/Visualizer'
 import { Equalizer } from './components/Equalizer'
@@ -256,9 +257,10 @@ export default function MusicPlayer() {
     }
   }
 
-  const handleDeletePlaylist = (id: string, e: React.MouseEvent) => {
+  const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm('Delete this playlist?')) {
+    const confirmed = await useDialogStore.getState().openConfirm('Delete this playlist?')
+    if (confirmed) {
       setPlaylists(prev => prev.filter(p => p.id !== id))
       if (activeTab === id) setActiveTab('recommend')
     }

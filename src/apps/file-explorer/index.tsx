@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
+import { useUIStore } from '@/os/kernel/useUIStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
-import { Eye } from 'lucide-react'
+import { Eye, Upload, FolderPlus } from 'lucide-react'
 import PreviewContainer from './preview/PreviewContainer'
+import Fuse from 'fuse.js'
 
-// New Components
+// Components
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
 import FileList from './components/FileList'
 import StatusBar from './components/StatusBar'
+import FileUploadZone from './components/FileUploadZone'
+import BatchProgressDialog, { BatchOperation } from './components/BatchProgressDialog'
 
 interface FileExplorerProps {
   initialPath?: string
@@ -23,12 +28,25 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const [currentPathId, setCurrentPathId] = useState(initialPath)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [batchProgress, setBatchProgress] = useState<{
+    isOpen: boolean
+    title: string
+    operations: BatchOperation[]
+    cancelRequested: boolean
+  }>({
+    isOpen: false,
+    title: '',
+    operations: [],
+    cancelRequested: false
+  })
   
   // Stores
   const { 
     files, getChildren, getPath, isLoading, loadFolderContent,
-    setClipboard, pasteItems, deleteItem 
+    setClipboard, pasteItems, deleteItem, createItem, moveItem
   } = useFileSystemStore()
+  const { setRenamingId } = useUIStore()
   const launchApp = useWindowStore(state => state.launchApp)
   const focusWindow = useWindowStore(state => state.focusWindow)
   const { showMenu } = useContextMenuStore()
@@ -43,7 +61,21 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     loadFolderContent(currentPathId)
   }, [currentPathId, loadFolderContent])
 
-  // Keyboard Shortcuts
+  // Search with Fuse.js
+  const children = getChildren(currentPathId)
+  const filteredChildren = useMemo(() => {
+    if (!searchQuery.trim()) return children
+
+    const fuse = new Fuse(children, {
+      keys: ['name'],
+      threshold: 0.3,
+      includeScore: true
+    })
+
+    return fuse.search(searchQuery).map(result => result.item)
+  }, [children, searchQuery])
+
+  // Keyboard Shortcuts (Extended)
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Ignore if input is active
@@ -51,6 +83,14 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
+          case 'a':
+            e.preventDefault()
+            setSelectedIds(children.map(c => c.id))
+            break
+          case 'd':
+            e.preventDefault()
+            setSelectedIds([])
+            break
           case 'c':
             e.preventDefault()
             if (selectedIds.length > 0) {
@@ -68,19 +108,22 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
             await pasteItems(currentPathId)
             loadFolderContent(currentPathId)
             break
+          case 'n':
+            e.preventDefault()
+            handleCreateFolder()
+            break
         }
       } else {
         switch (e.key) {
+          case 'F2':
+            e.preventDefault()
+            if (selectedIds.length === 1) {
+              setRenamingId(selectedIds[0])
+            }
+            break
           case 'Delete':
             if (selectedIds.length > 0) {
-              // TODO: Add confirmation dialog?
-              if (confirm(t('explorer.delete_confirm') || 'Are you sure you want to delete these items?')) {
-                for (const id of selectedIds) {
-                  await deleteItem(id)
-                }
-                setSelectedIds([])
-                loadFolderContent(currentPathId)
-              }
+              handleBatchDelete()
             }
             break
           case 'Backspace':
@@ -92,7 +135,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIds, currentPathId, setClipboard, pasteItems, deleteItem, loadFolderContent, t])
+  }, [selectedIds, currentPathId, children, setClipboard, pasteItems, loadFolderContent, t])
 
   // Handlers
   const handleNavigate = async (id: string) => {
@@ -186,14 +229,188 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     showMenu(e.clientX, e.clientY, 'desktop-item', { id })
   }
 
+  // Batch Delete with Progress
+  const handleBatchDelete = async () => {
+    const confirmed = await useDialogStore.getState().openConfirm(
+      t('explorer.delete_confirm') || `Delete ${selectedIds.length} item(s)?`
+    )
+    
+    if (!confirmed) return
+
+    const operations: BatchOperation[] = selectedIds.map(id => ({
+      id,
+      name: files[id]?.name || 'Unknown',
+      status: 'pending' as const
+    }))
+
+    setBatchProgress({
+      isOpen: true,
+      title: 'Deleting Files',
+      operations,
+      cancelRequested: false
+    })
+
+    for (let i = 0; i < operations.length; i++) {
+      if (batchProgress.cancelRequested) break
+
+      setBatchProgress(prev => ({
+        ...prev,
+        operations: prev.operations.map((op, idx) =>
+          idx === i ? { ...op, status: 'processing' } : op
+        )
+      }))
+
+      try {
+        await deleteItem(operations[i].id)
+        setBatchProgress(prev => ({
+          ...prev,
+          operations: prev.operations.map((op, idx) =>
+            idx === i ? { ...op, status: 'success' } : op
+          )
+        }))
+      } catch (error) {
+        setBatchProgress(prev => ({
+          ...prev,
+          operations: prev.operations.map((op, idx) =>
+            idx === i ? { ...op, status: 'error', error: String(error) } : op
+          )
+        }))
+      }
+    }
+
+    setSelectedIds([])
+    loadFolderContent(currentPathId)
+  }
+
+  // Create Folder
+  const handleCreateFolder = async () => {
+    const name = await useDialogStore.getState().openPrompt(
+      'New Folder',
+      'Enter folder name:'
+    )
+    if (name) {
+      await createItem(currentPathId, name, 'folder')
+      loadFolderContent(currentPathId)
+    }
+  }
+
+  // File Upload Handler
+  const handleUploadComplete = () => {
+    loadFolderContent(currentPathId)
+  }
+
+  // Manual Upload Handler
+  const handleManualUpload = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files
+      if (!files) return
+
+      const operations: BatchOperation[] = Array.from(files).map(file => ({
+        id: file.name,
+        name: file.name,
+        status: 'pending' as const
+      }))
+
+      setBatchProgress({
+        isOpen: true,
+        title: 'Uploading Files',
+        operations,
+        cancelRequested: false
+      })
+
+      for (let i = 0; i < files.length; i++) {
+        if (batchProgress.cancelRequested) break
+
+        setBatchProgress(prev => ({
+          ...prev,
+          operations: prev.operations.map((op, idx) =>
+            idx === i ? { ...op, status: 'processing' } : op
+          )
+        }))
+
+        try {
+          const file = files[i]
+          const content = await file.arrayBuffer()
+          const textContent = new TextDecoder().decode(content)
+          await createItem(currentPathId, file.name, 'file', textContent)
+          
+          setBatchProgress(prev => ({
+            ...prev,
+            operations: prev.operations.map((op, idx) =>
+              idx === i ? { ...op, status: 'success' } : op
+            )
+          }))
+        } catch (error) {
+          setBatchProgress(prev => ({
+            ...prev,
+            operations: prev.operations.map((op, idx) =>
+              idx === i ? { ...op, status: 'error', error: String(error) } : op
+            )
+          }))
+        }
+      }
+
+      loadFolderContent(currentPathId)
+    }
+    input.click()
+  }
+
+  // Drag and Drop Handler
+  const handleFileDrop = async (draggedIds: string[], targetId: string) => {
+    const operations: BatchOperation[] = draggedIds.map(id => ({
+      id,
+      name: files[id]?.name || 'Unknown',
+      status: 'pending' as const
+    }))
+
+    setBatchProgress({
+      isOpen: true,
+      title: 'Moving Files',
+      operations,
+      cancelRequested: false
+    })
+
+    for (let i = 0; i < operations.length; i++) {
+      if (batchProgress.cancelRequested) break
+
+      setBatchProgress(prev => ({
+        ...prev,
+        operations: prev.operations.map((op, idx) =>
+          idx === i ? { ...op, status: 'processing' } : op
+        )
+      }))
+
+      try {
+        await moveItem(operations[i].id, targetId)
+        setBatchProgress(prev => ({
+          ...prev,
+          operations: prev.operations.map((op, idx) =>
+            idx === i ? { ...op, status: 'success' } : op
+          )
+        }))
+      } catch (error) {
+        setBatchProgress(prev => ({
+          ...prev,
+          operations: prev.operations.map((op, idx) =>
+            idx === i ? { ...op, status: 'error', error: String(error) } : op
+          )
+        }))
+      }
+    }
+
+    loadFolderContent(currentPathId)
+  }
+
   // Derived State
-  const children = getChildren(currentPathId)
   const path = getPath(currentPathId)
   const currentFolder = files[currentPathId] || files['root']
 
   return (
     <div 
-      className="h-full flex flex-col bg-[#191919] text-white pt-10" // pt-10 for window controls
+      className="h-full flex flex-col bg-[#191919] text-white pt-10 relative"
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* Top Toolbar */}
@@ -205,9 +422,13 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         canGoUp={!!currentFolder.parentId}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onNewFolder={handleCreateFolder}
+        onUpload={handleManualUpload}
       />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Sidebar */}
         <Sidebar 
           currentPathId={currentPathId}
@@ -215,7 +436,13 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent">
+        <div className="flex-1 flex flex-col min-w-0 bg-transparent relative">
+          {/* File Upload Drop Zone */}
+          <FileUploadZone
+            targetFolderId={currentPathId}
+            onUploadComplete={handleUploadComplete}
+          />
+
           {isLoading ? (
              <div className="h-full flex flex-col items-center justify-center text-white/30">
                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50 mb-4" />
@@ -223,13 +450,14 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
              </div>
           ) : (
             <FileList 
-              items={children}
+              items={filteredChildren}
               viewMode={viewMode}
               onNavigate={handleNavigate}
               onDoubleClick={handleDoubleClick}
               onContextMenu={handleItemContextMenu}
               selectedIds={selectedIds}
               onSelect={handleSelect}
+              onDrop={handleFileDrop}
             />
           )}
         </div>
@@ -239,6 +467,15 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       <StatusBar 
         totalItems={children.length}
         selectedItems={children.filter(c => selectedIds.includes(c.id))}
+      />
+
+      {/* Batch Progress Dialog */}
+      <BatchProgressDialog
+        isOpen={batchProgress.isOpen}
+        title={batchProgress.title}
+        operations={batchProgress.operations}
+        onCancel={() => setBatchProgress(prev => ({ ...prev, cancelRequested: true }))}
+        onClose={() => setBatchProgress({ isOpen: false, title: '', operations: [], cancelRequested: false })}
       />
     </div>
   )

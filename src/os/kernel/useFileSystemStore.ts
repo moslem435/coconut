@@ -17,6 +17,7 @@ export interface FileNode {
   originalParentId?: string | null // For trash restoration
   icon?: string // Custom icon (e.g. for mounted drives)
   isMount?: boolean
+  needsPermission?: boolean
 }
 
 interface FileSystemState {
@@ -54,6 +55,7 @@ interface FileSystemState {
   // New Actions
   mountLocalFolder: () => Promise<void>
   loadFolderContent: (folderId: string) => Promise<void>
+  checkMountPermissions: () => Promise<void>
 }
 
 // Initial File System
@@ -333,13 +335,13 @@ export const useFileSystemStore = create<FileSystemState>()(
         if (id === state.rootId) return '/'
 
         const pathNodes = state.getPath(id)
-        
+
         // Check if path contains a mount point
         const mountIndex = pathNodes.findIndex(n => n.isMount)
         if (mountIndex !== -1) {
-           const mountNode = pathNodes[mountIndex]
-           const relativePath = pathNodes.slice(mountIndex + 1).map(n => n.name).join('/')
-           return `/mnt/${mountNode.id}${relativePath ? '/' + relativePath : ''}`
+          const mountNode = pathNodes[mountIndex]
+          const relativePath = pathNodes.slice(mountIndex + 1).map(n => n.name).join('/')
+          return `/mnt/${mountNode.id}${relativePath ? '/' + relativePath : ''}`
         }
 
         return '/' + pathNodes.slice(1).map(n => n.name).join('/')
@@ -390,34 +392,37 @@ export const useFileSystemStore = create<FileSystemState>()(
 
       initialize: async () => {
         try {
-           const { NativeDriver } = await import('@/os/kernel/filesystem/NativeDriver')
-           const mounts = await NativeDriver.restoreMounts()
+          const { NativeDriver } = await import('@/os/kernel/filesystem/NativeDriver')
+          const mounts = await NativeDriver.restoreMounts()
 
-           // Mount each restored handle
-           mounts.forEach((handle, id) => {
-               fs.mount(handle, id)
-               
-               // Add to State
-               const newNode: FileNode = {
-                    id: id,
-                    parentId: 'root',
-                    name: handle.name,
-                    type: 'folder',
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                    icon: 'hard-drive',
-                    isMount: true
-               }
-               
-               set(state => {
-                   if (state.files[id]) return state // Already exists
-                   return {
-                       files: { ...state.files, [id]: newNode }
-                   }
-               })
-           })
+          // Mount each restored handle
+          mounts.forEach((handle, id) => {
+            fs.mount(handle, id)
+
+            // Add to State
+            const newNode: FileNode = {
+              id: id,
+              parentId: 'root',
+              name: handle.name,
+              type: 'folder',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              icon: 'hard-drive',
+              isMount: true
+            }
+
+            set(state => {
+              if (state.files[id]) return state // Already exists
+              return {
+                files: { ...state.files, [id]: newNode }
+              }
+            })
+
+            // Check permissions after restore (async)
+            get().checkMountPermissions()
+          })
         } catch (e) {
-            console.error('Failed to restore mounts:', e)
+          console.error('Failed to restore mounts:', e)
         }
       },
 
@@ -550,22 +555,44 @@ export const useFileSystemStore = create<FileSystemState>()(
 
           // Check current children in state
           const currentChildren = Object.values(get().files).filter(f => f.parentId === folderId)
-          const currentNames = new Set(currentChildren.map(c => c.name))
+          const currentChildrenMap = new Map(currentChildren.map(c => [c.name, c]))
+          const fsNamesSet = new Set(childrenNames)
 
           const newFiles = { ...get().files }
           let hasChanges = false
 
-          // 1. Add new files
+          // 1. Identify Phantom Files (In State but not in FS)
+          for (const child of currentChildren) {
+            if (!fsNamesSet.has(child.name)) {
+              console.log(`[loadFolderContent] Removing phantom file: ${child.name} (${child.id})`)
+              delete newFiles[child.id]
+              hasChanges = true
+            }
+          }
+
+          // 2. Add New Files & 3. Update Existing Metadata
           for (const name of childrenNames) {
-            if (!currentNames.has(name)) {
-              const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
-              console.log(`[loadFolderContent] Found new item: ${name}, Path: ${childPath}`)
+            const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+            const existingNode = currentChildrenMap.get(name)
 
-              try {
-                const stats = await fs.stat(childPath)
+            try {
+              const stats = await fs.stat(childPath)
+
+              if (existingNode) {
+                // Update existing if changed (simple mtime check)
+                if (existingNode.updatedAt !== stats.mtime) {
+                  console.log(`[loadFolderContent] Updating metadata for: ${name}`)
+                  newFiles[existingNode.id] = {
+                    ...existingNode,
+                    updatedAt: stats.mtime,
+                    // size: stats.size // TODO: Add size to FileNode if needed
+                  }
+                  hasChanges = true
+                }
+              } else {
+                // Create new node
                 const childId = uuidv4()
-                console.log(`[loadFolderContent] Adding item ${name} with ID ${childId}`)
-
+                console.log(`[loadFolderContent] Found new item: ${name}, Path: ${childPath}`)
                 newFiles[childId] = {
                   id: childId,
                   parentId: folderId,
@@ -573,20 +600,20 @@ export const useFileSystemStore = create<FileSystemState>()(
                   type: stats.isDirectory ? 'folder' : 'file',
                   createdAt: stats.ctime,
                   updatedAt: stats.mtime,
-                  content: undefined
+                  content: undefined,
+                  // Mark children of mounts as inside a mount too (optional, but helpful for logic)
+                  isMount: false // It's inside a mount, but not a mount point itself
                 }
                 hasChanges = true
-              } catch (err) {
-                console.warn(`Failed to stat child ${childPath}`, err)
               }
+
+            } catch (err) {
+              console.warn(`Failed to stat child ${childPath}`, err)
             }
           }
 
-          // 2. Remove deleted files (optional, but good for sync)
-          // ... for now let's just add new ones to be safe and simple
-
           if (hasChanges) {
-            console.log(`[loadFolderContent] Updating state with ${Object.keys(newFiles).length} files`)
+            console.log(`[loadFolderContent] Updating state with changes`)
             set({ files: newFiles })
           } else {
             console.log(`[loadFolderContent] No changes detected`)
@@ -706,7 +733,7 @@ export const useFileSystemStore = create<FileSystemState>()(
 
           const path = state.resolvePath(node.id)
           if (!path) continue
-          
+
           // Skip mounted paths - they are already persisted on the native FS
           // and we don't want to overwrite them with potentially empty content
           if (path.startsWith('/mnt/')) continue
@@ -749,7 +776,7 @@ export const useFileSystemStore = create<FileSystemState>()(
           // Check for name collision and generate new name if needed
           let newName = item.name
           let counter = 1
-          while (Object.values(files).some(f => 
+          while (Object.values(files).some(f =>
             f.parentId === targetFolderId && f.name === newName && f.id !== itemId
           )) {
             const nameParts = item.name.split('.')
@@ -763,11 +790,11 @@ export const useFileSystemStore = create<FileSystemState>()(
           }
 
           if (clipboard.op === 'cut') {
-             // For cut, we just move and rename if needed
-             if (newName !== item.name) {
-               await get().renameItem(itemId, newName)
-             }
-             await moveItem(itemId, targetFolderId)
+            // For cut, we just move and rename if needed
+            if (newName !== item.name) {
+              await get().renameItem(itemId, newName)
+            }
+            await moveItem(itemId, targetFolderId)
           } else {
             // For copy, we create a new item
             // Note: Deep copy for folders is not implemented yet, simpler for files
@@ -785,6 +812,31 @@ export const useFileSystemStore = create<FileSystemState>()(
         // Clear clipboard after cut
         if (clipboard.op === 'cut') {
           set({ clipboard: { items: [], op: null } })
+        }
+      },
+
+      checkMountPermissions: async () => {
+        const state = get()
+        const mounts = Object.values(state.files).filter(f => f.isMount)
+
+        for (const mount of mounts) {
+          const path = state.resolvePath(mount.id)
+          try {
+            // We use verifyPermission which calls queryPermission (non-blocking)
+            const hasPerm = await fs.verifyPermission(path)
+
+            // Only update if status changed
+            if (mount.needsPermission === hasPerm) {
+              set(s => ({
+                files: {
+                  ...s.files,
+                  [mount.id]: { ...s.files[mount.id], needsPermission: !hasPerm }
+                }
+              }))
+            }
+          } catch (e) {
+            console.warn('Failed to check permission for mount:', mount.id)
+          }
         }
       }
     }),
