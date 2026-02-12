@@ -201,6 +201,15 @@ const INITIAL_FILES: Record<string, FileNode> = {
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
+  'shortcut-taskmanager': {
+    id: 'shortcut-taskmanager',
+    parentId: 'desktop',
+    name: 'Task Manager',
+    type: 'file',
+    appId: 'task-manager',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  },
   'shortcut-weather': {
     id: 'shortcut-weather',
     parentId: 'desktop',
@@ -422,6 +431,25 @@ export const useFileSystemStore = create<FileSystemState>()(
             // Check permissions after restore (async)
             get().checkMountPermissions()
           })
+
+          // Ensure System Shortcuts exist (for updates)
+          set(state => {
+             const newFiles = { ...state.files }
+             let hasChanges = false
+             
+             Object.entries(INITIAL_FILES).forEach(([id, node]) => {
+                // Check if shortcut exists, if not add it
+                // We also check if it's a shortcut to avoid overwriting user files
+                if (id.startsWith('shortcut-') && !newFiles[id]) {
+                    newFiles[id] = node
+                    hasChanges = true
+                }
+             })
+             
+             if (!hasChanges) return state
+             return { files: newFiles }
+          })
+
         } catch (e) {
           console.error('Failed to restore mounts:', e)
         }

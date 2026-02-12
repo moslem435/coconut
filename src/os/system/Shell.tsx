@@ -9,6 +9,7 @@ import { useSystemStore } from '@/os/kernel/useSystemStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { APPS_REGISTRY } from '@/os/registry/config'
+import { Kernel } from '@/os/kernel/Kernel'
 
 // Components
 import Taskbar from './Taskbar'
@@ -33,6 +34,7 @@ export default function Shell({ onShutdown }: ShellProps) {
   const { syncToOPFS, initialize } = useFileSystemStore()
 
   useEffect(() => {
+    Kernel.init()
     syncToOPFS().catch(console.error)
     initialize().catch(console.error)
   }, []) // Run once on startup

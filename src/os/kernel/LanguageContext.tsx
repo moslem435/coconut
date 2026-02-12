@@ -19,6 +19,7 @@ const translations = {
     "app.terminal": "Terminal",
     "app.weather": "Weather",
     "app.vscode-lite": "VS Code",
+    "app.task-manager": "Task Manager",
 
     // Boot Sequence
     "boot.start": "Click to Start",
@@ -341,6 +342,7 @@ const translations = {
     "app.terminal": "终端",
     "app.weather": "天气",
     "app.vscode-lite": "VS Code",
+    "app.task-manager": "任务管理器",
 
     // Boot Sequence
     "boot.start": "点击启动",

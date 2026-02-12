@@ -4,8 +4,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
 import { Folder, FileCode, ChevronRight, ChevronDown, Search, Menu, X, Save, Play, Terminal as TerminalIcon } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { TerminalCore } from '@/os/components/TerminalCore'
 import { FilePickerDialog } from '@/os/ui/dialogs/FilePickerDialog'
+import dynamic from 'next/dynamic'
+
+// Dynamically import XTerm
+const XTerm = dynamic(() => import('@/os/components/XTerm'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Node.js...</div>
+})
 
 // --- Syntax Highlighting Helper (Simple Regex Based) ---
 const highlightCode = (code: string, lang: string) => {
@@ -294,7 +300,9 @@ export default function VSCodeLite() {
                              <X size={12} />
                          </div>
                      </div>
-                     <TerminalCore className="flex-1 p-2 text-xs" style={{ backgroundColor: '#1e1e1e' }} initialWelcome={false} />
+                     <div className="flex-1 overflow-hidden">
+                        <XTerm className="h-full w-full" style={{ backgroundColor: '#1e1e1e' }} />
+                     </div>
                 </div>
             )}
         </div>

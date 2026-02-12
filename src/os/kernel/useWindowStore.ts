@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { ReactNode, ComponentType } from 'react'
 import { AppIcon } from '@/os/registry/types'
+import { useProcessStore } from '@/os/kernel/useProcessStore'
 
 export interface WindowState {
     id: string
@@ -75,6 +76,11 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
         const newZ = maxZIndex + 1
 
+        // Create Process (If App ID is present)
+        if (options?.appId) {
+            useProcessStore.getState().createProcess(options.appId, title, id)
+        }
+
         // Calculate centered position
         const windowWidth = options?.width ?? options?.size?.width ?? 800
         const windowHeight = options?.height ?? options?.size?.height ?? 600
@@ -134,11 +140,18 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
     closeWindow: (id) => {
         set(state => {
-            const newWindows = { ...state.windows }
-            delete newWindows[id]
+            const { [id]: removed, ...remaining } = state.windows
+            const nextActive = state.activeWindowId === id ? null : state.activeWindowId
+            
+            // Kill Process
+            const process = useProcessStore.getState().getProcessByWindowId(id)
+            if (process) {
+                useProcessStore.getState().killProcess(process.pid)
+            }
+
             return {
-                windows: newWindows,
-                activeWindowId: state.activeWindowId === id ? null : state.activeWindowId
+                windows: remaining,
+                activeWindowId: nextActive
             }
         })
     },

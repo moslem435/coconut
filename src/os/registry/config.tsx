@@ -10,6 +10,8 @@ import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
 import { manifest as MusicPlayerManifest } from '@/apps/music-player/manifest'
 import { manifest as WeatherManifest } from '@/apps/weather/manifest'
 import { manifest as VSCodeLiteManifest } from '@/apps/vscode-lite/manifest'
+import { manifest as SandboxTestManifest } from '@/apps/sandbox-test/manifest'
+import { manifest as TaskManagerManifest } from '@/apps/task-manager/manifest'
 
 // Re-export for compatibility
 export type { AppManifest as AppConfig } from './types'
@@ -26,6 +28,8 @@ export const APPS_REGISTRY: Record<string, AppManifest> = {
   [MusicPlayerManifest.id]: MusicPlayerManifest,
   [WeatherManifest.id]: WeatherManifest,
   [VSCodeLiteManifest.id]: VSCodeLiteManifest,
+  [SandboxTestManifest.id]: SandboxTestManifest,
+  [TaskManagerManifest.id]: TaskManagerManifest,
 }
 
 export type AppId = keyof typeof APPS_REGISTRY
