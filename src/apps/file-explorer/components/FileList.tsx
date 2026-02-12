@@ -140,7 +140,7 @@ export default function FileList({
         className="h-full overflow-y-auto pb-20 custom-scrollbar"
         onClick={() => onSelect('', false)}
       >
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2 p-4">
+        <div className="grid grid-cols-[repeat(auto-fill,100px)] gap-4 p-4">
           {items.map(node => {
             const isSelected = selectedIds.includes(node.id)
             
@@ -167,7 +167,7 @@ export default function FileList({
                 onDoubleClick={() => onDoubleClick(node.id)}
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
-                  "p-3 rounded-xl transition-all duration-200 border border-transparent cursor-default",
+                  "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
                   isSelected 
                     ? "bg-blue-500/20 border-blue-500/30 shadow-inner" 
                     : "",

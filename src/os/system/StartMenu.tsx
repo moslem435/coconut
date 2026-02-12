@@ -141,15 +141,6 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
 
                     {/* Menu Items */}
                     <div className="space-y-1">
-                        {Object.values(APPS_REGISTRY).filter(app => app.id !== 'portfolio-hub').map((app) => (
-                            <MenuItem
-                                key={app.id}
-                                manifest={app}
-                                label={t(`app.${app.id}`)}
-                                onClick={() => handleLaunchApp(app.id)}
-                            />
-                        ))}
-                        <div className="h-px w-full my-2 bg-gradient-to-r from-transparent via-[var(--os-border)] to-transparent" />
                         <MenuItem icon={Power} label={t('start.shutdown')} onClick={handleShutdown} danger />
                     </div>
                 </motion.div>
