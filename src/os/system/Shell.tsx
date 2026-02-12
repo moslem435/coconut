@@ -10,6 +10,7 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { Kernel } from '@/os/kernel/Kernel'
+import { useProcessStore } from '@/os/kernel/useProcessStore'
 
 // Components
 import Taskbar from './Taskbar'
@@ -37,6 +38,12 @@ export default function Shell({ onShutdown }: ShellProps) {
     Kernel.init()
     syncToOPFS().catch(console.error)
     initialize().catch(console.error)
+
+    const interval = setInterval(() => {
+      useProcessStore.getState().tick()
+    }, 2000)
+
+    return () => clearInterval(interval)
   }, []) // Run once on startup
 
   const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()

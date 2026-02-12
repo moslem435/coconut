@@ -15,7 +15,8 @@ class SystemBridge {
             if (e.data.type === 'SYSCALL_RESULT') {
                 const { id, result, error } = e.data;
                 if (this.pending.has(id)) {
-                    const { resolve, reject } = this.pending.get(id);
+                    const { resolve, reject, timeout } = this.pending.get(id);
+                    clearTimeout(timeout);
                     if (error) reject(new Error(error));
                     else resolve(result);
                     this.pending.delete(id);
@@ -27,14 +28,21 @@ class SystemBridge {
     call(method, ...args) {
         return new Promise((resolve, reject) => {
             const id = this.msgId++;
-            this.pending.set(id, { resolve, reject });
+            const timeout = setTimeout(() => {
+                if (this.pending.has(id)) {
+                    this.pending.delete(id);
+                    reject(new Error('SysCall Timeout: ' + method));
+                }
+            }, 5000);
+
+            this.pending.set(id, { resolve, reject, timeout });
             window.parent.postMessage({
                 id,
                 type: 'SYSCALL',
                 appId: this.appId,
                 method,
                 args
-            }, '*');
+            }, window.location.origin);
         });
     }
 }
