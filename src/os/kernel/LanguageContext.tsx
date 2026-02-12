@@ -314,6 +314,7 @@ const translations = {
     "explorer.delete_confirm": "Are you sure you want to delete these items?",
     "explorer.permission_denied": "Permission denied",
     "common.search": "Search",
+    "common.sort_by": "Sort by",
     "explorer.empty": "This folder is empty",
 
     // Common
@@ -324,6 +325,7 @@ const translations = {
     "common.ok": "OK",
     "common.cancel": "Cancel",
     "common.confirm": "Confirm",
+    "common.sort_by": "Sort by",
   },
   zh: {
     // App Titles
@@ -664,6 +666,7 @@ const translations = {
     "explorer.permission_denied": "访问被拒绝",
     "explorer.empty": "此文件夹为空",
     "common.search": "搜索",
+    "common.sort_by": "排序方式",
 
     // Common
     "common.name": "名称",

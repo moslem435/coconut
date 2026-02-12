@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
-  ArrowLeft, ArrowRight, ArrowUp, RotateCw, Search, 
+  ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCw, Search, 
   LayoutGrid, List as ListIcon, ChevronRight, Home, Upload, FolderPlus,
-  ArrowDownWideNarrow, Check
+  ArrowDownWideNarrow, Check, ChevronDown
 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
@@ -77,7 +77,7 @@ export default function Toolbar({
   ]
 
   return (
-    <div className="h-12 flex items-center gap-3 px-4 border-b border-white/5 bg-[rgba(var(--os-bg-panel-rgb),0.5)] backdrop-blur-md shrink-0">
+    <div className="relative z-20 h-12 flex items-center gap-3 px-4 border-b border-white/5 bg-[rgba(var(--os-bg-panel-rgb),0.5)] backdrop-blur-md shrink-0">
       
       {/* Navigation Controls */}
       <div className="flex items-center gap-1 text-white/70">
@@ -211,7 +211,7 @@ export default function Toolbar({
           <button
             onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
             className={cn(
-              "p-1.5 rounded-md hover:bg-white/10 transition-colors text-white/70 hover:text-white",
+              "p-1.5 rounded-md hover:bg-white/10 transition-colors text-white/70 hover:text-white flex items-center gap-1",
               isSortMenuOpen && "bg-white/10 text-white"
             )}
             title="Sort Options"
@@ -220,24 +220,40 @@ export default function Toolbar({
           </button>
 
           {isSortMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-32 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-              {sortOptions.map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    onSortChange(option.value)
-                    setIsSortMenuOpen(false)
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                >
-                  <span>{option.label}</span>
-                  {sortConfig.field === option.value && (
-                    <div className="flex items-center text-white/60">
-                      {sortConfig.order === 'asc' ? <ArrowUp size={10} /> : <ArrowDownWideNarrow size={10} className="rotate-180" />}
+            <div className="absolute right-0 top-full mt-2 w-48 bg-[#1e1e1e]/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right ring-1 ring-black/20">
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-white/40 uppercase tracking-wider select-none mb-1">
+                {t('common.sort_by') || 'Sort by'}
+              </div>
+              {sortOptions.map(option => {
+                const isSelected = sortConfig.field === option.value
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      onSortChange(option.value)
+                      setIsSortMenuOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors",
+                      isSelected ? "text-white bg-white/10" : "text-white/70 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    {/* Check Icon Container */}
+                    <div className="w-4 flex items-center justify-center shrink-0">
+                      {isSelected && <Check size={14} className="text-blue-400" />}
                     </div>
-                  )}
-                </button>
-              ))}
+                    
+                    <span className="flex-1 truncate">{option.label}</span>
+                    
+                    {/* Sort Direction Icon */}
+                    {isSelected && (
+                      <div className="text-white/40 shrink-0">
+                        {sortConfig.order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
