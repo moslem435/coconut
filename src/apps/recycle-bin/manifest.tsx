@@ -3,7 +3,8 @@ import { AppManifest } from '@/os/registry/types'
 import { Trash2 } from 'lucide-react'
 
 const RecycleBin = dynamic(() => import('./index'), {
-    loading: () => <div className="h-full w-full flex items-center justify-center">Loading...</div>
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Recycle Bin...</div>
 })
 
 export const manifest: AppManifest = {

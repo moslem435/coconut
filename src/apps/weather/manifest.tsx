@@ -3,7 +3,8 @@ import { AppManifest } from '@/os/registry/types'
 import dynamic from 'next/dynamic'
 
 const WeatherApp = dynamic(() => import('./index'), {
-  loading: () => <div className="h-full w-full bg-black/90" />
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Weather...</div>
 })
 
 export const manifest: AppManifest = {

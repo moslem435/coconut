@@ -130,12 +130,10 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         // Set launching state
         set(state => ({ launchingAppIds: [...state.launchingAppIds, id] }))
 
-        // Simulate boot delay
-        setTimeout(() => {
-            // Pass appId (id) to openWindow options
-            openWindow(id, title, component, icon, { ...options, appId: id })
-            set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
-        }, 500)
+        // Instant Launch (Removed delay)
+        // Pass appId (id) to openWindow options
+        openWindow(id, title, component, icon, { ...options, appId: id })
+        set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
     },
 
     closeWindow: (id) => {

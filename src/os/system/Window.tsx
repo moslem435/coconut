@@ -67,18 +67,22 @@ export default function Window({ id }: WindowProps) {
 
   // If peeking, we want to show it even if minimized
   // If minimized, restore to last position or center
+  // Ensure we don't fade out completely if we don't have a taskbar position, to keep the "fly down" effect visible
   const targetOpacity = isOtherPeeking ? 0 : (windowState.isMinimized && !isPeeking ? 0 : 1)
   const targetScale = isOtherPeeking ? 1 : (windowState.isMinimized && !isPeeking ? 0 : 1)
 
   // Calculate target position based on peek state
   // If minimized and peeking -> Restore to pre-minimized position (or current position if it wasn't moved)
   // Logic: windowState.position tracks the "restored" position even when minimized
+  const fallbackTaskbarX = typeof window !== 'undefined' ? window.innerWidth / 2 : 400
+  const fallbackTaskbarY = typeof window !== 'undefined' ? window.innerHeight - 20 : 800
+
   const targetX = (windowState.isMinimized && !isPeeking)
-    ? (windowState.taskbarPosition?.x ? windowState.taskbarPosition.x - (effectiveWidth / 2) : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (effectiveWidth / 2) : 100))
+    ? (windowState.taskbarPosition?.x ? windowState.taskbarPosition.x - (effectiveWidth / 2) : fallbackTaskbarX - (effectiveWidth / 2))
     : windowState.isMaximized ? 0 : windowState.position.x
 
   const targetY = (windowState.isMinimized && !isPeeking)
-    ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2) : (typeof window !== 'undefined' ? window.innerHeight : 800))
+    ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2) : fallbackTaskbarY)
     : windowState.isMaximized ? 0 : windowState.position.y
 
   const handleMinimize = () => {
@@ -87,9 +91,6 @@ export default function Window({ id }: WindowProps) {
     minimizeWindow(id)
   }
 
-
-  // Calculate taskbar position for minimize animation target
-  const taskbarY = typeof window !== 'undefined' ? window.innerHeight - 40 : 800
 
   return (
     <>
@@ -202,7 +203,7 @@ export default function Window({ id }: WindowProps) {
             : (typeof window !== 'undefined' ? (window.innerWidth / 2) - (effectiveWidth / 2) : windowState.position.x),
           y: windowState.taskbarPosition?.y
             ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2)
-            : taskbarY + 100,
+            : fallbackTaskbarY + 100,
         }}
         animate={{
           opacity: targetOpacity,
@@ -318,7 +319,7 @@ export default function Window({ id }: WindowProps) {
           }
         }}
       >
-        <div className="absolute top-0 left-0 right-0 z-50">
+        <div className="absolute top-0 left-0 right-0 z-[200]">
           <WindowTitleBar
             title={windowState.title}
             icon={windowState.icon}
@@ -355,7 +356,7 @@ export default function Window({ id }: WindowProps) {
           />
         </div>
 
-        <div className="flex-1 relative overflow-hidden w-full h-full">
+        <div className="flex-1 relative overflow-hidden w-full h-full z-0">
           <WindowContext.Provider value={id}>
             <AppErrorBoundary appId={id}>
               {windowState.component}

@@ -1,6 +1,11 @@
 import { AppManifest } from '@/os/registry/types'
 import { StickyNote } from 'lucide-react'
-import Notepad from './index'
+import dynamic from 'next/dynamic'
+
+const Notepad = dynamic(() => import('./index'), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Notepad...</div>
+})
 
 export const manifest: AppManifest = {
     id: 'notepad',

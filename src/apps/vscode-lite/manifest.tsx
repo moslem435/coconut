@@ -2,7 +2,10 @@ import { AppManifest } from '@/os/registry/types'
 import { Code2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const VSCodeLite = dynamic(() => import('./index'), { ssr: false })
+const VSCodeLite = dynamic(() => import('./index'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Editor...</div>
+})
 
 export const manifest: AppManifest = {
   id: 'vscode-lite',

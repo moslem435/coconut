@@ -2,7 +2,10 @@ import { AppManifest } from '@/os/registry/types'
 import { Image } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const PhotoGallery = dynamic(() => import('./index'), { ssr: false })
+const PhotoGallery = dynamic(() => import('./index'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Photos...</div>
+})
 
 export const manifest: AppManifest = {
   id: 'photo-gallery',

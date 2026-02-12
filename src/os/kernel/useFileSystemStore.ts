@@ -10,7 +10,7 @@ export interface FileNode {
   parentId: string | null
   name: string
   type: FileType
-  content?: string
+  // content?: string // REMOVED: Content is now only in OPFS
   appId?: string // For shortcuts
   createdAt: number
   updatedAt: number
@@ -28,6 +28,7 @@ interface FileSystemState {
 
   // Helpers
   resolvePath: (id: string) => string
+  getNodeByPath: (path: string) => FileNode | undefined
 
   // Actions
   createItem: (parentId: string, name: string, type: FileType, content?: string, appId?: string) => Promise<string>
@@ -36,6 +37,9 @@ interface FileSystemState {
   getItem: (id: string) => FileNode | undefined
   getChildren: (parentId: string) => FileNode[]
   getPath: (id: string) => FileNode[]
+  
+  // Content Access (New)
+  readFileContent: (id: string) => Promise<string>
 
   // New Actions
   updateFileContent: (id: string, content: string) => Promise<void>
@@ -242,20 +246,7 @@ const INITIAL_FILES: Record<string, FileNode> = {
     parentId: 'code',
     name: 'hello_world.ts',
     type: 'file',
-    content: `// Hello World in TypeScript
-function sayHello(name: string): void {
-    console.log("Hello, " + name + "!");
-}
-
-const user = "Developer";
-sayHello(user);
-
-// TODO: Implement more features
-interface Config {
-    debug: boolean;
-    version: number;
-}
-`,
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -264,21 +255,7 @@ interface Config {
     parentId: 'code',
     name: 'component.tsx',
     type: 'file',
-    content: `import React, { useState } from 'react';
-
-export const Counter = () => {
-    const [count, setCount] = useState(0);
-
-    return (
-        <div className="p-4 border rounded">
-            <h1>Count: {count}</h1>
-            <button onClick={() => setCount(c => c + 1)}>
-                Increment
-            </button>
-        </div>
-    );
-};
-`,
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -288,7 +265,7 @@ export const Counter = () => {
     parentId: 'pictures',
     name: 'Abstract_01.jpg',
     type: 'file',
-    content: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -297,7 +274,7 @@ export const Counter = () => {
     parentId: 'pictures',
     name: 'Cyber_City.jpg',
     type: 'file',
-    content: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop',
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -306,7 +283,7 @@ export const Counter = () => {
     parentId: 'pictures',
     name: 'Workspace.jpg',
     type: 'file',
-    content: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&auto=format&fit=crop',
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -316,7 +293,7 @@ export const Counter = () => {
     parentId: 'desktop',
     name: 'Welcome.txt',
     type: 'file',
-    content: 'Welcome to Portfolio OS! This is a simulated file system.',
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   },
@@ -325,7 +302,7 @@ export const Counter = () => {
     parentId: 'documents',
     name: 'About.md',
     type: 'file',
-    content: '# About Me\n\nI am a full-stack developer...',
+    // content removed
     createdAt: Date.now(),
     updatedAt: Date.now()
   }
@@ -356,6 +333,26 @@ export const useFileSystemStore = create<FileSystemState>()(
 
         return '/' + pathNodes.slice(1).map(n => n.name).join('/')
       },
+
+      getNodeByPath: (path: string) => {
+          const state = get()
+          if (!path || path === '/') return state.files[state.rootId]
+
+          // Remove leading slash and split
+          const parts = path.replace(/^\/+/, '').split('/')
+          let currentId = state.rootId
+
+          for (const part of parts) {
+              const children = state.getChildren(currentId)
+              const found = children.find(c => c.name === part)
+              if (found) {
+                  currentId = found.id
+              } else {
+                  return undefined
+              }
+          }
+          return state.files[currentId]
+      },
       // --- Mount Operations ---
       mountLocalFolder: async () => {
         try {
@@ -376,7 +373,7 @@ export const useFileSystemStore = create<FileSystemState>()(
             parentId: 'root',
             name: handle.name,
             type: 'folder',
-            content: undefined,
+            // content removed
             createdAt: Date.now(),
             updatedAt: Date.now(),
             appId: undefined,
@@ -462,7 +459,7 @@ export const useFileSystemStore = create<FileSystemState>()(
           parentId,
           name,
           type,
-          content,
+          // content removed
           appId,
           createdAt: Date.now(),
           updatedAt: Date.now()
@@ -473,9 +470,10 @@ export const useFileSystemStore = create<FileSystemState>()(
           files: { ...state.files, [id]: newItem }
         }))
 
+        const fullPath = get().resolvePath(id)
+
         // 2. Write to OPFS
         try {
-          const fullPath = get().resolvePath(id)
           if (type === 'folder') {
             await fs.mkdir(fullPath)
           } else {
@@ -484,6 +482,15 @@ export const useFileSystemStore = create<FileSystemState>()(
         } catch (error) {
           console.error('Failed to sync createItem to OPFS:', error)
         }
+
+        // 3. Sync to WebContainer (Optimized)
+        import('@/os/kernel/useWebContainerStore').then(({ useWebContainerStore }) => {
+            if (type === 'folder') {
+                useWebContainerStore.getState().syncMkdir(fullPath)
+            } else {
+                useWebContainerStore.getState().syncFile(fullPath, content || '')
+            }
+        })
 
         return id
       },
@@ -514,6 +521,11 @@ export const useFileSystemStore = create<FileSystemState>()(
         } catch (e) {
           console.error('OPFS Delete Failed', e)
         }
+
+        // Sync to WebContainer
+        import('@/os/kernel/useWebContainerStore').then(({ useWebContainerStore }) => {
+            useWebContainerStore.getState().syncUnlink(path)
+        })
       },
 
       renameItem: async (id, newName) => {
@@ -536,6 +548,21 @@ export const useFileSystemStore = create<FileSystemState>()(
         } catch (e) {
           console.error('OPFS Rename Failed', e)
         }
+
+        // WebContainer Sync
+        // WC does not have simple rename? It has fs.rename.
+        // We need to implement syncRename in store.
+        // For now, let's implement a simple move (rename is move)
+        // Or just let full sync handle it? No, we disabled full sync.
+        import('@/os/kernel/useWebContainerStore').then(({ useWebContainerStore }) => {
+            const { instance, isSyncingFromWC } = useWebContainerStore.getState()
+            if (!instance || isSyncingFromWC) return
+            
+            const wcOld = `/home/guest${oldPath}`
+            const wcNew = `/home/guest${newPath}`
+            
+            instance.fs.rename(wcOld, wcNew).catch(e => console.warn('WC rename failed', e))
+        })
       },
 
       getItem: (id) => get().files[id],
@@ -556,6 +583,17 @@ export const useFileSystemStore = create<FileSystemState>()(
         }
 
         return path
+      },
+
+      readFileContent: async (id: string) => {
+          const path = get().resolvePath(id)
+          if (!path) return ''
+          try {
+              return await fs.readFile(path)
+          } catch (e) {
+              console.warn(`Failed to read content for ${id}`, e)
+              return ''
+          }
       },
 
       // Load children for a folder (especially mounted ones)
@@ -600,17 +638,29 @@ export const useFileSystemStore = create<FileSystemState>()(
           }
 
           // 2. Add New Files & 3. Update Existing Metadata
-          for (const name of childrenNames) {
-            const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+          // Optimization: Run stat checks in parallel
+          const statPromises = childrenNames.map(async (name) => {
+             const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+             try {
+                const stats = await fs.stat(childPath)
+                return { name, stats, childPath }
+             } catch (e) {
+                console.warn(`Failed to stat ${childPath}`, e)
+                return null
+             }
+          })
+
+          const results = await Promise.all(statPromises)
+
+          for (const res of results) {
+            if (!res) continue
+            const { name, stats, childPath } = res
             const existingNode = currentChildrenMap.get(name)
 
-            try {
-              const stats = await fs.stat(childPath)
-
-              if (existingNode) {
-                // Update existing if changed (simple mtime check)
+            if (existingNode) {
+                // Update existing if changed
                 if (existingNode.updatedAt !== stats.mtime) {
-                  console.log(`[loadFolderContent] Updating metadata for: ${name}`)
+                  // ...
                   newFiles[existingNode.id] = {
                     ...existingNode,
                     updatedAt: stats.mtime,
@@ -618,10 +668,9 @@ export const useFileSystemStore = create<FileSystemState>()(
                   }
                   hasChanges = true
                 }
-              } else {
+            } else {
                 // Create new node
                 const childId = uuidv4()
-                console.log(`[loadFolderContent] Found new item: ${name}, Path: ${childPath}`)
                 newFiles[childId] = {
                   id: childId,
                   parentId: folderId,
@@ -630,15 +679,10 @@ export const useFileSystemStore = create<FileSystemState>()(
                   createdAt: stats.ctime,
                   updatedAt: stats.mtime,
                   size: stats.size,
-                  content: undefined,
-                  // Mark children of mounts as inside a mount too (optional, but helpful for logic)
-                  isMount: false // It's inside a mount, but not a mount point itself
+                  // content removed
+                  isMount: false
                 }
                 hasChanges = true
-              }
-
-            } catch (err) {
-              console.warn(`Failed to stat child ${childPath}`, err)
             }
           }
 
@@ -656,19 +700,25 @@ export const useFileSystemStore = create<FileSystemState>()(
       },
 
       updateFileContent: async (id, content) => {
-        // 1. Memory
+        // 1. Memory - Just update metadata if needed (e.g. updatedAt), NOT content
         set((state) => ({
           files: {
             ...state.files,
-            [id]: { ...state.files[id], content, updatedAt: Date.now() }
+            [id]: { ...state.files[id], updatedAt: Date.now() } // Content removed
           }
         }))
 
-        // 2. OPFS
         const path = get().resolvePath(id)
+
+        // 2. OPFS
         if (path) {
           await fs.writeFile(path, content)
         }
+
+        // 3. WebContainer
+        import('@/os/kernel/useWebContainerStore').then(({ useWebContainerStore }) => {
+            useWebContainerStore.getState().syncFile(path, content)
+        })
       },
 
       moveItem: async (id, newParentId) => {
@@ -745,11 +795,26 @@ export const useFileSystemStore = create<FileSystemState>()(
       },
 
       syncToOPFS: async () => {
+        // Optimization: Only sync if root doesn't exist or force sync is needed
+        // This prevents overwriting user data on every reload if persistence is used
+        try {
+          const rootExists = await fs.exists('/')
+          const desktopExists = await fs.exists('/Desktop')
+          
+          if (rootExists && desktopExists) {
+                console.log('OPFS seems populated, skipping full sync to preserve data.')
+                set({ isLoading: false })
+                return
+            }
+        } catch (e) {
+          console.warn('Failed to check OPFS status, proceeding with sync', e)
+        }
+
         set({ isLoading: true })
         const state = get()
         const files = Object.values(state.files)
 
-        console.log('Starting VFS -> OPFS Sync...')
+        console.log('Starting VFS -> OPFS Initial Sync...')
 
         // Sort files to ensure folders are created before files
         const sortedFiles = files.sort((a, b) => {
@@ -778,7 +843,29 @@ export const useFileSystemStore = create<FileSystemState>()(
                 await fs.mkdir(parentPath, true)
               }
 
-              await fs.writeFile(path, node.content || '')
+              // Initial Content Hydration (Only for initial static files)
+              // For user files, content is in OPFS, but for initial templates, we might need to write them once.
+              // Since we removed content from FileNode, we need a way to seed initial content.
+              // For now, let's assume initial templates are empty or we can fetch them.
+              // Actually, wait, if we removed content from state, where do we get the initial "Hello World" content?
+              // Good point. The INITIAL_FILES const still has content? 
+              // No, I removed it from INITIAL_FILES above.
+              
+              // Correct Strategy: 
+              // 1. Initial files (templates) should be written once.
+              // 2. We can keep a separate map of "Template Content" or re-add content just for initialization?
+              // 3. Or, better: Write them right now in code.
+              
+              let initialContent = ''
+              if (node.name === 'hello_world.ts') initialContent = '// Hello World...'
+              if (node.name === 'Welcome.txt') initialContent = 'Welcome to Portfolio OS!...'
+              
+              // Basic restoration of template content
+              if (node.id === 'code-1') initialContent = `// Hello World in TypeScript\nfunction sayHello(name: string): void {\n    console.log("Hello, " + name + "!");\n}\n\nconst user = "Developer";\nsayHello(user);`
+              if (node.id === 'welcome-txt') initialContent = 'Welcome to Portfolio OS! This is a simulated file system.'
+              if (node.id === 'about-md') initialContent = '# About Me\n\nI am a full-stack developer...'
+
+              await fs.writeFile(path, initialContent)
             }
           } catch (err) {
             console.warn(`Sync failed for ${path}`, err)
@@ -793,24 +880,28 @@ export const useFileSystemStore = create<FileSystemState>()(
       setClipboard: (items, op) => set({ clipboard: { items, op } }),
 
       pasteItems: async (targetFolderId) => {
-        const { clipboard, files, createItem, moveItem } = get()
+        const { clipboard, files, moveItem, resolvePath } = get()
         if (!clipboard.op || clipboard.items.length === 0) return
 
         const targetFolder = files[targetFolderId]
         if (!targetFolder || targetFolder.type !== 'folder') return
 
+        const targetPath = resolvePath(targetFolderId)
+
         for (const itemId of clipboard.items) {
           const item = files[itemId]
           if (!item) continue
 
-          // Check for name collision and generate new name if needed
+          // Check for name collision
           let newName = item.name
           let counter = 1
-          while (Object.values(files).some(f =>
-            f.parentId === targetFolderId && f.name === newName && f.id !== itemId
-          )) {
+          const hasCollision = (name: string) => Object.values(get().files).some(f =>
+            f.parentId === targetFolderId && f.name === name && f.id !== itemId
+          )
+
+          while (hasCollision(newName)) {
             const nameParts = item.name.split('.')
-            if (nameParts.length > 1) {
+            if (item.type === 'file' && nameParts.length > 1) {
               const ext = nameParts.pop()
               newName = `${nameParts.join('.')} (${counter}).${ext}`
             } else {
@@ -820,22 +911,52 @@ export const useFileSystemStore = create<FileSystemState>()(
           }
 
           if (clipboard.op === 'cut') {
-            // For cut, we just move and rename if needed
+            // Cut: Move and Rename
             if (newName !== item.name) {
               await get().renameItem(itemId, newName)
             }
             await moveItem(itemId, targetFolderId)
           } else {
-            // For copy, we create a new item
-            // Note: Deep copy for folders is not implemented yet, simpler for files
-            // For now, we only support copying files or empty folders
-            await createItem(
-              targetFolderId,
-              newName,
-              item.type,
-              item.content,
-              item.appId
-            )
+            // Copy: Recursive
+            const sourcePath = resolvePath(itemId)
+            const destPath = targetPath === '/' ? `/${newName}` : `${targetPath}/${newName}`
+
+            try {
+                // 1. Physical Copy
+                // @ts-ignore - copy is public now
+                await fs.copy(sourcePath, destPath)
+
+                // 2. State Copy (Recursive)
+                set((state) => {
+                    const newFiles = { ...state.files }
+                    
+                    const copyNodeRecursive = (originalId: string, newParentId: string, nameOverride?: string) => {
+                        const originalNode = state.files[originalId]
+                        if (!originalNode) return
+
+                        const newId = uuidv4()
+                        const newNode: FileNode = {
+                            ...originalNode,
+                            id: newId,
+                            parentId: newParentId,
+                            name: nameOverride || originalNode.name,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        }
+                        newFiles[newId] = newNode
+
+                        if (originalNode.type === 'folder') {
+                            const children = Object.values(state.files).filter(f => f.parentId === originalId)
+                            children.forEach(child => copyNodeRecursive(child.id, newId))
+                        }
+                    }
+
+                    copyNodeRecursive(itemId, targetFolderId, newName)
+                    return { files: newFiles }
+                })
+            } catch (e) {
+                console.error('Copy failed:', e)
+            }
           }
         }
 

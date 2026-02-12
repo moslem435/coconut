@@ -1,11 +1,11 @@
-import { ShieldAlert } from 'lucide-react'
+import { TestTube } from 'lucide-react'
 import { AppManifest } from '@/os/registry/types'
 import { SandboxedAppFrame } from '@/os/components/SandboxedAppFrame'
 
 export const manifest: AppManifest = {
     id: 'sandbox-test',
     title: 'Sandbox Test',
-    icon: ShieldAlert,
+    icon: TestTube,
     theme: {
         backgroundColor: '#0f172a',
         iconColor: '#34d399',

@@ -1,9 +1,10 @@
-import dynamic from 'next/dynamic'
-import { Settings } from 'lucide-react'
 import { AppManifest } from '@/os/registry/types'
+import { Settings } from 'lucide-react'
+import dynamic from 'next/dynamic'
 
 const SettingsApp = dynamic(() => import('./index'), {
-    loading: () => <div className="h-full w-full flex items-center justify-center text-white/20"> LOADING_MODULE...</div>
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Settings...</div>
 })
 
 export const manifest: AppManifest = {

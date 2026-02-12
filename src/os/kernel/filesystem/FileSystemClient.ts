@@ -193,7 +193,7 @@ export class FileSystemClient implements IFileSystem {
     /**
      * Recursive copy helper for cross-driver operations
      */
-    private async copy(source: string, dest: string): Promise<void> {
+    public async copy(source: string, dest: string): Promise<void> {
         const stats = await this.stat(source);
 
         if (stats.isDirectory) {

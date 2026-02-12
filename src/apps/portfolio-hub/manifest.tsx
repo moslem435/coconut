@@ -1,24 +1,23 @@
-import dynamic from 'next/dynamic'
-import { Briefcase } from 'lucide-react'
 import { AppManifest } from '@/os/registry/types'
-import PortfolioSplashScreen from './SplashScreen'
+import { LayoutDashboard } from 'lucide-react'
+import dynamic from 'next/dynamic'
 
-const PortfolioApp = dynamic(() => import('./index'), {
-    loading: () => <div className="flex items-center justify-center h-full text-cyan-500 font-mono animate-pulse">LOADING...</div>
+const PortfolioHub = dynamic(() => import('./index'), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Portfolio...</div>
 })
 
 export const manifest: AppManifest = {
     id: 'portfolio-hub',
     title: 'Portfolio Hub',
-    icon: Briefcase,
+    icon: LayoutDashboard,
     // iconUrl: removed for flat style
     theme: {
         backgroundColor: '#171717',
         iconColor: '#ffffff',
         lineColor: '#ffffff'
     },
-    component: PortfolioApp,
-    splashScreen: PortfolioSplashScreen,
+    component: PortfolioHub,
     defaultWindowOptions: {
         isMaximized: true
     }

@@ -2,7 +2,10 @@ import { AppManifest } from '@/os/registry/types'
 import { Music } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const MusicPlayer = dynamic(() => import('./index'), { ssr: false })
+const MusicPlayer = dynamic(() => import('./index'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Music...</div>
+})
 
 export const manifest: AppManifest = {
   id: 'music-player',

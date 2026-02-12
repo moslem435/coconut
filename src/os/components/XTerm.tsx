@@ -104,7 +104,8 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
             // Attempt to customize prompt - WebContainer jsh might ignore this but worth a try
             // or we might need to set it in .bashrc equivalent if it exists
             TERM: 'xterm-256color',
-        }
+        },
+        cwd: '/home/guest' // Start in mounted home directory
       })
       
       processRef.current = shellProcess

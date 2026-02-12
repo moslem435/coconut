@@ -1,9 +1,10 @@
-import { Activity } from 'lucide-react'
 import { AppManifest } from '@/os/registry/types'
+import { Activity } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const TaskManagerApp = dynamic(() => import('./index'), {
-    loading: () => <div className="h-full w-full flex items-center justify-center text-white/20">LOADING...</div>
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Task Manager...</div>
 })
 
 export const manifest: AppManifest = {
