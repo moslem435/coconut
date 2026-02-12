@@ -19,6 +19,12 @@ interface ProcessState {
     processes: Record<number, ProcessControlBlock>
     nextPid: number
     
+    // Selectors for optimized subscriptions
+    getProcessList: () => ProcessControlBlock[]
+    getTotalCpu: () => number
+    getTotalMem: () => number
+    getProcessCount: () => number
+    
     // Actions
     createProcess: (appId: string, name: string, windowId?: string) => number
     updateProcessStatus: (pid: number, status: ProcessStatus) => void
@@ -31,6 +37,12 @@ interface ProcessState {
 export const useProcessStore = create<ProcessState>((set, get) => ({
     processes: {},
     nextPid: 1000, // User processes start from 1000
+
+    // Optimized selectors
+    getProcessList: () => Object.values(get().processes),
+    getTotalCpu: () => Object.values(get().processes).reduce((acc, p) => acc + (p.cpuUsage || 0), 0),
+    getTotalMem: () => Object.values(get().processes).reduce((acc, p) => acc + (p.memoryUsage || 0), 0),
+    getProcessCount: () => Object.keys(get().processes).length,
 
     createProcess: (appId, name, windowId) => {
         const pid = get().nextPid

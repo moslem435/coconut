@@ -109,6 +109,14 @@ export class FileSystemClient implements IFileSystem {
         );
     }
 
+    async getFileBlob(path: string): Promise<Blob> {
+        return this.route<Blob>(
+            path,
+            'getFileBlob',
+            (d, p) => d.getFileBlob(p)
+        );
+    }
+
     async writeFile(path: string, content: Uint8Array | string): Promise<void> {
         return this.route<void>(
             path,

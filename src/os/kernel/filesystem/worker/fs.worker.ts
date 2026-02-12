@@ -43,6 +43,13 @@ self.onmessage = async (e: MessageEvent) => {
                 break;
             }
 
+            case 'getFileBlob': {
+                const handle = await getFileHandle(root, path);
+                const file = await handle.getFile();
+                result = file;  // Return File object (extends Blob)
+                break;
+            }
+
             case 'writeFile': {
                 const handle = await getFileHandle(root, path, true);
                 // Try-catch around createSyncAccessHandle to handle locks

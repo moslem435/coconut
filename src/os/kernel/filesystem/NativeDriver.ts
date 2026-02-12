@@ -125,6 +125,14 @@ export class NativeDriver implements IFileSystem {
         return new Uint8Array(buffer)
     }
 
+    async getFileBlob(path: string): Promise<Blob> {
+        const handle = await this.resolveHandle(path) as FileSystemFileHandle
+        if (handle.kind !== 'file') throw new Error(`Not a file: ${path}`)
+
+        const file = await handle.getFile()
+        return file  // File extends Blob, supports streaming
+    }
+
     async writeFile(path: string, content: Uint8Array | string): Promise<void> {
         // We need to traverse manually to creating intermediate if strict, 
         // but FSA getFileHandle({create: true}) creates the FILE, not folders.

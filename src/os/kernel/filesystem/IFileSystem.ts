@@ -29,6 +29,12 @@ export interface IFileSystem {
     readFile(path: string): Promise<Uint8Array>;
 
     /**
+     * Get file as Blob (for large files, streaming).
+     * Recommended for videos, images, and large binary files.
+     */
+    getFileBlob(path: string): Promise<Blob>;
+
+    /**
      * Write file content.
      * Overwrites if exists, creates if not.
      */

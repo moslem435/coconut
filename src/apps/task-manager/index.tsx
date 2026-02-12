@@ -1,24 +1,96 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useProcessStore, ProcessControlBlock } from '@/os/kernel/useProcessStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { XCircle, RefreshCw } from 'lucide-react'
 
 export default function TaskManager() {
-    const { processes, killProcess, setProcessPriority } = useProcessStore()
+    const killProcess = useProcessStore(state => state.killProcess)
+    const setProcessPriority = useProcessStore(state => state.setProcessPriority)
     const { closeWindow } = useWindowStore()
+    
+    // Optimized: Only subscribe to what we need
     const [processList, setProcessList] = useState<ProcessControlBlock[]>([])
+    const [totalCpu, setTotalCpu] = useState(0)
+    const [totalMem, setTotalMem] = useState(0)
+    
+    // Canvas for CPU chart
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const cpuHistoryRef = useRef<number[]>([])
 
     useEffect(() => {
-        // Sync with store
+        // Optimized: Use selectors to minimize re-renders
         const update = () => {
-            setProcessList(Object.values(useProcessStore.getState().processes))
+            const store = useProcessStore.getState()
+            setProcessList(store.getProcessList())
+            setTotalCpu(store.getTotalCpu())
+            setTotalMem(store.getTotalMem())
+            
+            // Update CPU chart
+            const cpu = Math.min(100, store.getTotalCpu())
+            cpuHistoryRef.current.push(cpu)
+            if (cpuHistoryRef.current.length > 60) {
+                cpuHistoryRef.current.shift()
+            }
+            drawCpuChart()
         }
         update()
         const interval = setInterval(update, 1000)
         return () => clearInterval(interval)
     }, [])
+
+    const drawCpuChart = () => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        
+        const width = canvas.width
+        const height = canvas.height
+        const history = cpuHistoryRef.current
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height)
+        
+        // Draw grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+        ctx.lineWidth = 1
+        for (let i = 0; i <= 4; i++) {
+            const y = (height / 4) * i
+            ctx.beginPath()
+            ctx.moveTo(0, y)
+            ctx.lineTo(width, y)
+            ctx.stroke()
+        }
+        
+        // Draw CPU line
+        if (history.length > 1) {
+            ctx.strokeStyle = '#3b82f6'
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            
+            history.forEach((cpu, i) => {
+                const x = (width / 60) * i
+                const y = height - (cpu / 100) * height
+                if (i === 0) {
+                    ctx.moveTo(x, y)
+                } else {
+                    ctx.lineTo(x, y)
+                }
+            })
+            
+            ctx.stroke()
+            
+            // Fill area under line
+            ctx.lineTo(width, height)
+            ctx.lineTo(0, height)
+            ctx.closePath()
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)'
+            ctx.fill()
+        }
+    }
 
     const handleEndTask = (pid: number, windowId?: string) => {
         killProcess(pid)
@@ -27,18 +99,24 @@ export default function TaskManager() {
         }
     }
 
-    const totalCpu = processList.reduce((acc, p) => acc + (p.cpuUsage || 0), 0)
-    const totalMem = processList.reduce((acc, p) => acc + (p.memoryUsage || 0), 0)
-
     return (
         <div className="h-full w-full bg-slate-900 text-slate-200 flex flex-col font-sans text-sm pt-10">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 bg-slate-800 border-b border-slate-700">
-                <div className="font-bold text-slate-100">Processes ({processList.length})</div>
-                <div className="flex gap-2">
-                    <div className="px-2 py-1 bg-slate-700 rounded text-xs">CPU: {Math.min(100, totalCpu)}%</div>
-                    <div className="px-2 py-1 bg-slate-700 rounded text-xs">Mem: {totalMem} MB</div>
+            {/* Header with CPU Chart */}
+            <div className="p-3 bg-slate-800 border-b border-slate-700">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="font-bold text-slate-100">Processes ({processList.length})</div>
+                    <div className="flex gap-2">
+                        <div className="px-2 py-1 bg-slate-700 rounded text-xs">CPU: {Math.min(100, Math.round(totalCpu))}%</div>
+                        <div className="px-2 py-1 bg-slate-700 rounded text-xs">Mem: {totalMem} MB</div>
+                    </div>
                 </div>
+                {/* CPU Chart */}
+                <canvas 
+                    ref={canvasRef} 
+                    width={600} 
+                    height={60}
+                    className="w-full h-[60px] bg-slate-950 rounded"
+                />
             </div>
 
             {/* List */}

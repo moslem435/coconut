@@ -6,6 +6,7 @@ import { IPreviewProvider } from '@/os/services/PreviewService'
 const VideoPreview = ({ fileId }: { fileId: string }) => {
     const [src, setSrc] = useState<string>('')
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string>('')
 
     useEffect(() => {
         let objectUrl: string | null = null
@@ -15,21 +16,15 @@ const VideoPreview = ({ fileId }: { fileId: string }) => {
                 const path = store.resolvePath(fileId)
                 if(!path) return
                 
-                // Note: Loading entire video into memory is bad for large files.
-                // Future upgrade: Use fs.createReadStream or getFile() to get Blob directly.
-                const buffer = await fs.readFile(path)
+                // ✅ Use streaming: Get Blob directly instead of loading entire file
+                const blob = await fs.getFileBlob(path)
                 
-                // Try to guess mime type from extension
-                const ext = path.split('.').pop()?.toLowerCase()
-                let mime = 'video/mp4'
-                if (ext === 'webm') mime = 'video/webm'
-                if (ext === 'ogg') mime = 'video/ogg'
-                
-                const blob = new Blob([buffer], { type: mime })
+                // Create Object URL for streaming playback
                 objectUrl = URL.createObjectURL(blob)
                 setSrc(objectUrl)
             } catch (e) {
-                console.error(e)
+                console.error('Failed to load video:', e)
+                setError(String(e))
             } finally {
                 setLoading(false)
             }
@@ -46,9 +41,20 @@ const VideoPreview = ({ fileId }: { fileId: string }) => {
         </div>
     )
 
+    if (error) return (
+        <div className="h-full flex items-center justify-center text-red-400">
+            Error: {error}
+        </div>
+    )
+
     return (
         <div className="h-full w-full bg-black flex items-center justify-center">
-            <video src={src} controls className="max-w-full max-h-full" />
+            <video 
+                src={src} 
+                controls 
+                className="max-w-full max-h-full"
+                preload="metadata"  // Only load metadata initially
+            />
         </div>
     )
 }
