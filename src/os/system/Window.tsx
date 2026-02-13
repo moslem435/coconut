@@ -191,48 +191,54 @@ export default function Window({ id }: WindowProps) {
         }}
       >
         <div className="absolute top-0 left-0 right-0 z-[200]">
-          <WindowTitleBar
-            title={windowState.title}
-            icon={windowState.icon}
-            appId={windowState.appId}
-            isDefaultTitle={windowState.isDefaultTitle}
-            isActive={isActive}
-            isMaximized={windowState.isMaximized}
-            isResizable={windowState.isResizable !== false}
-            colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}
-            onMinimize={handleMinimize}
-            onMaximize={() => maximizeWindow(id)}
-            onClose={() => closeWindow(id)}
-            dragControls={undefined}
-            onPointerDown={(e) => {
-              focusWindow(id)
-              if (windowState.isMaximized) {
-                dragControls.start(e)
-              } else {
-                ghostDragControls.start(e)
-              }
-            }}
-            onHoverMinimize={captureSnapshot}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
-            }}
-            labels={{
-              minimize: t('menu.minimize'),
-              maximize: t('menu.maximize'),
-              restore: t('menu.restore'),
-              close: t('menu.close')
-            }}
-          />
+          {!windowState.hideTitleBar && (
+            <WindowTitleBar
+              title={windowState.title}
+              icon={windowState.icon}
+              appId={windowState.appId}
+              isDefaultTitle={windowState.isDefaultTitle}
+              isActive={isActive}
+              isMaximized={windowState.isMaximized}
+              isResizable={windowState.isResizable !== false}
+              colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}
+              onMinimize={handleMinimize}
+              onMaximize={() => maximizeWindow(id)}
+              onClose={() => closeWindow(id)}
+              dragControls={undefined}
+              onPointerDown={(e) => {
+                focusWindow(id)
+                if (windowState.isMaximized) {
+                  dragControls.start(e)
+                } else {
+                  ghostDragControls.start(e)
+                }
+              }}
+              onHoverMinimize={captureSnapshot}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+              }}
+              labels={{
+                minimize: t('menu.minimize'),
+                maximize: t('menu.maximize'),
+                restore: t('menu.restore'),
+                close: t('menu.close')
+              }}
+            />
+          )}
         </div>
 
         <div className="flex-1 relative overflow-hidden w-full h-full z-0">
-          <WindowContext.Provider value={id}>
+          <WindowContext.Provider value={{
+            windowId: id,
+            dragControls: windowState.isMaximized ? dragControls : ghostDragControls
+          }}>
             <AppErrorBoundary appId={id}>
               {windowState.component}
             </AppErrorBoundary>
           </WindowContext.Provider>
+
 
           {(isResizing || isDragging) && (
             <div className="absolute inset-0 z-[100] bg-transparent" />

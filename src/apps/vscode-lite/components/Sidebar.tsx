@@ -1,42 +1,14 @@
 import React, { useState } from 'react'
-import { ChevronRight, ChevronDown, FileCode, Search, MoreHorizontal, FileText, Image, Music, Film, Box, Layout } from 'lucide-react'
+import { ChevronRight, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useEditorState } from '../hooks/useEditorState'
+import { useDialog } from '../hooks/useDialog'
 import { VSCODE_COLORS } from '../constants'
-
-// --- Icon Helper ---
-const getFileIcon = (name: string) => {
-  const ext = name.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-    case 'js':
-    case 'jsx':
-      return <FileCode size={14} className="text-blue-400" />
-    case 'css':
-    case 'scss':
-      return <Layout size={14} className="text-blue-300" />
-    case 'html':
-      return <Layout size={14} className="text-orange-400" />
-    case 'json':
-      return <Box size={14} className="text-yellow-400" />
-    case 'md':
-      return <FileText size={14} className="text-blue-200" />
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'gif':
-    case 'svg':
-      return <Image size={14} className="text-purple-400" />
-    case 'mp3':
-    case 'wav':
-      return <Music size={14} className="text-pink-400" />
-    case 'mp4':
-      return <Film size={14} className="text-red-400" />
-    default:
-      return <FileText size={14} className="text-gray-400" />
-  }
-}
+import { SearchPanel } from './SearchPanel'
+import { GitView } from './GitView'
+import { ContextMenu } from './ContextMenu'
+import { getFileIcon } from '../utils/fileIcons'
 
 interface FileTreeItemProps {
   id: string
@@ -45,19 +17,21 @@ interface FileTreeItemProps {
   toggleFolder: (id: string) => void
   activeFileId: string | null
   onFileSelect: (id: string) => void
+  onContextMenu: (e: React.MouseEvent, id: string) => void
 }
 
-const FileTreeItem: React.FC<FileTreeItemProps> = ({ 
-  id, 
-  depth = 0, 
-  expandedFolders, 
-  toggleFolder, 
-  activeFileId, 
-  onFileSelect 
+const FileTreeItem: React.FC<FileTreeItemProps> = ({
+  id,
+  depth = 0,
+  expandedFolders,
+  toggleFolder,
+  activeFileId,
+  onFileSelect,
+  onContextMenu
 }) => {
   const { files, getChildren } = useFileSystemStore()
   const item = files[id]
-  
+
   if (!item) return null
 
   const isFolder = item.type === 'folder'
@@ -76,19 +50,25 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
             e.stopPropagation()
             toggleFolder(id)
           }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onContextMenu(e, id)
+          }}
         >
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <span className="font-bold text-xs truncate">{item.name.toUpperCase()}</span>
         </div>
         {isExpanded && children.map(child => (
-          <FileTreeItem 
-            key={child.id} 
-            id={child.id} 
+          <FileTreeItem
+            key={child.id}
+            id={child.id}
             depth={depth + 1}
             expandedFolders={expandedFolders}
             toggleFolder={toggleFolder}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
+            onContextMenu={onContextMenu}
           />
         ))}
       </div>
@@ -105,6 +85,11 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
           e.stopPropagation()
           onFileSelect(id)
         }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onContextMenu(e, id)
+        }}
       >
         {getFileIcon(item.name)}
         <span className="truncate">{item.name}</span>
@@ -115,31 +100,116 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
 
 interface SidebarProps {
   activeView: 'explorer' | 'search' | 'git' | 'debug' | 'extensions'
-  activeFileId: string | null
-  onFileSelect: (fileId: string) => void
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeView, activeFileId, onFileSelect }) => {
-  const { rootId } = useFileSystemStore()
+export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
+  const { rootId, createItem, renameItem, deleteItem, files } = useFileSystemStore()
+  const { activeFileId, openFile } = useEditorState()
+  const onFileSelect = (id: string) => openFile(id)
   const { t } = useLanguage()
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ [rootId]: true })
+
+  // Dialog
+  const dialog = useDialog()
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, targetId: string } | null>(null)
+
+  const handleContextMenu = (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, targetId: id })
+  }
+
+  const handleMenuAction = async (action: string, targetId: string) => {
+    // Implement actions
+    if (action === 'new_file') {
+      const name = await dialog.prompt('Enter file name:', 'Untitled.ts', 'New File')
+      if (name) {
+        // If target is file, allow creating in parent? Or just in folder?
+        // If target is folder, create in it. If file, create in parent.
+        const targetNode = files[targetId]
+        const parentId = (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId
+        await createItem(parentId, name, 'file', '')
+        // Auto expand
+        if (targetNode.type === 'folder') {
+          setExpandedFolders(prev => ({ ...prev, [targetId]: true }))
+        }
+      }
+    }
+    if (action === 'new_folder') {
+      const name = await dialog.prompt('Enter folder name:', 'New Folder', 'New Folder')
+      if (name) {
+        const targetNode = files[targetId]
+        const parentId = (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId
+        await createItem(parentId, name, 'folder')
+        if (targetNode.type === 'folder') {
+          setExpandedFolders(prev => ({ ...prev, [targetId]: true }))
+        }
+      }
+    }
+    if (action === 'rename') {
+      const targetNode = files[targetId]
+      const newName = await dialog.prompt('Enter new name:', targetNode.name, 'Rename')
+      if (newName && newName !== targetNode.name) {
+        await renameItem(targetId, newName)
+      }
+    }
+    if (action === 'delete') {
+      const confirmed = await dialog.confirm(`Are you sure you want to delete '${files[targetId].name}'?`, 'Delete File')
+
+      if (confirmed) {
+        await deleteItem(targetId)
+      }
+    }
+  }
+
+  const getMenuItems = (targetId: string) => {
+    // Basic items
+    return [
+      { label: 'New File', action: () => handleMenuAction('new_file', targetId) },
+      { label: 'New Folder', action: () => handleMenuAction('new_folder', targetId) },
+      { separator: true, label: '', action: () => { } },
+      { label: 'Rename', action: () => handleMenuAction('rename', targetId) },
+      { label: 'Delete', action: () => handleMenuAction('delete', targetId), danger: true },
+    ]
+  }
 
   const toggleFolder = (id: string) => {
     setExpandedFolders(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  if (activeView === 'search') {
+    return (
+      <div
+        className="w-full flex flex-col border-r border-[#2b2b2b] select-none h-full"
+        style={{ backgroundColor: VSCODE_COLORS.sidebar }}
+      >
+        <SearchPanel />
+      </div>
+    )
+  }
+
+  if (activeView === 'git') {
+    return (
+      <div
+        className="w-full flex flex-col border-r border-[#2b2b2b] select-none h-full"
+        style={{ backgroundColor: VSCODE_COLORS.sidebar }}
+      >
+        <GitView />
+      </div>
+    )
+  }
+
   if (activeView !== 'explorer') {
     return (
-      <div 
-        className="w-60 flex flex-col border-r border-[#2b2b2b] select-none h-full"
+      <div
+        className="w-full flex flex-col border-r border-[#2b2b2b] select-none h-full"
         style={{ backgroundColor: VSCODE_COLORS.sidebar }}
       >
         <div className="h-9 px-4 flex items-center text-xs uppercase tracking-wider text-gray-400 font-medium">
           {activeView}
         </div>
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm p-4 text-center">
-          {activeView === 'search' && 'Search functionality is coming soon.'}
-          {activeView === 'git' && 'Source Control is not available in this demo.'}
           {activeView === 'debug' && 'Debugging is not configured.'}
           {activeView === 'extensions' && 'No extensions installed.'}
         </div>
@@ -148,24 +218,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, activeFileId, onFi
   }
 
   return (
-    <div 
-      className="w-60 flex flex-col border-r border-[#2b2b2b] select-none h-full"
+    <div
+      className="w-full flex flex-col border-r border-[#2b2b2b] select-none h-full"
       style={{ backgroundColor: VSCODE_COLORS.sidebar }}
     >
       <div className="h-9 px-4 flex items-center justify-between text-xs uppercase tracking-wider text-gray-400 font-medium group shrink-0">
         <span>{t('vscode.explorer')}</span>
         <MoreHorizontal size={14} className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white" />
       </div>
-      
+
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <FileTreeItem 
-          id={rootId} 
+        <FileTreeItem
+          id={rootId}
           expandedFolders={expandedFolders}
           toggleFolder={toggleFolder}
           activeFileId={activeFileId}
           onFileSelect={onFileSelect}
+          onContextMenu={handleContextMenu}
         />
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={getMenuItems(contextMenu.targetId)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

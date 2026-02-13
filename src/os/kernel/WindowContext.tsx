@@ -1,7 +1,18 @@
 import { createContext, useContext } from 'react'
+import { DragControls } from 'framer-motion'
 
-export const WindowContext = createContext<string | null>(null)
+interface WindowContextType {
+    windowId: string
+    dragControls?: DragControls
+}
+
+export const WindowContext = createContext<WindowContextType | null>(null)
+
+export const useWindowContext = () => {
+    return useContext(WindowContext)
+}
 
 export const useWindowId = () => {
-    return useContext(WindowContext)
+    const context = useContext(WindowContext)
+    return context?.windowId || null
 }

@@ -23,6 +23,8 @@ export interface AppManifest {
         isResizable?: boolean
         /** Content color theme for the title bar text/icons */
         titleBarColor?: 'light' | 'dark' | 'auto'
+        /** If true, the OS title bar is hidden. App must handle dragging. */
+        hideTitleBar?: boolean
     }
     /** If true, runs the app in an iframe sandbox */
     sandbox?: boolean

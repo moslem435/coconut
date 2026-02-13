@@ -52,3 +52,6 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Monaco Editor (copied from node_modules)
+/public/monaco-editor

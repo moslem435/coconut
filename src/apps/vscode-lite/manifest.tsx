@@ -22,6 +22,7 @@ export const manifest: AppManifest = {
     height: 800,
     isResizable: true,
     isMaximized: false,
-    titleBarColor: 'light'
+    titleBarColor: 'light',
+    hideTitleBar: true
   }
 }

@@ -23,6 +23,7 @@ export interface WindowState {
     titleBarColor?: 'light' | 'dark' | 'auto'
     isDefaultTitle?: boolean
     isResizable?: boolean
+    hideTitleBar?: boolean
 }
 
 interface WindowStore {
@@ -34,7 +35,7 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean }) => void
+    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean; hideTitleBar?: boolean }) => void
     launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
@@ -104,7 +105,8 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             taskbarPosition: options?.taskbarPosition,
             titleBarColor: options?.titleBarColor,
             isDefaultTitle: options?.isDefaultTitle,
-            isResizable: options?.isResizable
+            isResizable: options?.isResizable,
+            hideTitleBar: options?.hideTitleBar
         }
 
         set(state => ({
@@ -140,7 +142,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         set(state => {
             const { [id]: removed, ...remaining } = state.windows
             const nextActive = state.activeWindowId === id ? null : state.activeWindowId
-            
+
             // Kill Process
             const process = useProcessStore.getState().getProcessByWindowId(id)
             if (process) {
