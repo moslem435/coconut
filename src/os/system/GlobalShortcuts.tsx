@@ -19,7 +19,7 @@ export default function GlobalShortcuts() {
             launchApp(
                 app.id,
                 app.title,
-                <app.component />,
+                app.id,
                 app.icon,
                 { ...app.defaultWindowOptions, isDefaultTitle: true }
             )

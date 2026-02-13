@@ -86,7 +86,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
             launchApp(
                 app.id,
                 t(`app.${app.id}`),
-                <app.component />,
+                app.id,
                 app.icon,
                 { ...app.defaultWindowOptions, isDefaultTitle: true }
             )

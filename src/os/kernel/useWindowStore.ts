@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { ComponentType } from 'react'
 import { AppIcon } from '@/os/registry/types'
-import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { eventBus } from '@/os/kernel/EventBus'
 
 export interface WindowState {
@@ -19,8 +18,8 @@ export interface WindowState {
     }
     taskbarPosition?: { x: number; y: number }
     icon?: AppIcon
-    appId?: string
-    component: ComponentType<any>
+    appId: string // Made required for serialization optimization
+    componentProps?: Record<string, unknown> // 存储传递给组件的 props
     titleBarColor?: 'light' | 'dark' | 'auto'
     isDefaultTitle?: boolean
     isResizable?: boolean
@@ -31,13 +30,13 @@ interface WindowStore {
     windows: Record<string, WindowState>
     activeWindowId: string | null
     maxZIndex: number
-    snapshots: Record<string, string>
+    snapshotCache: Map<string, string> // 使用 Map 便于管理
     peekWindowId: string | null
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ComponentType<any>, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean; hideTitleBar?: boolean }) => void
-    launchApp: (id: string, title: string, component: ComponentType<any>, icon?: AppIcon, options?: any) => void
+    openWindow: (id: string, title: string, appId: string, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; isDefaultTitle?: boolean; hideTitleBar?: boolean; [key: string]: unknown }) => void
+    launchApp: (id: string, title: string, appId: string, icon?: AppIcon, options?: unknown) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
     minimizeWindow: (id: string) => void
@@ -48,42 +47,45 @@ interface WindowStore {
     updateTaskbarPosition: (id: string, position: { x: number; y: number }) => void
     showDesktop: () => void
     setSnapshot: (id: string, dataUrl: string) => void
+    getSnapshot: (id: string) => string | undefined
+    clearSnapshot: (id: string) => void
     setPeekWindowId: (id: string | null) => void
 }
 
 // 虚拟化窗口层级 - 只有前 3 个窗口参与 z-index 计算
 const VIRTUAL_Z_INDEX_THRESHOLD = 3
+const MAX_SNAPSHOTS = 10 // 最多缓存 10 个快照
 
 export const useWindowStore = create<WindowStore>((set, get) => ({
     windows: {},
     activeWindowId: null,
     maxZIndex: 100,
-    snapshots: {},
+    snapshotCache: new Map(),
     peekWindowId: null,
     launchingAppIds: [],
 
-    openWindow: (id, title, component, icon, options) => {
+    openWindow: (id, title, appId, icon, options) => {
         const { windows, maxZIndex, focusWindow } = get()
 
         if (windows[id]) {
+            const existingWindow = windows[id]
+            if (!existingWindow) return
+
             set(state => ({
                 windows: {
                     ...state.windows,
-                    [id]: { ...state.windows[id], isMinimized: false }
+                    [id]: { ...existingWindow, isMinimized: false }
                 }
             }))
             get().focusWindow(id)
-            eventBus.emit('window:opened', { id, appId: options?.appId })
+            eventBus.emit('window:opened', { id, appId })
             return
         }
 
         const newZ = maxZIndex + 1
 
-        // Create Process (If App ID is present)
-        if (options?.appId) {
-            useProcessStore.getState().createProcess(options.appId, title, id)
-            eventBus.emit('app:launched', { appId: options.appId, windowId: id })
-        }
+        // 发布事件，让 ProcessStore 监听并创建进程
+        eventBus.emit('app:launched', { appId, windowId: id })
 
         // Calculate centered position
         const windowWidth = options?.width ?? options?.size?.width ?? 800
@@ -93,23 +95,30 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         const centeredX = Math.max(0, (screenWidth - windowWidth) / 2)
         const centeredY = Math.max(0, (screenHeight - windowHeight) / 2 - 40)
 
+        // 提取组件 props（排除窗口配置属性）
+        const { 
+            size, width, height, isMaximized, isResizable, 
+            taskbarPosition, titleBarColor, isDefaultTitle, hideTitleBar,
+            ...componentProps 
+        } = options || {}
+
         const newWindow: WindowState = {
             id,
             title,
             isOpen: true,
             isMinimized: false,
-            isMaximized: options?.isMaximized ?? false,
+            isMaximized: isMaximized ?? false,
             position: { x: centeredX, y: centeredY },
-            size: options?.size ?? { width: windowWidth, height: windowHeight },
+            size: size ?? { width: windowWidth, height: windowHeight },
             zIndex: newZ,
-            component,
+            componentProps, // 存储组件 props
             icon,
-            appId: options?.appId,
-            taskbarPosition: options?.taskbarPosition,
-            titleBarColor: options?.titleBarColor,
-            isDefaultTitle: options?.isDefaultTitle,
-            isResizable: options?.isResizable,
-            hideTitleBar: options?.hideTitleBar
+            appId,
+            taskbarPosition,
+            titleBarColor,
+            isDefaultTitle,
+            isResizable,
+            hideTitleBar
         }
 
         set(state => ({
@@ -118,14 +127,14 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             maxZIndex: newZ
         }))
 
-        eventBus.emit('window:opened', { id, appId: options?.appId })
+        eventBus.emit('window:opened', { id, appId })
     },
 
-    launchApp: (id, title, component, icon, options) => {
+    launchApp: (id, title, appId, icon, options) => {
         const { windows, openWindow } = get()
 
         if (windows[id]) {
-            openWindow(id, title, component, icon, options)
+            openWindow(id, title, appId, icon, options)
             return
         }
 
@@ -133,7 +142,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
         set(state => ({ launchingAppIds: [...state.launchingAppIds, id] }))
 
-        openWindow(id, title, component, icon, { ...options, appId: id })
+        openWindow(id, title, appId, icon, options)
         set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
     },
 
@@ -144,18 +153,16 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             const { [id]: removed, ...remaining } = state.windows
             const nextActive = state.activeWindowId === id ? null : state.activeWindowId
 
-            // Kill Process
-            const process = useProcessStore.getState().getProcessByWindowId(id)
-            if (process) {
-                useProcessStore.getState().killProcess(process.pid)
-            }
-
             return {
                 windows: remaining,
                 activeWindowId: nextActive
             }
         })
 
+        // 清理快照
+        get().clearSnapshot(id)
+
+        // 发布事件，让 ProcessStore 监听并处理
         eventBus.emit('window:closed', { id, appId: window?.appId })
         if (window?.appId) {
             eventBus.emit('app:closed', { appId: window.appId, windowId: id })
@@ -170,14 +177,20 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 eventBus.emit('app:closed', { appId: window.appId, windowId: id })
             }
         })
+        
+        // 清理所有快照
+        get().snapshotCache.clear()
+        
         set({ windows: {}, activeWindowId: null, maxZIndex: 100 })
     },
 
     focusWindow: (id) => {
         const { activeWindowId, maxZIndex, windows } = get()
+        const targetWindow = windows[id]
+        if (!targetWindow) return
         
         // 优化：如果已经是顶层且活跃，跳过更新
-        if (activeWindowId === id && !windows[id]?.isMinimized && windows[id]?.zIndex === maxZIndex) {
+        if (activeWindowId === id && !targetWindow.isMinimized && targetWindow.zIndex === maxZIndex) {
             return
         }
 
@@ -195,7 +208,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 maxZIndex: newZ,
                 windows: {
                     ...state.windows,
-                    [id]: { ...state.windows[id], zIndex: newZ, isMinimized: false }
+                    [id]: { ...targetWindow, zIndex: newZ, isMinimized: false }
                 }
             }))
         } else {
@@ -204,7 +217,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 activeWindowId: id,
                 windows: {
                     ...state.windows,
-                    [id]: { ...state.windows[id], isMinimized: false }
+                    [id]: { ...targetWindow, isMinimized: false }
                 }
             }))
         }
@@ -213,10 +226,13 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     },
 
     minimizeWindow: (id) => {
+        const targetWindow = get().windows[id]
+        if (!targetWindow) return
+
         set(state => ({
             windows: {
                 ...state.windows,
-                [id]: { ...state.windows[id], isMinimized: true }
+                [id]: { ...targetWindow, isMinimized: true }
             },
             activeWindowId: state.activeWindowId === id ? null : state.activeWindowId
         }))
@@ -261,19 +277,25 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     },
 
     updateWindowPosition: (id, position) => {
+        const targetWindow = get().windows[id]
+        if (!targetWindow) return
+
         set(state => ({
             windows: {
                 ...state.windows,
-                [id]: { ...state.windows[id], position }
+                [id]: { ...targetWindow, position }
             }
         }))
     },
 
     updateWindowSize: (id, size) => {
+        const targetWindow = get().windows[id]
+        if (!targetWindow) return
+
         set(state => ({
             windows: {
                 ...state.windows,
-                [id]: { ...state.windows[id], size }
+                [id]: { ...targetWindow, size }
             }
         }))
     },
@@ -287,7 +309,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             return {
                 windows: {
                     ...state.windows,
-                    [id]: { ...state.windows[id], taskbarPosition: position }
+                    [id]: { ...win, taskbarPosition: position }
                 }
             }
         })
@@ -297,7 +319,10 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         set(state => {
             const newWindows = { ...state.windows }
             Object.keys(newWindows).forEach(key => {
-                newWindows[key] = { ...newWindows[key], isMinimized: true }
+                const win = newWindows[key]
+                if (win) {
+                    newWindows[key] = { ...win, isMinimized: true }
+                }
             })
             return {
                 windows: newWindows,
@@ -307,9 +332,25 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     },
 
     setSnapshot: (id, dataUrl) => {
-        set(state => ({
-            snapshots: { ...state.snapshots, [id]: dataUrl }
-        }))
+        const cache = get().snapshotCache
+        
+        // LRU 策略：如果超过最大数量，删除最旧的
+        if (cache.size >= MAX_SNAPSHOTS && !cache.has(id)) {
+            const firstKey = cache.keys().next().value
+            if (firstKey) {
+                cache.delete(firstKey)
+            }
+        }
+        
+        cache.set(id, dataUrl)
+    },
+
+    getSnapshot: (id) => {
+        return get().snapshotCache.get(id)
+    },
+
+    clearSnapshot: (id) => {
+        get().snapshotCache.delete(id)
     },
 
     setPeekWindowId: (id) => {

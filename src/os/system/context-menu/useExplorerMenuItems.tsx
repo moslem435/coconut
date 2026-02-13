@@ -47,7 +47,7 @@ export function useExplorerMenuItems(
                 action: () => {
                     const app = APPS_REGISTRY['terminal']
                     if (app) {
-                        openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                        openWindow(app.id, t('app.terminal'), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                     }
                     hideMenu()
                 }

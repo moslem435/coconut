@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 export interface WallpaperConfig {
-  type: 'image' | 'video' | 'gradient'
+  type: 'image' | 'video' | 'gradient' | 'preset' | 'solid'
   value: string
 }
 
@@ -38,7 +38,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
     }
 
     // 图片类型壁纸
-    if (wallpaper.type === 'image') {
+    if (wallpaper.type === 'image' || wallpaper.type === 'preset') {
       // 首次加载直接显示
       if (isFirstImageLoad.current) {
         isFirstImageLoad.current = false

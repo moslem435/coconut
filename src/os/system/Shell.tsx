@@ -1,16 +1,12 @@
-'use client'
-
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { DATA } from '@/lib/data'
-import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useEffect } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemStore } from '@/os/kernel/useSystemStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
-import { APPS_REGISTRY } from '@/os/registry/config'
 import { Kernel } from '@/os/kernel/Kernel'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
+import { logger } from '@/os/utils/logger'
 
 // Components
 import Taskbar from './Taskbar'
@@ -26,25 +22,24 @@ interface ShellProps {
 }
 
 export default function Shell({ onShutdown }: ShellProps) {
-  const { language } = useLanguage()
   // Optimize: Only subscribe to the list of window IDs.
   // Shell will only re-render when a window is added or removed.
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
   // VFS Sync
-  const { syncToOPFS, initialize } = useFileSystemStore()
+  const { initialize } = useFileSystemStore()
 
+  // 合并初始化逻辑
   useEffect(() => {
     Kernel.init()
-    syncToOPFS().catch(console.error)
-    initialize().catch(console.error)
+    initialize().catch(logger.error)
 
     const interval = setInterval(() => {
       useProcessStore.getState().tick()
     }, 2000)
 
     return () => clearInterval(interval)
-  }, []) // Run once on startup
+  }, [initialize])
 
   const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()
 
@@ -58,9 +53,7 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       {/* 1. Desktop Layer (Always Present) */}
       <div className="fixed inset-0 z-0">
-        <Desktop
-          onToggleMenu={toggleStartMenu}
-        />
+        <Desktop />
       </div>
 
       {/* 2. Window Manager / App Layer */}

@@ -30,7 +30,7 @@ export function useDesktopMenuItems(
         const handleOpenSettings = (categoryId = 'display') => {
             const app = APPS_REGISTRY['settings']
             if (app) {
-                openWindow(app.id, t('start.settings'), <app.component initialCategory={categoryId} />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                openWindow(app.id, t('start.settings'), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true, initialCategory: categoryId })
             }
             hideMenu()
         }
@@ -74,7 +74,7 @@ export function useDesktopMenuItems(
                 icon: Terminal,
                 action: () => {
                     const app = APPS_REGISTRY['terminal']
-                    if (app) openWindow(app.id, t('app.terminal'), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                    if (app) openWindow(app.id, t('app.terminal'), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                     hideMenu()
                 }
             },

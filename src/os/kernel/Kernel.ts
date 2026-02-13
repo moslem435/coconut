@@ -4,25 +4,39 @@ import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useProcessStore, ProcessPriority } from '@/os/kernel/useProcessStore'
 
 // Types
-export type SysCallMessage = {
+export type SysCallArgs = {
+    'process.exit': []
+    'fs.readFile': [path: string]
+    'fs.writeFile': [path: string, content: string | Uint8Array]
+    'fs.readDir': [path: string]
+    'window.close': []
+    'alert': [message: string]
+    'event.subscribe': [topic: string]
+    'event.unsubscribe': [topic: string]
+    'event.publish': [topic: string, payload: unknown]
+}
+
+export type SysCallMethod = keyof SysCallArgs
+
+export type SysCallMessage<M extends SysCallMethod = SysCallMethod> = {
     id: string
     type: 'SYSCALL'
     appId: string
-    method: string
-    args: any[]
+    method: M
+    args: SysCallArgs[M]
 }
 
-export type SysCallResponse = {
+export type SysCallResponse<T = unknown> = {
     id: string
     type: 'SYSCALL_RESULT'
-    result?: any
+    result?: T
     error?: string
 }
 
-export type KernelEvent = {
+export type KernelEvent<T = unknown> = {
     type: 'EVENT'
     topic: string
-    payload: any
+    payload: T
 }
 
 class EventBus {
@@ -54,20 +68,10 @@ class EventBus {
         }
     }
 
-    publish(topic: string, payload: any, senderOrigin: string) {
+    publish(topic: string, payload: unknown, senderOrigin: string) {
         const targets = this.subscribers.get(topic)
         if (targets) {
             targets.forEach(sub => {
-                // Security Check: Only send to the origin that subscribed
-                // If origin is null/opaque (e.g. sandboxed iframe without allow-same-origin), we might need to be careful.
-                // But generally, postMessage targetOrigin should match the subscriber's origin.
-                
-                // For 'null' origin (common in sandboxed iframes), we might have to use '*' if we want to support them,
-                // BUT the goal here is security. 
-                // If origin is 'null', targetOrigin '*' is required but risky.
-                // However, if we recorded 'null' during subscribe, we know it's the same 'null' context (conceptually).
-                // Browser postMessage with targetOrigin '/' or specific domain is best.
-                
                 const targetOrigin = sub.origin === 'null' ? '*' : sub.origin
                 
                 sub.window.postMessage({
@@ -213,39 +217,39 @@ class KernelSystem {
         }) ?? false
     }
 
-    private async executeSysCall(method: string, args: any[], source: Window, origin: string): Promise<any> {
+    private async executeSysCall(method: string, args: unknown[], source: Window, origin: string): Promise<unknown> {
         console.log(`[Kernel] Executing ${method}`, args)
 
         switch (method) {
             case 'process.exit':
                 return
             case 'fs.readFile':
-                const content = await fs.readFile(args[0])
+                const content = await fs.readFile(args[0] as string)
                 return new TextDecoder().decode(content)
             case 'fs.writeFile':
-                return fs.writeFile(args[0], args[1])
+                return fs.writeFile(args[0] as string, args[1] as string)
             case 'fs.readDir':
-                return fs.readdir(args[0])
+                return fs.readdir(args[0] as string)
             case 'window.close':
                 return 
             case 'alert':
                 alert(`[Sandbox App]: ${args[0]}`)
                 return
             case 'event.subscribe':
-                this.eventBus.subscribe(args[0], source, origin)
+                this.eventBus.subscribe(args[0] as string, source, origin)
                 return true
             case 'event.unsubscribe':
-                this.eventBus.unsubscribe(args[0], source)
+                this.eventBus.unsubscribe(args[0] as string, source)
                 return true
             case 'event.publish':
-                this.eventBus.publish(args[0], args[1], origin)
+                this.eventBus.publish(args[0] as string, args[1], origin)
                 return true
             default:
                 throw new Error(`Unknown system call: ${method}`)
         }
     }
 
-    private sendResult(source: Window, msgId: string, result: any, targetOrigin: string) {
+    private sendResult(source: Window, msgId: string, result: unknown, targetOrigin: string) {
         source.postMessage({
             id: msgId,
             type: 'SYSCALL_RESULT',

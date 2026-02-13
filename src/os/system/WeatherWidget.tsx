@@ -270,7 +270,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
           launchApp(
             app.id,
             app.title,
-            <app.component />,
+            app.id,
             app.icon,
             app.defaultWindowOptions
           )

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { ProcessControlBlock, ProcessStatus, ProcessPriority } from './process/types'
 import { updateAllProcesses } from './process/simulator'
+import { eventBus } from './EventBus'
 
 // Re-export types for backward compatibility
 export type { ProcessControlBlock, ProcessStatus, ProcessPriority } from './process/types'
@@ -106,3 +107,18 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         })
     }
 }))
+
+// 监听应用启动事件，自动创建进程
+eventBus.on('app:launched', ({ appId, windowId }) => {
+    const store = useProcessStore.getState()
+    store.createProcess(appId, appId, windowId)
+})
+
+// 监听窗口关闭事件，自动终止进程
+eventBus.on('window:closed', ({ id }) => {
+    const store = useProcessStore.getState()
+    const process = store.getProcessByWindowId(id)
+    if (process) {
+        store.killProcess(process.pid)
+    }
+})

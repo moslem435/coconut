@@ -36,7 +36,7 @@ export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundPro
       )}
 
       {/* 图片壁纸 */}
-      {wallpaper?.type === 'image' && (
+      {(wallpaper?.type === 'image' || wallpaper?.type === 'preset') && (
         <>
           {/* 当前显示的壁纸 */}
           <div
@@ -60,7 +60,7 @@ export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundPro
       )}
 
       {/* 渐变壁纸 */}
-      {wallpaper?.type === 'gradient' && (
+      {(wallpaper?.type === 'gradient' || wallpaper?.type === 'solid') && (
         <div
           className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
           style={{ background: wallpaper.value || 'var(--os-bg-base)' }}

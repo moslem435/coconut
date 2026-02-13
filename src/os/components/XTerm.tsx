@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
+import { logger } from '@/os/utils/logger'
 import '@xterm/xterm/css/xterm.css'
 
 interface XTermProps {
@@ -25,7 +26,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
 
   // Debug: Log WebContainer state
   useEffect(() => {
-    console.log('[XTerm] WebContainer state:', { 
+    logger.debug('[XTerm] WebContainer state:', { 
       hasInstance: !!instance, 
       isBooting, 
       error,
@@ -35,11 +36,11 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
 
   // 1. Boot WebContainer
   useEffect(() => {
-    console.log('[XTerm] Calling WebContainer boot...')
+    logger.debug('[XTerm] Calling WebContainer boot...')
     boot().then(() => {
-      console.log('[XTerm] WebContainer boot completed')
+      logger.debug('[XTerm] WebContainer boot completed')
     }).catch((err) => {
-      console.error('[XTerm] WebContainer boot failed:', err)
+      logger.error('[XTerm] WebContainer boot failed:', err)
     })
   }, [boot])
 
@@ -113,7 +114,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         term.writeln('\x1b[32m✔ System Online\x1b[0m')
         term.writeln('')
 
-        console.log('[XTerm] Spawning jsh shell...')
+        logger.debug('[XTerm] Spawning jsh shell...')
 
         // Spawn jsh (JavaScript Shell)
         const shellProcess = await instance.spawn('jsh', {
@@ -159,7 +160,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
       })
 
       setIsReady(true)
-      console.log('[XTerm] Terminal ready')
+      logger.debug('[XTerm] Terminal ready')
 
       return () => {
         input.dispose()
@@ -168,7 +169,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         processRef.current = null
       }
     } catch (error) {
-      console.error('[XTerm] Failed to start shell:', error)
+      logger.error('[XTerm] Failed to start shell:', error)
       term.clear()
       term.writeln('\x1b[31m✖ Failed to start terminal\x1b[0m')
       term.writeln('')

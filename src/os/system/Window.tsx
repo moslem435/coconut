@@ -1,19 +1,19 @@
 'use client'
 
-import { useDragControls } from 'framer-motion'
+import { useDragControls, motion } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { WindowTitleBar } from '@/os/ui/WindowTitleBar'
 import { AppErrorBoundary } from '@/os/system/AppErrorBoundary'
-import { SYSTEM_CONSTANTS } from '@/os/config/constants'
 import { useWindowResize } from '@/os/hooks/useWindowResize'
 import { useWindowSnapshot } from '@/os/hooks/useWindowSnapshot'
 import { useWindowDrag } from '@/os/hooks/useWindowDrag'
 import { WindowContext } from '@/os/kernel/WindowContext'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { motion } from 'framer-motion'
+import { APPS_REGISTRY } from '@/os/registry/config'
+import { useMemo, useCallback } from 'react'
 
 import { WindowGhostDrag } from './window/WindowGhostDrag'
 import { WindowSnapPreview } from './window/WindowSnapPreview'
@@ -62,6 +62,51 @@ export default function Window({ id }: WindowProps) {
   const dragControls = useDragControls()
   const ghostDragControls = useDragControls()
 
+  // Optimization: Memoize App Component lookup
+  const AppComp = useMemo(() => {
+    if (!windowState?.appId) return null
+    return APPS_REGISTRY[windowState.appId]?.component || null
+  }, [windowState?.appId])
+
+  // Optimization: Memoize Icon lookup
+  const appIcon = useMemo(() => {
+    if (windowState?.icon) return windowState.icon
+    if (windowState?.appId) return APPS_REGISTRY[windowState.appId]?.icon
+    return undefined
+  }, [windowState?.icon, windowState?.appId])
+
+  // Optimization: Memoize Handlers
+  const handleMinimize = useCallback(() => {
+    captureSnapshot()
+    minimizeWindow(id)
+  }, [captureSnapshot, minimizeWindow, id])
+
+  const handleMaximize = useCallback(() => maximizeWindow(id), [maximizeWindow, id])
+  const handleClose = useCallback(() => closeWindow(id), [closeWindow, id])
+
+  const handleTitleBarPointerDown = useCallback((e: React.PointerEvent) => {
+    focusWindow(id)
+    if (windowState?.isMaximized) {
+      dragControls.start(e)
+    } else {
+      ghostDragControls.start(e)
+    }
+  }, [focusWindow, id, windowState?.isMaximized, dragControls, ghostDragControls])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
+  }, [id])
+
+  // Optimization: Memoize Labels
+  const labels = useMemo(() => ({
+    minimize: t('menu.minimize'),
+    maximize: t('menu.maximize'),
+    restore: t('menu.restore'),
+    close: t('menu.close')
+  }), [t])
+
   if (!windowState || !windowState.isOpen) return null
 
   const isPeeking = peekWindowId === id
@@ -87,11 +132,6 @@ export default function Window({ id }: WindowProps) {
   const targetY = (windowState.isMinimized && !isPeeking)
     ? (windowState.taskbarPosition?.y ? (windowState.taskbarPosition.y + 24) - (effectiveHeight / 2) : fallbackTaskbarY)
     : windowState.isMaximized ? 0 : windowState.position.y
-
-  const handleMinimize = () => {
-    captureSnapshot()
-    minimizeWindow(id)
-  }
 
   return (
     <>
@@ -194,7 +234,7 @@ export default function Window({ id }: WindowProps) {
           {!windowState.hideTitleBar && (
             <WindowTitleBar
               title={windowState.title}
-              icon={windowState.icon}
+              icon={appIcon}
               appId={windowState.appId}
               isDefaultTitle={windowState.isDefaultTitle}
               isActive={isActive}
@@ -202,29 +242,13 @@ export default function Window({ id }: WindowProps) {
               isResizable={windowState.isResizable !== false}
               colorMode={windowState.titleBarColor === 'auto' ? (theme === 'light' ? 'dark' : 'light') : windowState.titleBarColor}
               onMinimize={handleMinimize}
-              onMaximize={() => maximizeWindow(id)}
-              onClose={() => closeWindow(id)}
+              onMaximize={handleMaximize}
+              onClose={handleClose}
               dragControls={undefined}
-              onPointerDown={(e) => {
-                focusWindow(id)
-                if (windowState.isMaximized) {
-                  dragControls.start(e)
-                } else {
-                  ghostDragControls.start(e)
-                }
-              }}
+              onPointerDown={handleTitleBarPointerDown}
               onHoverMinimize={captureSnapshot}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'window-titlebar', { windowId: id })
-              }}
-              labels={{
-                minimize: t('menu.minimize'),
-                maximize: t('menu.maximize'),
-                restore: t('menu.restore'),
-                close: t('menu.close')
-              }}
+              onContextMenu={handleContextMenu}
+              labels={labels}
             />
           )}
         </div>
@@ -235,7 +259,13 @@ export default function Window({ id }: WindowProps) {
             dragControls: windowState.isMaximized ? dragControls : ghostDragControls
           }}>
             <AppErrorBoundary appId={id}>
-              {windowState.component}
+              {AppComp ? (
+                <AppComp {...(windowState.componentProps || {})} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-red-400">
+                  App Component Not Found (ID: {windowState.appId})
+                </div>
+              )}
             </AppErrorBoundary>
           </WindowContext.Provider>
 

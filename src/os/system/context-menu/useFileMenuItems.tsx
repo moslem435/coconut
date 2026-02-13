@@ -40,7 +40,7 @@ export function useFileMenuItems(
                 action: () => {
                     if (data?.appId) {
                         const app = APPS_REGISTRY[data.appId]
-                        if (app) openWindow(app.id, t(`app.${app.id}`), <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                        if (app) openWindow(app.id, t(`app.${app.id}`), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                     } else if (data?.id) {
                         addNotification({ type: 'info', message: 'Double-click to open' })
                     }

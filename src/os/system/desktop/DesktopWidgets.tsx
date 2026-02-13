@@ -8,7 +8,7 @@ import WeatherWidget from '@/os/system/WeatherWidget'
 
 interface DesktopWidgetsProps {
   showWeatherWidget: boolean
-  dragConstraintsRef: RefObject<HTMLDivElement>
+  dragConstraintsRef: RefObject<HTMLDivElement | null>
 }
 
 export function DesktopWidgets({

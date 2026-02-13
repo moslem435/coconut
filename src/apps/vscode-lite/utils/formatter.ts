@@ -1,8 +1,9 @@
 // 按需加载 Prettier
 
 type ParserType = 'typescript' | 'babel' | 'css' | 'html' | 'markdown'
+type Plugin = unknown
 
-const parserCache = new Map<ParserType, any>()
+const parserCache = new Map<ParserType, unknown>()
 
 export async function formatCode(
   code: string,
@@ -14,7 +15,7 @@ export async function formatCode(
   // 根据文件扩展名确定 parser
   const ext = fileName.split('.').pop()?.toLowerCase()
   let parser: ParserType | undefined
-  let plugins: any[] = []
+  let plugins: Array<Plugin> = []
 
   if (ext === 'ts' || ext === 'tsx') {
     parser = 'typescript'

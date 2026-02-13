@@ -38,7 +38,7 @@ export function useTaskbarMenuItems(
                         const app = APPS_REGISTRY[data.appId!]
                         if (app) {
                             const title = app.id === 'settings' ? t('start.settings') : t(`app.${app.id}`)
-                            openWindow(app.id, title, <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                            openWindow(app.id, title, app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                         }
                     }
                     hideMenu()

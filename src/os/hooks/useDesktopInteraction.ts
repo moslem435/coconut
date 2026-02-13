@@ -37,7 +37,7 @@ export function useDesktopInteraction() {
         launchApp(
           app.id,
           app.title,
-          <app.component />,
+          app.id,
           app.icon,
           { ...app.defaultWindowOptions, isDefaultTitle: true }
         )
@@ -52,9 +52,9 @@ export function useDesktopInteraction() {
         launchApp(
           'file-explorer-' + item.id,
           item.name,
-          <fileExplorer.component initialPath={item.id} />,
+          fileExplorer.id,
           fileExplorer.icon,
-          fileExplorer.defaultWindowOptions
+          { ...fileExplorer.defaultWindowOptions, initialPath: item.id }
         )
       }
       return
@@ -65,27 +65,22 @@ export function useDesktopInteraction() {
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)
       
       if (isImage) {
-        const { default: ImageViewer } = await import('@/apps/file-explorer/components/ImageViewer')
-        const { Image: ImageIcon } = await import('lucide-react')
         const content = await readFileContent(item.id)
         
         launchApp(
           'preview-' + item.id,
           item.name,
-          <ImageViewer src={content} />,
-          ImageIcon,
-          { size: { width: 600, height: 400 } }
+          'image-viewer',
+          undefined,
+          { size: { width: 600, height: 400 }, src: content }
         )
       } else {
-        const { default: Notepad } = await import('@/apps/notepad')
-        const { StickyNote } = await import('lucide-react')
-        
         launchApp(
           'notepad-' + item.id,
           item.name,
-          <Notepad fileId={item.id} />,
-          StickyNote,
-          { size: { width: 600, height: 450 } }
+          'notepad',
+          undefined,
+          { size: { width: 600, height: 450 }, fileId: item.id }
         )
       }
       return
@@ -100,7 +95,7 @@ export function useDesktopInteraction() {
       openWindow(
         splashingApp.id,
         splashingApp.title,
-        <splashingApp.component />,
+        splashingApp.id,
         splashingApp.icon,
         { ...splashingApp.defaultWindowOptions, isDefaultTitle: true }
       )

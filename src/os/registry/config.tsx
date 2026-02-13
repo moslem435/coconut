@@ -28,6 +28,35 @@ register(require('@/apps/vscode-lite/manifest').manifest)
 register(require('@/apps/sandbox-test/manifest').manifest)
 register(require('@/apps/task-manager/manifest').manifest)
 
+// Register Internal Utility Apps (Components used as apps)
+// These allow opening files with specific viewers without needing full app manifest files for each utility
+import dynamic from 'next/dynamic'
+import { Image as ImageIcon, Eye } from 'lucide-react'
+
+register({
+    id: 'image-viewer',
+    title: 'Image Viewer',
+    icon: ImageIcon,
+    component: dynamic(() => import('@/apps/file-explorer/components/ImageViewer'), { ssr: false }),
+    defaultWindowOptions: {
+        width: 800,
+        height: 600,
+        isResizable: true,
+    }
+})
+
+register({
+    id: 'preview-container',
+    title: 'Preview',
+    icon: Eye,
+    component: dynamic(() => import('@/apps/file-explorer/preview/PreviewContainer'), { ssr: false }),
+    defaultWindowOptions: {
+        width: 800,
+        height: 600,
+        isResizable: true,
+    }
+})
+
 export const APPS_REGISTRY = registry
 export type { AppManifest as AppConfig } from './types'
 export type AppId = keyof typeof APPS_REGISTRY

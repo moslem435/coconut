@@ -37,7 +37,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     
     const isActive = useWindowStore(state => state.activeWindowId === id)
     const isLoading = useWindowStore(state => state.launchingAppIds.includes(appId) && !windowState.isOpen)
-    const snapshot = useWindowStore(state => state.snapshots[id])
+    const snapshot = useWindowStore(state => state.getSnapshot(id))
     
     // Actions
     const focusWindow = useWindowStore(state => state.focusWindow)
@@ -91,7 +91,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                 const rect = buttonRef.current?.getBoundingClientRect()
                 const taskbarPos = rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined
                 
-                launchApp(app.id, t(`app.${appId}`), <app.component />, app.icon, {
+                launchApp(app.id, t(`app.${appId}`), app.id, app.icon, {
                     ...app.defaultWindowOptions,
                     taskbarPosition: taskbarPos,
                     isDefaultTitle: true
