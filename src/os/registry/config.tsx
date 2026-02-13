@@ -1,35 +1,34 @@
 import { AppManifest } from './types'
-import { manifest as PortfolioManifest } from '@/apps/portfolio-hub/manifest'
-import { manifest as SettingsManifest } from '@/apps/settings/manifest'
-import { manifest as FileExplorerManifest } from '@/apps/file-explorer/manifest'
-import { manifest as BrowserManifest } from '@/apps/browser/manifest'
-import { manifest as TerminalManifest } from '@/apps/terminal/manifest'
-import { manifest as NotepadManifest } from '@/apps/notepad/manifest'
-import { manifest as RecycleBinManifest } from '@/apps/recycle-bin/manifest'
-import { manifest as PhotoGalleryManifest } from '@/apps/photo-gallery/manifest'
-import { manifest as MusicPlayerManifest } from '@/apps/music-player/manifest'
-import { manifest as WeatherManifest } from '@/apps/weather/manifest'
-import { manifest as VSCodeLiteManifest } from '@/apps/vscode-lite/manifest'
-import { manifest as SandboxTestManifest } from '@/apps/sandbox-test/manifest'
-import { manifest as TaskManagerManifest } from '@/apps/task-manager/manifest'
 
-// Re-export for compatibility
+/**
+ * Centralized App Registry
+ * 
+ * To add a new app:
+ * 1. Create your app in /src/apps/{app-name}/
+ * 2. Create manifest.tsx with exported `manifest`
+ * 3. Add ONE line below using the register() helper
+ */
+
+const registry: Record<string, AppManifest> = {}
+
+// Helper to simplify registration (reduces boilerplate)
+const register = (manifest: AppManifest) => (registry[manifest.id] = manifest, manifest)
+
+// Register all apps (one concise line per app)
+register(require('@/apps/portfolio-hub/manifest').manifest)
+register(require('@/apps/settings/manifest').manifest)
+register(require('@/apps/file-explorer/manifest').manifest)
+register(require('@/apps/browser/manifest').manifest)
+register(require('@/apps/terminal/manifest').manifest)
+register(require('@/apps/notepad/manifest').manifest)
+register(require('@/apps/recycle-bin/manifest').manifest)
+register(require('@/apps/photo-gallery/manifest').manifest)
+register(require('@/apps/music-player/manifest').manifest)
+register(require('@/apps/weather/manifest').manifest)
+register(require('@/apps/vscode-lite/manifest').manifest)
+register(require('@/apps/sandbox-test/manifest').manifest)
+register(require('@/apps/task-manager/manifest').manifest)
+
+export const APPS_REGISTRY = registry
 export type { AppManifest as AppConfig } from './types'
-
-export const APPS_REGISTRY: Record<string, AppManifest> = {
-  [PortfolioManifest.id]: PortfolioManifest,
-  [SettingsManifest.id]: SettingsManifest,
-  [FileExplorerManifest.id]: FileExplorerManifest,
-  [BrowserManifest.id]: BrowserManifest,
-  [TerminalManifest.id]: TerminalManifest,
-  [NotepadManifest.id]: NotepadManifest,
-  [RecycleBinManifest.id]: RecycleBinManifest,
-  [PhotoGalleryManifest.id]: PhotoGalleryManifest,
-  [MusicPlayerManifest.id]: MusicPlayerManifest,
-  [WeatherManifest.id]: WeatherManifest,
-  [VSCodeLiteManifest.id]: VSCodeLiteManifest,
-  [SandboxTestManifest.id]: SandboxTestManifest,
-  [TaskManagerManifest.id]: TaskManagerManifest,
-}
-
 export type AppId = keyof typeof APPS_REGISTRY

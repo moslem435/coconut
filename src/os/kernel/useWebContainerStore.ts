@@ -5,11 +5,11 @@ interface WebContainerState {
   instance: WebContainer | null
   isBooting: boolean
   error: string | null
-  
+
   boot: () => Promise<void>
   writeFile: (path: string, content: string) => Promise<void>
   readFile: (path: string) => Promise<string>
-  
+
   // New: Explicit Sync Methods for VFS
   syncFile: (path: string, content: string) => Promise<void>
   syncMkdir: (path: string) => Promise<void>
@@ -29,45 +29,45 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
   // New: Explicit Sync Methods for VFS (Optimized)
   syncFile: async (path, content) => {
-      const { instance, isSyncingFromWC } = get()
-      if (!instance || isSyncingFromWC) return
-      
-      const wcPath = `/home/guest${path}`
-      try {
-          console.log('[VFS->WC] writeFile:', wcPath)
-          await instance.fs.writeFile(wcPath, content)
-      } catch (e) {
-          console.warn('[VFS->WC] writeFile failed:', e)
-      }
+    const { instance, isSyncingFromWC } = get()
+    if (!instance || isSyncingFromWC) return
+
+    const wcPath = `/home/guest${path}`
+    try {
+      console.log('[VFS->WC] writeFile:', wcPath)
+      await instance.fs.writeFile(wcPath, content)
+    } catch (e) {
+      console.warn('[VFS->WC] writeFile failed:', e)
+    }
   },
 
   syncMkdir: async (path) => {
-      const { instance, isSyncingFromWC } = get()
-      if (!instance || isSyncingFromWC) return
+    const { instance, isSyncingFromWC } = get()
+    if (!instance || isSyncingFromWC) return
 
-      const wcPath = `/home/guest${path}`
-      try {
-          console.log('[VFS->WC] mkdir:', wcPath)
-          await instance.fs.mkdir(wcPath, { recursive: true })
-      } catch (e) {
-          console.warn('[VFS->WC] mkdir failed:', e)
-      }
+    const wcPath = `/home/guest${path}`
+    try {
+      console.log('[VFS->WC] mkdir:', wcPath)
+      await instance.fs.mkdir(wcPath, { recursive: true })
+    } catch (e) {
+      console.warn('[VFS->WC] mkdir failed:', e)
+    }
   },
 
   syncUnlink: async (path) => {
-      const { instance, isSyncingFromWC } = get()
-      if (!instance || isSyncingFromWC) return
+    const { instance, isSyncingFromWC } = get()
+    if (!instance || isSyncingFromWC) return
 
-      const wcPath = `/home/guest${path}`
-      try {
-          console.log('[VFS->WC] unlink:', wcPath)
-          // Try to determine if file or folder, but rm -r works for both mostly if we use custom logic
-          // WebContainer rm is strictly file or directory?
-          // rm(path, { recursive: true }) handles both
-          await instance.fs.rm(wcPath, { recursive: true, force: true })
-      } catch (e) {
-          console.warn('[VFS->WC] unlink failed:', e)
-      }
+    const wcPath = `/home/guest${path}`
+    try {
+      console.log('[VFS->WC] unlink:', wcPath)
+      // Try to determine if file or folder, but rm -r works for both mostly if we use custom logic
+      // WebContainer rm is strictly file or directory?
+      // rm(path, { recursive: true }) handles both
+      await instance.fs.rm(wcPath, { recursive: true, force: true })
+    } catch (e) {
+      console.warn('[VFS->WC] unlink failed:', e)
+    }
   },
 
   boot: async () => {
@@ -85,7 +85,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         bootPromise = WebContainer.boot()
       }
       const webcontainer = await bootPromise
-      
+
       // Mount a basic starter project
       // 1. Basic System Files & Project Structure
       const mountTree: any = {
@@ -136,43 +136,53 @@ app.listen(port, () => {
         },
         // System wide config (optional)
         'etc': {
-            directory: {
-                'motd': {
-                    file: {
-                        contents: 'Welcome to Portfolio OS (WebContainer Edition)'
-                    }
-                }
+          directory: {
+            'motd': {
+              file: {
+                contents: 'Welcome to Portfolio OS (WebContainer Edition)'
+              }
             }
+          }
         }
       }
 
       // 2. Sync VFS -> WebContainer Tree
       const { files, rootId, getNodeByPath, createItem, updateFileContent, deleteItem } = useFileSystemStore.getState()
-      
+
       // Helper to build tree
-      const buildTree = (parentId: string): any => {
-          const children = Object.values(files).filter(f => f.parentId === parentId)
-          const tree: any = {}
-          
-          children.forEach(child => {
-              if (child.type === 'folder') {
-                  tree[child.name] = {
-                      directory: buildTree(child.id)
-                  }
-              } else {
-                  tree[child.name] = {
-                      file: {
-                          contents: child.content || ''
-                      }
-                  }
+      const buildTree = async (parentId: string): Promise<any> => {
+        const children = Object.values(files).filter(f => f.parentId === parentId)
+        const tree: any = {}
+
+        for (const child of children) {
+          if (child.type === 'folder') {
+            tree[child.name] = {
+              directory: await buildTree(child.id)
+            }
+          } else {
+            try {
+              const content = await useFileSystemStore.getState().readFileContent(child.id)
+              tree[child.name] = {
+                file: {
+                  contents: content
+                }
               }
-          })
-          return tree
+            } catch (e) {
+              console.warn(`Failed to read content for mount: ${child.name}`, e)
+              tree[child.name] = {
+                file: {
+                  contents: ''
+                }
+              }
+            }
+          }
+        }
+        return tree
       }
 
       // Build the tree starting from root and mount it under '/home/guest'
       // Merge VFS tree into the guest directory
-      const vfsTree = buildTree(rootId)
+      const vfsTree = await buildTree(rootId)
       Object.assign(mountTree['home'].directory['guest'].directory, vfsTree)
 
       await webcontainer.mount(mountTree)
@@ -181,82 +191,79 @@ app.listen(port, () => {
 
       // 3. WebContainer -> VFS (fs.watch)
       webcontainer.fs.watch('/home/guest', { recursive: true }, async (event, filename) => {
-          // If we are currently syncing FROM VFS, ignore this echo
-          // Note: We don't have isSyncingFromVFS flag in store, but we can assume
-          // if we just called a sync method, WC will emit event.
-          // However, for simplicity, we rely on content check to break loop.
-          
-          if (!filename) return
-          if (filename.startsWith('project/')) return
+        // Explicitly check if filename is string. fs.watch type definition might be loose.
+        if (typeof filename !== 'string' || !filename) return
+        if (filename.startsWith('project/')) return
 
-          set({ isSyncingFromWC: true }) // Set flag so VFS knows not to echo back
+        set({ isSyncingFromWC: true })
 
+        try {
+          const vfsPath = filename
+
+          // Check existence and type using readdir on parent to avoid 'stat' error
+          const parentWcPath = `/home/guest/${vfsPath.split('/').slice(0, -1).join('/')}`
+          const name = vfsPath.split('/').pop()!
+
+          let entry: { isDirectory: () => boolean; name: string } | undefined
           try {
-              const vfsPath = filename
-              const fullWcPath = `/home/guest/${filename}`
-              
-              let exists = false
-              let stat
-              try {
-                  stat = await webcontainer.fs.stat(fullWcPath)
-                  exists = true
-              } catch (e) {
-                  exists = false
-              }
-
-              if (!exists) {
-                  const node = useFileSystemStore.getState().getNodeByPath(vfsPath)
-                  if (node) {
-                      console.log('[WC->VFS] Deleting:', vfsPath)
-                      await deleteItem(node.id)
-                  }
-              } else {
-                  const parentPath = vfsPath.split('/').slice(0, -1).join('/')
-                  const name = vfsPath.split('/').pop()!
-                  
-                  const parentNode = useFileSystemStore.getState().getNodeByPath(parentPath)
-                  if (!parentNode) {
-                       // Handle root children if parentPath is empty
-                       if (parentPath !== '') return
-                  }
-
-                  const parentId = parentPath === '' ? rootId : parentNode?.id
-                  if (!parentId) return
-
-                  const existingNode = useFileSystemStore.getState().getNodeByPath(vfsPath)
-
-                  if (stat?.isDirectory()) {
-                      if (!existingNode) {
-                          console.log('[WC->VFS] Creating Folder:', vfsPath)
-                          await createItem(parentId, name, 'folder')
-                      }
-                  } else {
-                      const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8')
-                      if (!existingNode) {
-                          console.log('[WC->VFS] Creating File:', vfsPath)
-                          await createItem(parentId, name, 'file', content)
-                      } else {
-                          if (existingNode.content !== content) {
-                              console.log('[WC->VFS] Updating File:', vfsPath)
-                              await updateFileContent(existingNode.id, content)
-                          }
-                      }
-                  }
-              }
+            // @ts-ignore - readdir with options is valid in WebContainer but types might be missing
+            const entries = await webcontainer.fs.readdir(parentWcPath, { withFileTypes: true })
+            entry = entries.find((e: any) => e.name === name)
           } catch (e) {
-              console.error('[WC->VFS] Sync Error:', e)
-          } finally {
-              // Small delay to ensure VFS updates have processed before releasing lock
-              setTimeout(() => set({ isSyncingFromWC: false }), 50)
+            // Parent might not exist or other error
           }
+
+          if (!entry) {
+            const node = useFileSystemStore.getState().getNodeByPath(vfsPath)
+            if (node) {
+              console.log('[WC->VFS] Deleting:', vfsPath)
+              await deleteItem(node.id)
+            }
+          } else {
+            const parentPath = vfsPath.split('/').slice(0, -1).join('/')
+            const parentNode = useFileSystemStore.getState().getNodeByPath(parentPath)
+
+            if (!parentNode && parentPath !== '') return
+
+            const parentId = parentPath === '' ? rootId : parentNode?.id
+            if (!parentId) return
+
+            const existingNode = useFileSystemStore.getState().getNodeByPath(vfsPath)
+
+            if (entry.isDirectory()) {
+              if (!existingNode) {
+                console.log('[WC->VFS] Creating Folder:', vfsPath)
+                await createItem(parentId, name, 'folder')
+              }
+            } else {
+              const fullWcPath = `/home/guest/${filename}`
+              const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8') as string
+
+              if (!existingNode) {
+                console.log('[WC->VFS] Creating File:', vfsPath)
+                await createItem(parentId, name, 'file', content)
+              } else {
+                const currentContent = await useFileSystemStore.getState().readFileContent(existingNode.id)
+                if (currentContent !== content) {
+                  console.log('[WC->VFS] Updating File:', vfsPath)
+                  await updateFileContent(existingNode.id, content)
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[WC->VFS] Sync Error:', e)
+        } finally {
+          setTimeout(() => set({ isSyncingFromWC: false }), 50)
+        }
       })
 
       set({ instance: webcontainer, isBooting: false })
     } catch (err) {
       console.error('Failed to boot WebContainer:', err)
-      set({ 
-        error: err instanceof Error ? err.message : 'Failed to boot WebContainer', 
-        isBooting: false 
+      set({
+        error: err instanceof Error ? err.message : 'Failed to boot WebContainer',
+        isBooting: false
       })
       bootPromise = null // Reset on failure
     }

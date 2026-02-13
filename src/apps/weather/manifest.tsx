@@ -11,10 +11,8 @@ export const manifest: AppManifest = {
   id: 'weather',
   title: 'Weather',
   icon: CloudSun,
-  category: 'utility',
   component: WeatherApp,
-  version: '1.0.0',
-  description: 'Real-time weather forecast',
+
   defaultWindowOptions: {
     width: 800,
     height: 600,
@@ -24,6 +22,6 @@ export const manifest: AppManifest = {
   },
   theme: {
     backgroundColor: '#0ea5e9', // Sky blue-ish
-    textColor: '#ffffff'
+    iconColor: '#ffffff'
   }
 }

@@ -25,7 +25,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const { getItem, updateFileContent, createItem } = useFileSystemStore()
+  const { getItem, updateFileContent, createItem, readFileContent } = useFileSystemStore()
   const { t } = useLanguage()
 
   // Load content
@@ -33,12 +33,14 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
     if (initialFileId) {
       const file = getItem(initialFileId)
       if (file) {
-        setContent(file.content || '')
-        setCurrentFileId(initialFileId)
-        setStatus(t('notepad.opened'))
+        readFileContent(initialFileId).then(c => {
+          setContent(c)
+          setCurrentFileId(initialFileId)
+          setStatus(t('notepad.opened'))
+        }).catch(e => console.error(e))
       }
     }
-  }, [initialFileId, getItem, t])
+  }, [initialFileId, getItem, t, readFileContent])
 
   // Track cursor position
   const updateCursorPos = () => {
@@ -75,19 +77,22 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
     setStatus(t('notepad.newfile'))
   }
 
-  const handleFilePickerConfirm = (pathOrId: string, name?: string) => {
+  const handleFilePickerConfirm = async (pathOrId: string, name?: string) => {
     if (pickerMode === 'open') {
       // pathOrId is fileId
       const file = getItem(pathOrId)
       if (file) {
-        setContent(file.content || '')
-        setCurrentFileId(pathOrId)
-        setStatus(t('notepad.opened'))
+        try {
+          const c = await readFileContent(pathOrId)
+          setContent(c)
+          setCurrentFileId(pathOrId)
+          setStatus(t('notepad.opened'))
+        } catch (e) { console.error(e) }
       }
     } else {
       // pathOrId is folderPath, name is fileName
       if (name) {
-        const newId = createItem(pathOrId, name, 'file', content)
+        const newId = await createItem(pathOrId, name, 'file', content)
         setCurrentFileId(newId)
         setStatus(`${t('notepad.savedto')} ${name}`)
       }

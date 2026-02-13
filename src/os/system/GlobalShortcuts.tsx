@@ -2,20 +2,35 @@ import { useEffect, useRef } from 'react'
 import { useSystemStore } from '@/os/kernel/useSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShortcuts } from '@/os/kernel/useShortcuts'
+import { APPS_REGISTRY } from '@/os/registry/config'
 
 export default function GlobalShortcuts() {
     const { toggleStartMenu, setStartMenuOpen } = useSystemStore()
-    const { minimizeAll, closeWindow, activeWindowId, openWindow } = useWindowStore()
-    
+    const { showDesktop, closeWindow, activeWindowId, launchApp } = useWindowStore()
+
     // Meta Key Logic State
     const metaPressedRef = useRef(false)
     const otherKeyPressedRef = useRef(false)
+
+    // Helper to launch by ID
+    const launchById = (appId: string) => {
+        const app = APPS_REGISTRY[appId]
+        if (app) {
+            launchApp(
+                app.id,
+                app.title,
+                <app.component />,
+                app.icon,
+                { ...app.defaultWindowOptions, isDefaultTitle: true }
+            )
+        }
+    }
 
     // Standard Shortcuts using the hook
     useShortcuts({
         'Meta + D': (e) => {
             e.preventDefault()
-            minimizeAll()
+            showDesktop()
             // Also close start menu if open
             setStartMenuOpen(false)
         },
@@ -27,15 +42,15 @@ export default function GlobalShortcuts() {
         },
         'Meta + E': (e) => {
             e.preventDefault()
-            openWindow('system/file-explorer')
+            launchById('file-explorer')
         },
         'Meta + I': (e) => {
             e.preventDefault()
-            openWindow('system/settings')
+            launchById('settings')
         },
         'Meta + R': (e) => {
             e.preventDefault()
-            openWindow('system/terminal')
+            launchById('terminal')
         }
     })
 
@@ -61,7 +76,7 @@ export default function GlobalShortcuts() {
                 metaPressedRef.current = false
             }
         }
-        
+
         // Use capture to ensure we get these events early
         window.addEventListener('keydown', handleKeyDown, { capture: true })
         window.addEventListener('keyup', handleKeyUp, { capture: true })

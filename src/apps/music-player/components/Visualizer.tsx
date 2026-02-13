@@ -7,7 +7,7 @@ interface VisualizerProps {
 
 export const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!canvasRef.current || !analyser) return
@@ -25,7 +25,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying }) =
 
       // Clear with slight transparency for trail effect? No, clean clear for crispness
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
+
       // Draw background
       // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
       // ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -39,34 +39,34 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying }) =
       for (let i = 0; i < bufferLength; i++) {
         // Logarithmic scale for better bass visualization
         barHeight = (dataArray[i] / 255) * (canvas.height * 0.8)
-        
+
         // Dynamic Gradient
         const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0)
         gradient.addColorStop(0, '#10b981') // Emerald-500
         gradient.addColorStop(0.5, '#06b6d4') // Cyan-500
         gradient.addColorStop(1, '#8b5cf6') // Violet-500
-        
+
         ctx.fillStyle = gradient
 
         // Draw Right Side
         ctx.fillRect(centerX + x, (canvas.height - barHeight) / 2, barWidth, barHeight)
-        
+
         // Draw Left Side
         ctx.fillRect(centerX - x - barWidth, (canvas.height - barHeight) / 2, barWidth, barHeight)
 
         x += barWidth + 1
-        
+
         // Optimization: Stop drawing high frequencies if off-screen (though mirroring makes this tricky)
         if (x > centerX) break
       }
     }
 
     if (isPlaying) {
-        draw()
+      draw()
     } else {
-        if (animationRef.current) cancelAnimationFrame(animationRef.current)
-        // Draw one last frame (flat) or clear
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      // Draw one last frame (flat) or clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
 
     return () => {
@@ -75,11 +75,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying }) =
   }, [analyser, isPlaying])
 
   return (
-    <canvas 
-        ref={canvasRef} 
-        width={600} 
-        height={200} 
-        className="w-full h-full rounded opacity-90"
+    <canvas
+      ref={canvasRef}
+      width={600}
+      height={200}
+      className="w-full h-full rounded opacity-90"
     />
   )
 }

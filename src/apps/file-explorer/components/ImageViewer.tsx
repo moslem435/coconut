@@ -25,16 +25,16 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
         if (fileId) {
             let objectUrl: string | null = null
             setLoading(true)
-            
+
             const loadFile = async () => {
                 try {
                     const store = useFileSystemStore.getState()
                     const path = store.resolvePath(fileId)
-                    
+
                     if (!path) throw new Error('File not found')
 
                     const content = await fs.readFile(path)
-                    
+
                     // Detect mime type based on extension (simple version)
                     const ext = path.split('.').pop()?.toLowerCase()
                     let mimeType = 'image/jpeg'
@@ -43,7 +43,7 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
                     if (ext === 'webp') mimeType = 'image/webp'
                     if (ext === 'svg') mimeType = 'image/svg+xml'
 
-                    const blob = new Blob([content], { type: mimeType })
+                    const blob = new Blob([content as any], { type: mimeType })
                     objectUrl = URL.createObjectURL(blob)
                     setSrc(objectUrl)
                 } catch (err) {
@@ -81,8 +81,8 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
 
     return (
         <div className="h-full flex items-center justify-center bg-black/90 overflow-hidden">
-            <img 
-                src={src} 
+            <img
+                src={src}
                 alt={alt}
                 className="max-w-full max-h-full object-contain select-none"
                 draggable={false}

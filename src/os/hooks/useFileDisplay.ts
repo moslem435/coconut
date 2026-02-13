@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { FileNode } from '@/os/kernel/useFileSystemStore'
+import { useMemo, useState, useEffect } from 'react'
+import { FileNode, useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { getFileIconAndTheme } from '@/apps/file-explorer/utils/fileIcons'
 
@@ -24,14 +24,32 @@ export function useFileDisplay(item: FileNode) {
     return getFileIconAndTheme(item)
   }, [item])
 
-  const thumbnail = useMemo(() => {
+  const { readFileContent } = useFileSystemStore()
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
     const ext = item.name.split('.').pop()?.toLowerCase()
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext || '')
-    if (isImage && item.content && (item.content.startsWith('http') || item.content.startsWith('data:'))) {
-        return item.content
+
+    if (isImage) {
+      readFileContent(item.id).then(content => {
+        if (mounted) {
+          if (content.startsWith('http') || content.startsWith('data:')) {
+            setThumbnail(content)
+          } else {
+            setThumbnail(null)
+          }
+        }
+      }).catch(() => {
+        if (mounted) setThumbnail(null)
+      })
+    } else {
+      setThumbnail(null)
     }
-    return null
- }, [item.name, item.content])
+
+    return () => { mounted = false }
+  }, [item.id, item.name, readFileContent])
 
   return { displayName, iconTheme, thumbnail }
 }

@@ -28,9 +28,10 @@ export function FileGridItem({
 }: FileGridItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
   const { Icon, backgroundColor, useAppIcon, manifest } = iconTheme
+  const IconComponent = Icon as any
 
   return (
-    <div 
+    <div
       className={cn("flex flex-col items-center gap-2 select-none", className)}
       {...props}
     >
@@ -43,19 +44,19 @@ export function FileGridItem({
             backgroundColor={backgroundColor}
           />
         ) : thumbnail ? (
-           <div 
-             className={cn(`flex items-center justify-center rounded-lg overflow-hidden shadow-sm bg-black/20 transition-transform duration-200`, selected && 'scale-105', iconClassName)}
-             style={{ width: iconSize, height: iconSize }}
-           >
-             <img 
-               src={thumbnail} 
-               alt={displayName}
-               className="w-full h-full object-cover"
-               draggable={false}
-             />
-           </div>
+          <div
+            className={cn(`flex items-center justify-center rounded-lg overflow-hidden shadow-sm bg-black/20 transition-transform duration-200`, selected && 'scale-105', iconClassName)}
+            style={{ width: iconSize, height: iconSize }}
+          >
+            <img
+              src={thumbnail}
+              alt={displayName}
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          </div>
         ) : (
-          <div 
+          <div
             className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200`, selected && 'scale-105', iconClassName)}
             style={{
               width: iconSize,
@@ -64,8 +65,8 @@ export function FileGridItem({
               color: '#ffffff'
             }}
           >
-            <Icon 
-              size={iconSize * 0.6} 
+            <IconComponent
+              size={iconSize * 0.6}
               strokeWidth={2}
             />
           </div>
@@ -77,13 +78,14 @@ export function FileGridItem({
           initialValue={item.name}
           className="w-full text-center text-xs rounded px-1 py-0.5"
           onComplete={onRename}
-          onCancel={onCancelRename}
+          onCancel={onCancelRename || (() => { })}
         />
       ) : (
-        <span className="text-xs text-center text-white/90 drop-shadow-md line-clamp-2 break-all w-full px-1 select-none">
+        <span className="text-xs text-center text-white/90 drop-shadow-md line-clamp-3 break-words w-full px-1 select-none">
           {displayName}
         </span>
       )}
     </div>
   )
 }
+

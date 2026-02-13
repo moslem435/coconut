@@ -12,7 +12,7 @@ import React from 'react'
 
 // Define return type
 export interface FileIconTheme {
-  Icon: React.ElementType
+  Icon: any
   backgroundColor: string
   color?: string // Text color, usually white
   useAppIcon: boolean
@@ -90,7 +90,7 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   'sass': { icon: Palette, color: COLORS.pink },
   'less': { icon: Palette, color: COLORS.indigo },
   'svg': { icon: ImageIcon, color: COLORS.amber },
-  
+
   // Data / Config (Green/Stone)
   'json': { icon: Braces, color: COLORS.emerald },
   'yaml': { icon: Settings, color: COLORS.slate },
@@ -103,7 +103,7 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   'toml': { icon: Settings, color: COLORS.slate },
   'ini': { icon: Settings, color: COLORS.slate },
   'conf': { icon: Settings, color: COLORS.slate },
-  
+
   // Media (Purple/Violet/Pink)
   'png': { icon: ImageIcon, color: COLORS.purple },
   'jpg': { icon: ImageIcon, color: COLORS.purple },
@@ -118,7 +118,7 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   'mp3': { icon: Music, color: COLORS.pink },
   'wav': { icon: Music, color: COLORS.pink },
   'ogg': { icon: Music, color: COLORS.pink },
-  
+
   // Documents (Slate/Red/Blue)
   'md': { icon: FileText, color: COLORS.slate },
   'txt': { icon: FileText, color: COLORS.slate },
@@ -129,7 +129,7 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   'xlsx': { icon: FileSpreadsheet, color: COLORS.green },
   'ppt': { icon: Monitor, color: COLORS.orange },
   'pptx': { icon: Monitor, color: COLORS.orange },
-  
+
   // System / Archives (Stone/Zinc)
   'zip': { icon: Archive, color: COLORS.stone },
   'rar': { icon: Archive, color: COLORS.stone },
@@ -170,7 +170,7 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
   }
 
   const lowerName = node.name.toLowerCase()
-  
+
   // 3. Exact Filename Match
   if (EXACT_MATCHES[lowerName]) {
     const match = EXACT_MATCHES[lowerName]

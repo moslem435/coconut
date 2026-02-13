@@ -38,10 +38,10 @@ const formatSize = (bytes?: number) => {
 const getFileTypeLabel = (node: FileNode) => {
   if (node.type === 'folder') return 'Folder'
   if (node.appId) return 'Shortcut'
-  
+
   const ext = node.name.split('.').pop()?.toLowerCase()
   if (!ext || ext === node.name) return 'File'
-  
+
   // Return uppercase extension as type
   return ext.toUpperCase()
 }
@@ -52,11 +52,12 @@ const formatTime = (timestamp: number) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function FileList({ 
-  items, viewMode, onNavigate, onDoubleClick, onContextMenu, 
+export default function FileList({
+  items, viewMode, onNavigate, onDoubleClick, onContextMenu,
   selectedIds, onSelect, onDrop, sortConfig, onSortChange
 }: FileListProps) {
   const { t } = useLanguage()
+
   const { renamingId, setRenamingId } = useUIStore()
   const { renameItem } = useFileSystemStore()
 
@@ -92,12 +93,12 @@ export default function FileList({
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     const node = items.find(item => item.id === targetId)
     if (node?.type === 'folder' && !draggedIds.includes(targetId)) {
       onDrop?.(draggedIds, targetId)
     }
-    
+
     setDraggedIds([])
     setDropTargetId(null)
   }
@@ -121,7 +122,7 @@ export default function FileList({
   // Empty State
   if (items.length === 0) {
     return (
-      <div 
+      <div
         className="h-full flex flex-col items-center justify-center text-white/20 select-none"
         onClick={() => onSelect('')}
       >
@@ -136,14 +137,14 @@ export default function FileList({
   // Grid view - simple non-virtualized
   if (viewMode === 'grid') {
     return (
-      <div 
+      <div
         className="h-full overflow-y-auto pb-20 custom-scrollbar"
-        onClick={() => onSelect('', false)}
+        onClick={(e) => onSelect('', e)}
       >
         <div className="grid grid-cols-[repeat(auto-fill,100px)] gap-4 p-4">
           {items.map(node => {
             const isSelected = selectedIds.includes(node.id)
-            
+
             return (
               <FileGridItem
                 key={node.id}
@@ -168,8 +169,8 @@ export default function FileList({
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
                   "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
-                  isSelected 
-                    ? "bg-blue-500/20 border-blue-500/30 shadow-inner" 
+                  isSelected
+                    ? "bg-blue-500/20 border-blue-500/30 shadow-inner"
                     : "",
                   dropTargetId === node.id && "bg-green-500/20 border-green-500/30",
                   draggedIds.includes(node.id) && "opacity-50"
@@ -184,41 +185,41 @@ export default function FileList({
 
   // List View with virtual scrolling
   const virtualItems = listVirtualizer.getVirtualItems()
-  
+
   return (
-    <div 
+    <div
       className="flex flex-col h-full overflow-hidden"
       onClick={() => onSelect('')}
     >
       {/* Table Header */}
       <div className="flex items-center px-4 py-2 text-xs font-medium text-white/40 border-b border-white/5 select-none shrink-0">
-        <div 
+        <div
           className="flex-[2] min-w-[200px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => onSortChange('name')}
         >
           {t('common.name') || 'Name'}
-          {sortConfig.field === 'name' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'name' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
-        <div 
+        <div
           className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => onSortChange('date')}
         >
           {t('common.date') || 'Date'}
-          {sortConfig.field === 'date' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'date' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
-        <div 
+        <div
           className="flex-1 min-w-[80px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => onSortChange('type')}
         >
           {t('common.type') || 'Type'}
-          {sortConfig.field === 'type' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'type' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
-        <div 
+        <div
           className="w-[80px] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-white transition-colors"
           onClick={() => onSortChange('size')}
         >
           {t('common.size') || 'Size'}
-          {sortConfig.field === 'size' && (sortConfig.order === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+          {sortConfig.field === 'size' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
       </div>
 
@@ -258,8 +259,8 @@ export default function FileList({
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
                   "flex items-center px-3 py-1.5 rounded-md text-sm text-white/80 transition-colors cursor-default group",
-                  isSelected 
-                    ? "bg-blue-500/20" 
+                  isSelected
+                    ? "bg-blue-500/20"
                     : "odd:bg-white/[0.02]",
                   dropTargetId === node.id && "bg-green-500/20 border border-green-500/30",
                   draggedIds.includes(node.id) && "opacity-50"
@@ -285,7 +286,7 @@ export default function FileList({
                   {getFileTypeLabel(node)}
                 </div>
                 <div className="w-[80px] text-right text-xs text-white/40 font-mono">
-                  {formatSize(node.content?.length)}
+                  {formatSize(node.size)}
                 </div>
               </div>
             )

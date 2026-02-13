@@ -16,18 +16,19 @@ export async function GET(request: NextRequest) {
         })
 
         if (!response.ok) {
-            return new NextResponse(`Failed to fetch image: ${response.status}`, { status: response.status })
+            return new NextResponse(`Failed to fetch resource: ${response.status} ${response.statusText}`, { status: response.status })
         }
 
-        const contentType = response.headers.get('content-type')
+        const contentType = response.headers.get('content-type') || 'application/octet-stream'
         const buffer = await response.arrayBuffer()
 
         // Return with CORP header to allow loading in COEP environment
         return new NextResponse(buffer, {
             headers: {
-                'Content-Type': contentType || 'image/jpeg',
-                'Cache-Control': 'public, max-age=86400, mutable',
-                'Cross-Origin-Resource-Policy': 'cross-origin'
+                'Content-Type': contentType,
+                'Cache-Control': 'public, max-age=3600',
+                'Cross-Origin-Resource-Policy': 'cross-origin',
+                'Access-Control-Allow-Origin': '*'
             }
         })
     } catch (error) {

@@ -1,26 +1,22 @@
-'use client'
-
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AppManifest } from '@/os/registry/types'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
-import { useUIStore } from '@/os/kernel/useUIStore'
-import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
-import { useDesktopStore } from '@/os/kernel/useDesktopStore'
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useShallow } from 'zustand/react/shallow'
 import { Image as ImageIcon, StickyNote } from 'lucide-react'
 import Notepad from '@/apps/notepad'
 import ImageViewer from '@/apps/file-explorer/components/ImageViewer'
 import WeatherWidget from '@/os/system/WeatherWidget'
-import { GRID_SIZE, GRID_PADDING, IconPosition, snapToGridPos, findFreePosition } from '@/os/utils/grid'
 import { useFileSelection } from '@/os/hooks/useFileSelection'
-import { FileGridItem } from '@/os/ui/file/FileGridItem'
-import { cn } from '@/lib/utils'
+import { useDesktopGrid } from '@/os/hooks/useDesktopGrid'
+import { DesktopIcon } from '@/os/system/DesktopIcon'
+import { GRID_PADDING } from '@/os/utils/grid'
 
 interface DesktopProps {
     onToggleMenu: () => void
@@ -28,24 +24,32 @@ interface DesktopProps {
 
 export default function Desktop({ onToggleMenu }: DesktopProps) {
     // System settings
-    const { snapToGrid, wallpaper, useAnimations, displayScale, showWeatherWidget, isSettingsLoaded } = useSystemSettings()
+    const {
+        snapToGrid, wallpaper, useAnimations,
+        showWeatherWidget, isSettingsLoaded
+    } = useSystemSettings()
 
-    // Derived Grid Settings
-    const scaleFactor = displayScale / 100
-    const currentGridSize = GRID_SIZE * scaleFactor
-    const currentGridPadding = GRID_PADDING * scaleFactor
-
-    // Context Menu
+    // Context Menu & Language
     const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
     const { t } = useLanguage()
 
-    // Actions - stable
-    const openWindow = useWindowStore(useShallow(state => state.openWindow))
-    const launchApp = useWindowStore(useShallow(state => state.launchApp))
-    const focusWindow = useWindowStore(useShallow(state => state.focusWindow))
+    // Window Actions
+    const { openWindow, launchApp, focusWindow } = useWindowStore(
+        useShallow(state => ({
+            openWindow: state.openWindow,
+            launchApp: state.launchApp,
+            focusWindow: state.focusWindow
+        }))
+    )
 
-    const isLoading = useFileSystemStore(state => state.isLoading)
-    const files = useFileSystemStore(state => state.files)
+    // File System
+    const { isLoading, files, readFileContent } = useFileSystemStore(
+        useShallow(state => ({
+            isLoading: state.isLoading,
+            files: state.files,
+            readFileContent: state.readFileContent
+        }))
+    )
 
     const desktopItems = useMemo(() =>
         Object.values(files).filter(f => f.parentId === 'desktop'),
@@ -55,26 +59,27 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     // Selection State
     const { selectedIds: selectedIcons, handleSelect, clearSelection, setSelectedIds: setSelectedIcons } = useFileSelection(desktopItems)
 
-    // Desktop Store
-    const { renamingId, setRenamingId } = useUIStore()
-    const { renameItem } = useFileSystemStore()
-    const { iconPositions, setIconPositions, updateIconPosition, organizeIcons } = useDesktopStore(
-        useShallow(state => ({
-            iconPositions: state.iconPositions,
-            setIconPositions: state.setIconPositions,
-            updateIconPosition: state.updateIconPosition,
-            organizeIcons: state.organizeIcons
-        }))
-    )
+    // Custom Hooks
+    const {
+        iconPositions, isLayoutReady, handleDragEnd,
+        currentGridSize, currentGridPadding, scaleFactor
+    } = useDesktopGrid({ desktopItems, selectedIcons })
 
-    const isDragging = useRef(false)
+    // Local State
     const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
-
-    // Splash screen state: which app is currently splashing
     const [splashingApp, setSplashingApp] = useState<AppManifest | null>(null)
     const [mounted, setMounted] = useState(false)
-    const [isLayoutReady, setIsLayoutReady] = useState(false)
     const desktopRef = useRef<HTMLDivElement>(null)
+
+    // Initialization
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    // Wallpaper Logic (Simplified for brevity, core logic preserved in hook if extracted later, sticking to simplifying render for now)
+    // ... Keeping wallpaper logic inline or extracting? 
+    // The prompt asked to split Desktop.tsx (550 lines). Wallpaper logic is about 100 lines. 
+    // Let's keep it for now as it wasn't explicitly targeted, but we can clean it up.
 
     // Initial Fade In
     const [isDesktopVisible, setIsDesktopVisible] = useState(false)
@@ -107,29 +112,21 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
     const [isWallpaperLoading, setIsWallpaperLoading] = useState(false)
     const [transitionType, setTransitionType] = useState('fade')
 
-    // Track current wallpaper request to handle race conditions
     const currentWallpaperRef = useRef<string | null>(wallpaper?.value || null)
     const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    // Force immediate load for the first image wallpaper to prevent "default -> image" flash/delay
     const isFirstImageLoad = useRef(true)
 
     // Handle Wallpaper Preloading and Transition
     useEffect(() => {
-        // Wait for wallpaper
         if (!wallpaper) return
-
-        // Update ref immediately
         currentWallpaperRef.current = wallpaper.value
 
-        // Clear any pending transition timeout
         if (transitionTimeoutRef.current) {
             clearTimeout(transitionTimeoutRef.current)
             transitionTimeoutRef.current = null
         }
 
         if (wallpaper.type === 'image') {
-            // OPTIMIZATION: If this is the first image load (boot/refresh), show immediately.
-            // This handles cases where activeWallpaper might have been briefly set to default gradient.
             if (isFirstImageLoad.current) {
                 isFirstImageLoad.current = false
                 setActiveWallpaper(wallpaper.value)
@@ -138,13 +135,8 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 return
             }
 
-            // If we are already displaying this wallpaper as the loaded one, 
-            // and it's not loading, we might just need to ensure active is synced eventually.
-            // But if user switches back and forth, we should respect the new request.
-            // Only skip if both loaded and active are already this wallpaper.
             if (loadedWallpaper === wallpaper.value && activeWallpaper === wallpaper.value) return
 
-            // Randomize transition effect
             const transitions = ['fade', 'zoom-in', 'zoom-out', 'blur']
             setTransitionType(transitions[Math.floor(Math.random() * transitions.length)])
 
@@ -153,13 +145,10 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             img.src = wallpaper.value
 
             img.onload = () => {
-                // Check if this is still the requested wallpaper
                 if (currentWallpaperRef.current !== wallpaper.value) return
-
                 setLoadedWallpaper(wallpaper.value)
                 setIsWallpaperLoading(false)
 
-                // Update active wallpaper after a short delay to allow fade transition
                 transitionTimeoutRef.current = setTimeout(() => {
                     if (currentWallpaperRef.current === wallpaper.value) {
                         setActiveWallpaper(wallpaper.value)
@@ -173,78 +162,24 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                 }
             }
         } else {
-            // For presets/video/colors, update immediately
             setLoadedWallpaper(null)
             setActiveWallpaper(wallpaper.value)
             setIsWallpaperLoading(false)
         }
-    }, [wallpaper, isSettingsLoaded, activeWallpaper]) // Run when wallpaper changes
+    }, [wallpaper, isSettingsLoaded, activeWallpaper])
 
-    // Initialize icon positions if empty
-    useEffect(() => {
-        setMounted(true)
-
-        // Calculate max rows based on viewport
-        const maxRows = typeof window !== 'undefined'
-            ? Math.floor((window.innerHeight - 150) / currentGridSize)
-            : 6
-
-        // Check if any items are missing positions
-        const itemIds = desktopItems.map(i => i.id)
-        const missingPositionIds = itemIds.filter(id => !iconPositions[id])
-
-        // 1. If NO positions exist at all (first run), organize everything
-        if (Object.keys(iconPositions).length === 0) {
-            organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
-        } 
-        // 2. If SOME items are missing positions (newly added files), assign them free spots
-        else if (missingPositionIds.length > 0) {
-            let newPositions = { ...iconPositions }
-            
-            missingPositionIds.forEach(id => {
-                // Find a free spot for this new item
-                // Start searching from (0,0) or last used position could be better, but (0,0) is safe
-                const pos = findFreePosition(GRID_PADDING, GRID_PADDING, id, newPositions, currentGridSize, currentGridPadding)
-                newPositions[id] = pos
-            })
-            
-            setIconPositions(newPositions)
-        }
-
-        setIsLayoutReady(true)
-    }, [desktopItems, iconPositions]) // Run when desktopItems changes (e.g. new file created)
-
-    // Handle Scale Changes
-    useEffect(() => {
-        if (!mounted) return
-        // Re-organize when scale changes to ensure everything fits
-        const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
-        const itemIds = desktopItems.map(i => i.id)
-        organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
-    }, [displayScale, currentGridSize, currentGridPadding]) // Re-run when scale changes
-
+    // Interaction Handlers
     const handleIconClick = (id: string, e: React.MouseEvent) => {
         e.stopPropagation()
-        // Don't select if we just finished dragging
-        if (isDragging.current) {
-            isDragging.current = false
-            return
-        }
-
         handleSelect(id, e)
     }
 
     const handleDoubleClick = (id: string) => {
-        // Clear selection immediately
         setSelectedIcons([])
-
-        // Find the item in VFS
         const item = desktopItems.find(i => i.id === id)
         if (!item) return
 
-        // 1. App Shortcut
         if (item.appId) {
-            // Check if window already exists and is open
             const isWindowOpen = useWindowStore.getState().windows[item.appId]?.isOpen
             if (isWindowOpen) {
                 focusWindow(item.appId)
@@ -254,123 +189,42 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             const app = APPS_REGISTRY[item.appId]
             if (!app) return
 
-            // If app has a splash screen, show it first
             if (app.splashScreen) {
                 setSplashingApp(app)
             } else {
-                launchApp(
-                    app.id,
-                    app.title,
-                    <app.component />,
-                    app.icon,
-                    { ...app.defaultWindowOptions, isDefaultTitle: true }
-                )
+                launchApp(app.id, app.title, <app.component />, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
             }
             return
         }
 
-        // 2. If it's a folder
         if (item.type === 'folder') {
             const fileExplorer = APPS_REGISTRY['file-explorer']
             if (fileExplorer) {
-                launchApp(
-                    'file-explorer-' + item.id,
-                    item.name,
-                    <fileExplorer.component initialPath={item.id} />,
-                    fileExplorer.icon,
-                    fileExplorer.defaultWindowOptions
-                )
+                launchApp('file-explorer-' + item.id, item.name, <fileExplorer.component initialPath={item.id} />, fileExplorer.icon, fileExplorer.defaultWindowOptions)
             }
             return
         }
 
-        // 3. If it's a file
         if (item.type === 'file') {
             const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)
-
             if (isImage) {
-                launchApp(
-                    'preview-' + item.id,
-                    item.name,
-                    <ImageViewer src={item.content || ''} />,
-                    ImageIcon,
-                    { size: { width: 600, height: 400 } }
-                )
+                readFileContent(item.id).then(content => {
+                    launchApp('preview-' + item.id, item.name, <ImageViewer src={content} />, ImageIcon, { size: { width: 600, height: 400 } })
+                })
             } else {
-                launchApp(
-                    'notepad-' + item.id,
-                    item.name,
-                    <Notepad fileId={item.id} />,
-                    StickyNote,
-                    { size: { width: 600, height: 450 } }
-                )
+                launchApp('notepad-' + item.id, item.name, <Notepad fileId={item.id} />, StickyNote, { size: { width: 600, height: 450 } })
             }
             return
         }
     }
 
-    // Called when splash screen completes
     const handleSplashComplete = () => {
         if (splashingApp) {
-            openWindow(
-                splashingApp.id,
-                splashingApp.title,
-                <splashingApp.component />,
-                splashingApp.icon,
-                { ...splashingApp.defaultWindowOptions, isDefaultTitle: true }
-            )
+            openWindow(splashingApp.id, splashingApp.title, <splashingApp.component />, splashingApp.icon, { ...splashingApp.defaultWindowOptions, isDefaultTitle: true })
             setSplashingApp(null)
         }
     }
 
-    const handleDragEnd = (id: string, x: number, y: number) => {
-        const currentPositions = iconPositions
-        const initialPos = currentPositions[id] || { x: GRID_PADDING, y: GRID_PADDING }
-        
-        // Calculate delta
-        const deltaX = x - initialPos.x
-        const deltaY = y - initialPos.y
-
-        // Determine which items to move
-        // If the dragged item is selected, move all selected items.
-        // Otherwise, just move the dragged item.
-        const itemsToMove = selectedIcons.includes(id) ? selectedIcons : [id]
-        
-        // Create a copy of positions to update
-        let newPositions = { ...currentPositions }
-        
-        itemsToMove.forEach(movingId => {
-            const oldPos = currentPositions[movingId] || { x: GRID_PADDING, y: GRID_PADDING }
-            
-            // Apply delta
-            let targetX = oldPos.x + deltaX
-            let targetY = oldPos.y + deltaY
-            
-            // For the primary dragged item, use the exact drop coordinates
-            if (movingId === id) {
-                targetX = x
-                targetY = y
-            }
-
-            let finalPos: IconPosition
-            if (snapToGrid) {
-                // Find free position that doesn't overlap with others
-                // We pass newPositions so it takes into account other items we just moved (if any)
-                // or existing items.
-                finalPos = findFreePosition(targetX, targetY, movingId, newPositions, currentGridSize, currentGridPadding)
-            } else {
-                // Free placement mode
-                finalPos = { x: Math.max(0, targetX), y: Math.max(0, targetY) }
-            }
-            
-            newPositions[movingId] = finalPos
-        })
-
-        // Update with full state
-        setIconPositions(newPositions)
-    }
-
-    // Render splash screen via portal
     const SplashComponent = splashingApp?.splashScreen
     const splashPortal = mounted && SplashComponent && createPortal(
         <AnimatePresence>
@@ -384,165 +238,95 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
             <div
                 ref={desktopRef}
                 className="fixed inset-0 font-sans overflow-hidden select-none cursor-default z-0"
-                style={{
-                    backgroundColor: 'var(--os-bg-base)',
-                    color: 'var(--os-text-primary)'
-                }}
+                style={{ backgroundColor: 'var(--os-bg-base)', color: 'var(--os-text-primary)' }}
                 onClick={clearSelection}
                 onContextMenu={(e) => {
                     e.preventDefault()
                     showMenu(e.clientX, e.clientY, 'desktop')
                 }}
             >
-                {/* Global Fade In Container */}
-                <div 
+                <div
                     className="absolute inset-0 transition-opacity duration-1000 ease-out"
                     style={{ opacity: isDesktopVisible ? 1 : 0 }}
                 >
-
-                {/* Background Wallpaper */}
-                {wallpaper?.type === 'video' ? (
-                    <video
-                        className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-1000"
-                        src={wallpaper.value}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                    />
-                ) : wallpaper?.type === 'image' ? (
-                    <>
-                        {/* Previous Wallpaper (Background Layer) */}
-                        <div
-                            className="absolute inset-0 transition-all duration-1000 bg-cover bg-center bg-no-repeat"
-                            style={{
-                                backgroundImage: `url(${activeWallpaper})`,
-                                opacity: 1,
-                                backgroundColor: !activeWallpaper ? 'var(--os-bg-base)' : undefined
-                            }}
+                    {/* Background Wallpaper */}
+                    {wallpaper?.type === 'video' ? (
+                        <video
+                            className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-1000"
+                            src={wallpaper.value}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
                         />
-
-                        {/* New Wallpaper (Foreground Layer - Fades In) */}
-                        <div
-                            className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
-                            style={{
-                                backgroundImage: `url(${loadedWallpaper})`,
-                                ...getTransitionStyle(transitionType, !isWallpaperLoading && loadedWallpaper === wallpaper.value)
-                            }}
-                        />
-                    </>
-                ) : (
-                    <div
-                        className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
-                        style={{ background: wallpaper?.value || 'var(--os-bg-base)' }}
-                    />
-                )}
-
-                {/* Ambient Overlay */}
-                <div className="absolute inset-0 pointer-events-none bg-black/10" />
-
-                {/* Weather Widget */}
-                {showWeatherWidget && <WeatherWidget dragConstraintsRef={desktopRef} />}
-
-                {/* Desktop Area */}
-                <div className="absolute inset-0 top-6 bottom-24">
-                    {!isLoading && isLayoutReady && desktopItems.map((item) => {
-                        const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
-                        const isSelected = selectedIcons.includes(item.id)
-
-                        return (
-                            <motion.div
-                                key={item.id}
-                                drag={renamingId !== item.id}
-                                dragMomentum={false}
-                                dragElastic={0}
-                                onDragStart={(e) => {
-                                    isDragging.current = true
-                                    if (!isSelected) {
-                                        setSelectedIcons([item.id])
-                                    }
-                                }}
-                                onDrag={(_, info) => {
-                                    if (!isSelected || selectedIcons.length <= 1) {
-                                        if (snapToGrid) {
-                                            const currentX = pos.x + info.offset.x
-                                            const currentY = pos.y + info.offset.y
-                                            const preview = snapToGridPos(currentX, currentY, currentGridSize, currentGridPadding)
-                                            setDragPreview(preview)
-                                        }
-                                    }
-                                    // Multi-drag visualization is handled by Framer Motion (visual only for dragged item currently)
-                                }}
-                                onDragEnd={(e, info) => {
-                                    // Small delay to prevent click event triggering
-                                    setTimeout(() => {
-                                        isDragging.current = false
-                                        setDragPreview(null)
-                                    }, 50)
-
-                                    const finalX = pos.x + info.offset.x
-                                    const finalY = pos.y + info.offset.y
-                                    handleDragEnd(item.id, finalX, finalY)
-                                }}
-                                initial={{ x: pos.x, y: pos.y }}
-                                animate={{ x: pos.x, y: pos.y }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 500,
-                                    damping: 30,
-                                    // Disable animation when dragging to feel responsive
-                                    x: { duration: isDragging.current ? 0 : undefined },
-                                    y: { duration: isDragging.current ? 0 : undefined }
-                                }}
+                    ) : wallpaper?.type === 'image' ? (
+                        <>
+                            <div
+                                className="absolute inset-0 transition-all duration-1000 bg-cover bg-center bg-no-repeat"
                                 style={{
-                                    width: currentGridSize,
-                                    height: currentGridSize,
-                                    zIndex: isDragging.current ? 50 : 1,
-                                    position: 'absolute'
+                                    backgroundImage: `url(${activeWallpaper})`,
+                                    opacity: 1,
+                                    backgroundColor: !activeWallpaper ? 'var(--os-bg-base)' : undefined
                                 }}
-                            >
-                                <FileGridItem
-                                    item={item}
-                                    selected={isSelected}
-                                    renaming={renamingId === item.id}
-                                    onRename={(newName) => {
-                                        if (newName && newName !== item.name) {
-                                            renameItem(item.id, newName).catch(console.error)
-                                        }
-                                        setRenamingId(null)
-                                    }}
-                                    onCancelRename={() => setRenamingId(null)}
-                                    className={cn(
-                                        "w-full h-full p-2 rounded-lg transition-colors",
-                                        isSelected ? "bg-white/20 ring-1 ring-white/30 backdrop-blur-sm" : "hover:bg-white/10"
-                                    )}
-                                    iconSize={48 * scaleFactor}
-                                    onClick={(e) => handleIconClick(item.id, e)}
-                                    onDoubleClick={() => handleDoubleClick(item.id)}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
-                                    }}
-                                />
-                            </motion.div>
-                        )
-                    })}
-
-                    {/* Drag Preview Ghost */}
-                    {dragPreview && snapToGrid && (
+                            />
+                            <div
+                                className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
+                                style={{
+                                    backgroundImage: `url(${loadedWallpaper})`,
+                                    ...getTransitionStyle(transitionType, !isWallpaperLoading && loadedWallpaper === wallpaper.value)
+                                }}
+                            />
+                        </>
+                    ) : (
                         <div
-                            className="absolute border-2 border-white/30 rounded bg-white/5 pointer-events-none z-0 transition-all duration-150"
-                            style={{
-                                left: dragPreview.x,
-                                top: dragPreview.y,
-                                width: currentGridSize,
-                                height: currentGridSize
-                            }}
+                            className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-50"
+                            style={{ background: wallpaper?.value || 'var(--os-bg-base)' }}
                         />
                     )}
+
+                    <div className="absolute inset-0 pointer-events-none bg-black/10" />
+
+                    {showWeatherWidget && <WeatherWidget dragConstraintsRef={desktopRef} />}
+
+                    <div className="absolute inset-0 top-6 bottom-24">
+                        {!isLoading && isLayoutReady && desktopItems.map((item) => {
+                            const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING } // Default fallback
+                            const isSelected = selectedIcons.includes(item.id)
+
+                            return (
+                                <DesktopIcon
+                                    key={item.id}
+                                    item={item}
+                                    pos={pos}
+                                    isSelected={isSelected}
+                                    scaleFactor={scaleFactor}
+                                    currentGridSize={currentGridSize}
+                                    currentGridPadding={currentGridPadding}
+                                    snapToGrid={snapToGrid}
+                                    onSelect={(id) => {
+                                        if (!isSelected) handleSelect(id)
+                                    }}
+                                    onDragEnd={handleDragEnd}
+                                    onDragPreview={setDragPreview}
+                                    onClick={handleIconClick}
+                                    onDoubleClick={handleDoubleClick}
+                                />
+                            )
+                        })}
+
+                        {dragPreview && snapToGrid && (
+                            <div
+                                className="absolute border-2 border-white/30 rounded bg-white/5 pointer-events-none z-0 transition-all duration-150"
+                                style={{
+                                    left: dragPreview.x,
+                                    top: dragPreview.y,
+                                    width: currentGridSize,
+                                    height: currentGridSize
+                                }}
+                            />
+                        )}
+                    </div>
                 </div>
-                </div> {/* End Global Fade In Container */}
             </div>
             {splashPortal}
         </>

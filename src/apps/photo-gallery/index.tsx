@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Grid, Maximize2, X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { GalleryItem } from './components/GalleryItem'
 
 export default function PhotoGallery() {
   const { files, getChildren } = useFileSystemStore()
@@ -47,6 +48,21 @@ export default function PhotoGallery() {
     }
   }
 
+  // Lightbox content loading
+  const { readFileContent } = useFileSystemStore()
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (selectedId) {
+      const img = images.find(i => i.id === selectedId)
+      if (img) {
+        readFileContent(img.id).then(setLightboxSrc).catch(() => setLightboxSrc(null))
+      }
+    } else {
+      setLightboxSrc(null)
+    }
+  }, [selectedId, images, readFileContent])
+
   return (
     <div className="h-full w-full bg-[#111] text-white flex flex-col pt-10">
       {/* Header / Toolbar */}
@@ -56,7 +72,7 @@ export default function PhotoGallery() {
           <span className="text-xs text-white/40">{images.length} {t('gallery.items')}</span>
         </div>
         <div className="flex gap-2">
-           {/* Toolbar actions could go here */}
+          {/* Toolbar actions could go here */}
         </div>
       </div>
 
@@ -76,20 +92,8 @@ export default function PhotoGallery() {
                 onClick={() => setSelectedId(img.id)}
                 className="aspect-square bg-white/5 rounded-lg overflow-hidden cursor-pointer relative group border border-white/5 hover:border-white/20 transition-colors"
               >
-                {/* Image Placeholder or Real Image */}
-                {img.content?.startsWith('http') ? (
-                  <img 
-                    src={img.content} 
-                    alt={getDisplayName(img)} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-white/5 to-white/10">
-                    <ImageIcon className="text-white/20 mb-2" />
-                    <span className="text-xs text-white/40 truncate w-full text-center px-2">{getDisplayName(img)}</span>
-                  </div>
-                )}
-                
+                <GalleryItem file={img} getDisplayName={getDisplayName} />
+
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Maximize2 className="text-white drop-shadow-lg" size={20} />
                 </div>
@@ -111,7 +115,7 @@ export default function PhotoGallery() {
           >
             {/* Controls */}
             <div className="absolute top-4 right-4 flex gap-4 z-50 pt-8">
-              <button 
+              <button
                 onClick={(e) => { e.stopPropagation(); setSelectedId(null); }}
                 className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors"
               >
@@ -141,21 +145,21 @@ export default function PhotoGallery() {
               className="relative max-w-[90%] max-h-[85%] rounded overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-               {images[selectedIndex]?.content?.startsWith('http') ? (
-                  <img 
-                    src={images[selectedIndex].content} 
-                    alt={getDisplayName(images[selectedIndex])} 
-                    className="max-w-full max-h-[80vh] object-contain" 
-                  />
-               ) : (
-                  <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[#222]">
-                    <ImageIcon size={64} className="text-white/20 mb-4" />
-                    <span className="text-xl text-white/40">{getDisplayName(images[selectedIndex])}</span>
-                  </div>
-               )}
-               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                  <p className="text-white font-medium">{getDisplayName(images[selectedIndex])}</p>
-               </div>
+              {lightboxSrc ? (
+                <img
+                  src={lightboxSrc}
+                  alt={getDisplayName(images[selectedIndex])}
+                  className="max-w-full max-h-[80vh] object-contain"
+                />
+              ) : (
+                <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[#222]">
+                  <ImageIcon size={64} className="text-white/20 mb-4" />
+                  <span className="text-xl text-white/40">{getDisplayName(images[selectedIndex])}</span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                <p className="text-white font-medium">{getDisplayName(images[selectedIndex])}</p>
+              </div>
             </motion.div>
           </motion.div>
         )}

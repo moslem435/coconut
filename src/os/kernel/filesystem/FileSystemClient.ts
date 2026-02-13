@@ -1,4 +1,4 @@
-import { IFileSystem, FileStat } from '../IFileSystem';
+import { IFileSystem, FileStat } from './IFileSystem';
 import { NativeDriver } from './NativeDriver';
 
 /**

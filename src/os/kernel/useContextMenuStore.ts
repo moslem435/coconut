@@ -1,13 +1,15 @@
 import { create } from 'zustand'
 
 export type MenuType = 'desktop' | 'taskbar-icon' | 'window-titlebar' | 'desktop-item' | 'explorer-background' | 'weather-widget' | 'default'
+export type Position = { x: number, y: number }
+export type ContextMenuData = any // Flexible data object for menu context
 
 interface ContextMenuState {
     visible: boolean
-    position: { x: number, y: number }
+    position: Position
     type: MenuType
-    data?: any // e.g., { windowId: string }
-    
+    data?: ContextMenuData
+
     // Actions
     showMenu: (x: number, y: number, type: MenuType, data?: any) => void
     hideMenu: () => void

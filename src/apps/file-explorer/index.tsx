@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useFileSelection } from '@/os/hooks/useFileSelection'
 import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
+import { useClipboardStore } from '@/os/kernel/useClipboardStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
@@ -33,7 +34,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const [currentPathId, setCurrentPathId] = useState(initialPath)
   const [history, setHistory] = useState<string[]>([initialPath])
   const [historyIndex, setHistoryIndex] = useState(0)
-  
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortConfig, setSortConfig] = useState<{ field: SortField, order: SortOrder }>({ field: 'name', order: 'asc' })
   const [searchQuery, setSearchQuery] = useState('')
@@ -48,12 +49,13 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     operations: [],
     cancelRequested: false
   })
-  
+
   // Stores
-  const { 
+  const {
     files, getChildren, getPath, isLoading, loadFolderContent,
-    setClipboard, pasteItems, deleteItem, createItem, moveItem
+    deleteItem, createItem, moveItem
   } = useFileSystemStore()
+  const { setClipboard, pasteItems } = useClipboardStore()
   const { setRenamingId } = useUIStore()
   const launchApp = useWindowStore(state => state.launchApp)
   const focusWindow = useWindowStore(state => state.focusWindow)
@@ -75,7 +77,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   // Search with Fuse.js
   const children = getChildren(currentPathId)
-  
+
   // Sorting Logic
   const sortedChildren = useMemo(() => {
     const items = [...children]
@@ -90,18 +92,18 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           break
         case 'type':
           if (a.type === b.type) {
-             const extA = a.name.split('.').pop() || ''
-             const extB = b.name.split('.').pop() || ''
-             comparison = extA.localeCompare(extB)
+            const extA = a.name.split('.').pop() || ''
+            const extB = b.name.split('.').pop() || ''
+            comparison = extA.localeCompare(extB)
           } else {
             comparison = a.type === 'folder' ? -1 : 1
           }
           break
         case 'size':
-           const sizeA = a.size ?? (a.content?.length || 0)
-           const sizeB = b.size ?? (b.content?.length || 0)
-           comparison = sizeA - sizeB
-           break
+          const sizeA = a.size || 0
+          const sizeB = b.size || 0
+          comparison = sizeA - sizeB
+          break
       }
       return sortConfig.order === 'asc' ? comparison : -comparison
     })
@@ -191,7 +193,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     if (files[id]?.type === 'folder') {
       const targetPath = useFileSystemStore.getState().resolvePath(id)
       const needsPermission = await fs.verifyPermission(targetPath)
-      
+
       if (!needsPermission) {
         const granted = await fs.requestPermission(targetPath)
         if (!granted) {
@@ -202,13 +204,13 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           return
         }
       }
-      
+
       // Update History
       const newHistory = history.slice(0, historyIndex + 1)
       newHistory.push(id)
       setHistory(newHistory)
       setHistoryIndex(newHistory.length - 1)
-      
+
       setCurrentPathId(id)
       clearSelection() // Clear selection on navigate
     }
@@ -277,7 +279,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       const isImage = /\.(jpg|jpeg|png|gif|webp|svg|ico|bmp)$/i.test(item.name)
 
       if (isText && !isImage) {
-         launchApp(
+        launchApp(
           'notepad-' + item.id,
           item.name,
           <Notepad fileId={item.id} />,
@@ -318,7 +320,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     const confirmed = await useDialogStore.getState().openConfirm(
       t('explorer.delete_confirm') || `Delete ${selectedIds.length} item(s)?`
     )
-    
+
     if (!confirmed) return
 
     const operations: BatchOperation[] = selectedIds.map(id => ({
@@ -418,7 +420,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         try {
           const file = files[i]
           let content = ''
-          
+
           // Check if file is an image
           if (file.type.startsWith('image/')) {
             content = await new Promise((resolve) => {
@@ -431,7 +433,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           }
 
           await createItem(currentPathId, file.name, 'file', content)
-          
+
           setBatchProgress(prev => ({
             ...prev,
             operations: prev.operations.map((op, idx) =>
@@ -504,12 +506,12 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const currentFolder = files[currentPathId] || files['root']
 
   return (
-    <div 
+    <div
       className="h-full flex flex-col bg-[#191919] text-white pt-10 relative"
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* Top Toolbar */}
-      <Toolbar 
+      <Toolbar
         currentPath={path}
         onNavigate={handleNavigate}
         onUp={handleUp}
@@ -531,7 +533,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* Sidebar */}
-        <Sidebar 
+        <Sidebar
           currentPathId={currentPathId}
           onNavigate={handleNavigate}
         />
@@ -545,12 +547,12 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           />
 
           {isLoading ? (
-             <div className="h-full flex flex-col items-center justify-center text-white/30">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50 mb-4" />
-               <span className="text-sm">Loading...</span>
-             </div>
+            <div className="h-full flex flex-col items-center justify-center text-white/30">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50 mb-4" />
+              <span className="text-sm">Loading...</span>
+            </div>
           ) : (
-            <FileList 
+            <FileList
               items={filteredChildren}
               viewMode={viewMode}
               sortConfig={sortConfig}
@@ -567,7 +569,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       </div>
 
       {/* Status Bar */}
-      <StatusBar 
+      <StatusBar
         totalItems={children.length}
         selectedItems={children.filter(c => selectedIds.includes(c.id))}
       />

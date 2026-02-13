@@ -104,7 +104,7 @@ const writeWeatherCache = (cache: WeatherCache) => {
 }
 
 interface WeatherWidgetProps {
-  dragConstraintsRef?: React.RefObject<HTMLDivElement>
+  dragConstraintsRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps) {
@@ -195,7 +195,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
 
       // 2. Get Weather via Open-Meteo
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
-      
+
       const weatherRes = await fetch(weatherUrl)
       if (!weatherRes.ok) throw new Error('Weather fetch failed')
       const weatherData = await weatherRes.json()
@@ -310,7 +310,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
     >
       {/* Main Card Content */}
       <div className="p-4 w-64 text-white hover:bg-white/5 transition-colors group">
-        
+
         {/* Header: Location & Status */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex flex-col">
@@ -331,7 +331,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
             )}
           </div>
           <div className="p-2 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors">
-             <CurrentIcon size={32} className={currentInfo.color} />
+            <CurrentIcon size={32} className={currentInfo.color} />
           </div>
         </div>
 
@@ -370,7 +370,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
             const DayIcon = dayInfo.icon
             const dateObj = new Date(day.date)
             const dayName = dateObj.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short' })
-            
+
             return (
               <div key={i} className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-white/40">{dayName}</span>

@@ -8,11 +8,11 @@ interface StatusBarProps {
 
 export default function StatusBar({ totalItems, selectedItems }: StatusBarProps) {
   const selectedCount = selectedItems.length
-  
+
   // Calculate total size of selected files
   const selectedSize = selectedItems.reduce((acc, item) => {
     if (item.type === 'file') {
-      return acc + (item.size ?? (item.content?.length || 0))
+      return acc + (item.size || 0)
     }
     return acc
   }, 0)

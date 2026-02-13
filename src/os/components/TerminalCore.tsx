@@ -18,26 +18,26 @@ const THEMES = {
 }
 
 interface TerminalCoreProps {
-    className?: string
-    style?: React.CSSProperties
-    initialCwd?: string
-    initialWelcome?: boolean
+  className?: string
+  style?: React.CSSProperties
+  initialCwd?: string
+  initialWelcome?: boolean
 }
 
-export const TerminalCore: React.FC<TerminalCoreProps> = ({ 
-    className, 
-    style, 
-    initialCwd = 'root', 
-    initialWelcome = true 
+export const TerminalCore: React.FC<TerminalCoreProps> = ({
+  className,
+  style,
+  initialCwd = 'root',
+  initialWelcome = true
 }) => {
   const { t } = useLanguage()
   const [history, setHistory] = useState<TerminalHistory[]>(
-    initialWelcome 
-    ? [
+    initialWelcome
+      ? [
         { type: 'output', content: t('terminal.welcome') },
         { type: 'output', content: t('terminal.help') },
       ]
-    : []
+      : []
   )
   const [input, setInput] = useState('')
   const [currentDirId, setCurrentDirId] = useState(initialCwd)
@@ -45,21 +45,21 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [theme, setTheme] = useState<keyof typeof THEMES>('default')
-  
+
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  
-  const { files, rootId, getChildren, getItem, getPath, createItem } = useFileSystemStore()
+
+  const { files, rootId, getChildren, getItem, getPath, createItem, readFileContent } = useFileSystemStore()
 
   // Initialize cwdPath
   useEffect(() => {
     if (initialCwd === rootId) {
-        setCwdPath('/')
+      setCwdPath('/')
     } else {
-        // Resolve path string from ID
-        const pathNodes = getPath(initialCwd)
-        const pathStr = pathNodes.slice(1).map(n => n.name).join('/')
-        setCwdPath('/' + pathStr)
+      // Resolve path string from ID
+      const pathNodes = getPath(initialCwd)
+      const pathStr = pathNodes.slice(1).map(n => n.name).join('/')
+      setCwdPath('/' + pathStr)
     }
   }, [initialCwd, rootId, getPath])
 
@@ -96,7 +96,7 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
   const resolvePath = (path: string): string | null => {
     const parts = path.split('/').filter(p => p.length > 0)
     let currentId = path.startsWith('/') ? rootId : currentDirId
-    
+
     for (const part of parts) {
       if (part === '.') continue
       if (part === '..') {
@@ -106,7 +106,7 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
         }
         continue
       }
-      
+
       const children = getChildren(currentId)
       const found = children.find(c => c.name === part)
       if (found) {
@@ -129,7 +129,7 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
     return '/' + pathStr
   }
 
-  const handleCommand = (cmdStr: string) => {
+  const handleCommand = async (cmdStr: string) => {
     const trimmed = cmdStr.trim()
     if (!trimmed) {
       setHistory(prev => [...prev, { type: 'input', content: '', cwd: cwdPath }])
@@ -139,62 +139,63 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
     setCommandHistory(prev => [trimmed, ...prev])
     setHistoryIndex(-1)
 
+    // Add input to history immediately
+    setHistory(prev => [...prev, { type: 'input', content: cmdStr, cwd: cwdPath }])
+
+    // Utility to add output
+    const addOutput = (content: string) => {
+      setHistory(prev => [...prev, { type: 'output', content }])
+    }
+
     // Handle Redirect >
     if (trimmed.includes('>')) {
-        const [left, right] = trimmed.split('>').map(s => s.trim())
-        if (left && right) {
-            if (left.startsWith('echo ')) {
-                const content = left.substring(5).replace(/^['"]|['"]$/g, '')
-                createItem(currentDirId, right, 'file', content)
-                setHistory(prev => [
-                    ...prev, 
-                    { type: 'input', content: trimmed, cwd: cwdPath },
-                    { type: 'output', content: '' }
-                ])
-                return
-            }
+      const [left, right] = trimmed.split('>').map(s => s.trim())
+      if (left && right) {
+        if (left.startsWith('echo ')) {
+          const content = left.substring(5).replace(/^['"]|['"]$/g, '')
+          await createItem(currentDirId, right, 'file', content)
+          return
         }
+      }
     }
 
     const [cmd, ...args] = trimmed.split(' ')
     const argStr = args.join(' ')
-    
-    const newHistory: TerminalHistory[] = [...history, { type: 'input', content: cmdStr, cwd: cwdPath }]
 
     switch (cmd) {
       case 'help':
-        newHistory.push({ type: 'output', content: t('terminal.help.desc') + '\n\nAvailable commands: help, clear, echo, whoami, date, pwd, ls, cd, cat, pkg, git, theme' })
+        addOutput(t('terminal.help.desc') + '\n\nAvailable commands: help, clear, echo, whoami, date, pwd, ls, cd, cat, pkg, git, theme')
         break
       case 'clear':
         setHistory([])
-        return 
+        return
       case 'echo':
-        newHistory.push({ type: 'output', content: argStr.replace(/^['"]|['"]$/g, '') })
+        addOutput(argStr.replace(/^['"]|['"]$/g, ''))
         break
       case 'whoami':
-        newHistory.push({ type: 'output', content: t('terminal.guest') })
+        addOutput(t('terminal.guest'))
         break
       case 'date':
-        newHistory.push({ type: 'output', content: new Date().toString() })
+        addOutput(new Date().toString())
         break
       case 'pwd':
-        newHistory.push({ type: 'output', content: cwdPath })
+        addOutput(cwdPath)
         break
       case 'ls': {
         const targetId = args.length > 0 ? resolvePath(args[0]) : currentDirId
         if (!targetId) {
-          newHistory.push({ type: 'output', content: `${t('terminal.ls.error')} '${args[0]}': ${t('terminal.cd.error')}` })
+          addOutput(`${t('terminal.ls.error')} '${args[0]}': ${t('terminal.cd.error')}`)
         } else {
           const item = getItem(targetId)
           if (item?.type === 'file') {
-             newHistory.push({ type: 'output', content: getDisplayName(item) })
+            addOutput(getDisplayName(item))
           } else {
             const children = getChildren(targetId)
             const list = children.map(c => {
               const name = getDisplayName(c)
               return c.type === 'folder' ? name + '/' : name
             }).join('  ')
-            newHistory.push({ type: 'output', content: list })
+            addOutput(list)
           }
         }
         break
@@ -207,11 +208,11 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
         }
         const targetId = resolvePath(argStr)
         if (!targetId) {
-           newHistory.push({ type: 'output', content: `${t('terminal.cd.error')}: ${argStr}` })
+          addOutput(`${t('terminal.cd.error')}: ${argStr}`)
         } else {
           const item = getItem(targetId)
           if (item?.type !== 'folder') {
-             newHistory.push({ type: 'output', content: `${t('terminal.cd.notdir')}: ${argStr}` })
+            addOutput(`${t('terminal.cd.notdir')}: ${argStr}`)
           } else {
             setCurrentDirId(targetId)
             setCwdPath(getDisplayPath(targetId))
@@ -221,50 +222,54 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
       }
       case 'cat': {
         if (!argStr) {
-           newHistory.push({ type: 'output', content: t('terminal.cat.missing') })
-           break
+          addOutput(t('terminal.cat.missing'))
+          break
         }
         const targetId = resolvePath(argStr)
         if (!targetId) {
-           newHistory.push({ type: 'output', content: `${t('terminal.cat.error')}: ${argStr}` })
+          addOutput(`${t('terminal.cat.error')}: ${argStr}`)
         } else {
-           const item = getItem(targetId)
-           if (item?.type === 'folder') {
-             newHistory.push({ type: 'output', content: `${t('terminal.cat.isdir')}: ${argStr}` })
-           } else {
-             newHistory.push({ type: 'output', content: item?.content || '' })
-           }
+          const item = getItem(targetId)
+          if (item?.type === 'folder') {
+            addOutput(`${t('terminal.cat.isdir')}: ${argStr}`)
+          } else {
+            try {
+              const content = await readFileContent(targetId)
+              addOutput(content)
+            } catch (e) {
+              addOutput('')
+            }
+          }
         }
         break
       }
       case 'pkg':
         if (args[0] === 'install') {
-            newHistory.push({ type: 'output', content: `Installing ${args[1] || 'packages'}...\n[####################] 100%\nDone.` })
+          addOutput(`Installing ${args[1] || 'packages'}...\n[####################] 100%\nDone.`)
         } else {
-            newHistory.push({ type: 'output', content: 'usage: pkg install <package_name>' })
+          addOutput('usage: pkg install <package_name>')
         }
         break
       case 'git':
         if (args[0] === 'status') {
-             newHistory.push({ type: 'output', content: 'On branch main\nYour branch is up to date with \'origin/main\'.\n\nNothing to commit, working tree clean' })
+          addOutput('On branch main\nYour branch is up to date with \'origin/main\'.\n\nNothing to commit, working tree clean')
         } else if (args[0] === 'clone') {
-             newHistory.push({ type: 'output', content: `Cloning into '${args[1] || 'repo'}'...\nremote: Enumerating objects: 100, done.\nremote: Total 100 (delta 0), reused 0 (delta 0)\nReceiving objects: 100% (100/100), done.` })
+          addOutput(`Cloning into '${args[1] || 'repo'}'...\nremote: Enumerating objects: 100, done.\nremote: Total 100 (delta 0), reused 0 (delta 0)\nReceiving objects: 100% (100/100), done.`)
         } else {
-            newHistory.push({ type: 'output', content: 'git: ' + (args[0] ? `'${args[0]}' is not a git command.` : 'usage: git <command>') })
+          addOutput('git: ' + (args[0] ? `'${args[0]}' is not a git command.` : 'usage: git <command>'))
         }
         break
       case 'theme':
         if (THEMES[args[0] as keyof typeof THEMES]) {
-            setTheme(args[0] as keyof typeof THEMES)
-            newHistory.push({ type: 'output', content: `Theme changed to ${args[0]}` })
+          setTheme(args[0] as keyof typeof THEMES)
+          addOutput(`Theme changed to ${args[0]}`)
         } else {
-             newHistory.push({ type: 'output', content: `Available themes: ${Object.keys(THEMES).join(', ')}` })
+          addOutput(`Available themes: ${Object.keys(THEMES).join(', ')}`)
         }
         break
       default:
-        newHistory.push({ type: 'output', content: `${cmd}: ${t('terminal.notfound')}` })
+        addOutput(`${cmd}: ${t('terminal.notfound')}`)
     }
-    setHistory(newHistory)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -272,46 +277,46 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
       handleCommand(input)
       setInput('')
     } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        if (commandHistory.length > 0) {
-            const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1)
-            setHistoryIndex(newIndex)
-            setInput(commandHistory[newIndex])
-        }
+      e.preventDefault()
+      if (commandHistory.length > 0) {
+        const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1)
+        setHistoryIndex(newIndex)
+        setInput(commandHistory[newIndex])
+      }
     } else if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        if (historyIndex > 0) {
-            const newIndex = historyIndex - 1
-            setHistoryIndex(newIndex)
-            setInput(commandHistory[newIndex])
-        } else if (historyIndex === 0) {
-            setHistoryIndex(-1)
-            setInput('')
-        }
+      e.preventDefault()
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1
+        setHistoryIndex(newIndex)
+        setInput(commandHistory[newIndex])
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1)
+        setInput('')
+      }
     } else if (e.key === 'Tab') {
-        e.preventDefault()
-        const parts = input.split(' ')
-        const lastPart = parts[parts.length - 1]
-        if (lastPart) {
-            const children = getChildren(currentDirId)
-            const match = children.find(c => c.name.startsWith(lastPart))
-            if (match) {
-                parts[parts.length - 1] = match.name
-                setInput(parts.join(' '))
-            }
+      e.preventDefault()
+      const parts = input.split(' ')
+      const lastPart = parts[parts.length - 1]
+      if (lastPart) {
+        const children = getChildren(currentDirId)
+        const match = children.find(c => c.name.startsWith(lastPart))
+        if (match) {
+          parts[parts.length - 1] = match.name
+          setInput(parts.join(' '))
         }
+      }
     }
   }
 
   const currentTheme = THEMES[theme]
 
   return (
-    <div 
+    <div
       className={`font-mono text-sm p-2 overflow-auto flex flex-col transition-colors duration-300 ${className}`}
-      style={{ 
-          backgroundColor: `${currentTheme.bg}D9`, 
-          color: currentTheme.fg,
-          ...style
+      style={{
+        backgroundColor: `${currentTheme.bg}D9`,
+        color: currentTheme.fg,
+        ...style
       }}
       onClick={handleContainerClick}
     >
@@ -329,7 +334,7 @@ export const TerminalCore: React.FC<TerminalCoreProps> = ({
           </div>
         ))}
       </div>
-      
+
       <div className="flex mt-1">
         <span className="mr-2 whitespace-nowrap" style={{ color: currentTheme.prompt }}>guest@system:{cwdPath}$</span>
         <input

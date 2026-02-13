@@ -1,326 +1,211 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
-import { useFileSystemStore, FileNode } from '@/os/kernel/useFileSystemStore'
-import { Folder, FileCode, ChevronRight, ChevronDown, Search, Menu, X, Save, Play, Terminal as TerminalIcon } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useShortcuts } from '@/os/kernel/useShortcuts'
 import { FilePickerDialog } from '@/os/ui/dialogs/FilePickerDialog'
 import dynamic from 'next/dynamic'
+
+import { ActivityBar } from './components/ActivityBar'
+import { Sidebar } from './components/Sidebar'
+import { TitleBar } from './components/TitleBar'
+import { TabBar } from './components/TabBar'
+import { StatusBar } from './components/StatusBar'
+import { EditorComponent } from './components/Editor'
+import { VSCODE_COLORS } from './constants'
 
 // Dynamically import XTerm
 const XTerm = dynamic(() => import('@/os/components/XTerm'), {
   ssr: false,
-  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Node.js...</div>
+  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Terminal...</div>
 })
 
-// --- Syntax Highlighting Helper (Simple Regex Based) ---
-const highlightCode = (code: string, lang: string) => {
-  if (!code) return ''
-  
-  // Basic tokenization for JS/TS
-  let html = code
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+export default function VSCode() {
+  const { files, getItem, updateFileContent, readFileContent } = useFileSystemStore()
+  const { t } = useLanguage()
 
-  // Comments
-  html = html.replace(/(\/\/.*)/g, '<span class="text-green-600">$1</span>')
-  
-  // Keywords
-  const keywords = /\b(import|export|const|let|var|function|return|if|else|for|while|switch|case|break|default|try|catch|async|await|interface|type|from)\b/g
-  html = html.replace(keywords, '<span class="text-pink-500 font-bold">$1</span>')
-
-  // Functions
-  html = html.replace(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)(?=\()/g, '<span class="text-blue-400">$1</span>')
-
-  // Strings
-  html = html.replace(/(['"`])(.*?)\1/g, '<span class="text-orange-400">$1$2$1</span>')
-
-  // Numbers
-  html = html.replace(/\b(\d+)\b/g, '<span class="text-purple-400">$1</span>')
-  
-  // React Components (Capitalized words)
-  html = html.replace(/\b([A-Z][a-zA-Z0-9]*)\b/g, '<span class="text-yellow-400">$1</span>')
-
-  return html
-}
-
-export default function VSCodeLite() {
-  const { files, rootId, getChildren, getItem, updateFileContent } = useFileSystemStore()
+  // State
+  const [activeView, setActiveView] = useState<'explorer' | 'search' | 'git' | 'debug' | 'extensions'>('explorer')
   const [activeFileId, setActiveFileId] = useState<string | null>(null)
   const [openFiles, setOpenFiles] = useState<string[]>([])
   const [content, setContent] = useState('')
   const [unsavedChanges, setUnsavedChanges] = useState<Record<string, string>>({}) // fileId -> content
   const [showTerminal, setShowTerminal] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const { t } = useLanguage()
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 })
 
-  // Sidebar state
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ [rootId]: true })
+  // --- Handlers ---
 
-  // Load file content when active tab changes
+  const handleFileSelect = useCallback((id: string) => {
+    if (!openFiles.includes(id)) {
+      setOpenFiles(prev => [...prev, id])
+    }
+    setActiveFileId(id)
+  }, [openFiles])
+
+  const handleCloseFile = useCallback((id: string) => {
+    const newOpen = openFiles.filter(fid => fid !== id)
+    setOpenFiles(newOpen)
+    
+    if (activeFileId === id) {
+      setActiveFileId(newOpen[newOpen.length - 1] || null)
+    }
+    
+    // Optional: Warn about unsaved changes? For now, we discard them or keep them?
+    // VS Code keeps them in memory usually until closed. If closed, it prompts.
+    // Here we will just discard for simplicity, or maybe keep them in unsavedChanges map?
+    // If we keep them, next time we open, they are there. That's better.
+  }, [openFiles, activeFileId])
+
+  const handleSave = useCallback(async () => {
+    if (activeFileId && unsavedChanges[activeFileId] !== undefined) {
+      const contentToSave = unsavedChanges[activeFileId]
+      await updateFileContent(activeFileId, contentToSave)
+      
+      setUnsavedChanges(prev => {
+        const next = { ...prev }
+        delete next[activeFileId]
+        return next
+      })
+    }
+  }, [activeFileId, unsavedChanges, updateFileContent])
+
+  const handleContentChange = useCallback((newContent: string | undefined) => {
+    if (newContent === undefined) return
+    setContent(newContent)
+    if (activeFileId) {
+      setUnsavedChanges(prev => ({ ...prev, [activeFileId]: newContent }))
+    }
+  }, [activeFileId])
+
+  const handleOpenFile = () => setPickerOpen(true)
+
+  const handleFilePickerConfirm = (pathOrId: string) => {
+    const file = getItem(pathOrId)
+    if (file && file.type === 'file') {
+      handleFileSelect(pathOrId)
+    }
+    setPickerOpen(false)
+  }
+
+  // --- Shortcuts ---
+  useShortcuts({
+    'Ctrl+S': (e) => { e.preventDefault(); handleSave() },
+    'Meta+S': (e) => { e.preventDefault(); handleSave() },
+    'Ctrl+P': (e) => { e.preventDefault(); handleOpenFile() },
+    'Meta+P': (e) => { e.preventDefault(); handleOpenFile() },
+  })
+
+  // --- Effects ---
+
+  // Load content when active file changes
   useEffect(() => {
+    let mounted = true
     if (activeFileId) {
       if (unsavedChanges[activeFileId] !== undefined) {
         setContent(unsavedChanges[activeFileId])
       } else {
-        const file = getItem(activeFileId)
-        setContent(file?.content || '')
+        readFileContent(activeFileId).then(c => {
+          if (mounted) setContent(c)
+        }).catch(() => {
+          if (mounted) setContent('')
+        })
       }
     } else {
       setContent('')
     }
-  }, [activeFileId])
+    return () => { mounted = false }
+  }, [activeFileId]) // Only when file changes
 
-  const handleFileClick = (id: string) => {
-    if (!openFiles.includes(id)) {
-      setOpenFiles([...openFiles, id])
-    }
-    setActiveFileId(id)
-  }
-
-  const handleCloseFile = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    const newOpen = openFiles.filter(fid => fid !== id)
-    setOpenFiles(newOpen)
-    if (activeFileId === id) {
-      setActiveFileId(newOpen[newOpen.length - 1] || null)
-    }
-    // Note: Discarding unsaved changes for simplicity in "Lite" version
-    if (unsavedChanges[id]) {
-        const newUnsaved = { ...unsavedChanges }
-        delete newUnsaved[id]
-        setUnsavedChanges(newUnsaved)
-    }
-  }
-
-  const toggleFolder = (id: string) => {
-    setExpandedFolders(prev => ({ ...prev, [id]: !prev[id] }))
-  }
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent)
-    if (activeFileId) {
-        setUnsavedChanges(prev => ({ ...prev, [activeFileId]: newContent }))
-    }
-  }
-
-  const handleSave = () => {
-    if (activeFileId) {
-        updateFileContent(activeFileId, content)
-        const newUnsaved = { ...unsavedChanges }
-        delete newUnsaved[activeFileId]
-        setUnsavedChanges(newUnsaved)
-    }
-  }
-
-  const handleOpenFile = () => {
-      setPickerOpen(true)
-  }
-
-  const handleFilePickerConfirm = (pathOrId: string, name?: string) => {
-      // Logic to open file
-      const file = getItem(pathOrId)
-      if (file && file.type === 'file') {
-          handleFileClick(pathOrId)
-      }
-      setPickerOpen(false)
-  }
-
-  // File Tree Recursive Component
-  const FileTreeItem = ({ id, depth = 0 }: { id: string, depth?: number }) => {
-    const item = files[id]
-    if (!item) return null
-
-    const isFolder = item.type === 'folder'
-    const isExpanded = expandedFolders[id]
-    const paddingLeft = `${depth * 12 + 10}px`
-
-    if (isFolder) {
-      const children = getChildren(id)
-      return (
-        <div>
-          <div 
-            className="flex items-center gap-1 py-0.5 hover:bg-[#2a2d2e] cursor-pointer text-gray-300 text-sm select-none"
-            style={{ paddingLeft }}
-            onClick={() => toggleFolder(id)}
-          >
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            <span className="font-bold text-xs">{item.name.toUpperCase()}</span>
-          </div>
-          {isExpanded && children.map(child => (
-            <FileTreeItem key={child.id} id={child.id} depth={depth + 1} />
-          ))}
-        </div>
-      )
-    } else {
-      return (
-        <div 
-          className={`flex items-center gap-2 py-1 hover:bg-[#2a2d2e] cursor-pointer text-sm ${activeFileId === id ? 'bg-[#37373d] text-white' : 'text-gray-400'}`}
-          style={{ paddingLeft }}
-          onClick={() => handleFileClick(id)}
-        >
-          <FileCode size={14} className="text-blue-400" />
-          <span>{item.name}</span>
-        </div>
-      )
-    }
-  }
+  // Derived state for current file
+  const activeFile = activeFileId ? files[activeFileId] : null
+  const language = activeFile ? (activeFile.name.split('.').pop() || 'plaintext') : 'plaintext'
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#3c3c3c] text-[#cccccc] font-sans pt-10">
-      {/* Top Bar (Menu & Actions) */}
-      <div className="h-8 bg-[#3c3c3c] flex items-center px-2 text-xs select-none justify-between">
-         <div className="flex gap-4">
-             <Menu size={14} className="cursor-pointer" />
-             <span className="cursor-pointer hover:text-white" onClick={handleOpenFile}>{t('vscode.file')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.edit')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.selection')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.view')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.go')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.run')}</span>
-             <span className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(!showTerminal)}>{t('vscode.terminal')}</span>
-             <span className="cursor-pointer hover:text-white">{t('vscode.help')}</span>
-         </div>
-         <div className="flex gap-2">
-            <button onClick={handleSave} className="hover:text-white" title={t('vscode.save')}>
-                <Save size={14} />
-            </button>
-            <button onClick={() => setShowTerminal(!showTerminal)} className={`hover:text-white ${showTerminal ? 'text-blue-400' : ''}`} title={t('vscode.terminal')}>
-                <TerminalIcon size={14} />
-            </button>
-            <button className="hover:text-green-400" title={t('vscode.runcode')}>
-                <Play size={14} />
-            </button>
-         </div>
-      </div>
+    <div className="h-full w-full flex flex-col font-sans text-[#cccccc] pt-10" style={{ backgroundColor: VSCODE_COLORS.bg }}>
+      
+      {/* Top Bar */}
+      <TitleBar 
+        onOpenFile={handleOpenFile}
+        onSave={handleSave}
+        onToggleTerminal={() => setShowTerminal(!showTerminal)}
+        showTerminal={showTerminal}
+      />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* Activity Bar */}
+        <ActivityBar activeView={activeView} onChangeView={setActiveView} />
+        
         {/* Sidebar */}
-        <div className="w-60 bg-[#252526] flex flex-col border-r border-[#1e1e1e]">
-            <div className="text-xs font-bold p-2 uppercase tracking-wider text-gray-500">{t('vscode.explorer')}</div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <FileTreeItem id={rootId} />
-            </div>
-        </div>
+        <Sidebar 
+          activeView={activeView} 
+          activeFileId={activeFileId} 
+          onFileSelect={handleFileSelect} 
+        />
 
-        {/* Editor Area */}
+        {/* Main Editor Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#1e1e1e]">
-            {/* Tabs */}
-            <div className="flex bg-[#252526] overflow-x-auto no-scrollbar">
-                {openFiles.map(fid => {
-                    const file = files[fid]
-                    const isActive = activeFileId === fid
-                    const isDirty = unsavedChanges[fid] !== undefined
-                    return (
-                        <div 
-                            key={fid}
-                            onClick={() => setActiveFileId(fid)}
-                            className={`
-                                group flex items-center gap-2 px-3 py-2 min-w-[120px] max-w-[200px] border-r border-[#1e1e1e] cursor-pointer text-sm select-none
-                                ${isActive ? 'bg-[#1e1e1e] text-white border-t-2 border-t-blue-500' : 'bg-[#2d2d2d] text-gray-400 hover:bg-[#2a2d2e]'}
-                            `}
-                        >
-                            <FileCode size={14} className={isActive ? 'text-yellow-400' : 'text-gray-500'} />
-                            <span className="truncate flex-1">{file?.name || t('vscode.deleted')}</span>
-                            <div 
-                                onClick={(e) => handleCloseFile(e, fid)}
-                                className={`opacity-0 group-hover:opacity-100 p-0.5 rounded-md hover:bg-gray-600 ${isDirty ? 'opacity-100' : ''}`}
-                            >
-                                {isDirty ? <div className="w-2 h-2 rounded-full bg-white mb-0.5 mx-1" /> : <X size={14} />}
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
+          {/* Tabs */}
+          <TabBar 
+            openFiles={openFiles}
+            activeFileId={activeFileId}
+            unsavedChanges={Object.keys(unsavedChanges).reduce((acc, key) => ({...acc, [key]: true}), {})}
+            onSelect={setActiveFileId}
+            onClose={handleCloseFile}
+          />
 
-            {/* Code Editor */}
-            {activeFileId ? (
-                <div className="flex-1 relative overflow-hidden text-sm font-mono leading-6">
-                    {/* Line Numbers */}
-                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-[#1e1e1e] text-gray-600 text-right pr-3 select-none pt-4">
-                        {content.split('\n').map((_, i) => (
-                            <div key={i}>{i + 1}</div>
-                        ))}
-                    </div>
-
-                    {/* Editor Container */}
-                    <div className="absolute left-12 right-0 top-0 bottom-0 overflow-auto custom-scrollbar">
-                        <div className="relative min-h-full w-full">
-                            {/* Syntax Highlighting Layer (Underlay) */}
-                            <pre 
-                                className="absolute top-0 left-0 m-0 p-4 pointer-events-none w-full h-full whitespace-pre font-inherit text-transparent"
-                                aria-hidden="true"
-                                dangerouslySetInnerHTML={{ __html: highlightCode(content, 'javascript') }}
-                                style={{ color: 'transparent' }} // Text is transparent, only spans have color? No, we need to make base text transparent but spans visible. 
-                                // Actually, standard trick is:
-                                // Pre: visible colors, pointer-events-none
-                                // Textarea: transparent text, visible caret, z-index top
-                            />
-                            
-                            {/* Visual Layer (Pre) */}
-                             <pre 
-                                className="absolute top-0 left-0 m-0 p-4 pointer-events-none w-full min-h-full whitespace-pre font-inherit z-0"
-                                dangerouslySetInnerHTML={{ __html: highlightCode(content, 'javascript') }}
-                            />
-
-                            {/* Input Layer (Textarea) */}
-                            <textarea
-                                className="absolute top-0 left-0 m-0 p-4 w-full h-full min-h-full resize-none bg-transparent text-transparent caret-white outline-none z-10 font-inherit overflow-hidden whitespace-pre"
-                                value={content}
-                                onChange={(e) => handleContentChange(e.target.value)}
-                                spellCheck={false}
-                                autoCapitalize="off"
-                                autoComplete="off"
-                            />
-                        </div>
-                    </div>
-                </div>
+          {/* Editor or Welcome Screen */}
+          <div className="flex-1 relative overflow-hidden">
+            {activeFileId && activeFile ? (
+              <EditorComponent 
+                fileId={activeFileId}
+                fileName={activeFile.name}
+                content={content}
+                onChange={handleContentChange}
+                onSave={handleSave}
+              />
             ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-600 select-none">
-                    <div className="text-6xl mb-4 font-thin">{t('vscode.welcome')}</div>
-                    <div className="text-sm">{t('vscode.start')}</div>
-                    <div className="mt-8 text-xs flex flex-col gap-2">
-                        <div className="flex gap-2"><span>{t('vscode.commands')}</span><span className="bg-[#333] px-1 rounded">Ctrl+Shift+P</span></div>
-                        <div className="flex gap-2"><span>{t('vscode.gofile')}</span><span className="bg-[#333] px-1 rounded">Ctrl+P</span></div>
-                    </div>
+              <div className="h-full w-full flex flex-col items-center justify-center text-gray-600 select-none bg-[#1e1e1e]">
+                <div className="text-6xl mb-4 font-thin">VS Code</div>
+                <div className="text-sm">{t('vscode.start')}</div>
+                <div className="mt-8 text-xs flex flex-col gap-2">
+                  <div className="flex gap-2"><span>{t('vscode.commands')}</span><span className="bg-[#333] px-1 rounded">Ctrl+Shift+P</span></div>
+                  <div className="flex gap-2"><span>{t('vscode.gofile')}</span><span className="bg-[#333] px-1 rounded">Ctrl+P</span></div>
                 </div>
+              </div>
             )}
+          </div>
 
-            {/* Terminal Panel */}
-            {showTerminal && (
-                <div className="h-48 border-t border-[#3c3c3c] bg-[#1e1e1e] flex flex-col">
-                     <div className="flex items-center justify-between px-2 py-1 bg-[#252526] text-xs uppercase tracking-wider text-gray-400 select-none">
-                         <div className="flex gap-4">
-                             <span className="text-white font-bold border-b border-white cursor-pointer">{t('vscode.terminal')}</span>
-                             <span className="cursor-pointer hover:text-white">{t('vscode.output')}</span>
-                             <span className="cursor-pointer hover:text-white">{t('vscode.problems')}</span>
-                         </div>
-                         <div className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(false)}>
-                             <X size={12} />
-                         </div>
-                     </div>
-                     <div className="flex-1 overflow-hidden">
-                        <XTerm className="h-full w-full" style={{ backgroundColor: '#1e1e1e' }} />
-                     </div>
+          {/* Terminal Panel */}
+          {showTerminal && (
+            <div className="h-48 border-t border-[#3c3c3c] bg-[#1e1e1e] flex flex-col shrink-0">
+               <div className="flex items-center justify-between px-2 py-1 bg-[#252526] text-xs uppercase tracking-wider text-gray-400 select-none">
+                <div className="flex gap-4">
+                  <span className="text-white font-bold border-b border-white cursor-pointer">{t('vscode.terminal')}</span>
+                  <span className="cursor-pointer hover:text-white">{t('vscode.output')}</span>
+                  <span className="cursor-pointer hover:text-white">{t('vscode.problems')}</span>
                 </div>
-            )}
+                <div className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(false)}>
+                  <span className="text-xs">×</span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden p-2">
+                <XTerm className="h-full w-full" style={{ backgroundColor: '#1e1e1e' }} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
-      
+
       {/* Status Bar */}
-      <div className="h-6 bg-[#007acc] flex items-center justify-between px-3 text-xs text-white select-none">
-          <div className="flex gap-4">
-            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-white flex items-center justify-center text-[8px]">×</div> 0</div>
-            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-white flex items-center justify-center text-[8px]">!</div> 0</div>
-          </div>
-          <div className="flex gap-4">
-             {activeFileId && <span>{t('vscode.ln')} {content.substring(0, content.length).split('\n').length}, {t('vscode.col')} 1</span>} 
-             <span>{t('vscode.utf8')}</span>
-             <span>{t('vscode.lang')}</span>
-             <span className="hover:bg-white/20 px-1 cursor-pointer">{t('vscode.prettier')}</span>
-          </div>
-      </div>
+      <StatusBar 
+        line={cursorPosition.line} 
+        col={cursorPosition.col} 
+        language={language.toUpperCase()}
+        errorCount={0}
+        warningCount={0}
+      />
 
       <FilePickerDialog
         isOpen={pickerOpen}

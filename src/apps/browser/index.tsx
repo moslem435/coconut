@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, FormEvent, useMemo } from 'react'
-import { 
-    ArrowLeft, 
-    ArrowRight, 
-    RotateCw, 
-    Search, 
-    Home, 
-    Plus, 
-    X, 
-    Globe, 
+import {
+    ArrowLeft,
+    ArrowRight,
+    RotateCw,
+    Search,
+    Home,
+    Plus,
+    X,
+    Globe,
     Star,
     MoreVertical,
     Clock,
@@ -79,7 +79,7 @@ const PAGES = {
 }
 
 const GOOGLE_SEARCH_URL = 'https://www.google.com/search?q='
-const GOOGLE_HOME_URL = 'https://www.google.com/webhp?igu=1' 
+const GOOGLE_HOME_URL = 'https://www.google.com/webhp?igu=1'
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
@@ -94,15 +94,15 @@ const isValidUrl = (string: string) => {
 
 const formatUrl = (input: string): string => {
     const trimmed = input.trim()
-    
+
     if (trimmed.startsWith(INTERNAL_PREFIX)) return trimmed
-    
+
     // Check if it's a likely domain or localhost
     const domainRegex = /^(?:[a-zA-Z0-9-]+\.[a-zA-Z]{2,}|localhost(?::\d+)?|(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?)(?:\/[^\s]*)?$/
-    
+
     if (isValidUrl(trimmed)) return trimmed
     if (isValidUrl(`https://${trimmed}`)) return `https://${trimmed}`
-    
+
     if (domainRegex.test(trimmed)) {
         return `https://${trimmed}`
     }
@@ -130,17 +130,17 @@ export default function Browser() {
         const saved = localStorage.getItem('os_browser_history')
         return saved ? JSON.parse(saved) : []
     })
-    
+
     const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>(() => {
         const saved = localStorage.getItem('os_browser_bookmarks')
         return saved ? JSON.parse(saved) : []
     })
-    
+
     const [downloads, setDownloads] = useState<DownloadEntry[]>(() => {
         const saved = localStorage.getItem('os_browser_downloads')
         return saved ? JSON.parse(saved) : []
     })
-    
+
     const [settings, setSettings] = useState<BrowserSettings>(() => {
         const saved = localStorage.getItem('os_browser_settings')
         return saved ? JSON.parse(saved) : {
@@ -162,16 +162,16 @@ export default function Browser() {
     }])
     const [activeTabId, setActiveTabId] = useState<string>(tabs[0].id)
     const [showMenu, setShowMenu] = useState(false)
-    
+
     // File Picker State
     const [pickerOpen, setPickerOpen] = useState(false)
-    const [pendingDownload, setPendingDownload] = useState<{url: string, name: string} | null>(null)
+    const [pendingDownload, setPendingDownload] = useState<{ url: string, name: string } | null>(null)
 
     const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({})
     const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
 
     // --- Effects ---
-    
+
     useEffect(() => {
         localStorage.setItem('os_browser_history', JSON.stringify(globalHistory))
     }, [globalHistory])
@@ -207,7 +207,7 @@ export default function Browser() {
     const handleNavigate = (e?: FormEvent, overrideUrl?: string) => {
         e?.preventDefault()
         const targetUrl = formatUrl(overrideUrl || activeTab.inputUrl)
-        
+
         const newHistory = activeTab.history.slice(0, activeTab.historyIndex + 1)
         newHistory.push(targetUrl)
 
@@ -219,7 +219,7 @@ export default function Browser() {
             isLoading: !targetUrl.startsWith(INTERNAL_PREFIX),
             title: targetUrl
         })
-        
+
         addToHistory(targetUrl, targetUrl)
     }
 
@@ -304,7 +304,7 @@ export default function Browser() {
     const toggleBookmark = () => {
         const currentUrl = activeTab.url
         const exists = bookmarks.find(b => b.url === currentUrl)
-        
+
         if (exists) {
             setBookmarks(prev => prev.filter(b => b.url !== currentUrl))
         } else {
@@ -327,10 +327,10 @@ export default function Browser() {
 
     const handleDownloadConfirm = (pathId: string, fileName?: string) => {
         if (!pendingDownload || !fileName) return
-        
+
         // Create a dummy file
         createItem(pathId, fileName, 'file', `<html><body>Saved from ${pendingDownload.url}</body></html>`)
-        
+
         // Add to downloads list
         setDownloads(prev => [{
             id: generateId(),
@@ -341,7 +341,7 @@ export default function Browser() {
             size: '124 KB', // Dummy size
             status: 'completed'
         }, ...prev])
-        
+
         setPendingDownload(null)
         setPickerOpen(false)
         navigateTo(PAGES.DOWNLOADS)
@@ -365,9 +365,9 @@ export default function Browser() {
                             <Globe size={48} className="text-blue-500" />
                             <span>Browser</span>
                         </div>
-                        
+
                         <form onSubmit={(e) => handleNavigate(e, activeTab.inputUrl)} className="w-full relative">
-                            <input 
+                            <input
                                 className="w-full h-12 px-6 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm focus:shadow-md focus:border-blue-500 outline-none text-lg dark:bg-gray-800 dark:text-white transition-all"
                                 placeholder={t('browser.search')}
                                 value={activeTab.inputUrl === PAGES.NEWTAB ? '' : activeTab.inputUrl}
@@ -379,7 +379,7 @@ export default function Browser() {
 
                         <div className="grid grid-cols-4 gap-4 w-full mt-8">
                             {bookmarks.slice(0, 8).map(b => (
-                                <button 
+                                <button
                                     key={b.id}
                                     onClick={() => navigateTo(b.url)}
                                     className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors"
@@ -407,13 +407,13 @@ export default function Browser() {
                             globalHistory.map((item, i) => (
                                 <div key={i} className="flex items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg group">
                                     <div className="text-xs text-gray-400 w-16">
-                                        {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </div>
                                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigateTo(item.url)}>
                                         <div className="font-medium truncate dark:text-gray-200">{item.title}</div>
                                         <div className="text-xs text-gray-400 truncate">{item.url}</div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => setGlobalHistory(prev => prev.filter((_, idx) => idx !== i))}
                                         className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500"
                                     >
@@ -444,7 +444,7 @@ export default function Browser() {
                                         <div className="font-medium truncate dark:text-gray-200">{item.title}</div>
                                         <div className="text-xs text-gray-400 truncate">{item.url}</div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => setBookmarks(prev => prev.filter(b => b.id !== item.id))}
                                         className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500"
                                     >
@@ -499,10 +499,10 @@ export default function Browser() {
                         <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                             <h3 className="font-medium mb-4 dark:text-gray-200">Appearance</h3>
                             <label className="flex items-center gap-3 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     checked={settings.showBookmarkBar}
-                                    onChange={e => setSettings(s => ({...s, showBookmarkBar: e.target.checked}))}
+                                    onChange={e => setSettings(s => ({ ...s, showBookmarkBar: e.target.checked }))}
                                     className="w-4 h-4"
                                 />
                                 <span className="dark:text-gray-300">Show bookmarks bar</span>
@@ -513,29 +513,29 @@ export default function Browser() {
                             <h3 className="font-medium mb-4 dark:text-gray-200">Startup</h3>
                             <div className="flex flex-col gap-2">
                                 <label className="flex items-center gap-3">
-                                    <input 
-                                        type="radio" 
+                                    <input
+                                        type="radio"
                                         name="homepage"
                                         checked={settings.homePage === PAGES.NEWTAB}
-                                        onChange={() => setSettings(s => ({...s, homePage: PAGES.NEWTAB}))}
+                                        onChange={() => setSettings(s => ({ ...s, homePage: PAGES.NEWTAB }))}
                                     />
                                     <span className="dark:text-gray-300">Open New Tab page</span>
                                 </label>
                                 <label className="flex items-center gap-3">
-                                    <input 
-                                        type="radio" 
+                                    <input
+                                        type="radio"
                                         name="homepage"
                                         checked={settings.homePage === GOOGLE_HOME_URL}
-                                        onChange={() => setSettings(s => ({...s, homePage: GOOGLE_HOME_URL}))}
+                                        onChange={() => setSettings(s => ({ ...s, homePage: GOOGLE_HOME_URL }))}
                                     />
                                     <span className="dark:text-gray-300">Open Google</span>
                                 </label>
                             </div>
                         </div>
-                        
+
                         <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                             <h3 className="font-medium mb-4 dark:text-gray-200">Data</h3>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setGlobalHistory([])
                                     setDownloads([])
@@ -570,8 +570,8 @@ export default function Browser() {
                             className={`
                                 group relative flex items-center gap-2 px-3 py-2 min-w-[160px] max-w-[240px] h-[36px] 
                                 rounded-t-lg text-xs transition-colors cursor-default
-                                ${tab.id === activeTabId 
-                                    ? 'bg-white dark:bg-[#202020] text-gray-800 dark:text-gray-200 shadow-sm z-10' 
+                                ${tab.id === activeTabId
+                                    ? 'bg-white dark:bg-[#202020] text-gray-800 dark:text-gray-200 shadow-sm z-10'
                                     : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/40 dark:hover:bg-white/10'
                                 }
                             `}
@@ -579,7 +579,7 @@ export default function Browser() {
                         >
                             <Globe size={14} className={tab.id === activeTabId ? 'text-blue-500' : 'text-gray-400'} />
                             <span className="flex-1 truncate font-medium">{tab.title || t('browser.loading')}</span>
-                            <button 
+                            <button
                                 onClick={(e) => handleCloseTab(e, tab.id)}
                                 className={`
                                     p-0.5 rounded-full hover:bg-gray-200/80 dark:hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity
@@ -588,15 +588,15 @@ export default function Browser() {
                             >
                                 <X size={12} />
                             </button>
-                            
+
                             {tab.id !== activeTabId && (
                                 <div className="absolute right-[-1px] top-2 bottom-2 w-[1px] bg-gray-300/50 dark:bg-white/10" />
                             )}
                         </motion.div>
                     ))}
                 </AnimatePresence>
-                
-                <button 
+
+                <button
                     onClick={handleNewTab}
                     className="p-1.5 ml-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 transition-colors"
                 >
@@ -607,27 +607,27 @@ export default function Browser() {
             {/* Toolbar */}
             <div className="flex items-center gap-2 p-2 bg-white dark:bg-[#202020] border-b border-gray-200 dark:border-gray-700 shrink-0 z-20 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)]">
                 <div className="flex gap-1">
-                    <button 
-                        onClick={handleGoBack} 
+                    <button
+                        onClick={handleGoBack}
                         disabled={activeTab.historyIndex <= 0}
                         className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                     >
                         <ArrowLeft size={16} />
                     </button>
-                    <button 
+                    <button
                         onClick={handleGoForward}
                         disabled={activeTab.historyIndex >= activeTab.history.length - 1}
                         className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                     >
                         <ArrowRight size={16} />
                     </button>
-                    <button 
-                        onClick={handleRefresh} 
+                    <button
+                        onClick={handleRefresh}
                         className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors ${activeTab.isLoading ? 'animate-spin' : ''}`}
                     >
                         <RotateCw size={16} />
                     </button>
-                    <button 
+                    <button
                         onClick={handleHome}
                         className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors"
                     >
@@ -642,7 +642,7 @@ export default function Browser() {
                         <Search size={14} className="text-gray-400" />
                     )}
                     <form onSubmit={handleNavigate} className="flex-1 min-w-0">
-                        <input 
+                        <input
                             className="w-full bg-transparent outline-none text-sm min-w-0 placeholder-gray-400 dark:text-gray-200"
                             value={activeTab.inputUrl}
                             onChange={(e) => updateTab(activeTabId, { inputUrl: e.target.value })}
@@ -656,7 +656,7 @@ export default function Browser() {
                 </div>
 
                 <div className="relative">
-                    <button 
+                    <button
                         onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
                         className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors ${showMenu ? 'bg-gray-100 dark:bg-white/10' : ''}`}
                     >
@@ -693,7 +693,7 @@ export default function Browser() {
             {/* Content Area */}
             <div className="flex-1 relative bg-white dark:bg-[#111] overflow-hidden">
                 {tabs.map(tab => (
-                    <div 
+                    <div
                         key={tab.id}
                         className={`absolute inset-0 w-full h-full bg-white dark:bg-[#111] ${tab.id === activeTabId ? 'z-10 visible' : 'z-0 invisible'}`}
                     >
@@ -702,13 +702,13 @@ export default function Browser() {
                                 <div className="h-full bg-blue-500 animate-progress-indeterminate" />
                             </div>
                         )}
-                        
+
                         {tab.url.startsWith(INTERNAL_PREFIX) ? (
                             <InternalPage url={tab.url} />
                         ) : (
-                            <iframe 
+                            <iframe
                                 ref={el => { iframeRefs.current[tab.id] = el }}
-                                src={tab.url}
+                                src={tab.url.startsWith('http') && !tab.url.includes('localhost') ? `/api/proxy?url=${encodeURIComponent(tab.url)}` : tab.url}
                                 className="w-full h-full border-none block bg-white"
                                 onLoad={() => handleIframeLoad(tab.id)}
                                 onError={() => handleIframeLoad(tab.id)}

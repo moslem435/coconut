@@ -18,10 +18,10 @@ const DocPreview = ({ fileId, name }: { fileId: string, name: string }) => {
             try {
                 const store = useFileSystemStore.getState()
                 const path = store.resolvePath(fileId)
-                if(!path) return
-                
+                if (!path) return
+
                 const buffer = await fs.readFile(path)
-                
+
                 // Determine mime type
                 const ext = name.split('.').pop()?.toLowerCase()
                 let mimeType = undefined
@@ -31,11 +31,11 @@ const DocPreview = ({ fileId, name }: { fileId: string, name: string }) => {
                 if (ext === 'xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 if (ext === 'csv') mimeType = 'text/csv'
 
-                const blob = new Blob([buffer], { type: mimeType })
+                const blob = new Blob([buffer as any], { type: mimeType })
                 objectUrl = URL.createObjectURL(blob)
-                
-                setDocs([{ 
-                    uri: objectUrl, 
+
+                setDocs([{
+                    uri: objectUrl,
                     fileName: name,
                     fileType: mimeType
                 }])
@@ -61,8 +61,8 @@ const DocPreview = ({ fileId, name }: { fileId: string, name: string }) => {
 
     return (
         <div className="h-full w-full bg-white overflow-hidden pt-10">
-            <DocViewer 
-                documents={docs} 
+            <DocViewer
+                documents={docs}
                 pluginRenderers={DocViewerRenderers}
                 config={{
                     header: {
@@ -81,9 +81,9 @@ const DocPreview = ({ fileId, name }: { fileId: string, name: string }) => {
                     primary: "#5296d8",
                     secondary: "#ffffff",
                     tertiary: "#5296d899",
-                    text_primary: "#ffffff",
-                    text_secondary: "#5296d8",
-                    text_tertiary: "#00000099",
+                    textPrimary: "#ffffff",
+                    textSecondary: "#5296d8",
+                    textTertiary: "#00000099",
                     disableThemeScrollbar: false,
                 }}
             />

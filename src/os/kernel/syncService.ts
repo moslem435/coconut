@@ -1,0 +1,72 @@
+import { FileSystemState, FileNode } from './useFileSystemStore'
+import { fs } from '@/os/kernel/filesystem/FileSystemClient'
+
+export const syncService = {
+    syncToOPFS: async (state: FileSystemState, set: (partial: Partial<FileSystemState>) => void) => {
+        // Optimization: Only sync if root doesn't exist or force sync is needed
+        // This prevents overwriting user data on every reload if persistence is used
+        try {
+            const rootExists = await fs.exists('/')
+            const desktopExists = await fs.exists('/Desktop')
+
+            if (rootExists && desktopExists) {
+                console.log('OPFS seems populated, skipping full sync to preserve data.')
+                set({ isLoading: false })
+                return
+            }
+        } catch (e) {
+            console.warn('Failed to check OPFS status, proceeding with sync', e)
+        }
+
+        set({ isLoading: true })
+        const files = Object.values(state.files)
+
+        console.log('Starting VFS -> OPFS Initial Sync...')
+
+        // Sort files to ensure folders are created before files
+        const sortedFiles = files.sort((a, b) => {
+            if (a.type === 'folder' && b.type !== 'folder') return -1
+            if (a.type !== 'folder' && b.type === 'folder') return 1
+            return 0
+        })
+
+        for (const node of sortedFiles) {
+            if (node.id === 'root' || node.id === 'trash') continue;
+
+            const path = state.resolvePath(node.id)
+            if (!path) continue
+
+            // Skip mounted paths - they are already persisted on the native FS
+            // and we don't want to overwrite them with potentially empty content
+            if (path.startsWith('/mnt/')) continue
+
+            try {
+                if (node.type === 'folder') {
+                    await fs.mkdir(path, true)
+                } else {
+                    // Ensure parent directory exists for file
+                    const parentPath = path.substring(0, path.lastIndexOf('/'))
+                    if (parentPath && parentPath !== '/') {
+                        await fs.mkdir(parentPath, true)
+                    }
+
+                    // Initial Content Hydration (Only for initial static files)
+                    let initialContent = ''
+                    if (node.name === 'hello_world.ts') initialContent = '// Hello World...'
+                    if (node.name === 'Welcome.txt') initialContent = 'Welcome to Portfolio OS!...'
+
+                    // Basic restoration of template content
+                    if (node.id === 'code-1') initialContent = `// Hello World in TypeScript\nfunction sayHello(name: string): void {\n    console.log("Hello, " + name + "!");\n}\n\nconst user = "Developer";\nsayHello(user);`
+                    if (node.id === 'welcome-txt') initialContent = 'Welcome to Portfolio OS! This is a simulated file system.'
+                    if (node.id === 'about-md') initialContent = '# About Me\n\nI am a full-stack developer...'
+
+                    await fs.writeFile(path, initialContent)
+                }
+            } catch (err) {
+                console.warn(`Sync failed for ${path}`, err)
+            }
+        }
+        console.log('VFS -> OPFS Sync Complete')
+        set({ isLoading: false })
+    }
+}

@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark overflow-hidden">
+    <html lang="en" className="dark overflow-hidden" suppressHydrationWarning>
       <body className={`${roboto.variable} ${orbitron.variable} ${rajdhani.variable} font-sans bg-black text-white antialiased overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-100`}>
         <SiteProtection />
         <SystemSettingsProvider>
