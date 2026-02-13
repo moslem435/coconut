@@ -3,13 +3,23 @@
 import React, { useState } from 'react'
 import { Search, File } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
-import { useEditorState } from '../hooks/useEditorState'
+import { useEditorStateV2 } from '../hooks/useEditorStateV2'
 
 export const SearchPanel: React.FC = () => {
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<{ id: string, name: string, line: string, lineNum: number }[]>([])
     const { files, readFileContent } = useFileSystemStore()
-    const { openFile } = useEditorState()
+    const { openFile: openFileInEditor, getFileContent } = useEditorStateV2()
+    
+    const handleFileOpen = async (fileId: string) => {
+        const cachedContent = getFileContent(fileId)
+        if (cachedContent !== undefined) {
+            openFileInEditor(fileId, cachedContent)
+        } else {
+            const content = await readFileContent(fileId)
+            openFileInEditor(fileId, content)
+        }
+    }
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -65,7 +75,7 @@ export const SearchPanel: React.FC = () => {
                             <div
                                 key={`${res.id}-${idx}`}
                                 className="px-4 py-2 hover:bg-[#2a2d2e] cursor-pointer group"
-                                onClick={() => openFile(res.id)}
+                                onClick={() => handleFileOpen(res.id)}
                             >
                                 <div className="flex items-center gap-2 text-sm text-blue-300">
                                     <File size={12} />

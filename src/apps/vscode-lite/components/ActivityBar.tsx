@@ -45,14 +45,16 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, setActiveV
 
       <div className="flex flex-col gap-6 w-full items-center pb-2">
         <div
-          className="w-12 h-12 flex items-center justify-center cursor-pointer text-[#858585] hover:text-white"
+          className="w-12 h-12 flex items-center justify-center cursor-pointer text-[#858585] hover:text-white transition-colors"
           title="Accounts"
+          onClick={() => console.log('Accounts - TODO')}
         >
           <User size={24} strokeWidth={1.5} />
         </div>
         <div
-          className="w-12 h-12 flex items-center justify-center cursor-pointer text-[#858585] hover:text-white"
-          title="Manage"
+          className="w-12 h-12 flex items-center justify-center cursor-pointer text-[#858585] hover:text-white transition-colors"
+          title="Manage (Settings)"
+          onClick={() => console.log('Settings - TODO')}
         >
           <Settings size={24} strokeWidth={1.5} />
         </div>

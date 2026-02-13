@@ -17,8 +17,14 @@ interface BottomPanelProps {
 }
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
-    // TODO: Add support for multiple tabs (Output, Debug Console, Problems)
     const [activeTab, setActiveTab] = React.useState<'terminal' | 'output' | 'problems'>('terminal')
+    const [isMaximized, setIsMaximized] = React.useState(false)
+
+    const handleMaximize = () => {
+        setIsMaximized(!isMaximized)
+        // TODO: 实际调整面板大小
+        console.log('Maximize panel:', !isMaximized)
+    }
 
     return (
         <div className="h-full w-full flex flex-col bg-[#1e1e1e] border-t border-[#2b2b2b]">
@@ -46,10 +52,18 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
                 </div>
 
                 <div className="flex items-center gap-2 text-[#969696]">
-                    <button className="hover:text-white" title="Maximize Panel">
+                    <button 
+                        className="hover:text-white transition-colors" 
+                        title={isMaximized ? "Restore Panel" : "Maximize Panel"}
+                        onClick={handleMaximize}
+                    >
                         <Maximize2 size={14} />
                     </button>
-                    <button className="hover:text-white" onClick={onClose} title="Close Panel">
+                    <button 
+                        className="hover:text-white transition-colors" 
+                        onClick={onClose} 
+                        title="Close Panel"
+                    >
                         <X size={14} />
                     </button>
                 </div>

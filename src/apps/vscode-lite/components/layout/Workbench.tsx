@@ -3,13 +3,13 @@
 import React from 'react'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { Sidebar } from '../Sidebar'
-import { EditorGroup } from './EditorGroup'
+import { EditorGroupV2 } from './EditorGroupV2'
 import { BottomPanel } from './BottomPanel'
 import { Preview } from '../Preview'
 import { ActivityBar } from '../ActivityBar'
 import { StatusBar } from '../StatusBar'
 import { VSCODE_COLORS, LANGUAGE_MAP } from '../../constants'
-import { useEditorState } from '../../hooks/useEditorState'
+import { useEditorStateV2 } from '../../hooks/useEditorStateV2'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { DialogContainer } from '../Dialog'
 
@@ -31,7 +31,7 @@ export const Workbench: React.FC<WorkbenchProps> = ({
     showPreview,
     onTogglePreview
 }) => {
-    const { cursorPosition, activeFileId } = useEditorState()
+    const { cursorPosition, activeFileId } = useEditorStateV2()
     const { files } = useFileSystemStore()
 
     const activeFile = activeFileId ? files[activeFileId] : null
@@ -64,7 +64,7 @@ export const Workbench: React.FC<WorkbenchProps> = ({
                             <Panel>
                                 <PanelGroup orientation="horizontal">
                                     <Panel>
-                                        <EditorGroup />
+                                        <EditorGroupV2 />
                                     </Panel>
 
                                     {showPreview && (

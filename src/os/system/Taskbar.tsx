@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo } from 'react'
 import { Volume2, Command, Settings2 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
@@ -39,6 +40,29 @@ export default function Taskbar({
   
   const launchingAppIds = useWindowStore(useShallow(state => state.launchingAppIds))
   const { pinnedAppIds } = useSystemSettings()
+
+  // Check if active window is maximized for auto-hide behavior
+  const isMaximized = useWindowStore(useShallow(state => {
+    if (!state.activeWindowId) return false
+    return state.windows[state.activeWindowId]?.isMaximized || false
+  }))
+
+  const [isHovered, setIsHovered] = useState(false)
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleMouseEnter = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+    setIsHovered(true)
+  }
+
+  const handleMouseLeave = () => {
+    hideTimerRef.current = setTimeout(() => {
+      setIsHovered(false)
+    }, 300)
+  }
 
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false)
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false)
@@ -78,12 +102,37 @@ export default function Taskbar({
     return items
   }, [openWindowsStrings, pinnedAppIds, launchingAppIds])
 
+  const shouldHide = isMaximized && !isHovered && !isStartMenuOpen && !isQuickSettingsOpen && !isActionCenterOpen
+
   return (
-    <div
-      data-taskbar
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 h-14 z-[10000] flex items-center justify-between gap-4 select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 transition-[width,height] duration-300 w-fit max-w-[calc(100vw-2rem)]"
-      style={{
-        backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
+    <>
+      {/* Trigger Area for Auto-hide */}
+      {isMaximized && (
+        <div
+          className="fixed bottom-0 left-0 right-0 h-6 z-[9999]"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        />
+      )}
+
+      <motion.div
+        data-taskbar
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        initial={{ y: 0, x: "-50%" }}
+        animate={{ 
+          y: shouldHide ? "150%" : 0,
+          x: "-50%"
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 30,
+          mass: 1
+        }}
+        className="fixed bottom-4 left-1/2 h-14 z-[10000] flex items-center justify-between gap-4 select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 w-fit max-w-[calc(100vw-2rem)]"
+        style={{
+          backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
         backdropFilter: 'blur(40px) saturate(150%)',
         WebkitBackdropFilter: 'blur(40px) saturate(150%)'
@@ -174,6 +223,7 @@ export default function Taskbar({
         onClose={() => setIsActionCenterOpen(false)}
         toggleRef={actionCenterRef as React.RefObject<HTMLDivElement>}
       />
-    </div>
+    </motion.div>
+    </>
   )
 }

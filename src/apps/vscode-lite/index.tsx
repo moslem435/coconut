@@ -6,19 +6,24 @@ import { TitleBar } from './components/TitleBar'
 import { CommandPalette } from './components/CommandPalette'
 import { FilePickerDialog } from '@/os/ui/dialogs/FilePickerDialog'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
-import { useEditorState } from './hooks/useEditorState'
+import { useEditorStateV2 } from './hooks/useEditorStateV2'
+import { useUnsavedChanges } from './hooks/useUnsavedChanges'
 import { useShortcuts } from '@/os/kernel/useShortcuts'
-import dynamic from 'next/dynamic'
-
-// Dynamically import XTerm
-const XTerm = dynamic(() => import('@/os/components/XTerm'), {
-  ssr: false,
-  loading: () => <div className="h-full w-full flex items-center justify-center text-white/50">Loading Terminal...</div>
-})
+import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
 
 export default function VSCode() {
   const { getItem } = useFileSystemStore()
-  const { openFile, activeFileId } = useEditorState()
+  const { openFile: openFileInEditor, getFileContent } = useEditorStateV2()
+  const { readFileContent } = useFileSystemStore()
+  const { boot: bootWebContainer } = useWebContainerStore()
+  
+  // 未保存提示
+  useUnsavedChanges()
+  
+  // 预启动 WebContainer（用于终端）
+  useEffect(() => {
+    bootWebContainer()
+  }, [bootWebContainer])
 
   // State
   const [activeView, setActiveView] = useState<'explorer' | 'search' | 'git' | 'debug' | 'extensions'>('explorer')
@@ -30,10 +35,16 @@ export default function VSCode() {
   // --- Handlers ---
   const handleOpenFile = () => setPickerOpen(true)
 
-  const handleFilePickerConfirm = (pathOrId: string) => {
+  const handleFilePickerConfirm = async (pathOrId: string) => {
     const file = getItem(pathOrId)
     if (file && file.type === 'file') {
-      openFile(file.id) // Use hook to open
+      const cachedContent = getFileContent(file.id)
+      if (cachedContent !== undefined) {
+        openFileInEditor(file.id, cachedContent)
+      } else {
+        const content = await readFileContent(file.id)
+        openFileInEditor(file.id, content)
+      }
     }
     setPickerOpen(false)
   }
@@ -88,21 +99,6 @@ export default function VSCode() {
           showPreview={showPreview}
           onTogglePreview={setShowPreview}
         />
-
-        {/* Terminal Overlay (Temporary, until integrated into Panel) */}
-        {showTerminal && (
-          <div className="absolute bottom-0 left-0 right-0 h-48 border-t border-[#3c3c3c] bg-[#1e1e1e] z-50 flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-2 py-1 bg-[#252526] text-xs uppercase tracking-wider text-gray-400 select-none">
-              <span className="font-bold">Terminal</span>
-              <div className="cursor-pointer hover:text-white" onClick={() => setShowTerminal(false)}>
-                ×
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden p-2">
-              <XTerm className="h-full w-full" style={{ backgroundColor: '#1e1e1e' }} />
-            </div>
-          </div>
-        )}
       </div>
 
       <FilePickerDialog

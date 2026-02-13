@@ -2,12 +2,9 @@ import React, { useRef } from 'react'
 import Editor, { OnMount, loader } from '@monaco-editor/react'
 import { VSCODE_COLORS, LANGUAGE_MAP } from '../constants'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { useMonacoIntellisense } from '../hooks/useMonacoIntellisense'
-import { useEditorState } from '../hooks/useEditorState'
-import { format } from 'prettier/standalone'
-import * as parserTypescript from 'prettier/plugins/typescript'
-import * as parserBabel from 'prettier/plugins/babel'
-import * as parserEstree from 'prettier/plugins/estree'
+import { useMonacoIntellisenseV2 } from '../hooks/useMonacoIntellisenseV2'
+import { useEditorStateV2 } from '../hooks/useEditorStateV2'
+import { formatCode } from '../utils/formatter'
 
 // Configure Monaco to use local files instead of CDN
 loader.config({ 
@@ -34,10 +31,10 @@ export const EditorComponent: React.FC<EditorComponentProps> = ({
   const editorRef = useRef<any>(null)
   const [monaco, setMonaco] = React.useState<any>(null)
   const { t } = useLanguage()
-  const { setCursorPosition } = useEditorState()
+  const { setCursorPosition } = useEditorStateV2()
 
   // Enable Intellisense
-  useMonacoIntellisense(monaco)
+  useMonacoIntellisenseV2(monaco)
 
   const handleEditorDidMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor
@@ -48,34 +45,8 @@ export const EditorComponent: React.FC<EditorComponentProps> = ({
       // Format Code
       try {
         const currentCode = editor.getValue()
-        // Simple heuristic for parser based on file extension
-        const parser = fileName.endsWith('.ts') ? 'typescript' :
-          fileName.endsWith('.tsx') ? 'typescript' :
-            fileName.endsWith('.js') ? 'babel' :
-              fileName.endsWith('.jsx') ? 'babel' : undefined
-
-        if (parser) {
-          const formatted = await format(currentCode, {
-            parser,
-            plugins: [parserTypescript, parserBabel, parserEstree],
-            singleQuote: true,
-            semi: false,
-            printWidth: 100
-          })
-
-          // Check if content changed to avoid cursor jump issues if possible
-          // Monaco editor.setValue moves cursor to top? 
-          // Ideally we use applyEdits, but setValue is simpler for now.
-          // onChange will be triggered by setValue?
-          // Yes.
-
-          // We call onChange with formatted code to update state
-          onChange(formatted)
-
-          // But we also need to update the editor content immediately if it's not controlled?
-          // The Editor component IS controlled via `value={content}`. 
-          // So calling onChange should propagate back to `content` prop and update editor.
-        }
+        const formatted = await formatCode(currentCode, fileName)
+        onChange(formatted)
       } catch (e) {
         console.warn('Prettier format failed:', e)
       }

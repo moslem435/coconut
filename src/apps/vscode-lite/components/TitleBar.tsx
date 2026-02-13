@@ -39,11 +39,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     {
       label: t('vscode.file'),
       items: [
-        { label: 'New File', action: () => { }, shortcut: 'Ctrl+N' },
+        { label: 'New File', action: () => console.log('New File - TODO'), shortcut: 'Ctrl+N' },
         { label: 'Open File...', action: onOpenFile, shortcut: 'Ctrl+O' },
         { separator: true, label: '' },
         { label: 'Save', action: onSave, shortcut: 'Ctrl+S' },
-        { label: 'Save As...', disabled: true },
+        { label: 'Save As...', action: () => console.log('Save As - TODO'), disabled: false },
         { separator: true, label: '' },
         { label: 'Exit', action: () => windowId && closeWindow(windowId) }
       ]
@@ -51,12 +51,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     {
       label: t('vscode.edit'),
       items: [
-        { label: 'Undo', shortcut: 'Ctrl+Z' },
-        { label: 'Redo', shortcut: 'Ctrl+Y' },
+        { label: 'Undo', action: () => document.execCommand('undo'), shortcut: 'Ctrl+Z' },
+        { label: 'Redo', action: () => document.execCommand('redo'), shortcut: 'Ctrl+Y' },
         { separator: true, label: '' },
-        { label: 'Cut', shortcut: 'Ctrl+X' },
-        { label: 'Copy', shortcut: 'Ctrl+C' },
-        { label: 'Paste', shortcut: 'Ctrl+V' },
+        { label: 'Cut', action: () => document.execCommand('cut'), shortcut: 'Ctrl+X' },
+        { label: 'Copy', action: () => document.execCommand('copy'), shortcut: 'Ctrl+C' },
+        { label: 'Paste', action: () => document.execCommand('paste'), shortcut: 'Ctrl+V' },
       ]
     },
     {
@@ -64,11 +64,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       items: [
         { label: 'Command Palette...', action: onOpenCommandPalette, shortcut: 'Ctrl+Shift+P' },
         { separator: true, label: '' },
-        { label: 'Explorer', action: () => { } },
-        { label: 'Search', action: () => { } },
-        { label: 'Source Control', action: () => { } },
+        { label: 'Explorer', action: () => console.log('Explorer - Already visible') },
+        { label: 'Search', action: () => console.log('Search - TODO') },
+        { label: 'Source Control', action: () => console.log('Source Control - TODO') },
         { separator: true, label: '' },
-        { label: 'Toggle Word Wrap', action: () => { } },
+        { label: 'Toggle Word Wrap', action: () => console.log('Word Wrap - TODO') },
       ]
     },
     {
@@ -81,10 +81,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     {
       label: t('vscode.help'),
       items: [
-        { label: 'Welcome' },
-        { label: 'Documentation' },
+        { label: 'Welcome', action: () => console.log('Welcome - TODO') },
+        { label: 'Documentation', action: () => window.open('https://code.visualstudio.com/docs', '_blank') },
         { separator: true, label: '' },
-        { label: 'About' }
+        { label: 'About', action: () => alert('VS Code Lite\nVersion 1.0.0\nBuilt with Monaco Editor') }
       ]
     }
   ]

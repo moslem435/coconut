@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { ChevronRight, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { useEditorState } from '../hooks/useEditorState'
+import { useEditorStateV2 } from '../hooks/useEditorStateV2'
 import { useDialog } from '../hooks/useDialog'
 import { VSCODE_COLORS } from '../constants'
 import { SearchPanel } from './SearchPanel'
@@ -103,9 +103,18 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
-  const { rootId, createItem, renameItem, deleteItem, files } = useFileSystemStore()
-  const { activeFileId, openFile } = useEditorState()
-  const onFileSelect = (id: string) => openFile(id)
+  const { rootId, createItem, renameItem, deleteItem, files, readFileContent } = useFileSystemStore()
+  const { activeFileId, openFile: openFileInEditor, getFileContent } = useEditorStateV2()
+  
+  const onFileSelect = async (id: string) => {
+    const cachedContent = getFileContent(id)
+    if (cachedContent !== undefined) {
+      openFileInEditor(id, cachedContent)
+    } else {
+      const content = await readFileContent(id)
+      openFileInEditor(id, content)
+    }
+  }
   const { t } = useLanguage()
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ [rootId]: true })
 
@@ -224,7 +233,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
     >
       <div className="h-9 px-4 flex items-center justify-between text-xs uppercase tracking-wider text-gray-400 font-medium group shrink-0">
         <span>{t('vscode.explorer')}</span>
-        <MoreHorizontal size={14} className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white" />
+        <MoreHorizontal 
+          size={14} 
+          className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
+          onClick={() => console.log('Explorer actions - TODO')}
+          title="More Actions..."
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">

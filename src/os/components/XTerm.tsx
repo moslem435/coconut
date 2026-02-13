@@ -23,9 +23,24 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   const { instance, boot, isBooting, error } = useWebContainerStore()
   const [isReady, setIsReady] = useState(false)
 
+  // Debug: Log WebContainer state
+  useEffect(() => {
+    console.log('[XTerm] WebContainer state:', { 
+      hasInstance: !!instance, 
+      isBooting, 
+      error,
+      isReady 
+    })
+  }, [instance, isBooting, error, isReady])
+
   // 1. Boot WebContainer
   useEffect(() => {
-    boot()
+    console.log('[XTerm] Calling WebContainer boot...')
+    boot().then(() => {
+      console.log('[XTerm] WebContainer boot completed')
+    }).catch((err) => {
+      console.error('[XTerm] WebContainer boot failed:', err)
+    })
   }, [boot])
 
   // 2. Initialize XTerm
@@ -93,12 +108,15 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     const startShell = async () => {
       const term = xtermRef.current!
 
-      term.clear()
-      term.writeln('\x1b[32m✔ System Online\x1b[0m')
-      term.writeln('')
+      try {
+        term.clear()
+        term.writeln('\x1b[32m✔ System Online\x1b[0m')
+        term.writeln('')
 
-      // Spawn jsh (JavaScript Shell)
-      const shellProcess = await instance.spawn('jsh', {
+        console.log('[XTerm] Spawning jsh shell...')
+
+        // Spawn jsh (JavaScript Shell)
+        const shellProcess = await instance.spawn('jsh', {
         terminal: {
           cols: term.cols,
           rows: term.rows,
@@ -141,6 +159,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
       })
 
       setIsReady(true)
+      console.log('[XTerm] Terminal ready')
 
       return () => {
         input.dispose()
@@ -148,6 +167,15 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         shellProcess.kill()
         processRef.current = null
       }
+    } catch (error) {
+      console.error('[XTerm] Failed to start shell:', error)
+      term.clear()
+      term.writeln('\x1b[31m✖ Failed to start terminal\x1b[0m')
+      term.writeln('')
+      term.writeln(`Error: ${error instanceof Error ? error.message : String(error)}`)
+      term.writeln('')
+      term.writeln('Please check browser console for details')
+    }
     }
 
     startShell()
