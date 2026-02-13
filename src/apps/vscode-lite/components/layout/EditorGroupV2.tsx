@@ -22,19 +22,7 @@ export const EditorGroupV2: React.FC = () => {
   
   const { files, readFileContent, updateFileContent } = useFileSystemStore()
 
-  // 打开文件时加载内容
-  const handleFileOpen = async (fileId: string) => {
-    const cachedContent = getFileContent(fileId)
-    
-    if (cachedContent !== undefined) {
-      // 已缓存，直接切换
-      setActiveFile(fileId)
-    } else {
-      // 未缓存，读取文件
-      const content = await readFileContent(fileId)
-      openFile(fileId, content)
-    }
-  }
+
 
   // 保存文件
   const handleSave = async (fileId: string) => {

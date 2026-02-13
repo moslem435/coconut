@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import { ReactNode, ComponentType } from 'react'
+import { ComponentType } from 'react'
 import { AppIcon } from '@/os/registry/types'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
+import { eventBus } from '@/os/kernel/EventBus'
 
 export interface WindowState {
     id: string
@@ -19,7 +20,7 @@ export interface WindowState {
     taskbarPosition?: { x: number; y: number }
     icon?: AppIcon
     appId?: string
-    component: ReactNode
+    component: ComponentType<any>
     titleBarColor?: 'light' | 'dark' | 'auto'
     isDefaultTitle?: boolean
     isResizable?: boolean
@@ -35,8 +36,8 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean; hideTitleBar?: boolean }) => void
-    launchApp: (id: string, title: string, component: ReactNode, icon?: AppIcon, options?: any) => void
+    openWindow: (id: string, title: string, component: ComponentType<any>, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; appId?: string; isDefaultTitle?: boolean; hideTitleBar?: boolean }) => void
+    launchApp: (id: string, title: string, component: ComponentType<any>, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
     minimizeWindow: (id: string) => void
@@ -50,6 +51,9 @@ interface WindowStore {
     setPeekWindowId: (id: string | null) => void
 }
 
+// 虚拟化窗口层级 - 只有前 3 个窗口参与 z-index 计算
+const VIRTUAL_Z_INDEX_THRESHOLD = 3
+
 export const useWindowStore = create<WindowStore>((set, get) => ({
     windows: {},
     activeWindowId: null,
@@ -62,9 +66,6 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         const { windows, maxZIndex, focusWindow } = get()
 
         if (windows[id]) {
-            // Restore and focus
-            // We manually update state first to ensure minimized flag is cleared BEFORE focus logic runs if needed,
-            // though focusWindow also handles it. Doing it here ensures strict compliance with old logic.
             set(state => ({
                 windows: {
                     ...state.windows,
@@ -72,6 +73,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 }
             }))
             get().focusWindow(id)
+            eventBus.emit('window:opened', { id, appId: options?.appId })
             return
         }
 
@@ -80,6 +82,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         // Create Process (If App ID is present)
         if (options?.appId) {
             useProcessStore.getState().createProcess(options.appId, title, id)
+            eventBus.emit('app:launched', { appId: options.appId, windowId: id })
         }
 
         // Calculate centered position
@@ -88,7 +91,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
         const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080
         const centeredX = Math.max(0, (screenWidth - windowWidth) / 2)
-        const centeredY = Math.max(0, (screenHeight - windowHeight) / 2 - 40) // -40 for taskbar
+        const centeredY = Math.max(0, (screenHeight - windowHeight) / 2 - 40)
 
         const newWindow: WindowState = {
             id,
@@ -114,31 +117,29 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             activeWindowId: id,
             maxZIndex: newZ
         }))
-    },
 
+        eventBus.emit('window:opened', { id, appId: options?.appId })
+    },
 
     launchApp: (id, title, component, icon, options) => {
         const { windows, openWindow } = get()
 
-        // If already open, just focus it immediately
         if (windows[id]) {
             openWindow(id, title, component, icon, options)
             return
         }
 
-        // If already launching, ignore
         if (get().launchingAppIds.includes(id)) return
 
-        // Set launching state
         set(state => ({ launchingAppIds: [...state.launchingAppIds, id] }))
 
-        // Instant Launch (Removed delay)
-        // Pass appId (id) to openWindow options
         openWindow(id, title, component, icon, { ...options, appId: id })
         set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
     },
 
     closeWindow: (id) => {
+        const window = get().windows[id]
+        
         set(state => {
             const { [id]: removed, ...remaining } = state.windows
             const nextActive = state.activeWindowId === id ? null : state.activeWindowId
@@ -154,28 +155,61 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
                 activeWindowId: nextActive
             }
         })
+
+        eventBus.emit('window:closed', { id, appId: window?.appId })
+        if (window?.appId) {
+            eventBus.emit('app:closed', { appId: window.appId, windowId: id })
+        }
     },
 
     closeAllWindows: () => {
+        const windows = get().windows
+        Object.keys(windows).forEach(id => {
+            const window = windows[id]
+            if (window?.appId) {
+                eventBus.emit('app:closed', { appId: window.appId, windowId: id })
+            }
+        })
         set({ windows: {}, activeWindowId: null, maxZIndex: 100 })
     },
 
     focusWindow: (id) => {
         const { activeWindowId, maxZIndex, windows } = get()
-        // Optimization: Don't trigger update if already top and active
-        if (activeWindowId === id && !windows[id]?.isMinimized && windows[id]?.zIndex === maxZIndex) return
+        
+        // 优化：如果已经是顶层且活跃，跳过更新
+        if (activeWindowId === id && !windows[id]?.isMinimized && windows[id]?.zIndex === maxZIndex) {
+            return
+        }
 
-        set(state => {
-            const newZ = state.maxZIndex + 1
-            return {
+        // 虚拟化 z-index：只更新必要的窗口
+        const sortedWindows = Object.values(windows)
+            .filter(w => !w.isMinimized)
+            .sort((a, b) => b.zIndex - a.zIndex)
+        
+        const needsUpdate = sortedWindows.slice(0, VIRTUAL_Z_INDEX_THRESHOLD).some(w => w.id === id)
+        
+        if (needsUpdate || sortedWindows.length <= VIRTUAL_Z_INDEX_THRESHOLD) {
+            const newZ = maxZIndex + 1
+            set(state => ({
                 activeWindowId: id,
                 maxZIndex: newZ,
                 windows: {
                     ...state.windows,
                     [id]: { ...state.windows[id], zIndex: newZ, isMinimized: false }
                 }
-            }
-        })
+            }))
+        } else {
+            // 只更新活跃状态，不改变 z-index
+            set(state => ({
+                activeWindowId: id,
+                windows: {
+                    ...state.windows,
+                    [id]: { ...state.windows[id], isMinimized: false }
+                }
+            }))
+        }
+
+        eventBus.emit('window:focused', { id })
     },
 
     minimizeWindow: (id) => {
@@ -186,6 +220,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             },
             activeWindowId: state.activeWindowId === id ? null : state.activeWindowId
         }))
+        eventBus.emit('window:minimized', { id })
     },
 
     maximizeWindow: (id) => {
@@ -222,6 +257,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             }))
         }
         focusWindow(id)
+        eventBus.emit('window:maximized', { id })
     },
 
     updateWindowPosition: (id, position) => {
@@ -261,7 +297,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         set(state => {
             const newWindows = { ...state.windows }
             Object.keys(newWindows).forEach(key => {
-                newWindows[key].isMinimized = true
+                newWindows[key] = { ...newWindows[key], isMinimized: true }
             })
             return {
                 windows: newWindows,

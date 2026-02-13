@@ -190,25 +190,3 @@ img {
 @utility backface-visible {
   backface-visibility: visible;
 }
-
-/* Hide debug panels and overlays */
-/* Target common debug panel patterns */
-[class*="debug"],
-[class*="Debug"],
-[id*="debug"],
-[id*="Debug"],
-iframe[src*="debug"],
-/* Hide fixed positioned elements in bottom-left corner that look like debug panels */
-body>div[style*="position: fixed"][style*="bottom: 0"][style*="left: 0"],
-body>div[style*="position:fixed"][style*="bottom:0"][style*="left:0"],
-/* Hide React DevTools and similar */
-.__react-dev-tools,
-#__next-build-watcher,
-#webpack-dev-server-client-overlay,
-/* Generic bottom-left fixed panels */
-div[style*="position: fixed"][style*="bottom"][style*="left"][style*="z-index"] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
