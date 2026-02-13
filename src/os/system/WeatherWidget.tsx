@@ -158,45 +158,24 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
       let longitude = cached?.longitude ?? DEFAULT_LOCATION.lon
       let city = cached?.city ?? DEFAULT_LOCATION.city
 
-      // 1. Try Get Location via IP (Multi-source Fallback)
+      // 1. Try Get Location via API proxy (避免 CORS 和限流问题)
       try {
-        // Strategy: Try Primary -> If fail, Try Backup
-        const fetchLocation = async (url: string) => {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 3000)
-          const res = await fetch(url, { signal: controller.signal })
-          clearTimeout(timeoutId)
-          if (!res.ok) throw new Error(`Fetch failed: ${url}`)
-          return res.json()
-        }
-
-        try {
-          // Attempt 1: ipapi.co
-          const locData = await fetchLocation('https://ipapi.co/json/')
+        const locRes = await fetch('/api/weather?type=location')
+        if (locRes.ok) {
+          const locData = await locRes.json()
           if (locData.latitude && locData.longitude) {
             latitude = locData.latitude
             longitude = locData.longitude
-            city = locData.city || locData.region || city
-          }
-        } catch (e) {
-          console.warn('Primary geo-ip failed, trying backup...', e)
-          // Attempt 2: geojs.io (Backup)
-          const locData = await fetchLocation('https://get.geojs.io/v1/ip/geo.json')
-          if (locData.latitude && locData.longitude) {
-            latitude = parseFloat(locData.latitude)
-            longitude = parseFloat(locData.longitude)
-            city = locData.city || locData.region || city
+            city = locData.city || city
           }
         }
       } catch (locErr) {
-        console.warn('All location auto-detect sources failed, using default:', locErr)
-        // Fallback silently to default
+        console.warn('Location API failed, using cached/default:', locErr)
+        // Fallback silently to cached or default
       }
 
-      // 2. Get Weather via Open-Meteo
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
-
-      const weatherRes = await fetch(weatherUrl)
+      // 2. Get Weather via API proxy
+      const weatherRes = await fetch(`/api/weather?type=forecast&lat=${latitude}&lon=${longitude}`)
       if (!weatherRes.ok) throw new Error('Weather fetch failed')
       const weatherData = await weatherRes.json()
 
