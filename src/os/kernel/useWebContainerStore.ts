@@ -193,7 +193,12 @@ app.listen(port, () => {
       webcontainer.fs.watch('/home/guest', { recursive: true }, async (event, filename) => {
         // Explicitly check if filename is string. fs.watch type definition might be loose.
         if (typeof filename !== 'string' || !filename) return
-        if (filename.startsWith('project/')) return
+
+        // Ignore node_modules and hidden files/directories
+        if (filename.includes('node_modules') || filename.includes('/.') || filename.startsWith('.')) return
+
+        // Previously we ignored project/, now we allow it for source code sync
+        // if (filename.startsWith('project/')) return
 
         set({ isSyncingFromWC: true })
 

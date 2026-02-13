@@ -264,7 +264,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                             <div
                                 className="absolute inset-0 transition-all duration-1000 bg-cover bg-center bg-no-repeat"
                                 style={{
-                                    backgroundImage: `url(${activeWallpaper})`,
+                                    backgroundImage: activeWallpaper ? `url(${activeWallpaper})` : undefined,
                                     opacity: 1,
                                     backgroundColor: !activeWallpaper ? 'var(--os-bg-base)' : undefined
                                 }}
@@ -272,7 +272,7 @@ export default function Desktop({ onToggleMenu }: DesktopProps) {
                             <div
                                 className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
                                 style={{
-                                    backgroundImage: `url(${loadedWallpaper})`,
+                                    backgroundImage: loadedWallpaper ? `url(${loadedWallpaper})` : undefined,
                                     ...getTransitionStyle(transitionType, !isWallpaperLoading && loadedWallpaper === wallpaper.value)
                                 }}
                             />
