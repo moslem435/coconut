@@ -95,15 +95,6 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'shortcut-browser': {
-        id: 'shortcut-browser',
-        parentId: 'desktop',
-        name: 'Browser',
-        type: 'file',
-        appId: 'browser',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    },
     'shortcut-terminal': {
         id: 'shortcut-terminal',
         parentId: 'desktop',

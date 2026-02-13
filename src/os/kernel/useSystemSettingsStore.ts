@@ -62,7 +62,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     isMuted: false,
     snapToGrid: true,
     showWeatherWidget: true,
-    pinnedAppIds: ['portfolio-hub', 'browser'],
+    pinnedAppIds: ['portfolio-hub', 'vscode-lite'],
     wallpaper: {
         type: 'preset',
         value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'

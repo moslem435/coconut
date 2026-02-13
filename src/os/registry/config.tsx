@@ -18,7 +18,6 @@ const register = (manifest: AppManifest) => (registry[manifest.id] = manifest, m
 register(require('@/apps/portfolio-hub/manifest').manifest)
 register(require('@/apps/settings/manifest').manifest)
 register(require('@/apps/file-explorer/manifest').manifest)
-register(require('@/apps/browser/manifest').manifest)
 register(require('@/apps/terminal/manifest').manifest)
 register(require('@/apps/notepad/manifest').manifest)
 register(require('@/apps/recycle-bin/manifest').manifest)
