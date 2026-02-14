@@ -209,6 +209,18 @@ class FileSystemSyncService {
   }
 
   /**
+   * 获取文件 Blob
+   */
+  async getFileBlob(path: string): Promise<Blob | null> {
+    try {
+      return await ioService.getFileBlob(path)
+    } catch (error) {
+      console.warn(`[SyncService] Failed to get blob for ${path}:`, error)
+      return null
+    }
+  }
+
+  /**
    * 读取目录内容
    */
   async readDirectory(path: string): Promise<string[]> {

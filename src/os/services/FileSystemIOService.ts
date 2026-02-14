@@ -118,6 +118,20 @@ class FileSystemIOService {
   }
 
   /**
+   * 获取文件 Blob (用于大文件/流式传输)
+   */
+  async getFileBlob(path: string): Promise<Blob> {
+    PathValidator.validate(path)
+    
+    try {
+      return await fs.getFileBlob(path)
+    } catch (error) {
+      console.error(`[IOService] Failed to get blob for ${path}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * 写入文件内容
    */
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {

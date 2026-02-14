@@ -29,6 +29,7 @@ export interface ActionSlice {
   
   // 内容访问
   readFileContent: (id: string) => Promise<string>
+  getFileBlob: (id: string) => Promise<Blob | null>
 }
 
 export const createActionSlice: StateCreator<
@@ -149,6 +150,19 @@ export const createActionSlice: StateCreator<
     } catch (e) {
       console.warn(`Failed to read content for ${id}`, e)
       return ''
+    }
+  },
+
+  // 获取文件 Blob（委托给 syncService）
+  getFileBlob: async (id) => {
+    const path = get().resolvePath(id)
+    if (!path) return null
+    
+    try {
+      return await syncService.getFileBlob(path)
+    } catch (e) {
+      console.warn(`Failed to get blob for ${id}`, e)
+      return null
     }
   }
 })

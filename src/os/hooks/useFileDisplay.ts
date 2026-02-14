@@ -24,32 +24,64 @@ export function useFileDisplay(item: FileNode) {
     return getFileIconAndTheme(item)
   }, [item])
 
-  const { readFileContent } = useFileSystemStore()
+  const { readFileContent, getFileBlob } = useFileSystemStore()
   const [thumbnail, setThumbnail] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
     const ext = item.name.split('.').pop()?.toLowerCase()
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext || '')
+    
+    // Blob URL 清理函数
+    let blobUrl: string | null = null;
 
     if (isImage) {
-      readFileContent(item.id).then(content => {
-        if (mounted) {
-          if (content.startsWith('http') || content.startsWith('data:')) {
-            setThumbnail(content)
-          } else {
-            setThumbnail(null)
-          }
+      // 优先尝试获取 Blob，避免 Base64 内存占用
+      getFileBlob(item.id).then(blob => {
+        if (!mounted) return;
+
+        if (blob) {
+          blobUrl = URL.createObjectURL(blob);
+          setThumbnail(blobUrl);
+        } else {
+          // 回退到读取内容（可能已经是 Base64 或 URL）
+          readFileContent(item.id).then(content => {
+            if (mounted) {
+              if (content.startsWith('http') || content.startsWith('data:')) {
+                setThumbnail(content)
+              } else {
+                setThumbnail(null)
+              }
+            }
+          }).catch(() => {
+            if (mounted) setThumbnail(null)
+          })
         }
       }).catch(() => {
-        if (mounted) setThumbnail(null)
+         // Fallback if getFileBlob fails
+          readFileContent(item.id).then(content => {
+            if (mounted) {
+              if (content.startsWith('http') || content.startsWith('data:')) {
+                setThumbnail(content)
+              } else {
+                setThumbnail(null)
+              }
+            }
+          }).catch(() => {
+            if (mounted) setThumbnail(null)
+          })
       })
     } else {
       setThumbnail(null)
     }
 
-    return () => { mounted = false }
-  }, [item.id, item.name, readFileContent])
+    return () => { 
+      mounted = false 
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl)
+      }
+    }
+  }, [item.id, item.name, readFileContent, getFileBlob])
 
   return { displayName, iconTheme, thumbnail }
 }

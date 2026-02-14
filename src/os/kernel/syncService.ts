@@ -1,21 +1,22 @@
 import { FileSystemState, FileNode } from './useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
+import { get, set as setIdx } from 'idb-keyval'
+import { FILESYSTEM_VERSION } from './initialFileTree'
 
 export const syncService = {
     syncToOPFS: async (state: FileSystemState, set: (partial: Partial<FileSystemState>) => void) => {
-        // Optimization: Only sync if root doesn't exist or force sync is needed
-        // This prevents overwriting user data on every reload if persistence is used
+        // Optimization: Use IndexedDB versioning to determine if sync is needed
         try {
+            const installedVersion = await get('fs_version')
             const rootExists = await fs.exists('/')
-            const desktopExists = await fs.exists('/Desktop')
 
-            if (rootExists && desktopExists) {
-                console.log('OPFS seems populated, skipping full sync to preserve data.')
+            if (rootExists && installedVersion === FILESYSTEM_VERSION) {
+                console.log(`[SyncService] Version match (${FILESYSTEM_VERSION}), skipping sync.`)
                 set({ isLoading: false })
                 return
             }
         } catch (e) {
-            console.warn('Failed to check OPFS status, proceeding with sync', e)
+            console.warn('Failed to check version, proceeding with sync', e)
         }
 
         set({ isLoading: true })
@@ -66,6 +67,15 @@ export const syncService = {
                 console.warn(`Sync failed for ${path}`, err)
             }
         }
+        
+        // Update version after successful sync
+        try {
+            await setIdx('fs_version', FILESYSTEM_VERSION)
+            console.log(`[SyncService] Updated fs_version to ${FILESYSTEM_VERSION}`)
+        } catch (e) {
+            console.warn('[SyncService] Failed to update fs_version', e)
+        }
+
         console.log('VFS -> OPFS Sync Complete')
         set({ isLoading: false })
     }

@@ -18,6 +18,8 @@ export interface FileNode {
 
 export const INITIAL_ROOT_ID = 'root'
 
+export const FILESYSTEM_VERSION = 2; // Increment this to force re-sync
+
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {
         id: INITIAL_ROOT_ID,
@@ -58,6 +60,15 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         type: 'folder',
         createdAt: Date.now(),
         updatedAt: Date.now()
+    },
+    'abstract-01': {
+        id: 'abstract-01',
+        parentId: 'pictures',
+        name: 'Abstract_01.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500 // Simulated size
     },
     'downloads': {
         id: 'downloads',

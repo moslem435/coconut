@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
 import { cn } from '@/lib/utils'
 import { Folder, ArrowUp, ArrowDown } from 'lucide-react'
@@ -117,6 +117,43 @@ export default function FileList({
     getScrollElement: () => listParentRef.current,
     estimateSize: () => 36,
     overscan: 10,
+    enabled: viewMode === 'list'
+  })
+
+  // Grid Virtualization Logic
+  const gridParentRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    if (!gridParentRef.current || viewMode !== 'grid') return
+    
+    const updateWidth = () => {
+      if (gridParentRef.current) {
+        setContainerWidth(gridParentRef.current.clientWidth)
+      }
+    }
+    
+    updateWidth()
+    
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(gridParentRef.current)
+    
+    return () => observer.disconnect()
+  }, [viewMode])
+
+  const GRID_ITEM_WIDTH = 100
+  const GRID_GAP = 16 // 1rem
+  const GRID_PADDING = 32 // 1rem * 2 (left + right)
+
+  const columns = Math.max(1, Math.floor((containerWidth - GRID_PADDING + GRID_GAP) / (GRID_ITEM_WIDTH + GRID_GAP)))
+  const rowCount = Math.ceil(items.length / columns)
+
+  const gridVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => gridParentRef.current,
+    estimateSize: () => 140, // Item height + gap
+    overscan: 5,
+    enabled: viewMode === 'grid'
   })
 
   // Empty State
@@ -134,48 +171,79 @@ export default function FileList({
     )
   }
 
-  // Grid view - simple non-virtualized
+  // Grid view - virtualized
   if (viewMode === 'grid') {
+    const virtualRows = gridVirtualizer.getVirtualItems()
+    
     return (
       <div
+        ref={gridParentRef}
         className="h-full overflow-y-auto pb-20 custom-scrollbar"
         onClick={(e) => onSelect('', e)}
       >
-        <div className="grid grid-cols-[repeat(auto-fill,100px)] gap-4 p-4">
-          {items.map(node => {
-            const isSelected = selectedIds.includes(node.id)
-
+        <div
+          style={{
+            height: `${gridVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualRows.map((virtualRow) => {
+            const startIndex = virtualRow.index * columns
+            const rowItems = items.slice(startIndex, Math.min(startIndex + columns, items.length))
+            
             return (
-              <FileGridItem
-                key={node.id}
-                item={node}
-                selected={isSelected}
-                renaming={renamingId === node.id}
-                onRename={(newName) => {
-                  if (newName && newName !== node.name) {
-                    renameItem(node.id, newName).catch(console.error)
-                  }
-                  setRenamingId(null)
+              <div
+                key={virtualRow.index}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${columns}, 100px)`,
+                  gap: '16px',
+                  padding: '16px', // p-4
                 }}
-                onCancelRename={() => setRenamingId(null)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, node.id)}
-                onDragOver={(e) => handleDragOver(e, node.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, node.id)}
-                onDragEnd={handleDragEnd}
-                onClick={(e) => handleMouseDown(e, node.id)}
-                onDoubleClick={() => onDoubleClick(node.id)}
-                onContextMenu={(e) => onContextMenu(e, node.id)}
-                className={cn(
-                  "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
-                  isSelected
-                    ? "bg-blue-500/20 border-blue-500/30 shadow-inner"
-                    : "",
-                  dropTargetId === node.id && "bg-green-500/20 border-green-500/30",
-                  draggedIds.includes(node.id) && "opacity-50"
-                )}
-              />
+              >
+                {rowItems.map(node => {
+                  const isSelected = selectedIds.includes(node.id)
+
+                  return (
+                    <FileGridItem
+                      key={node.id}
+                      item={node}
+                      selected={isSelected}
+                      renaming={renamingId === node.id}
+                      onRename={(newName) => {
+                        if (newName && newName !== node.name) {
+                          renameItem(node.id, newName).catch(console.error)
+                        }
+                        setRenamingId(null)
+                      }}
+                      onCancelRename={() => setRenamingId(null)}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, node.id)}
+                      onDragOver={(e) => handleDragOver(e, node.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, node.id)}
+                      onDragEnd={handleDragEnd}
+                      onClick={(e) => handleMouseDown(e, node.id)}
+                      onDoubleClick={() => onDoubleClick(node.id)}
+                      onContextMenu={(e) => onContextMenu(e, node.id)}
+                      className={cn(
+                        "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
+                        isSelected
+                          ? "bg-blue-500/20 border-blue-500/30 shadow-inner"
+                          : "",
+                        dropTargetId === node.id && "bg-green-500/20 border-green-500/30",
+                        draggedIds.includes(node.id) && "opacity-50"
+                      )}
+                    />
+                  )
+                })}
+              </div>
             )
           })}
         </div>

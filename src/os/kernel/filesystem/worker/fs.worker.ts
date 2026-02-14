@@ -280,7 +280,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
             }
         }
 
-        self.postMessage({ id, type, result });
+        self.postMessage({ id, type, result }, result instanceof Uint8Array ? [result.buffer] : []);
 
     } catch (error: any) {
         self.postMessage({ id, type, error: error.message });
