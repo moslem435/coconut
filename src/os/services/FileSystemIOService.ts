@@ -47,8 +47,13 @@ class FileSystemIOService {
         const buffer = await fs.readFile(path)
         return new TextDecoder().decode(buffer)
       }
-    } catch (error) {
-      console.error(`[IOService] Failed to read file ${path}:`, error)
+    } catch (error: any) {
+      if (error.message?.includes('File not found')) {
+        // Expected error for missing files, just warn or ignore
+        // console.warn(`[IOService] File not found: ${path}`)
+      } else {
+        console.error(`[IOService] Failed to read file ${path}:`, error)
+      }
       throw error
     }
   }
@@ -236,8 +241,12 @@ class FileSystemIOService {
         ctime: stats.ctime,
         mtime: stats.mtime
       }
-    } catch (error) {
-      console.error(`[IOService] Failed to stat ${path}:`, error)
+    } catch (error: any) {
+      if (error.message?.includes('File not found')) {
+        // Expected error, ignore log
+      } else {
+        console.error(`[IOService] Failed to stat ${path}:`, error)
+      }
       throw error
     }
   }

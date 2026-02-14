@@ -40,21 +40,21 @@ class FileSystemWorkerClient {
     if (this.isInitialized) return
     
     try {
-      // 使用动态导入创建 Worker
+      // 使用统一的 Worker
       this.worker = new Worker(
-        new URL('@/os/workers/fileSystemWorker.ts', import.meta.url),
+        new URL('../worker/fs.worker.ts', import.meta.url),
         { type: 'module' }
       )
       
       this.worker.onmessage = (event) => {
-        const { type, id, patch, error } = event.data
+        const { type, id, result, error } = event.data
         const pending = this.pendingRequests.get(id)
         
         if (pending) {
-          if (type === 'ERROR') {
+          if (error) {
             pending.reject(new Error(error))
-          } else if (type === 'DIFF_RESULT') {
-            pending.resolve(patch)
+          } else if (type === 'computeDiff') {
+            pending.resolve(result)
           }
           this.pendingRequests.delete(id)
         }
@@ -96,7 +96,7 @@ class FileSystemWorkerClient {
       this.pendingRequests.set(id, { resolve, reject })
       
       this.worker!.postMessage({
-        type: 'COMPUTE_DIFF',
+        type: 'computeDiff',
         id,
         ...request
       })

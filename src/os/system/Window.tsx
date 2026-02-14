@@ -107,6 +107,16 @@ export default function Window({ id }: WindowProps) {
     close: t('menu.close')
   }), [t])
 
+  // Optimization: Memoize App Content to avoid re-renders on zIndex change
+  const appContent = useMemo(() => {
+    if (!AppComp) return null
+    return (
+      <AppErrorBoundary appId={id}>
+        <AppComp {...(windowState?.componentProps || {})} />
+      </AppErrorBoundary>
+    )
+  }, [AppComp, id, windowState?.componentProps])
+
   if (!windowState || !windowState.isOpen) return null
 
   const isPeeking = peekWindowId === id
@@ -258,15 +268,11 @@ export default function Window({ id }: WindowProps) {
             windowId: id,
             dragControls: windowState.isMaximized ? dragControls : ghostDragControls
           }}>
-            <AppErrorBoundary appId={id}>
-              {AppComp ? (
-                <AppComp {...(windowState.componentProps || {})} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-red-400">
-                  App Component Not Found (ID: {windowState.appId})
-                </div>
-              )}
-            </AppErrorBoundary>
+            {appContent || (
+              <div className="flex items-center justify-center h-full text-red-400">
+                App Component Not Found (ID: {windowState.appId})
+              </div>
+            )}
           </WindowContext.Provider>
 
 

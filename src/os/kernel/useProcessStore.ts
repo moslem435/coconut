@@ -91,22 +91,51 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
     },
 
     tick: () => {
-        set(state => {
-            const processList = Object.values(state.processes)
-
-            // Update all process metrics using the simplified simulator
-            updateAllProcesses(processList)
-
-            // Build updated processes map
-            const updatedProcesses = processList.reduce((acc, pcb) => {
-                acc[pcb.pid] = pcb
-                return acc
-            }, {} as Record<number, ProcessControlBlock>)
-
-            return { processes: updatedProcesses }
-        })
+        // Optimistic update via worker
+        // Logic moved to ProcessWorkerClient
     }
 }))
+
+// --- Worker Integration ---
+
+let worker: Worker | null = null;
+
+if (typeof window !== 'undefined') {
+    worker = new Worker(new URL('./worker/process.worker.ts', import.meta.url), { type: 'module' })
+
+    worker.onmessage = (e) => {
+        const { processes } = e.data
+        const store = useProcessStore.getState()
+        
+        // Update store with calculated metrics
+        // We need to merge metrics back carefully to not overwrite other state changes
+        // But since this is a simulation, we assume process list stability for now or just update metrics
+        
+        // Optimization: Convert array back to map
+        const updatedMap = { ...store.processes }
+        
+        processes.forEach((p: ProcessControlBlock) => {
+            if (updatedMap[p.pid]) {
+                updatedMap[p.pid] = { 
+                    ...updatedMap[p.pid], 
+                    cpuUsage: p.cpuUsage, 
+                    memoryUsage: p.memoryUsage 
+                }
+            }
+        })
+        
+        useProcessStore.setState({ processes: updatedMap })
+    }
+
+    // Start the loop
+    setInterval(() => {
+        const store = useProcessStore.getState()
+        const processList = Object.values(store.processes)
+        if (processList.length > 0 && worker) {
+            worker.postMessage({ processes: processList })
+        }
+    }, 2000)
+}
 
 // 监听应用启动事件，自动创建进程
 eventBus.on('app:launched', ({ appId, windowId }) => {

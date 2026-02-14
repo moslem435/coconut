@@ -1,0 +1,75 @@
+/**
+ * FileStat Interface
+ */
+export interface FileStat {
+    size: number;
+    mtime: number;
+    atime: number;
+    ctime: number;
+    isDirectory: boolean;
+    isFile: boolean;
+    mimeType?: string;
+}
+
+/**
+ * Standard Interface for the Kernel's Virtual File System.
+ */
+export interface IFileSystem {
+    // --- Core IO Operations ---
+
+    /**
+     * Read file content.
+     * Returns Uint8Array for binary data, which can be decoded to string if needed.
+     */
+    readFile(path: string): Promise<Uint8Array>;
+
+    /**
+     * Get file as Blob (for large files, streaming).
+     * Recommended for videos, images, and large binary files.
+     */
+    getFileBlob(path: string): Promise<Blob>;
+
+    /**
+     * Write file content.
+     * Overwrites if exists, creates if not.
+     */
+    writeFile(path: string, content: Uint8Array | string): Promise<void>;
+
+    /**
+     * Delete a file or directory.
+     * For directories, `recursive` must be true if not empty.
+     */
+    unlink(path: string, recursive?: boolean): Promise<void>;
+
+    /**
+     * Rename or move a file/directory.
+     */
+    rename(oldPath: string, newPath: string): Promise<void>;
+
+    // --- Directory Operations ---
+
+    /**
+     * List files in a directory.
+     * Returns an array of filenames (not full paths).
+     */
+    readdir(path: string): Promise<string[]>;
+
+    /**
+     * Create a directory.
+     * If `recursive` is true, creates parent directories as needed (mkdir -p).
+     */
+    mkdir(path: string, recursive?: boolean): Promise<void>;
+
+    // --- Metadata ---
+
+    /**
+     * Get file statistics.
+     * Throws error if file does not exist.
+     */
+    stat(path: string): Promise<FileStat>;
+
+    /**
+     * Check if a path exists.
+     */
+    exists(path: string): Promise<boolean>;
+}

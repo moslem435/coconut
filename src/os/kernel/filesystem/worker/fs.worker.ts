@@ -3,33 +3,59 @@
 /**
  * fs.worker.ts
  * 
- * This worker manages the Origin Private File System (OPFS).
- * It uses the scalable `FileSystemSyncAccessHandle` API which is only available in Workers.
+ * Unified File System Worker
+ * 
+ * Responsibilities:
+ * 1. IO Operations (Read/Write to OPFS)
+ * 2. Diff Computation (Compare file trees)
  * 
  * Communication Protocol:
- * Request: { id: string, type: string, path: string, content?: Uint8Array | string, recursive?: boolean }
- * Response: { id: string, result?: any, error?: string }
+ * Request: { id: string, type: string, ...payload }
+ * Response: { id: string, type: string, result?: any, error?: string }
  */
 
-self.onmessage = async (e: MessageEvent) => {
-    const { id, type, path, content, recursive, oldPath, newPath } = e.data;
+import type { FileNode } from '../../initialFileTree'
+
+interface FileSystemRequest {
+    id: string
+    type: 'readFile' | 'getFileBlob' | 'writeFile' | 'unlink' | 'readdir' | 'mkdir' | 'stat' | 'exists' | 'rename' | 'computeDiff'
+    path?: string
+    content?: Uint8Array | string
+    recursive?: boolean
+    oldPath?: string
+    newPath?: string
+    // Diff specific
+    currentFiles?: FileNode[]
+    fsSnapshot?: Array<{
+        name: string
+        isDirectory: boolean
+        mtime: number
+        size?: number
+    }>
+    folderId?: string
+}
+
+self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
+    const { id, type, path, content, recursive, oldPath, newPath, currentFiles, fsSnapshot, folderId } = e.data;
 
     try {
-        const root = await navigator.storage.getDirectory();
+        // Initialize Root for IO operations
+        let root: FileSystemDirectoryHandle | null = null;
+        if (type !== 'computeDiff') {
+             root = await navigator.storage.getDirectory();
+        }
+
         let result;
 
         switch (type) {
             case 'readFile': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 const handle = await getFileHandle(root, path);
-                // Use standard getFile for read if possible to avoid lock
-                // createSyncAccessHandle locks the file exclusively
                 try {
                     const file = await handle.getFile();
                     const buffer = await file.arrayBuffer();
                     result = new Uint8Array(buffer);
                 } catch (readError) {
-                     // Fallback to sync handle if getFile fails for some reason (rare for read)
-                     // or if we strictly need synchronous behavior (but we are in async worker)
                      const accessHandle = await handle.createSyncAccessHandle();
                      try {
                         const fileSize = accessHandle.getSize();
@@ -44,15 +70,16 @@ self.onmessage = async (e: MessageEvent) => {
             }
 
             case 'getFileBlob': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 const handle = await getFileHandle(root, path);
                 const file = await handle.getFile();
-                result = file;  // Return File object (extends Blob)
+                result = file;
                 break;
             }
 
             case 'writeFile': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 const handle = await getFileHandle(root, path, true);
-                // Try-catch around createSyncAccessHandle to handle locks
                 try {
                     const accessHandle = await handle.createSyncAccessHandle();
                     try {
@@ -60,7 +87,7 @@ self.onmessage = async (e: MessageEvent) => {
                         if (typeof content === 'string') {
                             data = new TextEncoder().encode(content);
                         } else {
-                            data = content;
+                            data = content as Uint8Array;
                         }
 
                         accessHandle.truncate(0);
@@ -70,7 +97,6 @@ self.onmessage = async (e: MessageEvent) => {
                         accessHandle.close();
                     }
                 } catch (lockError: any) {
-                    // If locked, try standard writable (stream) which might queue
                     if (lockError.name === 'NoModificationAllowedError' || lockError.message.includes('Access Handle')) {
                         const writable = await handle.createWritable();
                         try {
@@ -90,14 +116,16 @@ self.onmessage = async (e: MessageEvent) => {
             }
 
             case 'unlink': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 await removePath(root, path, recursive);
                 break;
             }
 
             case 'readdir': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 const dirHandle = await getDirHandle(root, path);
                 const entries: string[] = [];
-                // @ts-ignore - Iteration over directory handle
+                // @ts-ignore
                 for await (const [name] of dirHandle.entries()) {
                     entries.push(name);
                 }
@@ -106,41 +134,45 @@ self.onmessage = async (e: MessageEvent) => {
             }
 
             case 'mkdir': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 await getDirHandle(root, path, true);
                 break;
             }
 
             case 'stat': {
-                // Determine if it's a file or directory
-                // This is a bit tricky with pure OPFS without traversing everything.
-                // We'll try to get it as file first, then directory.
+                if (!root || !path) throw new Error('Invalid arguments');
                 try {
                     const handle = await getFileHandle(root, path);
                     const file = await handle.getFile();
                     result = {
                         size: file.size,
                         mtime: file.lastModified,
-                        atime: file.lastModified,
-                        ctime: file.lastModified,
-                        isFile: true,
-                        isDirectory: false
-                    };
-                } catch {
-                    // Try directory
-                    await getDirHandle(root, path);
-                    result = {
-                        size: 0,
-                        mtime: Date.now(),
                         atime: Date.now(),
                         ctime: Date.now(),
-                        isFile: false,
-                        isDirectory: true
+                        isDirectory: false,
+                        isFile: true,
+                        mimeType: file.type || undefined
                     };
+                } catch {
+                    try {
+                        await getDirHandle(root, path);
+                        result = {
+                            size: 0,
+                            mtime: Date.now(),
+                            atime: Date.now(),
+                            ctime: Date.now(),
+                            isDirectory: true,
+                            isFile: false
+                        };
+                    } catch {
+                        throw new Error(`File not found: ${path}`);
+                    }
                 }
                 break;
             }
 
             case 'exists': {
+                if (!root || !path) throw new Error('Invalid arguments');
                 try {
                     await getFileHandle(root, path);
                     result = true;
@@ -156,12 +188,11 @@ self.onmessage = async (e: MessageEvent) => {
             }
 
             case 'rename': {
+                if (!root || !oldPath || !newPath) throw new Error('Invalid arguments');
                 // Fallback: Copy + Delete Strategy
-                // 1. Check source type
                 let sourceHandle: FileSystemHandle;
                 let isFile = true;
 
-                // Try to find source
                 try {
                     sourceHandle = await getFileHandle(root, oldPath);
                 } catch {
@@ -178,68 +209,115 @@ self.onmessage = async (e: MessageEvent) => {
                     const file = await oldFileHandle.getFile();
                     const fileContent = await file.arrayBuffer();
 
-                    // Write new
                     const newHandle = await getFileHandle(root, newPath, true);
                     const accessHandle = await newHandle.createSyncAccessHandle();
-                    accessHandle.truncate(0);
-                    accessHandle.write(new Uint8Array(fileContent), { at: 0 });
-                    accessHandle.flush();
-                    accessHandle.close();
-
-                    // Delete old
-                    await removePath(root, oldPath);
+                    try {
+                        accessHandle.truncate(0);
+                        accessHandle.write(new Uint8Array(fileContent), { at: 0 });
+                        accessHandle.flush();
+                    } finally {
+                        accessHandle.close();
+                    }
+                    await root.removeEntry(oldPath.split('/').pop()!);
                 } else {
-                    throw new Error("Directory rename not fully supported in V1");
+                    // Recursive directory move not fully implemented in this simple fallback
+                    // For now, assume empty or implement recursive copy if needed
+                    await getDirHandle(root, newPath, true);
+                    await root.removeEntry(oldPath.split('/').pop()!);
                 }
                 break;
             }
 
-            default:
-                throw new Error(`Unknown command: ${type}`);
+            case 'computeDiff': {
+                if (!currentFiles || !fsSnapshot || !folderId) throw new Error('Invalid diff arguments');
+                
+                const currentMap = new Map(currentFiles.map(f => [f.name, f]));
+                const fsMap = new Map(fsSnapshot.map(f => [f.name, f]));
+                
+                const patch = {
+                  toAdd: [] as FileNode[],
+                  toRemove: [] as string[],
+                  toUpdate: [] as Array<{ id: string; updates: Partial<FileNode> }>
+                };
+                
+                // 1. Remove (in current but not in fs)
+                for (const [name, file] of currentMap) {
+                  if (!fsMap.has(name)) {
+                    patch.toRemove.push(file.id);
+                  }
+                }
+                
+                // 2. Add or Update
+                for (const [name, fsEntry] of fsMap) {
+                  const existing = currentMap.get(name);
+                  
+                  if (!existing) {
+                    // New file
+                    patch.toAdd.push({
+                      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                      parentId: folderId,
+                      name,
+                      type: fsEntry.isDirectory ? 'folder' : 'file',
+                      createdAt: Date.now(),
+                      updatedAt: fsEntry.mtime,
+                      size: fsEntry.size || 0,
+                      isMount: false
+                    });
+                  } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== fsEntry.size) {
+                    // Update file
+                    patch.toUpdate.push({
+                      id: existing.id,
+                      updates: {
+                        updatedAt: fsEntry.mtime,
+                        size: fsEntry.size
+                      }
+                    });
+                  }
+                }
+                
+                result = patch;
+                break;
+            }
         }
 
-        self.postMessage({ id, result });
+        self.postMessage({ id, type, result });
 
-    } catch (err: any) {
-        self.postMessage({ id, error: err.message || JSON.stringify(err) });
+    } catch (error: any) {
+        self.postMessage({ id, type, error: error.message });
     }
 };
 
 // --- Helpers ---
 
-async function getFileHandle(root: FileSystemDirectoryHandle, path: string, create = false): Promise<FileSystemFileHandle> {
+async function getFileHandle(root: FileSystemDirectoryHandle, path: string, create = false) {
     const parts = path.split('/').filter(p => p.length > 0);
     const fileName = parts.pop();
+    if (!fileName) throw new Error('Invalid file path');
 
-    if (!fileName) throw new Error('Invalid path');
-
-    let dir = root;
+    let current = root;
     for (const part of parts) {
-        dir = await dir.getDirectoryHandle(part, { create });
+        current = await current.getDirectoryHandle(part, { create });
     }
-
-    return dir.getFileHandle(fileName, { create });
+    return await current.getFileHandle(fileName, { create });
 }
 
-async function getDirHandle(root: FileSystemDirectoryHandle, path: string, create = false): Promise<FileSystemDirectoryHandle> {
+async function getDirHandle(root: FileSystemDirectoryHandle, path: string, create = false) {
     const parts = path.split('/').filter(p => p.length > 0);
-    let dir = root;
+    let current = root;
     for (const part of parts) {
-        dir = await dir.getDirectoryHandle(part, { create });
+        current = await current.getDirectoryHandle(part, { create });
     }
-    return dir;
+    return current;
 }
 
 async function removePath(root: FileSystemDirectoryHandle, path: string, recursive = false) {
     const parts = path.split('/').filter(p => p.length > 0);
     const name = parts.pop();
+    if (!name) return;
 
-    if (!name) return; // Root?
-
-    let dir = root;
+    let current = root;
     for (const part of parts) {
-        dir = await dir.getDirectoryHandle(part);
+        current = await current.getDirectoryHandle(part);
     }
-
-    await dir.removeEntry(name, { recursive });
+    await current.removeEntry(name, { recursive });
 }
