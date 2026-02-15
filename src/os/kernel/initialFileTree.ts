@@ -196,6 +196,15 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
+    'shortcut-ai-chat': {
+        id: 'shortcut-ai-chat',
+        parentId: 'desktop',
+        name: 'AI Assistant',
+        type: 'file',
+        appId: 'ai-chat',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    },
     // Sample Folders
     'music': {
         id: 'music',
