@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Script from 'next/script'
-import { Play, Power, Save, Upload, AlertCircle, Monitor, Download, HardDrive, Trash2 } from 'lucide-react'
+import { Monitor, AlertCircle } from 'lucide-react'
 import { OS_PRESETS, OSConfig } from './config'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useImageDownloader } from './hooks/useImageDownloader'
 import { ImageStorage } from './services/ImageStorage'
+import { EmulatorSidebar } from './components/EmulatorSidebar'
+import { EmulatorTerminal } from './components/EmulatorTerminal'
 
 declare global {
     interface Window {
@@ -24,6 +26,7 @@ export default function EmulatorApp() {
     const [v86Loaded, setV86Loaded] = useState(false)
     const [localError, setLocalError] = useState<string | null>(null)
     const [isLocalReady, setIsLocalReady] = useState(false)
+    const [emulatorInstance, setEmulatorInstance] = useState<any>(null)
     
     const { progress, isDownloading, error: downloadError, downloadImage } = useImageDownloader()
     
@@ -102,9 +105,6 @@ export default function EmulatorApp() {
                 bootSource = { url: customUrl }
             } else if (isLocalReady) {
                 // Load from OPFS
-                // v86 needs ArrayBuffer or File object.
-                // However, passing File object directly sometimes has issues in async context or worker
-                // Let's try explicit buffer read
                 console.log('Loading local file:', filename)
                 try {
                     const buffer = await ImageStorage.getFileBuffer(filename)
@@ -117,8 +117,6 @@ export default function EmulatorApp() {
                     return
                 }
             } else {
-                // Fallback to remote? Or force download?
-                // Let's force download if not windows98
                 if (selectedOS.id !== 'windows98') {
                     setLocalError(t('emulator.error.not_downloaded'))
                     setIsStarting(false)
@@ -162,6 +160,7 @@ export default function EmulatorApp() {
             try {
                 const starter = new V86Constructor(config)
                 emulatorRef.current = starter
+                setEmulatorInstance(starter)
 
                 // Add debug listeners
                 starter.add_listener('emulator-ready', () => {
@@ -178,9 +177,6 @@ export default function EmulatorApp() {
                     setLocalError('Emulator download error: ' + (e?.message || 'Unknown'))
                 })
                 
-                // Wait for init
-                // await new Promise<void>((resolve) => setTimeout(resolve, 100))
-                
                 setIsRunning(true)
                 setLocalError(null)
             } catch (initErr: any) {
@@ -192,6 +188,7 @@ export default function EmulatorApp() {
             console.error('Failed to start emulator:', err)
             setLocalError(err.message || 'Failed to start emulator')
             setIsRunning(false)
+            setEmulatorInstance(null)
         } finally {
             setIsStarting(false)
         }
@@ -202,6 +199,7 @@ export default function EmulatorApp() {
             emulatorRef.current.destroy()
             emulatorRef.current = null
         }
+        setEmulatorInstance(null)
         setIsRunning(false)
         if (screenRef.current) screenRef.current.innerHTML = ''
     }
@@ -215,7 +213,7 @@ export default function EmulatorApp() {
     const displayedError = localError || downloadError
 
     return (
-        <div className="flex flex-col h-full bg-black text-white overflow-hidden pt-10">
+        <div className="flex h-full bg-black text-white overflow-hidden pt-10">
             <Script 
                 src="/v86/libv86.js" 
                 strategy="afterInteractive"
@@ -223,150 +221,82 @@ export default function EmulatorApp() {
                 onError={() => setLocalError('Failed to load emulator core.')}
             />
 
-            {/* Toolbar */}
-            <div className="flex items-center gap-2 p-2 bg-[#2d2d2d] border-b border-[#3d3d3d] shrink-0">
-                <div className="flex items-center gap-2 mr-4">
-                    <span className="text-sm font-semibold text-gray-300">{t('emulator.profile')}:</span>
-                    <select 
-                        className="bg-[#1e1e1e] border border-[#3d3d3d] rounded px-2 py-1 text-sm outline-none focus:border-blue-500 max-w-[150px]"
-                        value={selectedOS?.id || ''}
-                        onChange={(e) => {
-                            const os = OS_PRESETS.find(p => p.id === e.target.value)
-                            if (os) {
-                                setSelectedOS(os)
-                                setCustomUrl('')
-                            }
-                        }}
-                        disabled={isRunning || isDownloading || isStarting}
-                    >
-                        {OS_PRESETS.map(os => (
-                            <option key={os.id} value={os.id}>{os.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {selectedOS?.id === 'windows98' && (
-                     <input 
-                        type="text" 
-                        placeholder="ISO/IMG URL..." 
-                        className="bg-[#1e1e1e] border border-[#3d3d3d] rounded px-2 py-1 text-sm outline-none focus:border-blue-500 w-48"
-                        value={customUrl}
-                        onChange={(e) => setCustomUrl(e.target.value)}
-                        disabled={isRunning}
-                    />
-                )}
-
-                {/* Controls */}
-                {!isRunning ? (
-                    <>
-                        {/* Download Button (Only for presets) */}
-                        {selectedOS?.id !== 'windows98' && !isLocalReady && (
-                            <button 
-                                onClick={handleDownload}
-                                disabled={isDownloading}
-                                className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50 transition-colors"
-                            >
-                                <Download size={14} />
-                                {isDownloading ? `${progress}%` : t('emulator.download')}
-                            </button>
-                        )}
-
-                        {/* Start Button */}
-                        <button 
-                            onClick={startEmulator}
-                            disabled={!v86Loaded || !selectedOS || (selectedOS.id !== 'windows98' && !isLocalReady) || isStarting}
-                            className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isStarting ? (
-                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <Play size={14} />
-                            )}
-                            {isStarting ? 'Starting...' : t('emulator.start')}
-                        </button>
-
-                        {/* Delete Cache Button */}
-                        {isLocalReady && (
-                            <button 
-                                onClick={handleDeleteLocal}
-                                className="p-1.5 hover:bg-red-900/50 text-red-400 hover:text-red-300 rounded transition-colors"
-                                title={t('emulator.delete_cache')}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        )}
-                    </>
-                ) : (
-                    <button 
-                        onClick={stopEmulator}
-                        className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition-colors"
-                    >
-                        <Power size={14} />
-                        {t('emulator.stop')}
-                    </button>
-                )}
-
-                <div className="h-4 w-px bg-[#3d3d3d] mx-2" />
-
-                <div className="flex-1" />
-
-                {/* Status Indicators */}
-                {isLocalReady && !isRunning && (
-                    <div className="flex items-center gap-1 text-green-400 text-xs px-2">
-                        <HardDrive size={12} />
-                        Local Ready
-                    </div>
-                )}
-
-                {displayedError && (
-                    <div className="flex items-center gap-1 text-red-400 text-xs px-2 truncate max-w-[200px]" title={displayedError}>
-                        <AlertCircle size={12} />
-                        {displayedError}
-                    </div>
-                )}
+            {/* Sidebar Resource Manager */}
+            <div className="w-64 shrink-0 h-full border-r border-[#333]">
+                <EmulatorSidebar 
+                    selectedOS={selectedOS}
+                    onSelectOS={(os) => {
+                        setSelectedOS(os)
+                        setCustomUrl('')
+                    }}
+                    isLocalReady={isLocalReady}
+                    onDownload={handleDownload}
+                    onDelete={handleDeleteLocal}
+                    isDownloading={isDownloading}
+                    progress={progress}
+                    isRunning={isRunning}
+                    onStart={startEmulator}
+                    onStop={stopEmulator}
+                    isStarting={isStarting}
+                    v86Loaded={v86Loaded}
+                />
             </div>
 
-            {/* Screen Container */}
-            <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-                {/* Overlay for Status/Download/Error */}
-                {!isRunning && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-                        <div className="flex flex-col items-center gap-4 text-gray-500">
-                            {isDownloading ? (
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                                    <p className="text-blue-400 font-medium">Downloading... {progress}%</p>
-                                    <p className="text-xs text-gray-500">Saved to Local Storage (OPFS)</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <Monitor size={64} className="opacity-20" />
-                                    <div className="text-center">
-                                        <h3 className="text-lg font-medium text-gray-300">{selectedOS?.name}</h3>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            {isLocalReady ? t('emulator.status.ready') : t('emulator.status.need_download')}
-                                        </p>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-full min-w-0">
+                {/* Screen Area */}
+                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+                    {/* Overlay for Status/Download/Error */}
+                    {!isRunning && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0a0a0a]">
+                            <div className="flex flex-col items-center gap-4 text-gray-500">
+                                {isDownloading ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                                        <p className="text-blue-400 font-medium">Downloading... {progress}%</p>
+                                        <p className="text-xs text-gray-500">Saved to Local Storage (OPFS)</p>
                                     </div>
-                                </>
-                            )}
+                                ) : (
+                                    <>
+                                        <Monitor size={64} className="opacity-20" />
+                                        <div className="text-center">
+                                            <h3 className="text-lg font-medium text-gray-300">{selectedOS?.name || 'Select OS'}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                {isLocalReady ? 'Ready to Boot' : 'Download Required'}
+                                            </p>
+                                            {displayedError && (
+                                                <div className="mt-4 flex items-center justify-center gap-2 text-red-400 text-sm bg-red-900/20 px-4 py-2 rounded">
+                                                    <AlertCircle size={16} />
+                                                    {displayedError}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
+                    )}
+                    
+                    {/* v86 Screen Container */}
+                    <div 
+                        ref={screenRef} 
+                        id="screen_container"
+                        className="w-full h-full flex items-center justify-center bg-black"
+                    >
+                        <style jsx global>{`
+                            #screen_container canvas {
+                                display: block;
+                                max-width: 100%;
+                                max-height: 100%;
+                                object-fit: contain;
+                            }
+                        `}</style>
                     </div>
-                )}
-                
-                {/* v86 Screen Container - Always mounted */}
-                <div 
-                    ref={screenRef} 
-                    id="screen_container"
-                    className="w-full h-full flex items-center justify-center bg-black"
-                >
-                    <style jsx global>{`
-                        #screen_container canvas {
-                            display: block;
-                            max-width: 100%;
-                            max-height: 100%;
-                            object-fit: contain;
-                        }
-                    `}</style>
+                </div>
+
+                {/* Terminal Area */}
+                <div className="h-48 shrink-0 bg-black border-t border-[#333]">
+                    <EmulatorTerminal emulator={emulatorInstance} />
                 </div>
             </div>
         </div>
