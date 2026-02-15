@@ -1,8 +1,9 @@
 const en: Record<string, string> = {
     // App Titles
-    "app.portfolio-hub": "Portfolio Hub",
+    "app.portfolio-hub": "Portfolio",
     "app.settings": "Settings",
     "app.browser": "Browser",
+    "app.calculator": "Calculator",
     "app.file-explorer": "File Explorer",
     "app.music-player": "Music Player",
     "app.notepad": "Notepad",
@@ -13,6 +14,22 @@ const en: Record<string, string> = {
     "app.vscode-lite": "VS Code",
     "app.task-manager": "Task Manager",
     "app.sandbox-test": "Sandbox Test",
+    "app.emulator": "Retro PC",
+    "emulator.download": "Download Image",
+    "emulator.status.ready": "Ready (Local Cache)",
+    "emulator.status.need_download": "Image Download Required",
+    "emulator.delete_cache": "Delete Local Cache",
+    "emulator.confirm_delete": "Are you sure you want to delete the local cached image? You will need to download it again.",
+    "emulator.error.not_downloaded": "Please download the system image first",
+    "emulator.profile": "Profile",
+    "emulator.start": "Start",
+    "emulator.stop": "Stop",
+    "emulator.save": "Save State",
+    "emulator.upload": "Upload Image",
+    "emulator.error.image": "Please provide a valid disk image URL",
+    "emulator.placeholder.select": "Select an OS and click Start",
+    "emulator.placeholder.loading": "Loading emulator core...",
+    "emulator.placeholder.win98": "Note: You need to provide a Windows 98 ISO URL",
 
     // Boot Sequence
     "boot.start": "Click to Start",
@@ -47,6 +64,13 @@ const en: Record<string, string> = {
     "settings.desc.about": "System information and version",
 
     // Files & Folders
+    "explorer.root": "Root",
+    "explorer.desktop": "Desktop",
+    "explorer.documents": "Documents",
+    "explorer.pictures": "Pictures",
+    "explorer.downloads": "Downloads",
+    "explorer.music": "Music",
+    "explorer.code": "Code",
     "file.welcome": "Welcome.txt",
     "file.about": "About.md",
     "file.code.hello": "hello_world.ts",
@@ -318,6 +342,21 @@ const en: Record<string, string> = {
     "common.ok": "OK",
     "common.cancel": "Cancel",
     "common.confirm": "Confirm",
+
+    // Calendar
+    "calendar.week.sun": "Su",
+    "calendar.week.mon": "Mo",
+    "calendar.week.tue": "Tu",
+    "calendar.week.wed": "We",
+    "calendar.week.thu": "Th",
+    "calendar.week.fri": "Fr",
+    "calendar.week.sat": "Sa",
+    "calendar.select.month": "Select Month",
+    "calendar.select.year": "Select Year",
+    "calendar.select.date": "Select a date",
+    "calendar.today": "Back to Today",
+    "calendar.holiday.work": "W",
+    "calendar.holiday.rest": "H",
 }
 
 export default en

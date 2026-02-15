@@ -1,10 +1,10 @@
 const zh: Record<string, string> = {
     // App Titles
-    "app.portfolio-hub": "Portfolio Hub",
+    "app.portfolio-hub": "Portfolio",
     "app.settings": "设置",
     "app.browser": "浏览器",
     "app.calculator": "计算器",
-    "app.file-explorer": "文件资源管理器",
+    "app.file-explorer": "资源管理器",
     "app.music-player": "音乐播放器",
     "app.notepad": "记事本",
     "app.photo-gallery": "照片库",
@@ -14,6 +14,22 @@ const zh: Record<string, string> = {
     "app.vscode-lite": "VS Code",
     "app.task-manager": "任务管理器",
     "app.sandbox-test": "沙箱测试",
+    "app.emulator": "模拟器",
+    "emulator.download": "下载镜像",
+    "emulator.status.ready": "已就绪 (本地缓存)",
+    "emulator.status.need_download": "需要下载镜像",
+    "emulator.delete_cache": "删除本地缓存",
+    "emulator.confirm_delete": "确定要删除本地缓存的镜像文件吗？下次启动需要重新下载。",
+    "emulator.error.not_downloaded": "请先下载系统镜像",
+    "emulator.profile": "系统配置",
+    "emulator.start": "启动",
+    "emulator.stop": "停止",
+    "emulator.save": "保存状态",
+    "emulator.upload": "上传镜像",
+    "emulator.error.image": "请提供有效的磁盘镜像链接",
+    "emulator.placeholder.select": "选择一个系统并点击启动",
+    "emulator.placeholder.loading": "正在加载模拟器核心...",
+    "emulator.placeholder.win98": "注意：你需要提供 Windows 98 ISO 链接",
 
     // Boot Sequence
     "boot.start": "点击启动",
@@ -48,6 +64,13 @@ const zh: Record<string, string> = {
     "settings.desc.about": "系统信息和版本",
 
     // Files & Folders
+    "explorer.root": "根目录",
+    "explorer.desktop": "桌面",
+    "explorer.documents": "文档",
+    "explorer.pictures": "图片",
+    "explorer.downloads": "下载",
+    "explorer.music": "音乐",
+    "explorer.code": "代码",
     "file.welcome": "欢迎.txt",
     "file.about": "关于.md",
     "file.code.hello": "hello_world.ts",
@@ -344,6 +367,21 @@ const zh: Record<string, string> = {
     "common.ok": "确定",
     "common.cancel": "取消",
     "common.confirm": "确认",
+
+    // Calendar
+    "calendar.week.sun": "日",
+    "calendar.week.mon": "一",
+    "calendar.week.tue": "二",
+    "calendar.week.wed": "三",
+    "calendar.week.thu": "四",
+    "calendar.week.fri": "五",
+    "calendar.week.sat": "六",
+    "calendar.select.month": "选择月份",
+    "calendar.select.year": "选择年份",
+    "calendar.select.date": "选择日期",
+    "calendar.today": "回到今天",
+    "calendar.holiday.work": "班",
+    "calendar.holiday.rest": "休",
 }
 
 export default zh

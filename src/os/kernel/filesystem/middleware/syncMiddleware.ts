@@ -38,8 +38,19 @@ export function createSyncMiddleware(
   const operationQueue: SyncOperation[] = []
   const inFlightOps = new Map<string, SyncOperation>()
   
+  // Serial Queue to prevent race conditions
+  let syncChain = Promise.resolve()
+
+  const queueOperation = (op: SyncOperation) => {
+    syncChain = syncChain
+        .then(() => executeOperation(op))
+        .catch(err => {
+            console.error(`[SyncMiddleware] Op ${op.type}:${op.id} failed:`, err)
+        })
+  }
+
   // 监听文件系统操作事件
-  eventBus.on('fs:file:created', async (data: any) => {
+  eventBus.on('fs:file:created', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
       type: 'create',
@@ -47,10 +58,10 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    await executeOperation(operation)
+    queueOperation(operation)
   })
   
-  eventBus.on('fs:file:deleted', async (data: any) => {
+  eventBus.on('fs:file:deleted', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
       type: 'delete',
@@ -58,10 +69,10 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    await executeOperation(operation)
+    queueOperation(operation)
   })
   
-  eventBus.on('fs:file:renamed', async (data: any) => {
+  eventBus.on('fs:file:renamed', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
       type: 'rename',
@@ -69,10 +80,10 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    await executeOperation(operation)
+    queueOperation(operation)
   })
   
-  eventBus.on('fs:file:moved', async (data: any) => {
+  eventBus.on('fs:file:moved', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
       type: 'move',
@@ -80,10 +91,10 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    await executeOperation(operation)
+    queueOperation(operation)
   })
   
-  eventBus.on('fs:file:updated', async (data: any) => {
+  eventBus.on('fs:file:updated', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
       type: 'update',
@@ -91,7 +102,7 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    await executeOperation(operation)
+    queueOperation(operation)
   })
   
   /**

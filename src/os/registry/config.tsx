@@ -27,6 +27,7 @@ register(require('@/apps/weather/manifest').manifest)
 register(require('@/apps/vscode-lite/manifest').manifest)
 register(require('@/apps/sandbox-test/manifest').manifest)
 register(require('@/apps/task-manager/manifest').manifest)
+register(require('@/apps/emulator/manifest').manifest)
 
 // Register Internal Utility Apps (Components used as apps)
 // These allow opening files with specific viewers without needing full app manifest files for each utility

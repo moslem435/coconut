@@ -140,7 +140,31 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                     </div>
 
                     {/* Menu Items */}
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-4 gap-2 p-2 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {Object.values(APPS_REGISTRY)
+                            .filter(app => !['image-viewer', 'preview-container', 'launcher'].includes(app.id))
+                            .map(app => (
+                                <button
+                                    key={app.id}
+                                    onClick={() => handleLaunchApp(app.id)}
+                                    className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-[var(--os-hover-bg)] transition-colors group"
+                                    title={t(`app.${app.id}`)}
+                                >
+                                    <AppIcon 
+                                        manifest={app} 
+                                        size={32} 
+                                        className="drop-shadow-sm group-hover:scale-110 transition-transform"
+                                    />
+                                    <span className="text-[10px] text-center w-full truncate text-[var(--os-text-primary)]">
+                                        {t(`app.${app.id}`)}
+                                    </span>
+                                </button>
+                            ))}
+                    </div>
+
+                    <div className="h-px w-full bg-[var(--os-border)] my-2" />
+
+                    <div className="space-y-1 p-2">
                         <MenuItem icon={Power} label={t('start.shutdown')} onClick={handleShutdown} danger />
                     </div>
                 </motion.div>

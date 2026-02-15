@@ -4,7 +4,7 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { getFileIconAndTheme } from '@/apps/file-explorer/utils/fileIcons'
 
 export function useFileDisplay(item: FileNode) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   const displayName = useMemo(() => {
     // 1. App Shortcut
@@ -18,7 +18,7 @@ export function useFileDisplay(item: FileNode) {
 
     // 3. Everything else: use the real file name
     return item.name
-  }, [item.id, item.name, item.appId, t])
+  }, [item.id, item.name, item.appId, t, language])
 
   const iconTheme = useMemo(() => {
     return getFileIconAndTheme(item)

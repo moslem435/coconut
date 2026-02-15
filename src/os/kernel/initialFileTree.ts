@@ -97,6 +97,15 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
+    'shortcut-emulator': {
+        id: 'shortcut-emulator',
+        parentId: 'desktop',
+        name: 'Retro PC',
+        type: 'file',
+        appId: 'emulator',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    },
     'shortcut-files': {
         id: 'shortcut-files',
         parentId: 'desktop',

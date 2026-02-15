@@ -81,7 +81,7 @@ export function FileGridItem({
           onCancel={onCancelRename || (() => { })}
         />
       ) : (
-        <span className="text-xs text-center text-white/90 drop-shadow-md line-clamp-3 break-words w-full px-1 select-none">
+        <span className="text-xs text-center text-white/90 drop-shadow-md break-words w-full px-1 select-none">
           {displayName}
         </span>
       )}
