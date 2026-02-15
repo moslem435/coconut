@@ -36,7 +36,7 @@ export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundPro
       )}
 
       {/* 图片壁纸 */}
-      {(wallpaper?.type === 'image' || wallpaper?.type === 'preset') && (
+      {(wallpaper?.type === 'image' || wallpaper?.type === 'preset' || wallpaper?.type === 'daily') && (
         <>
           {/* 当前显示的壁纸 */}
           <div
@@ -53,7 +53,7 @@ export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundPro
             className="absolute inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
             style={{
               backgroundImage: loadedWallpaper ? `url(${loadedWallpaper})` : undefined,
-              ...getTransitionStyle(!isLoading && loadedWallpaper === wallpaper.value)
+              ...getTransitionStyle(!isLoading && !!loadedWallpaper)
             }}
           />
         </>

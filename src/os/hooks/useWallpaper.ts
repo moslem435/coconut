@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 export interface WallpaperConfig {
-  type: 'image' | 'video' | 'gradient' | 'preset' | 'solid'
+  type: 'image' | 'video' | 'gradient' | 'preset' | 'solid' | 'daily'
   value: string
 }
 
@@ -18,18 +18,18 @@ export interface WallpaperState {
 }
 
 export function useWallpaper(wallpaper: WallpaperConfig | null) {
-  const [activeWallpaper, setActiveWallpaper] = useState<string | null>(wallpaper?.value || null)
+  const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null)
   const [loadedWallpaper, setLoadedWallpaper] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [transitionType, setTransitionType] = useState<WallpaperState['transitionType']>('fade')
 
-  const currentWallpaperRef = useRef<string | null>(wallpaper?.value || null)
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isFirstImageLoad = useRef(true)
 
   useEffect(() => {
     if (!wallpaper) return
-    currentWallpaperRef.current = wallpaper.value
+
+    let isCancelled = false
 
     // 清理之前的过渡
     if (transitionTimeoutRef.current) {
@@ -37,58 +37,92 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
       transitionTimeoutRef.current = null
     }
 
-    // 图片类型壁纸
-    if (wallpaper.type === 'image' || wallpaper.type === 'preset') {
-      // 首次加载直接显示
-      if (isFirstImageLoad.current) {
-        isFirstImageLoad.current = false
-        setActiveWallpaper(wallpaper.value)
-        setLoadedWallpaper(null)
-        setIsLoading(false)
-        return
-      }
+    const load = async () => {
+      let targetValue = wallpaper.value
 
-      // 已经是当前壁纸，跳过
-      if (loadedWallpaper === wallpaper.value && activeWallpaper === wallpaper.value) {
-        return
-      }
-
-      // 随机选择过渡效果
-      const transitions: WallpaperState['transitionType'][] = ['fade', 'zoom-in', 'zoom-out', 'blur']
-      setTransitionType(transitions[Math.floor(Math.random() * transitions.length)])
-
-      // 预加载新壁纸
-      setIsLoading(true)
-      const img = new Image()
-      img.src = wallpaper.value
-
-      img.onload = () => {
-        if (currentWallpaperRef.current !== wallpaper.value) return
-        setLoadedWallpaper(wallpaper.value)
-        setIsLoading(false)
-
-        // 延迟切换以显示过渡动画
-        transitionTimeoutRef.current = setTimeout(() => {
-          if (currentWallpaperRef.current === wallpaper.value) {
-            setActiveWallpaper(wallpaper.value)
+      // 如果是每日壁纸，先获取 URL
+      if (wallpaper.type === 'daily') {
+        setIsLoading(true)
+        try {
+          const res = await fetch('/api/wallpaper')
+          const data = await res.json()
+          if (isCancelled) return
+          if (data.url) {
+            targetValue = data.url
           }
-        }, 1000)
-      }
-
-      img.onerror = () => {
-        if (currentWallpaperRef.current === wallpaper.value) {
+        } catch (error) {
+          console.error('Failed to load daily wallpaper:', error)
+          if (isCancelled) return
           setIsLoading(false)
+          return
         }
       }
-    } else {
-      // 视频或渐变直接切换
-      setLoadedWallpaper(null)
-      setActiveWallpaper(wallpaper.value)
-      setIsLoading(false)
+
+      // 图片类型壁纸 (daily 也是图片)
+      if (wallpaper.type === 'image' || wallpaper.type === 'preset' || wallpaper.type === 'daily') {
+        // 首次加载直接显示
+        if (isFirstImageLoad.current) {
+          isFirstImageLoad.current = false
+          setActiveWallpaper(targetValue)
+          setLoadedWallpaper(null)
+          setIsLoading(false)
+          return
+        }
+
+        // 已经是当前壁纸，跳过
+        if (loadedWallpaper === targetValue && activeWallpaper === targetValue) {
+          setIsLoading(false)
+          return
+        }
+        
+        // 如果当前已经在显示这个壁纸（可能之前是 null，现在加载完了）
+        if (activeWallpaper === targetValue) {
+            setIsLoading(false)
+            return
+        }
+
+        // 随机选择过渡效果
+        const transitions: WallpaperState['transitionType'][] = ['fade', 'zoom-in', 'zoom-out', 'blur']
+        setTransitionType(transitions[Math.floor(Math.random() * transitions.length)])
+
+        // 预加载新壁纸
+        setIsLoading(true)
+        const img = new Image()
+        img.src = targetValue
+
+        img.onload = () => {
+          if (isCancelled) return
+          setLoadedWallpaper(targetValue)
+          setIsLoading(false)
+
+          // 延迟切换以显示过渡动画
+          transitionTimeoutRef.current = setTimeout(() => {
+            if (!isCancelled) {
+              setActiveWallpaper(targetValue)
+            }
+          }, 1000)
+        }
+
+        img.onerror = () => {
+          if (isCancelled) {
+            return
+          }
+          setIsLoading(false)
+        }
+      } else {
+        // 视频或渐变直接切换
+        if (isCancelled) return
+        setLoadedWallpaper(null)
+        setActiveWallpaper(targetValue)
+        setIsLoading(false)
+      }
     }
+
+    load()
 
     // 清理函数
     return () => {
+      isCancelled = true
       if (transitionTimeoutRef.current) {
         clearTimeout(transitionTimeoutRef.current)
       }

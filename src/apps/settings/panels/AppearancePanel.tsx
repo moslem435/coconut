@@ -25,20 +25,9 @@ export function AppearancePanel() {
     const accentColors = getAccentColors(t)
     const wallpaperOptions = getWallpaperOptions(t)
 
-    const handleWallpaperSelect = async (wp: any) => {
+    const handleWallpaperSelect = (wp: any) => {
         if (wp.value === 'daily') {
-            setIsLoadingWallpaper(true)
-            try {
-                const res = await fetch('/api/wallpaper')
-                const data = await res.json()
-                if (data.url) {
-                    setWallpaper({ type: 'image', value: data.url })
-                }
-            } catch (error) {
-                console.error('Failed to set daily wallpaper:', error)
-            } finally {
-                setIsLoadingWallpaper(false)
-            }
+            setWallpaper({ type: 'daily', value: 'daily' })
         } else {
             setWallpaper({ type: wp.type, value: wp.value })
         }
