@@ -13,7 +13,7 @@ const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron' })
 const rajdhani = Rajdhani({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-rajdhani' })
 
 export const metadata: Metadata = {
-  title: 'FolioOS',
+  title: 'Coconut OS',
   description: 'Interactive 3D Portfolio Experience',
 }
 

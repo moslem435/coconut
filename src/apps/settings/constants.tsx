@@ -1,4 +1,4 @@
-import { Atom, Activity, Palette, Terminal, Zap, Layers, Hexagon, Move, Shapes } from 'lucide-react'
+import { Atom, Activity, Palette, Terminal, Zap, Layers, Hexagon, Move, Shapes, Container, Brain, Code, SquareTerminal, HardDrive } from 'lucide-react'
 
 export const getAccentColors = (t: (key: string) => string) => [
     { name: t('color.cyan'), value: '#06b6d4' },
@@ -22,13 +22,18 @@ export const getWallpaperOptions = (t: (key: string) => string) => [
 ]
 
 export const techStack = [
-    { icon: <Atom size={20} />, name: 'React 19', color: '#61DAFB' },
-    { icon: <Layers size={20} />, name: 'Next.js 16', color: '#FFFFFF' },
-    { icon: <Terminal size={20} />, name: 'TypeScript', color: '#3178C6' },
-    { icon: <Palette size={20} />, name: 'Tailwind 4', color: '#38B2AC' },
-    { icon: <Zap size={20} />, name: 'Zustand', color: '#F59E0B' },
-    { icon: <Activity size={20} />, name: 'Framer Motion', color: '#EC4899' },
-    { icon: <Hexagon size={20} />, name: 'Three.js / R3F', color: '#FFFFFF' },
-    { icon: <Move size={20} />, name: 'dnd-kit', color: '#FFFFFF' },
-    { icon: <Shapes size={20} />, name: 'Lucide Icons', color: '#FF7F50' },
+    { icon: <Atom size={20} />, name: 'React 19', color: '#61DAFB', url: 'https://react.dev' },
+    { icon: <Layers size={20} />, name: 'Next.js 16', color: '#FFFFFF', url: 'https://nextjs.org' },
+    { icon: <Terminal size={20} />, name: 'TypeScript', color: '#3178C6', url: 'https://www.typescriptlang.org' },
+    { icon: <Palette size={20} />, name: 'Tailwind 4', color: '#38B2AC', url: 'https://tailwindcss.com' },
+    { icon: <Zap size={20} />, name: 'Zustand', color: '#F59E0B', url: 'https://zustand-demo.pmnd.rs' },
+    { icon: <Activity size={20} />, name: 'Framer Motion', color: '#EC4899', url: 'https://www.framer.com/motion' },
+    { icon: <Hexagon size={20} />, name: 'Three.js / R3F', color: '#FFFFFF', url: 'https://docs.pmnd.rs/react-three-fiber' },
+    { icon: <Move size={20} />, name: 'dnd-kit', color: '#FFFFFF', url: 'https://dndkit.com' },
+    { icon: <Container size={20} />, name: 'WebContainer', color: '#FCD34D', url: 'https://webcontainers.io' },
+    { icon: <Brain size={20} />, name: 'WebLLM', color: '#F97316', url: 'https://webllm.mlc.ai' },
+    { icon: <Code size={20} />, name: 'Monaco Editor', color: '#3B82F6', url: 'https://microsoft.github.io/monaco-editor' },
+    { icon: <SquareTerminal size={20} />, name: 'Xterm.js', color: '#22C55E', url: 'https://xtermjs.org' },
+    { icon: <HardDrive size={20} />, name: 'OPFS / IDB', color: '#EC4899', url: 'https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system' },
+    { icon: <Shapes size={20} />, name: 'Lucide Icons', color: '#FF7F50', url: 'https://lucide.dev' },
 ]

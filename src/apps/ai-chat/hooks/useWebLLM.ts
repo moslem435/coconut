@@ -20,6 +20,7 @@ export interface WebLLMState {
         downloaded: string;
         total: string;
     } | null;
+    gpuInfo: string | null;
 }
 
 export interface ModelConfig {
@@ -77,7 +78,8 @@ export function useWebLLM() {
         messages: [],
         error: null,
         currentModelId: null,
-        downloadStats: null
+        downloadStats: null,
+        gpuInfo: null
     });
 
     const engineRef = useRef<MLCEngineInterface | null>(null);
@@ -90,33 +92,74 @@ export function useWebLLM() {
     // Check WebGPU support
     const checkWebGPUSupport = useCallback(async () => {
         if (typeof navigator === 'undefined' || !navigator.gpu) {
-            return false;
+            return { supported: false, info: null };
         }
         try {
-            const adapter = await navigator.gpu.requestAdapter();
-            return !!adapter;
+            // Explicitly request high performance GPU
+            const adapter = await navigator.gpu.requestAdapter({
+                powerPreference: 'high-performance'
+            });
+            
+            if (!adapter) return { supported: false, info: null };
+
+            let info = '';
+            // Try to get adapter info
+            if (adapter.info) {
+                 info = adapter.info.description || adapter.info.device || '';
+                 if (!info) {
+                     // Try other fields if standard ones are empty
+                     // @ts-ignore
+                     const vendor = adapter.info.vendor || '';
+                     // @ts-ignore
+                     const arch = adapter.info.architecture || '';
+                     if (vendor || arch) {
+                         info = `${vendor} ${arch}`.trim();
+                     }
+                 }
+            } else if ('requestAdapterInfo' in adapter) {
+                 // @ts-ignore
+                 const adapterInfo = await adapter.requestAdapterInfo();
+                 info = adapterInfo.description || adapterInfo.device || '';
+            }
+            
+            if (!info) {
+                info = 'WebGPU Adapter (Unknown)';
+            }
+
+            return { supported: true, info };
         } catch (e) {
-            return false;
+            return { supported: false, info: null };
         }
     }, []);
+
+    // Auto-detect GPU on mount
+    useEffect(() => {
+        checkWebGPUSupport().then(({ supported, info }) => {
+            if (supported && info) {
+                setState(prev => ({ ...prev, gpuInfo: info }));
+            }
+        });
+    }, [checkWebGPUSupport]);
 
     // Initialize the engine
     const initEngine = useCallback(async (modelId: string) => {
         try {
             abortRef.current = false;
+            
+            // Check WebGPU support first
+            const { supported, info } = await checkWebGPUSupport();
+            if (!supported) {
+                throw new Error("ai.error.webgpu_not_supported");
+            }
+
             setState(prev => ({ 
                 ...prev, 
                 isLoading: true, 
                 error: null, 
                 currentModelId: modelId,
-                downloadStats: null 
+                downloadStats: null,
+                gpuInfo: info
             }));
-
-            // Check WebGPU support first
-            const isWebGPUSupported = await checkWebGPUSupport();
-            if (!isWebGPUSupported) {
-                throw new Error("ai.error.webgpu_not_supported");
-            }
             
             lastProgressRef.current = null;
             lastStatsRef.current = null;

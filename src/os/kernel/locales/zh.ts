@@ -89,6 +89,16 @@ const zh: Record<string, string> = {
     "settings.desc.account": "个人资料和账户信息",
     "settings.desc.privacy": "安全和隐私选项",
     "settings.desc.about": "系统信息和版本",
+    "settings.about.slogan": "代码如海风般清新。",
+    "settings.about.pillar.web.title": "原生 Web",
+    "settings.about.pillar.web.desc": "随处运行",
+    "settings.about.pillar.dev.title": "开发就绪",
+    "settings.about.pillar.dev.desc": "内置 Node.js",
+    "settings.about.pillar.local.title": "本地优先",
+    "settings.about.pillar.local.desc": "数据驻留本地",
+    "settings.about.powered_title": "构建于现代 Web 技术",
+    "settings.about.copyright": "© 2026 Coconut Corp. 保留所有权利。",
+    "settings.about.github": "GitHub 仓库",
 
     // Files & Folders
     "explorer.root": "根目录",
@@ -206,7 +216,7 @@ const zh: Record<string, string> = {
     "msg.unpinned": "已取消固定",
     "msg.folder.impl": "新建文件夹功能尚未实现 (模拟)",
     "msg.info": "提示",
-    "msg.about.title": "FolioOS v1.0",
+    "msg.about.title": "关于 Coconut OS",
     "msg.about.desc": "一个基于 Web 技术的操作系统模拟界面。",
 
     // Taskbar / Status
@@ -224,7 +234,7 @@ const zh: Record<string, string> = {
     // Start Menu
     "start.menu": "开始",
     "start.visitor": "访客",
-    "start.os": "Portfolio OS",
+    "start.os": "Coconut OS",
     "start.settings": "设置",
     "start.shutdown": "关机",
     "start.notifications": "通知",

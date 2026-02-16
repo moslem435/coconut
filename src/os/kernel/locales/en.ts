@@ -89,6 +89,16 @@ const en: Record<string, string> = {
     "settings.desc.account": "Profile and account information",
     "settings.desc.privacy": "Security and privacy options",
     "settings.desc.about": "System information and version",
+    "settings.about.slogan": "Code with a tropical breeze.",
+    "settings.about.pillar.web.title": "Web Native",
+    "settings.about.pillar.web.desc": "Runs everywhere",
+    "settings.about.pillar.dev.title": "Dev Ready",
+    "settings.about.pillar.dev.desc": "Node.js inside",
+    "settings.about.pillar.local.title": "Local First",
+    "settings.about.pillar.local.desc": "Your data stays here",
+    "settings.about.powered_title": "Built with Modern Web",
+    "settings.about.copyright": "© 2026 Coconut Corp. All rights reserved.",
+    "settings.about.github": "GitHub Repository",
 
     // Files & Folders
     "explorer.root": "Root",
@@ -210,7 +220,7 @@ const en: Record<string, string> = {
     "msg.unpinned": "Unpinned from Taskbar",
     "msg.folder.impl": "New Folder not implemented (Simulation)",
     "msg.info": "Info",
-    "msg.about.title": "Portfolio OS v1.0",
+    "msg.about.title": "About Coconut OS",
     "msg.about.desc": "A Web-based Operating System Simulation.",
 
     // Taskbar / Status
@@ -223,7 +233,7 @@ const en: Record<string, string> = {
     // Start Menu
     "start.menu": "Start",
     "start.visitor": "Visitor",
-    "start.os": "Portfolio OS",
+    "start.os": "Coconut OS",
     "start.settings": "Settings",
     "start.shutdown": "Shut Down",
     "start.notifications": "Notifications",

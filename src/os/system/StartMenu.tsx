@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Terminal, Power, Settings } from 'lucide-react'
+import { Palmtree, Power, Settings } from 'lucide-react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
@@ -131,7 +131,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                                 backgroundColor: 'var(--os-bg-base)',
                                 border: '1px solid var(--os-border)'
                             }}>
-                            <Terminal size={24} style={{ color: 'var(--os-accent)' }} />
+                            <Palmtree size={24} style={{ color: 'var(--os-accent)' }} />
                         </div>
                         <div>
                             <div className="text-sm font-semibold" style={{ color: 'var(--os-text-primary)' }}>{t('start.visitor')}</div>

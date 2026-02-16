@@ -4,11 +4,17 @@ export function TechStackGrid() {
     return (
         <div className="grid grid-cols-3 gap-3">
             {techStack.map((item) => (
-                <div key={item.name} className="flex flex-col items-center justify-center p-3 rounded-lg border border-[var(--os-border)] bg-[var(--os-bg-base)] hover:bg-[var(--os-hover-bg)] transition-colors gap-2 group cursor-default">
+                <div 
+                    key={item.name} 
+                    className="flex flex-col items-center justify-center p-3 rounded-lg border border-[var(--os-border)] bg-[var(--os-bg-base)] hover:bg-[var(--os-hover-bg)] transition-colors gap-2 group cursor-pointer"
+                    onClick={() => {
+                        if (item.url) window.open(item.url, '_blank')
+                    }}
+                >
                     <div style={{ color: item.color }} className="group-hover:scale-110 transition-transform">
                         {item.icon}
                     </div>
-                    <span className="text-xs text-[var(--os-text-secondary)] text-center">{item.name}</span>
+                    <span className="text-xs text-[var(--os-text-secondary)] text-center group-hover:text-[var(--os-text-primary)] transition-colors">{item.name}</span>
                 </div>
             ))}
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { Volume2, Command, Settings2 } from 'lucide-react'
+import { Volume2, Palmtree, Settings2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -149,7 +149,7 @@ export default function Taskbar({
             className="h-10 w-10 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
             style={{ backgroundColor: 'var(--os-hover-bg)' }}
           >
-            <Command className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
+            <Palmtree className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
           </button>
         </Tooltip>
 

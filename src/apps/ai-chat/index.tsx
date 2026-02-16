@@ -14,6 +14,7 @@ export default function AIChatApp() {
         error, 
         currentModelId,
         downloadStats,
+        gpuInfo,
         initEngine, 
         sendMessage, 
         resetChat,
@@ -57,6 +58,17 @@ export default function AIChatApp() {
                     <p className="text-gray-400 text-sm max-w-lg mx-auto mb-6">
                         {t('ai.welcome.desc')}
                     </p>
+                    {gpuInfo && (
+                        <div className="mb-6 flex flex-col items-center gap-1 text-xs text-gray-500 bg-[#252526] py-2 px-4 rounded-lg border border-[#333] w-fit mx-auto max-w-[90%]">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                Detected GPU: <span className="text-gray-300 font-medium">{gpuInfo}</span>
+                            </div>
+                            <p className="text-[10px] opacity-70 mt-1">
+                                If this is not your dedicated GPU, check your browser settings to enable hardware acceleration.
+                            </p>
+                        </div>
+                    )}
                     <h3 className="text-lg font-medium text-left px-4 mb-4 flex items-center gap-2">
                         <Download size={18} />
                         {t('ai.model.select')}
@@ -134,6 +146,11 @@ export default function AIChatApp() {
                         </div>
                     </div>
                     <p className="text-xs text-gray-500 text-center px-2 break-words leading-tight">{progress}</p>
+                    {gpuInfo && (
+                        <p className="text-[10px] text-gray-500 text-center mt-1 opacity-70">
+                            Running on: {gpuInfo}
+                        </p>
+                    )}
                     
                     {/* Detailed Stats */}
                     {downloadStats && (
@@ -172,6 +189,13 @@ export default function AIChatApp() {
                     </button>
                     <Cpu size={16} className="text-green-400" />
                     <span className="font-medium text-sm truncate max-w-[200px]">{currentModelName}</span>
+                    
+                    {/* GPU Info */}
+                    {gpuInfo && (
+                        <div className="hidden sm:flex items-center text-xs text-gray-500 border-l border-gray-700 pl-3 ml-1 h-4">
+                            <span className="truncate max-w-[150px]" title={gpuInfo}>{gpuInfo}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-1">
                     <button 
