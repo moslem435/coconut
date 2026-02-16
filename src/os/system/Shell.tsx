@@ -9,13 +9,13 @@ import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { useDynamicIslandStore } from '@/os/kernel/useDynamicIslandStore'
 import { logger } from '@/os/utils/logger'
 import { Zap } from 'lucide-react'
+import { useNotificationToIslandBridge } from '@/os/hooks/useNotificationToIslandBridge'
 
 // Components
 import Taskbar from './Taskbar'
 import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
 import Window from './Window'
-import Notifications from './Notifications'
 import GlobalShortcuts from './GlobalShortcuts'
 import GlobalDialogs from './GlobalDialogs'
 import DynamicIsland from './DynamicIsland'
@@ -91,8 +91,8 @@ export default function Shell({ onShutdown }: ShellProps) {
       {/* Context Menu */}
       <ContextMenu />
 
-      {/* Notifications - z-[9999] defined in component */}
-      <Notifications />
+      {/* Notifications - Removed in favor of Dynamic Island */}
+      {/* <Notifications /> */}
 
       {/* Global Dialogs - z-[99999] */}
       <GlobalDialogs />
