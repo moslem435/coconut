@@ -1,0 +1,57 @@
+# AI Agent Skills & Best Practices
+
+This file defines the coding standards and best practices for this project, derived from Vercel's engineering standards and community best practices.
+
+## 1. React Best Practices (Priority: CRITICAL)
+
+### Eliminating Waterfalls
+- **Rule**: Avoid sequential `await` calls that don't depend on each other.
+- **Fix**: Use `Promise.all()` for independent asynchronous operations.
+- **Fix**: Move `await` inside the branch/condition where the data is actually needed (Defer Await).
+- **Component Level**: Use `<Suspense>` boundaries to stream content rather than blocking the entire page.
+
+### Bundle Size Optimization
+- **Rule**: Avoid barrel files (e.g., `index.ts` that re-exports everything) for tree-shaking efficiency.
+- **Fix**: Import components/functions directly from their source files.
+- **Dynamic Imports**: Use `next/dynamic` for heavy components (charts, maps, heavy editors) that are not critical for LCP (Largest Contentful Paint).
+- **Conditional Loading**: Only import modules when the specific feature is activated by the user.
+
+### Re-render Optimization
+- **Rule**: Do not use `useEffect` to derive state. Derive state directly during render.
+- **Rule**: Use functional state updates (`setCount(c => c + 1)`) to avoid stale closures and unnecessary dependencies.
+- **Rule**: Prefer Composition (passing children) over `React.memo` for performance.
+- **Rule**: Use `useRef` for transient values that change frequently but don't need to trigger a re-render (e.g., scroll position tracking for analytics).
+
+## 2. Next.js Best Practices
+
+### Server Components (RSC)
+- **Default**: Write components as Server Components by default. Only add `"use client"` when necessary (state, effects, event listeners).
+- **Data Fetching**: Fetch data in Server Components to reduce client bundle size and execute closer to the database.
+- **Serialization**: Pass only the necessary data to Client Components. Avoid passing large objects or class instances that require heavy serialization.
+
+### Server Actions
+- **Security**: Always validate inputs in Server Actions using Zod or similar.
+- **Auth**: Verify authentication and authorization explicitly in every Server Action.
+- **Feedback**: Use `useActionState` (React 19) or similar patterns to handle loading and error states for Server Actions.
+
+### Data Fetching
+- **Parallelization**: Parallelize data fetching in Server Components using `Promise.all` or by initiating promises before awaiting them.
+- **Caching**: Understand and utilize `React.cache()` for request-memoization to avoid duplicate fetch calls for the same data in a single request.
+
+## 3. Tailwind CSS (v4) & UI
+
+- **Styling**: Use Tailwind utility classes. Avoid inline styles or CSS-in-JS unless absolutely necessary for dynamic values.
+- **Configuration**: This project uses Tailwind v4. Configuration is CSS-first.
+- **Icons**: Use `lucide-react` for icons. Import individual icons to avoid tree-shaking issues if not using a optimized compiler.
+
+## 4. TypeScript
+
+- **Strictness**: No `any`. Use `unknown` if the type is truly not known yet, and narrow it down.
+- **Props**: Define component props using `interface` or `type`.
+- **Async**: Always type the return value of async functions, especially Server Actions.
+
+## 5. State Management (Zustand)
+
+- **Selectors**: When using Zustand hooks, always select only the state you need to prevent unnecessary re-renders.
+  - Bad: `const { count } = useStore()`
+  - Good: `const count = useStore(s => s.count)`

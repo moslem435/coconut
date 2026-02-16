@@ -6,7 +6,9 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { Kernel } from '@/os/kernel/Kernel'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
+import { useDynamicIslandStore } from '@/os/kernel/useDynamicIslandStore'
 import { logger } from '@/os/utils/logger'
+import { Zap } from 'lucide-react'
 
 // Components
 import Taskbar from './Taskbar'
@@ -16,6 +18,7 @@ import Window from './Window'
 import Notifications from './Notifications'
 import GlobalShortcuts from './GlobalShortcuts'
 import GlobalDialogs from './GlobalDialogs'
+import DynamicIsland from './DynamicIsland'
 
 interface ShellProps {
   onShutdown?: () => void
@@ -28,11 +31,21 @@ export default function Shell({ onShutdown }: ShellProps) {
 
   // VFS Sync
   const { initialize } = useFileSystemStore()
+  const { showSuccess, showNotification } = useDynamicIslandStore()
 
   // 合并初始化逻辑
   useEffect(() => {
     Kernel.init()
     initialize().catch(logger.error)
+
+    // Demo: Show Dynamic Island notification on startup
+    setTimeout(() => {
+        showSuccess('System Ready')
+    }, 1500)
+
+    setTimeout(() => {
+        showNotification('Welcome to Coconut OS', 'Local First, AI Ready', <Zap size={24} className="text-yellow-400" />)
+    }, 3500)
 
     const interval = setInterval(() => {
       useProcessStore.getState().tick()
@@ -65,6 +78,7 @@ export default function Shell({ onShutdown }: ShellProps) {
       </AnimatePresence>
 
       {/* 3. System UI Layer (Always Top) */}
+      <DynamicIsland />
 
       {/* Status Bar - z-[200] */}
       <Taskbar
