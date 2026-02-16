@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { IPreviewProvider } from '@/os/services/PreviewService'
+import { Copy, Check } from 'lucide-react'
 import Prism from 'prismjs'
 import 'prismjs/themes/prism-tomorrow.css'
 import 'prismjs/components/prism-javascript'
@@ -23,6 +24,7 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [highlightedCode, setHighlightedCode] = useState<string>('')
+    const [copied, setCopied] = useState(false)
 
     // Detect language from extension
     const getLanguage = (filename: string): string => {
@@ -82,6 +84,12 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
         load()
     }, [fileId, name])
 
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
     if (loading) return (
         <div className="h-full flex items-center justify-center text-white/50">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
@@ -91,17 +99,37 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
     if (error) return <div className="p-4 text-red-400">{error}</div>
 
     return (
-        <div className="h-full w-full bg-[#1e1e1e] text-[#d4d4d4] overflow-auto selection:bg-blue-500/30">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#252526]">
-                <span className="text-sm text-white/70">{name}</span>
-                <span className="text-xs text-white/40">{content.length} characters</span>
+        <div className="h-full w-full bg-[#1e1e1e] text-[#d4d4d4] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#252526] shrink-0">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm text-white/70 font-medium">{name}</span>
+                    <span className="text-xs text-white/40">{content.length} chars</span>
+                </div>
+                <button 
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/10 text-xs text-white/60 hover:text-white transition-colors"
+                >
+                    {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
             </div>
-            <pre className="p-4 min-w-full inline-block text-sm leading-relaxed">
-                <code 
-                    className={`language-${getLanguage(name)}`}
-                    dangerouslySetInnerHTML={{ __html: highlightedCode }}
-                />
-            </pre>
+            
+            <div className="flex-1 overflow-auto relative font-mono text-sm selection:bg-blue-500/30 flex">
+                {/* Line Numbers */}
+                <div className="sticky left-0 bg-[#1e1e1e] border-r border-white/5 px-3 py-4 text-right text-white/30 select-none shrink-0 min-w-[3rem]">
+                    {content.split('\n').map((_, i) => (
+                        <div key={i} className="leading-relaxed">{i + 1}</div>
+                    ))}
+                </div>
+                
+                {/* Code Content */}
+                <pre className="p-4 leading-relaxed min-w-0 flex-1 tab-[4]">
+                    <code 
+                        dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                        className={`language-${getLanguage(name)}`}
+                    />
+                </pre>
+            </div>
         </div>
     )
 }

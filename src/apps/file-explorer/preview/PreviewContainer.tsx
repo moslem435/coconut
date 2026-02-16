@@ -9,6 +9,9 @@ import { TextPreviewProvider } from './TextPreviewProvider'
 import { VideoPreviewProvider } from './VideoPreviewProvider'
 import { DocPreviewProvider } from './DocPreviewProvider'
 import { CodePreviewProvider } from './CodePreviewProvider'
+import { MarkdownPreviewProvider } from './MarkdownPreviewProvider'
+import { AudioPreviewProvider } from './AudioPreviewProvider'
+import { ArchivePreviewProvider } from './ArchivePreviewProvider'
 import { DefaultPreviewProvider } from './DefaultPreviewProvider'
 
 // Initialize Registry (Idempotent-ish)
@@ -18,6 +21,9 @@ const registerAll = () => {
     PreviewService.register(VideoPreviewProvider)
     PreviewService.register(DocPreviewProvider)
     PreviewService.register(CodePreviewProvider)
+    PreviewService.register(MarkdownPreviewProvider)
+    PreviewService.register(AudioPreviewProvider)
+    PreviewService.register(ArchivePreviewProvider)
     PreviewService.register(TextPreviewProvider)
     PreviewService.register(DefaultPreviewProvider)
 }
