@@ -16,6 +16,7 @@ const en: Record<string, string> = {
     "app.sandbox-test": "Sandbox Test",
     "app.emulator": "Retro PC",
     "app.ai-chat": "AI Assistant",
+    "app.yume": "Yume",
     "ai.welcome.title": "Local AI Assistant",
     "ai.welcome.desc": "Run Llama-3-8B directly in your browser using WebGPU. No data leaves your device. Initial download may take a few minutes (~4GB).",
     "ai.button.start": "Load Model & Start Chat",

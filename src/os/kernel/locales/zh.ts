@@ -16,6 +16,7 @@ const zh: Record<string, string> = {
     "app.sandbox-test": "沙箱测试",
     "app.emulator": "模拟器",
     "app.ai-chat": "AI 助手",
+    "app.yume": "Yume",
     "ai.welcome.title": "本地 AI 助手",
     "ai.welcome.desc": "使用 WebGPU 在浏览器中直接运行 Llama-3-8B。数据完全本地化。首次运行需要下载模型（约 4GB）。",
     "ai.button.start": "加载模型并开始",

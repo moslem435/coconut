@@ -13,14 +13,14 @@ const nextConfig: NextConfig = {
       {
         source: '/(.*)',
         headers: [
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
+          // {
+          //   key: 'Cross-Origin-Embedder-Policy',
+          //   value: 'credentialless',
+          // },
+          // {
+          //   key: 'Cross-Origin-Opener-Policy',
+          //   value: 'same-origin',
+          // },
           {
             key: 'Content-Security-Policy',
             value: [
@@ -29,14 +29,13 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self' data:",
-              "frame-src 'self' blob: https://*.stackblitz.com https://stackblitz.com",
+              "frame-src 'self' blob: https://*.stackblitz.com https://stackblitz.com http://yume.noktt.cn",
               "connect-src 'self' https: ws: wss:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
-              "frame-ancestors 'none'",
-              "upgrade-insecure-requests"
+              "frame-ancestors 'none'"
             ].join('; ')
           },
           {
