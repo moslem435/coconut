@@ -17,8 +17,9 @@ import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
 import Window from './Window'
 import GlobalShortcuts from './GlobalShortcuts'
+
 import GlobalDialogs from './GlobalDialogs'
-import DynamicIsland from './DynamicIsland'
+import CyberFeed from './CyberFeed'
 
 interface ShellProps {
   onShutdown?: () => void
@@ -28,6 +29,9 @@ export default function Shell({ onShutdown }: ShellProps) {
   // Optimize: Only subscribe to the list of window IDs.
   // Shell will only re-render when a window is added or removed.
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
+
+  // Bridge: Sync NotificationStore -> DynamicIslandStore (CyberFeed)
+  useNotificationToIslandBridge()
 
   // VFS Sync
   const { initialize } = useFileSystemStore()
@@ -78,7 +82,7 @@ export default function Shell({ onShutdown }: ShellProps) {
       </AnimatePresence>
 
       {/* 3. System UI Layer (Always Top) */}
-      <DynamicIsland />
+      <CyberFeed />
 
       {/* Status Bar - z-[200] */}
       <Taskbar
