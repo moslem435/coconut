@@ -1,15 +1,14 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Palmtree, Globe, Container, ShieldCheck, Zap, AlertTriangle, CheckCircle2, Info, Loader2 } from 'lucide-react'
+import { Palmtree, Globe, Container, ShieldCheck } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { SettingSection } from '../components/SettingSection'
 import { TechStackGrid } from '../components/TechStackGrid'
-import { useDynamicIslandStore } from '@/os/kernel/useDynamicIslandStore'
+import { DevTools } from '../components/DevTools'
 
 export function AboutPanel() {
     const { t } = useLanguage()
-    const { showNotification, showSuccess, showError, showLoading } = useDynamicIslandStore()
     const [devModeCount, setDevModeCount] = useState(0)
 
     const [coconuts, setCoconuts] = useState<{ id: number, x: number }[]>([])
@@ -116,38 +115,18 @@ export function AboutPanel() {
                 )}
             </div>
 
-            {/* Dynamic Island Test Area (Dev Mode Only) */}
-            {devModeCount >= 3 && (
-                <div className="p-4 rounded-xl bg-[var(--os-bg-base)]/50 border border-[var(--os-border)]">
-                    <h3 className="text-xs font-bold text-[var(--os-text-secondary)] uppercase tracking-wider mb-3">Dynamic Island Tests</h3>
-                    <div className="flex flex-wrap gap-2">
-                        <button 
-                            onClick={() => showSuccess('Saved Successfully')}
-                            className="px-3 py-1.5 text-xs rounded-lg bg-green-500/10 text-green-500 hover:bg-green-500/20 border border-green-500/20 transition-colors flex items-center gap-1"
-                        >
-                            <CheckCircle2 size={14} /> Success
-                        </button>
-                        <button 
-                            onClick={() => showError('Connection Failed')}
-                            className="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 transition-colors flex items-center gap-1"
-                        >
-                            <AlertTriangle size={14} /> Error
-                        </button>
-                        <button 
-                            onClick={() => showNotification('System Update', 'New version available', <Zap size={18} className="text-yellow-400"/>)}
-                            className="px-3 py-1.5 text-xs rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20 transition-colors flex items-center gap-1"
-                        >
-                            <Info size={14} /> Notification
-                        </button>
-                        <button 
-                            onClick={() => showLoading('Installing packages...')}
-                            className="px-3 py-1.5 text-xs rounded-lg bg-[var(--os-text-primary)]/10 text-[var(--os-text-primary)] hover:bg-[var(--os-text-primary)]/20 border border-[var(--os-text-primary)]/20 transition-colors flex items-center gap-1"
-                        >
-                            <Loader2 size={14} className="animate-spin" /> Loading
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Developer Tools */}
+            <AnimatePresence>
+                {devModeCount >= 3 && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                    >
+                        <DevTools />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* The 3 Pillars */}
             <div className="grid grid-cols-3 gap-4">

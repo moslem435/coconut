@@ -43,6 +43,17 @@ export interface SystemEvents {
 class EventBus {
   private listeners = new Map<keyof SystemEvents, Set<EventCallback>>()
   private onceListeners = new Map<keyof SystemEvents, Set<EventCallback>>()
+  private globalListeners = new Set<(event: keyof SystemEvents, data: any) => void>()
+
+  /**
+   * 订阅所有事件（用于调试/日志）
+   */
+  onAny(callback: (event: keyof SystemEvents, data: any) => void): EventSubscription {
+    this.globalListeners.add(callback)
+    return {
+      unsubscribe: () => this.globalListeners.delete(callback)
+    }
+  }
 
   /**
    * 订阅事件
@@ -103,6 +114,15 @@ class EventBus {
     event: K,
     data: SystemEvents[K]
   ): void {
+    // 执行全局监听器
+    this.globalListeners.forEach(callback => {
+      try {
+        callback(event, data)
+      } catch (error) {
+        console.error(`[EventBus] Error in global listener for ${event}:`, error)
+      }
+    })
+
     // 执行普通监听器
     const listeners = this.listeners.get(event)
     if (listeners) {

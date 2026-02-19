@@ -25,7 +25,14 @@ export async function GET(request: NextRequest) {
             const image = data.images[0]
             const bingUrl = `https://www.bing.com${image.url}`
 
-            return NextResponse.json({ url: getProxyUrl(bingUrl) })
+            return NextResponse.json(
+                { url: getProxyUrl(bingUrl) },
+                {
+                    headers: {
+                        'Cache-Control': 'public, max-age=3600, must-revalidate'
+                    }
+                }
+            )
         }
 
         throw new Error('Invalid Bing API response')

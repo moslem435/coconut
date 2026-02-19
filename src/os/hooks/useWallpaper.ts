@@ -25,6 +25,22 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
 
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isFirstImageLoad = useRef(true)
+  const [dailyRefreshKey, setDailyRefreshKey] = useState(new Date().toDateString())
+
+  // Check for day change every minute if using daily wallpaper
+  useEffect(() => {
+    if (wallpaper?.type !== 'daily') return
+
+    const checkDate = () => {
+      const today = new Date().toDateString()
+      if (today !== dailyRefreshKey) {
+        setDailyRefreshKey(today)
+      }
+    }
+
+    const interval = setInterval(checkDate, 60000)
+    return () => clearInterval(interval)
+  }, [wallpaper?.type, dailyRefreshKey])
 
   useEffect(() => {
     if (!wallpaper) return
@@ -44,7 +60,8 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
       if (wallpaper.type === 'daily') {
         setIsLoading(true)
         try {
-          const res = await fetch('/api/wallpaper')
+          // Add timestamp to prevent browser caching
+          const res = await fetch(`/api/wallpaper?t=${Date.now()}`)
           const data = await res.json()
           if (isCancelled) return
           if (data.url) {
@@ -127,7 +144,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
         clearTimeout(transitionTimeoutRef.current)
       }
     }
-  }, [wallpaper?.value, wallpaper?.type])
+  }, [wallpaper?.value, wallpaper?.type, dailyRefreshKey])
 
   /**
    * 获取过渡样式
