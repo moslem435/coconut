@@ -212,16 +212,6 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     return () => observer.disconnect()
   }, [])
 
-  if (error) {
-    return (
-      <div className="p-4 text-red-500">
-        Error booting WebContainer: {error}
-        <br />
-        Make sure your browser supports SharedArrayBuffer (COOP/COEP headers required).
-      </div>
-    )
-  }
-
   // 5. Context Menu Handler
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -261,6 +251,16 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         break
     }
     setContextMenu(null)
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-500">
+        Error booting WebContainer: {error}
+        <br />
+        Make sure your browser supports SharedArrayBuffer (COOP/COEP headers required).
+      </div>
+    )
   }
 
   return (
