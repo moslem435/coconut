@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { RefreshCw, FolderPlus, Terminal, FileText } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
@@ -15,7 +14,6 @@ export function useExplorerMenuItems(
     hideMenu: () => void
 ): MenuItem[] {
     const { t } = useLanguage()
-    const { addNotification } = useNotificationStore()
     const { getItem, createItem } = useFileSystemStore()
     const { openWindow } = useWindowStore()
 
@@ -51,26 +49,7 @@ export function useExplorerMenuItems(
                     }
                     hideMenu()
                 }
-            },
-            { type: 'separator' },
-            {
-                label: t('menu.properties'),
-                icon: FileText,
-                action: () => {
-                    if (data?.pathId) {
-                        const folder = getItem(data.pathId)
-                        if (folder) {
-                            addNotification({
-                                type: 'info',
-                                title: t('menu.properties'),
-                                message: `${t('common.name')}: ${folder.name}\n${t('common.type')}: ${folder.type}\nID: ${folder.id}`,
-                                duration: 5000
-                            })
-                        }
-                    }
-                    hideMenu()
-                }
             }
         ]
-    }, [visible, isVisibleType, data, t, addNotification, getItem, createItem, openWindow, hideMenu])
+    }, [visible, isVisibleType, data, t, getItem, createItem, openWindow, hideMenu])
 }

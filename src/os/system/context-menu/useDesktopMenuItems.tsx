@@ -3,7 +3,6 @@ import { RefreshCw, FolderPlus, Terminal, ArrowDownAZ, Grid3X3, Palette, Monitor
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
@@ -19,7 +18,6 @@ export function useDesktopMenuItems(
 ): MenuItem[] {
     const { t } = useLanguage()
     const { displayScale } = useSystemSettings()
-    const { addNotification } = useNotificationStore()
     const { createItem, getChildren } = useFileSystemStore()
     const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore()
     const { openWindow } = useWindowStore()
@@ -121,18 +119,7 @@ export function useDesktopMenuItems(
                 label: t('menu.displaysettings'),
                 icon: Monitor,
                 action: () => handleOpenSettings('display')
-            },
-            { type: 'separator' },
-            {
-                label: t('menu.about'),
-                icon: Info,
-                action: () => addNotification({
-                    type: 'info',
-                    title: t('msg.about.title'),
-                    message: t('msg.about.desc'),
-                    duration: 5000
-                })
             }
         ]
-    }, [visible, isVisibleType, t, displayScale, position, iconPositions, createItem, getChildren, organizeIcons, updateIconPosition, openWindow, addNotification, hideMenu])
+    }, [visible, isVisibleType, t, displayScale, position, iconPositions, createItem, getChildren, organizeIcons, updateIconPosition, openWindow, hideMenu])
 }

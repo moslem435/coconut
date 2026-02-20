@@ -93,8 +93,6 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
         <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={40} />
         
         <ResponsiveCamera targetWidth={6.5} minZ={10} />
-
-        {/* <color attach="background" args={['#050505']} /> */}
         
         {/* Dynamic Lighting based on Project Color */}
         <ambientLight intensity={0.2} />

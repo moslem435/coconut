@@ -3,7 +3,6 @@ import { ExternalLink, Check, X } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 import { MenuItem } from './types'
@@ -16,7 +15,6 @@ export function useTaskbarMenuItems(
 ): MenuItem[] {
     const { t } = useLanguage()
     const { pinnedAppIds, pinApp, unpinApp } = useSystemSettings()
-    const { addNotification } = useNotificationStore()
     const { openWindow, closeWindow, focusWindow, minimizeWindow, windows } = useWindowStore()
 
     return useMemo(() => {
@@ -51,10 +49,8 @@ export function useTaskbarMenuItems(
                 action: () => {
                     if (isPinned) {
                         unpinApp(data.appId!)
-                        addNotification({ type: 'info', message: t('msg.unpinned') })
                     } else {
                         pinApp(data.appId!)
-                        addNotification({ type: 'success', message: t('msg.pinned') })
                     }
                     hideMenu()
                 }
@@ -71,5 +67,5 @@ export function useTaskbarMenuItems(
                 }
             }
         ].filter(item => !item.disabled)
-    }, [visible, isVisibleType, data, pinnedAppIds, windows, t, pinApp, unpinApp, addNotification, openWindow, closeWindow, focusWindow, minimizeWindow, hideMenu])
+    }, [visible, isVisibleType, data, pinnedAppIds, windows, t, pinApp, unpinApp, openWindow, closeWindow, focusWindow, minimizeWindow, hideMenu])
 }

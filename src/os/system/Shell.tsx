@@ -6,10 +6,8 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useShallow } from 'zustand/react/shallow'
 import { Kernel } from '@/os/kernel/Kernel'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
-import { useDynamicIslandStore } from '@/os/kernel/useDynamicIslandStore'
 import { logger } from '@/os/utils/logger'
 import { Zap } from 'lucide-react'
-import { useNotificationToIslandBridge } from '@/os/hooks/useNotificationToIslandBridge'
 
 // Components
 import Taskbar from './Taskbar'
@@ -19,7 +17,6 @@ import Window from './Window'
 import GlobalShortcuts from './GlobalShortcuts'
 
 import GlobalDialogs from './GlobalDialogs'
-import CyberFeed from './CyberFeed'
 
 interface ShellProps {
   onShutdown?: () => void
@@ -30,26 +27,13 @@ export default function Shell({ onShutdown }: ShellProps) {
   // Shell will only re-render when a window is added or removed.
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
-  // Bridge: Sync NotificationStore -> DynamicIslandStore (CyberFeed)
-  useNotificationToIslandBridge()
-
   // VFS Sync
   const { initialize } = useFileSystemStore()
-  const { showSuccess, showNotification } = useDynamicIslandStore()
 
   // 合并初始化逻辑
   useEffect(() => {
     Kernel.init()
     initialize().catch(logger.error)
-
-    // Demo: Show Dynamic Island notification on startup
-    setTimeout(() => {
-        showSuccess('System Ready')
-    }, 1500)
-
-    setTimeout(() => {
-        showNotification('Welcome to Coconut OS', 'Local First, AI Ready', <Zap size={24} className="text-yellow-400" />)
-    }, 3500)
 
     const interval = setInterval(() => {
       useProcessStore.getState().tick()
@@ -66,8 +50,6 @@ export default function Shell({ onShutdown }: ShellProps) {
 
   return (
     <>
-      <GlobalShortcuts />
-
       {/* 1. Desktop Layer (Always Present) */}
       <div className="fixed inset-0 z-0">
         <Desktop />
@@ -81,9 +63,6 @@ export default function Shell({ onShutdown }: ShellProps) {
         ))}
       </AnimatePresence>
 
-      {/* 3. System UI Layer (Always Top) */}
-      <CyberFeed />
-
       {/* Status Bar - z-[200] */}
       <Taskbar
         onStartClick={handleStartClick}
@@ -95,11 +74,9 @@ export default function Shell({ onShutdown }: ShellProps) {
       {/* Context Menu */}
       <ContextMenu />
 
-      {/* Notifications - Removed in favor of Dynamic Island */}
-      {/* <Notifications /> */}
-
       {/* Global Dialogs - z-[99999] */}
       <GlobalDialogs />
+      <GlobalShortcuts />
     </>
   )
 }

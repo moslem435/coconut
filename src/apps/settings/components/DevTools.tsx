@@ -9,12 +9,10 @@ import {
 } from 'lucide-react'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
-import { useDynamicIslandStore } from '@/os/kernel/useDynamicIslandStore'
-import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { eventBus, SystemEvents } from '@/os/kernel/EventBus'
 
 export function DevTools() {
-    const [activeTab, setActiveTab] = useState<'feed' | 'kernel' | 'storage' | 'logs'>('feed')
+    const [activeTab, setActiveTab] = useState<'kernel' | 'storage' | 'logs'>('kernel')
     
     return (
         <div className="flex flex-col gap-4 p-4 rounded-xl bg-[var(--os-bg-base)]/50 border border-[var(--os-border)] w-full">
@@ -29,12 +27,6 @@ export function DevTools() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-[var(--os-border)]/50 pb-2 overflow-x-auto no-scrollbar">
-                <TabButton 
-                    active={activeTab === 'feed'} 
-                    onClick={() => setActiveTab('feed')} 
-                    icon={<Bell size={14} />} 
-                    label="Feed" 
-                />
                 <TabButton 
                     active={activeTab === 'kernel'} 
                     onClick={() => setActiveTab('kernel')} 
@@ -58,11 +50,6 @@ export function DevTools() {
             {/* Content */}
             <div className="min-h-[200px]">
                 <AnimatePresence mode="wait">
-                    {activeTab === 'feed' && (
-                        <TabContent key="feed">
-                            <IslandTab />
-                        </TabContent>
-                    )}
                     {activeTab === 'kernel' && (
                         <TabContent key="kernel">
                             <KernelTab />
@@ -114,203 +101,7 @@ function TabContent({ children }: { children: React.ReactNode }) {
     )
 }
 
-function IslandTab() {
-    const { addActivity, removeActivity, reset } = useDynamicIslandStore()
-    const { addNotification } = useNotificationStore()
-    
-    // Wrappers for consistent behavior
-    const showSuccess = (msg: string) => addNotification({ title: 'Success', message: msg, type: 'success' })
-    const showError = (msg: string) => addNotification({ title: 'Error', message: msg, type: 'error' })
-    const showNotification = (title: string, msg: string, icon?: any) => addNotification({ title, message: msg, type: 'info' })
-    const showLoading = (title: string, progress: number) => {
-        // Loading is still an activity, not a notification history item
-        useDynamicIslandStore.getState().showLoading(title, progress)
-    }
 
-    const handlePlayMusic = () => {
-        addActivity({
-            id: 'music-player',
-            type: 'media',
-            title: 'NEON GENESIS',
-            description: 'CYBERPUNK 2077 OST',
-            icon: <Music size={20} className="text-cyan-400" />,
-            priority: 20,
-            component: (
-                <div className="flex flex-col gap-4 w-full font-mono text-cyan-50">
-                    <div className="flex gap-4 items-center">
-                         <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-lg shadow-[0_0_15px_rgba(8,145,178,0.5)] shrink-0 flex items-center justify-center text-2xl animate-pulse">
-                            🎵
-                         </div>
-                         <div className="flex flex-col justify-center min-w-0 flex-1">
-                             <h3 className="font-bold text-lg truncate tracking-wider text-cyan-300 drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]">NEON GENESIS</h3>
-                             <p className="text-cyan-200/60 text-xs truncate uppercase tracking-widest">CYBERPUNK 2077 OST</p>
-                         </div>
-                         <div className="flex gap-1 items-end h-8">
-                             {[1,2,3,4,5].map(i => (
-                                 <motion.div 
-                                    key={i}
-                                    animate={{ height: [8, 24, 12, 20] }}
-                                    transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-                                    className="w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"
-                                 />
-                             ))}
-                         </div>
-                    </div>
-                    {/* Progress */}
-                    <div className="flex flex-col gap-1">
-                        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                             <motion.div 
-                                className="h-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" 
-                                initial={{ width: "30%" }}
-                                animate={{ width: "45%" }}
-                                transition={{ duration: 10, ease: "linear" }}
-                             />
-                        </div>
-                        <div className="flex justify-between text-[10px] text-cyan-200/40 font-mono">
-                            <span>01:24</span>
-                            <span>03:45</span>
-                        </div>
-                    </div>
-                    
-                    {/* Controls */}
-                    <div className="flex justify-center gap-8 items-center mt-1">
-                         <button className="text-cyan-200/70 hover:text-cyan-400 hover:scale-110 transition-all"><SkipBack size={20} /></button>
-                         <button className="w-12 h-12 rounded-full bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 hover:bg-cyan-400 hover:text-black hover:shadow-[0_0_15px_rgba(34,211,238,0.8)] transition-all">
-                            <Pause size={20} fill="currentColor" />
-                         </button>
-                         <button className="text-cyan-200/70 hover:text-cyan-400 hover:scale-110 transition-all"><SkipForward size={20} /></button>
-                    </div>
-                </div>
-            )
-        })
-    }
-
-    const handleDownload = () => {
-        const id = addActivity({
-            type: 'system',
-            title: 'DOWNLOADING',
-            description: 'NEURAL_LINK_V2.0.PKG',
-            icon: <Download size={20} className="text-green-400" />,
-            priority: 25,
-            progress: 0
-        })
-
-        // Simulate progress
-        let progress = 0
-        const interval = setInterval(() => {
-            progress += 5
-            if (progress > 100) {
-                clearInterval(interval)
-                removeActivity(id)
-                showSuccess('INSTALLATION COMPLETE')
-            } else {
-                useDynamicIslandStore.getState().updateActivity(id, { progress })
-            }
-        }, 200)
-    }
-
-    const handleIncomingCall = () => {
-        addActivity({
-            id: 'incoming-call',
-            type: 'call',
-            title: 'INCOMING TRANSMISSION',
-            description: 'UNKNOWN ORIGIN',
-            icon: <Phone size={20} className="text-green-400 animate-pulse" />,
-            priority: 40,
-            component: (
-                <div className="flex flex-col gap-5 w-full items-center font-mono">
-                    <div className="w-20 h-20 rounded-full border-2 border-green-500/30 flex items-center justify-center relative">
-                        <div className="absolute inset-0 rounded-full border border-green-500/50 animate-ping opacity-20" />
-                        <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center text-3xl text-green-400 shadow-[0_0_20px_rgba(74,222,128,0.3)]">
-                            👽
-                        </div>
-                    </div>
-                    <div className="text-center">
-                        <h3 className="text-xl font-bold text-green-400 tracking-widest drop-shadow-[0_0_8px_rgba(74,222,128,0.6)]">UNKNOWN</h3>
-                        <p className="text-green-200/50 text-xs tracking-[0.2em] uppercase mt-1">Encrypted Signal</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-6 w-full px-2 mt-2">
-                         <button 
-                            onClick={() => removeActivity('incoming-call')}
-                            className="h-12 rounded bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all flex items-center justify-center text-red-400 gap-2 group"
-                        >
-                            <Phone size={18} className="rotate-[135deg] group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-bold tracking-wider">DECLINE</span>
-                         </button>
-                         <button 
-                            onClick={() => {
-                                removeActivity('incoming-call')
-                                showSuccess('CONNECTION ESTABLISHED')
-                            }}
-                            className="h-12 rounded bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 hover:border-green-500/50 transition-all flex items-center justify-center text-green-400 gap-2 group shadow-[0_0_15px_rgba(74,222,128,0.1)]"
-                        >
-                            <Phone size={18} className="group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-bold tracking-wider">ACCEPT</span>
-                         </button>
-                    </div>
-                </div>
-            )
-        })
-    }
-
-    return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-                <ActionButton 
-                    onClick={() => showSuccess('Saved Successfully')}
-                    icon={<CheckCircle2 size={14} />}
-                    label="Success"
-                    color="green"
-                />
-                <ActionButton 
-                    onClick={() => showError('Connection Failed')}
-                    icon={<AlertTriangle size={14} />}
-                    label="Error"
-                    color="red"
-                />
-                <ActionButton 
-                    onClick={() => showNotification('System Update', 'New version available', <Zap size={18} className="text-yellow-400"/>)}
-                    icon={<Info size={14} />}
-                    label="Notification"
-                    color="blue"
-                />
-                <ActionButton 
-                    onClick={() => showLoading('Installing packages...', 45)}
-                    icon={<Loader2 size={14} className="animate-spin" />}
-                    label="Loading"
-                    color="gray"
-                />
-                <ActionButton 
-                    onClick={handlePlayMusic}
-                    icon={<Music size={14} />}
-                    label="Play Music"
-                    color="purple"
-                />
-                <ActionButton 
-                    onClick={handleDownload}
-                    icon={<Download size={14} />}
-                    label="Download File"
-                    color="orange"
-                />
-                <ActionButton 
-                    onClick={handleIncomingCall}
-                    icon={<Phone size={14} />}
-                    label="Incoming Call"
-                    color="green"
-                />
-                <ActionButton 
-                    onClick={() => useDynamicIslandStore.getState().reset()}
-                    icon={<X size={14} />}
-                    label="Clear All"
-                    color="red"
-                />
-            </div>
-            <div className="p-3 rounded-lg bg-[var(--os-bg-base)] border border-[var(--os-border)] text-xs text-[var(--os-text-secondary)]">
-                <p>Click buttons to test Cyber Feed notifications. Hover over the items to pause auto-dismiss.</p>
-            </div>
-        </div>
-    )
-}
 
 function ActionButton({ onClick, icon, label, color }: { onClick: () => void, icon: React.ReactNode, label: string, color: string }) {
     const colorClasses: Record<string, string> = {

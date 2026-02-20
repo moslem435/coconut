@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { ExternalLink, FileEdit, Download, FileText, Trash2 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { useNotificationStore } from '@/os/kernel/useNotificationStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
@@ -25,7 +24,6 @@ export function useFileMenuItems(
     hideMenu: () => void
 ): MenuItem[] {
     const { t } = useLanguage()
-    const { addNotification } = useNotificationStore()
     const { getItem, readFileContent, deleteItem } = useFileSystemStore()
     const { setRenamingId } = useUIStore()
     const { openWindow } = useWindowStore()
@@ -41,8 +39,6 @@ export function useFileMenuItems(
                     if (data?.appId) {
                         const app = APPS_REGISTRY[data.appId]
                         if (app) openWindow(app.id, t(`app.${app.id}`), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
-                    } else if (data?.id) {
-                        addNotification({ type: 'info', message: 'Double-click to open' })
                     }
                     hideMenu()
                 }
@@ -83,24 +79,6 @@ export function useFileMenuItems(
                     }
                 }
             },
-            {
-                label: t('menu.properties'),
-                icon: FileText,
-                action: () => {
-                    if (data?.id) {
-                        const file = getItem(data.id)
-                        if (file) {
-                            addNotification({
-                                type: 'info',
-                                title: t('menu.properties'),
-                                message: `${t('common.name')}: ${file.name}\n${t('common.type')}: ${file.type}\nID: ${file.id}`,
-                                duration: 5000
-                            })
-                        }
-                    }
-                    hideMenu()
-                }
-            },
             { type: 'separator' },
             {
                 label: t('menu.delete'),
@@ -109,11 +87,10 @@ export function useFileMenuItems(
                 action: () => {
                     if (data?.id) {
                         deleteItem(data.id).catch(console.error)
-                        addNotification({ type: 'success', message: 'Item deleted' })
                     }
                     hideMenu()
                 }
             }
         ]
-    }, [visible, isVisibleType, data, t, addNotification, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu])
+    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu])
 }
