@@ -9,25 +9,53 @@ interface GalleryItemProps {
 }
 
 export const GalleryItem: React.FC<GalleryItemProps> = ({ file, getDisplayName }) => {
-    const { readFileContent } = useFileSystemStore()
+    const { getFileBlob } = useFileSystemStore()
     const [src, setSrc] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         let mounted = true
+        let objectUrl: string | null = null
+        let retryCount = 0
+        const maxRetries = 3
+
+        const load = () => {
+            if (!mounted) return
+            
+            getFileBlob(file.id).then(blob => {
+                if (!mounted) return
+                if (blob) {
+                    objectUrl = URL.createObjectURL(blob)
+                    setSrc(objectUrl)
+                    setLoading(false)
+                } else {
+                    // If blob is null, it might be syncing. Retry.
+                    if (retryCount < maxRetries) {
+                        retryCount++
+                        setTimeout(load, 1000)
+                    } else {
+                        setLoading(false)
+                    }
+                }
+            }).catch(() => {
+                if (!mounted) return
+                if (retryCount < maxRetries) {
+                    retryCount++
+                    setTimeout(load, 1000)
+                } else {
+                    setLoading(false)
+                }
+            })
+        }
+
         setLoading(true)
+        load()
 
-        readFileContent(file.id).then(content => {
-            if (mounted) {
-                setSrc(content)
-                setLoading(false)
-            }
-        }).catch(() => {
-            if (mounted) setLoading(false)
-        })
-
-        return () => { mounted = false }
-    }, [file.id, readFileContent])
+        return () => { 
+            mounted = false
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
+        }
+    }, [file.id, getFileBlob])
 
     if (loading) {
         return (

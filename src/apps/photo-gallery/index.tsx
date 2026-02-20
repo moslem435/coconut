@@ -49,19 +49,31 @@ export default function PhotoGallery() {
   }
 
   // Lightbox content loading
-  const { readFileContent } = useFileSystemStore()
+  const { getFileBlob } = useFileSystemStore()
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   useEffect(() => {
+    let objectUrl: string | null = null
     if (selectedId) {
       const img = images.find(i => i.id === selectedId)
       if (img) {
-        readFileContent(img.id).then(setLightboxSrc).catch(() => setLightboxSrc(null))
+        getFileBlob(img.id).then(blob => {
+          if (blob) {
+            objectUrl = URL.createObjectURL(blob)
+            setLightboxSrc(objectUrl)
+          } else {
+            setLightboxSrc(null)
+          }
+        }).catch(() => setLightboxSrc(null))
       }
     } else {
       setLightboxSrc(null)
     }
-  }, [selectedId, images, readFileContent])
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [selectedId, images, getFileBlob])
 
   return (
     <div className="h-full w-full bg-[#111] text-white flex flex-col pt-10">

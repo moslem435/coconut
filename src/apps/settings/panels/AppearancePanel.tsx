@@ -47,7 +47,7 @@ export function AppearancePanel() {
                         >
                             {wp.type === 'image' ? (
                                 <img
-                                    src={wp.value === 'daily' ? '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop') : wp.value}
+                                    src={wp.value === 'daily' ? '/wallpapers/default.jpg' : wp.value}
                                     className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                     alt={wp.name}
                                 />

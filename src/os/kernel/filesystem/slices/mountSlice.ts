@@ -10,6 +10,7 @@ import type { FileNode } from '../../initialFileTree'
 import { INITIAL_FILES, INITIAL_ROOT_ID } from '../../initialFileTree'
 import { fs } from '../FileSystemClient'
 import { syncService } from '@/os/services/FileSystemSyncService'
+import { syncService as initialSyncService } from '../../syncService'
 import { logger } from '@/os/utils/logger'
 import { fileSystemWorker } from '../utils/fileSystemWorkerClient'
 
@@ -129,6 +130,9 @@ export const createMountSlice: StateCreator<
 
   initialize: async () => {
     try {
+      // @ts-ignore - syncToOPFS expects full store
+      await initialSyncService.syncToOPFS(get(), set)
+
       const { NativeDriver } = await import('../NativeDriver')
       const mounts = await NativeDriver.restoreMounts()
 

@@ -40,12 +40,11 @@ export async function GET(request: NextRequest) {
         console.error('Error fetching daily wallpaper:', error)
 
         const origin = request.nextUrl.origin
-        const fallbackUrl = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=90&w=1920&auto=format&fit=crop'
-        // Construct proxy URL manually since we might be in the catch block
-        const proxyFallback = `${origin}/api/proxy?url=${encodeURIComponent(fallbackUrl)}`
+        // Use local fallback
+        const localFallback = `${origin}/wallpapers/default.jpg`
 
         return NextResponse.json(
-            { url: proxyFallback },
+            { url: localFallback },
             { status: 200 }
         )
     }

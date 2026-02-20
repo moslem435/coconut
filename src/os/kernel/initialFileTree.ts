@@ -18,7 +18,7 @@ export interface FileNode {
 
 export const INITIAL_ROOT_ID = 'root'
 
-export const FILESYSTEM_VERSION = 3; // Increment this to force re-sync
+export const FILESYSTEM_VERSION = 6; // Increment this to force re-sync
 
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {
@@ -61,14 +61,41 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'abstract-01': {
-        id: 'abstract-01',
+    'gallery-abstract': {
+        id: 'gallery-abstract',
         parentId: 'pictures',
-        name: 'Abstract_01.jpg',
+        name: 'abstract.jpg',
         type: 'file',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        size: 1024 * 500 // Simulated size
+        size: 1024 * 500
+    },
+    'gallery-colorful': {
+        id: 'gallery-colorful',
+        parentId: 'pictures',
+        name: 'colorful.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
+    'gallery-gradient': {
+        id: 'gallery-gradient',
+        parentId: 'pictures',
+        name: 'gradient.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
+    'gallery-cars': {
+        id: 'gallery-cars',
+        parentId: 'pictures',
+        name: 'cars.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
     },
     'downloads': {
         id: 'downloads',
@@ -251,30 +278,35 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         updatedAt: Date.now()
     },
     // Sample Images
-    'img-1': {
-        id: 'img-1',
+    'gallery-abstract': {
+        id: 'gallery-abstract',
         parentId: 'pictures',
-        name: 'Abstract_01.jpg',
+        name: 'abstract.jpg',
         type: 'file',
-        // content removed
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'img-2': {
-        id: 'img-2',
+    'gallery-colorful': {
+        id: 'gallery-colorful',
         parentId: 'pictures',
-        name: 'Cyber_City.jpg',
+        name: 'colorful.jpg',
         type: 'file',
-        // content removed
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'img-3': {
-        id: 'img-3',
+    'gallery-gradient': {
+        id: 'gallery-gradient',
         parentId: 'pictures',
-        name: 'Workspace.jpg',
+        name: 'gradient.jpg',
         type: 'file',
-        // content removed
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    },
+    'gallery-cars': {
+        id: 'gallery-cars',
+        parentId: 'pictures',
+        name: 'cars.jpg',
+        type: 'file',
         createdAt: Date.now(),
         updatedAt: Date.now()
     },

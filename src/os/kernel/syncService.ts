@@ -52,9 +52,22 @@ export const syncService = {
                     }
 
                     // Initial Content Hydration (Only for initial static files)
-                    let initialContent = ''
+                    let initialContent: string | Uint8Array = ''
                     if (node.name === 'hello_world.ts') initialContent = '// Hello World...'
                     if (node.name === 'Welcome.txt') initialContent = 'Welcome to Portfolio OS!...'
+
+                    // Gallery Images
+                    if (node.parentId === 'pictures') {
+                        try {
+                            const response = await fetch(`/gallery/${node.name}`)
+                            if (response.ok) {
+                                const blob = await response.blob()
+                                initialContent = new Uint8Array(await blob.arrayBuffer())
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to fetch gallery image ${node.name}`, e)
+                        }
+                    }
 
                     // Basic restoration of template content
                     if (node.id === 'code-1') initialContent = `// Hello World in TypeScript\nfunction sayHello(name: string): void {\n    console.log("Hello, " + name + "!");\n}\n\nconst user = "Developer";\nsayHello(user);`

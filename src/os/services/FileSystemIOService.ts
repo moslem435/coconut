@@ -125,8 +125,13 @@ class FileSystemIOService {
     
     try {
       return await fs.getFileBlob(path)
-    } catch (error) {
-      console.error(`[IOService] Failed to get blob for ${path}:`, error)
+    } catch (error: any) {
+      // Suppress "not found" errors which are expected during sync or polling
+      if (error.message?.includes('could not be found') || error.name === 'NotFoundError') {
+        // file not found is expected in some cases
+      } else {
+        console.error(`[IOService] Failed to get blob for ${path}:`, error)
+      }
       throw error
     }
   }

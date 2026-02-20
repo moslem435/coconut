@@ -16,9 +16,9 @@ export const getWallpaperOptions = (t: (key: string) => string) => [
     { name: t('wallpaper.preset.neon'), type: 'preset' as const, value: 'linear-gradient(to right, #f83600 0%, #f9d423 100%)' },
     { name: t('wallpaper.preset.midnight'), type: 'preset' as const, value: 'linear-gradient(109.6deg, rgb(36, 45, 57) 11.2%, rgb(16, 37, 60) 51.2%, rgb(0, 0, 0) 98.6%)' },
     { name: t('wallpaper.image.daily'), type: 'image' as const, value: 'daily' },
-    { name: t('wallpaper.image.snow'), type: 'image' as const, value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
-    { name: t('wallpaper.image.desert'), type: 'image' as const, value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
-    { name: t('wallpaper.image.city'), type: 'image' as const, value: '/api/proxy?url=' + encodeURIComponent('https://images.unsplash.com/photo-1519501025264-65ba15a82390?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') },
+    { name: t('wallpaper.image.snow'), type: 'image' as const, value: '/wallpapers/snow.jpg' },
+    { name: t('wallpaper.image.desert'), type: 'image' as const, value: '/wallpapers/desert.jpg' },
+    { name: t('wallpaper.image.city'), type: 'image' as const, value: '/wallpapers/city.jpg' },
 ]
 
 export const techStack = [
