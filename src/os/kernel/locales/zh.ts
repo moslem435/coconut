@@ -420,6 +420,7 @@ const zh: Record<string, string> = {
     "calendar.today": "回到今天",
     "calendar.holiday.work": "班",
     "calendar.holiday.rest": "休",
+    "todo.add_placeholder": "添加待办事项...",
 }
 
 export default zh
