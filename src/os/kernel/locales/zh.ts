@@ -176,6 +176,9 @@ const zh: Record<string, string> = {
     "wallpaper.image.snow": "雪山",
     "wallpaper.image.desert": "沙漠",
     "wallpaper.image.city": "城市",
+    "wallpaper.video.ocean": "海浪 (视频)",
+    "wallpaper.dynamic.daynight": "动态昼夜",
+    "wallpaper.dynamic.mojave": "macOS Mojave (模拟)",
 
     "color.cyan": "青色",
     "color.blue": "蓝色",

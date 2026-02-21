@@ -6,7 +6,7 @@ import { persist, subscribeWithSelector } from 'zustand/middleware'
 export type ThemeMode = 'dark' | 'light'
 
 export interface Wallpaper {
-    type: 'preset' | 'image' | 'solid' | 'video' | 'daily'
+    type: 'preset' | 'image' | 'solid' | 'video' | 'daily' | 'dynamic-time'
     value: string
 }
 

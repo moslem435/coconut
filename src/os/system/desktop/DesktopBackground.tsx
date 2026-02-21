@@ -36,7 +36,7 @@ export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundPro
       )}
 
       {/* 图片壁纸 */}
-      {(wallpaper?.type === 'image' || wallpaper?.type === 'preset' || wallpaper?.type === 'daily') && (
+      {(wallpaper?.type === 'image' || wallpaper?.type === 'preset' || wallpaper?.type === 'daily' || wallpaper?.type === 'dynamic-time') && (
         <>
           {/* 当前显示的壁纸 */}
           <div

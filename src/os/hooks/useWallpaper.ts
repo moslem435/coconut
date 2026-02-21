@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 export interface WallpaperConfig {
-  type: 'image' | 'video' | 'gradient' | 'preset' | 'solid' | 'daily'
+  type: 'image' | 'video' | 'gradient' | 'preset' | 'solid' | 'daily' | 'dynamic-time'
   value: string
 }
 
@@ -26,19 +26,25 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isFirstImageLoad = useRef(true)
   const [dailyRefreshKey, setDailyRefreshKey] = useState(new Date().toDateString())
+  const [hourRefreshKey, setHourRefreshKey] = useState(new Date().getHours())
 
-  // Check for day change every minute if using daily wallpaper
+  // Check for day/time change every minute
   useEffect(() => {
-    if (wallpaper?.type !== 'daily') return
+    if (wallpaper?.type !== 'daily' && wallpaper?.type !== 'dynamic-time') return
 
-    const checkDate = () => {
-      const today = new Date().toDateString()
+    const checkTime = () => {
+      const now = new Date()
+      const today = now.toDateString()
       if (today !== dailyRefreshKey) {
         setDailyRefreshKey(today)
       }
+      
+      // For dynamic-time, we might need minute-level precision
+      // But we use a counter to force re-evaluation every minute
+      setHourRefreshKey(prev => (prev + 1) % 1440) 
     }
 
-    const interval = setInterval(checkDate, 60000)
+    const interval = setInterval(checkTime, 60000)
     return () => clearInterval(interval)
   }, [wallpaper?.type, dailyRefreshKey])
 
@@ -75,8 +81,44 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
         }
       }
 
-      // 图片类型壁纸 (daily 也是图片)
-      if (wallpaper.type === 'image' || wallpaper.type === 'preset' || wallpaper.type === 'daily') {
+      // 如果是动态时间壁纸，解析 schedule 并获取当前时间对应的 URL
+      if (wallpaper.type === 'dynamic-time') {
+        try {
+          const schedule = JSON.parse(wallpaper.value) as { time: number | string, url: string }[]
+          const now = new Date()
+          const currentMinutes = now.getHours() * 60 + now.getMinutes()
+          
+          // 解析并排序所有时间点（统一转换为分钟）
+          const normalizedSchedule = schedule.map(item => {
+            let minutes = 0
+            if (typeof item.time === 'string') {
+              const [h, m] = item.time.split(':').map(Number)
+              minutes = h * 60 + (m || 0)
+            } else {
+              minutes = item.time * 60
+            }
+            return { ...item, minutes }
+          }).sort((a, b) => a.minutes - b.minutes)
+          
+          // 找到当前时间对应的 slot (currentMinutes >= slot.minutes)
+          let activeSlot = normalizedSchedule[normalizedSchedule.length - 1]
+          
+          for (const slot of normalizedSchedule) {
+            if (currentMinutes >= slot.minutes) {
+              activeSlot = slot
+            }
+          }
+          
+          if (activeSlot && activeSlot.url) {
+            targetValue = activeSlot.url
+          }
+        } catch (error) {
+          console.error('Failed to parse dynamic wallpaper schedule:', error)
+        }
+      }
+
+      // 图片类型壁纸 (daily 和 dynamic-time 最终也是图片)
+      if (['image', 'preset', 'daily', 'dynamic-time'].includes(wallpaper.type)) {
         // 首次加载直接显示
         if (isFirstImageLoad.current) {
           isFirstImageLoad.current = false
@@ -92,7 +134,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
           return
         }
         
-        // 如果当前已经在显示这个壁纸（可能之前是 null，现在加载完了）
+        // 如果当前已经在显示这个壁纸
         if (activeWallpaper === targetValue) {
             setIsLoading(false)
             return
@@ -144,7 +186,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
         clearTimeout(transitionTimeoutRef.current)
       }
     }
-  }, [wallpaper?.value, wallpaper?.type, dailyRefreshKey])
+  }, [wallpaper?.value, wallpaper?.type, dailyRefreshKey, hourRefreshKey])
 
   /**
    * 获取过渡样式
