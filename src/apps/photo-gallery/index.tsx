@@ -76,12 +76,12 @@ export default function PhotoGallery() {
   }, [selectedId, images, getFileBlob])
 
   return (
-    <div className="h-full w-full bg-[#111] text-white flex flex-col pt-10">
+    <div className="h-full w-full bg-[var(--os-bg-window)] text-[var(--os-text-primary)] flex flex-col pt-10">
       {/* Header / Toolbar */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-white/10 bg-[#111]/90 backdrop-blur z-10">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--os-border)] bg-[var(--os-bg-panel)]/90 backdrop-blur z-10">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm">{t('gallery.library')}</span>
-          <span className="text-xs text-white/40">{images.length} {t('gallery.items')}</span>
+          <span className="text-xs text-[var(--os-text-muted)]">{images.length} {t('gallery.items')}</span>
         </div>
         <div className="flex gap-2">
           {/* Toolbar actions could go here */}
@@ -91,7 +91,7 @@ export default function PhotoGallery() {
       {/* Grid View */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         {images.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-white/30">
+          <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
             <ImageIcon size={48} className="mb-4 opacity-50" />
             <p>{t('gallery.empty')}</p>
           </div>
@@ -102,7 +102,7 @@ export default function PhotoGallery() {
                 key={img.id}
                 layoutId={`img-${img.id}`}
                 onClick={() => setSelectedId(img.id)}
-                className="aspect-square bg-white/5 rounded-lg overflow-hidden cursor-pointer relative group border border-white/5 hover:border-white/20 transition-colors"
+                className="aspect-square bg-[var(--os-bg-selection)] rounded-lg overflow-hidden cursor-pointer relative group border border-[var(--os-border)] hover:border-[var(--os-border-active)] transition-colors"
               >
                 <GalleryItem file={img} getDisplayName={getDisplayName} />
 
@@ -122,14 +122,14 @@ export default function PhotoGallery() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/95 flex items-center justify-center backdrop-blur-md pt-8"
+            className="absolute inset-0 z-50 bg-[var(--os-bg-window)]/95 flex items-center justify-center backdrop-blur-md pt-8"
             onClick={() => setSelectedId(null)}
           >
             {/* Controls */}
             <div className="absolute top-4 right-4 flex gap-4 z-50 pt-8">
               <button
                 onClick={(e) => { e.stopPropagation(); setSelectedId(null); }}
-                className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors"
+                className="p-2 bg-[var(--os-bg-selection)] rounded-full hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)] transition-colors"
               >
                 <X size={20} />
               </button>
@@ -138,7 +138,7 @@ export default function PhotoGallery() {
             <button
               onClick={handlePrev}
               disabled={selectedIndex === 0}
-              className={`absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed z-50 ${selectedIndex === 0 ? 'hidden' : ''}`}
+              className={`absolute left-4 p-3 rounded-full bg-[var(--os-bg-selection)] hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed z-50 ${selectedIndex === 0 ? 'hidden' : ''}`}
             >
               <ChevronLeft size={24} />
             </button>
@@ -146,7 +146,7 @@ export default function PhotoGallery() {
             <button
               onClick={handleNext}
               disabled={selectedIndex === images.length - 1}
-              className={`absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed z-50 ${selectedIndex === images.length - 1 ? 'hidden' : ''}`}
+              className={`absolute right-4 p-3 rounded-full bg-[var(--os-bg-selection)] hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed z-50 ${selectedIndex === images.length - 1 ? 'hidden' : ''}`}
             >
               <ChevronRight size={24} />
             </button>
@@ -164,9 +164,9 @@ export default function PhotoGallery() {
                   className="max-w-full max-h-[80vh] object-contain"
                 />
               ) : (
-                <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[#222]">
-                  <ImageIcon size={64} className="text-white/20 mb-4" />
-                  <span className="text-xl text-white/40">{getDisplayName(images[selectedIndex])}</span>
+                <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[var(--os-bg-base)]">
+                  <ImageIcon size={64} className="text-[var(--os-text-muted)] mb-4" />
+                  <span className="text-xl text-[var(--os-text-muted)]">{getDisplayName(images[selectedIndex])}</span>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">

@@ -13,6 +13,7 @@ export interface FileGridItemProps extends React.HTMLAttributes<HTMLDivElement> 
   onCancelRename?: () => void
   iconSize?: number
   iconClassName?: string
+  textClassName?: string
 }
 
 export function FileGridItem({
@@ -24,6 +25,7 @@ export function FileGridItem({
   className,
   iconSize = 48,
   iconClassName,
+  textClassName,
   ...props
 }: FileGridItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
@@ -68,6 +70,7 @@ export function FileGridItem({
             <IconComponent
               size={iconSize * 0.6}
               strokeWidth={2}
+              fill={item.type === 'folder' ? 'currentColor' : 'none'}
             />
           </div>
         )}
@@ -81,7 +84,10 @@ export function FileGridItem({
           onCancel={onCancelRename || (() => { })}
         />
       ) : (
-        <span className="text-xs text-center text-white/90 drop-shadow-md break-words w-full px-1 select-none">
+        <span className={cn(
+          "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none",
+          textClassName || "text-[var(--os-text-primary)]"
+        )}>
           {displayName}
         </span>
       )}

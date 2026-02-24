@@ -116,7 +116,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                     className="fixed w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl z-[10001]"
                     style={{
                         backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.75)',
-                        boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                        boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--os-border), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
                         backdropFilter: 'blur(40px) saturate(150%)',
                         left: position?.x ?? 0,
                         bottom: position?.y ?? '5rem', // Fallback in REM
@@ -187,7 +187,7 @@ function MenuItem({ manifest, icon: Icon, label, onClick, danger }: MenuItemProp
         <button
             onClick={onClick}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group ${danger
-                ? 'hover:bg-red-500/10 text-red-400'
+                ? 'hover:bg-[var(--os-danger)]/10 text-[var(--os-danger)]'
                 : 'hover:bg-[var(--os-hover-bg)] text-[var(--os-text-primary)]'
                 }`}
         >
@@ -197,7 +197,7 @@ function MenuItem({ manifest, icon: Icon, label, onClick, danger }: MenuItemProp
                     icon={Icon} 
                     size={32} 
                     background={true}
-                    className={danger ? 'text-red-400' : undefined}
+                    className={danger ? 'text-[var(--os-danger)]' : undefined}
                 />
             ) : (
                 <div className="w-8 h-8 flex items-center justify-center">

@@ -6,6 +6,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { useFileSelection } from '@/os/hooks/useFileSelection'
 import { useDesktopGrid } from '@/os/hooks/useDesktopGrid'
 import { useDesktopInteraction } from '@/os/hooks/useDesktopInteraction'
+import { useWallpaper } from '@/os/hooks/useWallpaper'
+import { getImageBrightness, getColorBrightness, isDarkBrightness } from '@/os/utils/color'
 import { eventBus } from '@/os/kernel/EventBus'
 
 // Sub-components
@@ -19,6 +21,50 @@ export default function Desktop() {
     const {
         snapToGrid, wallpaper, showWeatherWidget
     } = useSystemSettings()
+
+    // Wallpaper Hook
+    const {
+        activeWallpaper,
+        loadedWallpaper,
+        isLoading: isWallpaperLoading,
+        getTransitionStyle
+    } = useWallpaper(wallpaper)
+
+    // Background Brightness State
+    const [isDarkBackground, setIsDarkBackground] = useState(true)
+
+    // Calculate background brightness
+    useEffect(() => {
+        if (!activeWallpaper) return
+
+        const checkBrightness = async () => {
+            try {
+                let brightness = 128
+                
+                // For images, we need to load and analyze
+                if (['image', 'daily', 'dynamic-time'].includes(wallpaper?.type || '')) {
+                    brightness = await getImageBrightness(activeWallpaper)
+                } 
+                // For CSS values (solid, gradient, preset)
+                else {
+                    // For gradients, this is tricky. We might just default to dark for now or parse.
+                    // getColorBrightness handles solid colors well.
+                    // For gradients, it might fail or return default.
+                    // Let's assume most gradients are somewhat dark or colorful enough for white text.
+                    // Or we can try to sample if possible.
+                    // For now, let's just try getColorBrightness.
+                    brightness = getColorBrightness(activeWallpaper)
+                }
+                
+                setIsDarkBackground(isDarkBrightness(brightness))
+            } catch (e) {
+                console.warn('Failed to calculate brightness', e)
+                setIsDarkBackground(true) // Default to dark background (white text)
+            }
+        }
+
+        checkBrightness()
+    }, [activeWallpaper, wallpaper?.type])
 
     // Context Menu
     const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
@@ -118,7 +164,14 @@ export default function Desktop() {
                 }}
             >
                 {/* Background */}
-                <DesktopBackground wallpaper={wallpaper} isVisible={isDesktopVisible} />
+                <DesktopBackground 
+                    wallpaper={wallpaper} 
+                    isVisible={isDesktopVisible}
+                    activeWallpaper={activeWallpaper}
+                    loadedWallpaper={loadedWallpaper}
+                    isLoading={isWallpaperLoading}
+                    getTransitionStyle={getTransitionStyle}
+                />
 
                 {/* Widgets */}
                 <DesktopWidgets
@@ -131,6 +184,7 @@ export default function Desktop() {
                     {!isLoading && (
                         <DesktopIcons
                             items={desktopItems}
+                            textColor={isDarkBackground ? 'text-white' : 'text-black'}
                             iconPositions={iconPositions}
                             selectedIds={selectedIcons}
                             isLayoutReady={isLayoutReady}

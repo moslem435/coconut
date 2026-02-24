@@ -18,8 +18,7 @@ export function AppearancePanel() {
         wallpaper, setWallpaper,
         useTransparency, setUseTransparency,
         useAnimations, setUseAnimations,
-        useTaskbarPreviews, setUseTaskbarPreviews,
-        skipBootSequence, setSkipBootSequence
+        useTaskbarPreviews, setUseTaskbarPreviews
     } = useSystem()
 
     const accentColors = getAccentColors(t)
@@ -142,11 +141,6 @@ export function AppearancePanel() {
                         checked={useTaskbarPreviews}
                         onChange={setUseTaskbarPreviews}
                         label={t('settings.appearance.previews')}
-                    />
-                    <ToggleSwitch
-                        checked={skipBootSequence}
-                        onChange={setSkipBootSequence}
-                        label={t('settings.appearance.skipboot')}
                     />
                 </div>
             </SettingSection>

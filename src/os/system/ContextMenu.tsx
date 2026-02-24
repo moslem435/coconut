@@ -72,13 +72,13 @@ export default function SystemContextMenu() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: useAnimations ? 0.1 : 0 }}
-          className="fixed z-[20000] min-w-[220px] bg-[#1e1e1e]/85 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl py-1.5 overflow-hidden select-none font-sans"
+          className="fixed z-[20000] min-w-[220px] bg-[var(--os-bg-panel)]/85 backdrop-blur-xl border border-[var(--os-border)] shadow-2xl rounded-xl py-1.5 overflow-hidden select-none font-sans"
           style={getMenuStyle()}
           onContextMenu={(e) => e.preventDefault()}
         >
           {menuItems.map((item, index) => {
             if (item.type === 'separator') {
-              return <div key={index} className="h-px bg-white/10 my-1 mx-3" />
+              return <div key={index} className="h-px bg-[var(--os-border)] my-1 mx-3" />
             }
 
             const Icon = item.icon
@@ -92,8 +92,8 @@ export default function SystemContextMenu() {
                   }}
                   className={`w-full text-left px-3 py-2 flex items-center justify-between text-[13px] font-medium transition-all rounded-lg group
                     ${item.danger
-                      ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-                      : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                      ? 'text-[var(--os-danger)] hover:bg-[var(--os-danger)]/10 hover:text-[var(--os-danger)]'
+                      : 'text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] hover:text-[var(--os-text-primary)]'
                     }`}
                 >
                   <div className="flex items-center gap-3">

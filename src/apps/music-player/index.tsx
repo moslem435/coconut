@@ -512,21 +512,21 @@ export default function MusicPlayer() {
     <div
       onClick={() => setActiveTab(id || label.toLowerCase())}
       className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors ${activeTab === (id || label.toLowerCase())
-        ? 'bg-[#1DB954]/10 text-[#1DB954]'
-        : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'
+        ? 'bg-[var(--os-accent)]/10 text-[var(--os-accent)]'
+        : 'text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)] hover:bg-[var(--os-hover-bg)]'
         }`}
     >
       <div className="flex items-center gap-3">
         <Icon size={18} />
         <span className="text-sm font-medium">{label}</span>
       </div>
-      {count && <span className="text-xs text-gray-600">{count}</span>}
+      {count && <span className="text-xs text-[var(--os-text-muted)]">{count}</span>}
     </div>
   )
 
   return (
     <div
-      className="h-full w-full flex flex-col bg-[#1e1e1e] text-[#e0e0e0] font-sans overflow-hidden select-none relative pt-10"
+      className="h-full w-full flex flex-col bg-[var(--os-bg-window)] text-[var(--os-text-primary)] font-sans overflow-hidden select-none relative pt-10"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -559,20 +559,20 @@ export default function MusicPlayer() {
       <div className="flex-1 flex overflow-hidden">
 
         {/* Sidebar */}
-        <div className="w-56 bg-[#181818] flex flex-col pt-6 pb-2 border-r border-[#2c2c2c] shrink-0">
+        <div className="w-56 bg-[var(--os-bg-panel)] flex flex-col pt-6 pb-2 border-r border-[var(--os-border)] shrink-0">
 
           {/* User Profile */}
           <div className="px-5 mb-8 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-400 to-cyan-500 p-[2px]">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[var(--os-accent)] to-[var(--os-accent-dim)] p-[2px]">
               <img
                 src="https://github.com/shadcn.png"
-                className="w-full h-full rounded-full border-2 border-[#181818]"
+                className="w-full h-full rounded-full border-2 border-[var(--os-bg-panel)]"
                 alt="Avatar"
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-white">Yume</span>
-              <span className="text-[10px] text-emerald-400 border border-emerald-400/30 px-1 rounded-sm w-fit">{t('music.vip')}</span>
+              <span className="text-sm font-bold text-[var(--os-text-primary)]">Yume</span>
+              <span className="text-[10px] text-[var(--os-accent)] border border-[var(--os-accent)]/30 px-1 rounded-sm w-fit">{t('music.vip')}</span>
             </div>
           </div>
 
@@ -584,30 +584,30 @@ export default function MusicPlayer() {
             <SidebarItem icon={Sliders} label={t('music.eq')} id="eq" />
           </div>
 
-          <div className="px-5 text-xs text-gray-500 font-medium mb-2">{t('music.my')}</div>
+          <div className="px-5 text-xs text-[var(--os-text-muted)] font-medium mb-2">{t('music.my')}</div>
           <div className="flex flex-col gap-1 px-3 mb-6">
             <SidebarItem icon={Heart} label={t('music.likes')} id="likes" count={Object.values(liked).filter(Boolean).length} />
             <SidebarItem icon={Clock} label={t('music.recent')} id="recent" count="12" />
             <SidebarItem icon={Download} label={t('music.local')} id="local" />
           </div>
 
-          <div className="px-5 text-xs text-gray-500 font-medium mb-2 flex justify-between items-center group cursor-pointer" onClick={handleCreatePlaylist}>
+          <div className="px-5 text-xs text-[var(--os-text-muted)] font-medium mb-2 flex justify-between items-center group cursor-pointer" onClick={handleCreatePlaylist}>
             <span>{t('music.playlists')}</span>
-            <span className="opacity-0 group-hover:opacity-100 text-lg leading-none hover:text-white transition-colors">+</span>
+            <span className="opacity-0 group-hover:opacity-100 text-lg leading-none hover:text-[var(--os-text-primary)] transition-colors">+</span>
           </div>
           <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
             {playlists.map((pl) => (
               <div
                 key={pl.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#2a2a2a] cursor-pointer text-sm transition-colors group relative ${activeTab === pl.id ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--os-hover-bg)] cursor-pointer text-sm transition-colors group relative ${activeTab === pl.id ? 'bg-[var(--os-hover-bg)] text-[var(--os-text-primary)]' : 'text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]'}`}
                 onClick={() => setActiveTab(pl.id)}
               >
-                <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded bg-[var(--os-bg-selection)] flex items-center justify-center shrink-0">
                   <ListMusic size={14} />
                 </div>
                 <span className="truncate flex-1">{pl.name}</span>
                 <button
-                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 text-[var(--os-text-muted)] hover:text-red-400 transition-opacity"
                   onClick={(e) => handleDeletePlaylist(pl.id, e)}
                 >
                   <Trash2 size={14} />
@@ -618,21 +618,21 @@ export default function MusicPlayer() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col bg-[#1e1e1e] min-w-0">
+        <div className="flex-1 flex flex-col bg-[var(--os-bg-window)] min-w-0">
 
           {/* Header */}
           <div className="h-16 flex items-center justify-between px-8 shrink-0">
             <div className="flex items-center gap-4">
-              <div className="flex gap-2 text-gray-400">
-                <button className="hover:text-white"><ChevronLeft size={20} /></button>
-                <button className="hover:text-white"><ChevronRight size={20} /></button>
+              <div className="flex gap-2 text-[var(--os-text-secondary)]">
+                <button className="hover:text-[var(--os-text-primary)]"><ChevronLeft size={20} /></button>
+                <button className="hover:text-[var(--os-text-primary)]"><ChevronRight size={20} /></button>
               </div>
-              <button className="hover:animate-spin text-gray-400 hover:text-white ml-2">
+              <button className="hover:animate-spin text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)] ml-2">
                 <RefreshCw size={16} />
               </button>
 
               <div className="relative ml-4 group">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-400" />
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--os-text-muted)] group-focus-within:text-[var(--os-accent)]" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -641,14 +641,14 @@ export default function MusicPlayer() {
                     if (e.target.value) setActiveTab('hall')
                   }}
                   placeholder={t('music.search')}
-                  className="bg-[#2a2a2a] text-sm text-white rounded-full pl-10 pr-4 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                  className="bg-[var(--os-bg-selection)] text-sm text-[var(--os-text-primary)] rounded-full pl-10 pr-4 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-[var(--os-accent)]/50 transition-all"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-gray-400">
-              <button className="hover:text-white"><Mic2 size={18} /></button>
-              <button className="hover:text-white"><Settings size={18} /></button>
+            <div className="flex items-center gap-4 text-[var(--os-text-secondary)]">
+              <button className="hover:text-[var(--os-text-primary)]"><Mic2 size={18} /></button>
+              <button className="hover:text-[var(--os-text-primary)]"><Settings size={18} /></button>
             </div>
           </div>
 
@@ -657,17 +657,17 @@ export default function MusicPlayer() {
 
             {activeTab === 'recommend' && (
               <>
-                <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                  {t('start.visitor')} <span className="text-lg font-normal text-gray-500">{t('music.recommend')}</span>
+                <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-[var(--os-text-primary)]">
+                  {t('start.visitor')} <span className="text-lg font-normal text-[var(--os-text-muted)]">{t('music.recommend')}</span>
                 </h1>
 
                 {/* Hero Banner */}
-                <div className="w-full h-48 rounded-xl bg-gradient-to-r from-emerald-900/40 to-black relative overflow-hidden mb-8 group cursor-pointer border border-white/5" onClick={() => playTrack(INITIAL_TRACKS[0])}>
+                <div className="w-full h-48 rounded-xl bg-gradient-to-r from-[var(--os-accent)]/20 to-black relative overflow-hidden mb-8 group cursor-pointer border border-[var(--os-border)]" onClick={() => playTrack(INITIAL_TRACKS[0])}>
                   <div className="absolute inset-0 flex items-center p-8">
                     <div className="relative z-10">
-                      <div className="text-emerald-400 font-medium mb-2 tracking-wider text-sm">{t('music.daily')}</div>
+                      <div className="text-[var(--os-accent)] font-medium mb-2 tracking-wider text-sm">{t('music.daily')}</div>
                       <h2 className="text-3xl font-bold text-white mb-4 w-2/3 leading-tight">{t('music.fresh')}</h2>
-                      <button className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center hover:scale-105 transition-transform text-black">
+                      <button className="w-10 h-10 rounded-full bg-[var(--os-accent)] flex items-center justify-center hover:scale-105 transition-transform text-white">
                         <Play size={20} fill="currentColor" className="ml-1" />
                       </button>
                     </div>
@@ -682,28 +682,28 @@ export default function MusicPlayer() {
                 {/* Grid Section */}
                 <div className="mb-8">
                   <div className="flex justify-between items-end mb-4">
-                    <h3 className="text-lg font-bold text-white">{t('music.your_playlist')}</h3>
-                    <button className="text-xs text-gray-500 hover:text-white transition-colors">{t('music.show_all')}</button>
+                    <h3 className="text-lg font-bold text-[var(--os-text-primary)]">{t('music.your_playlist')}</h3>
+                    <button className="text-xs text-[var(--os-text-muted)] hover:text-[var(--os-text-primary)] transition-colors">{t('music.show_all')}</button>
                   </div>
 
                   <div className="grid grid-cols-5 gap-5">
                     {INITIAL_TRACKS.map((item, index) => (
                       <div key={item.id} className="group cursor-pointer" onClick={() => playTrack(item)}>
-                        <div className="aspect-square rounded-lg overflow-hidden relative mb-3 bg-[#2a2a2a]">
+                        <div className="aspect-square rounded-lg overflow-hidden relative mb-3 bg-[var(--os-bg-selection)]">
                           <img src={item.cover} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.title} />
                           {/* Play Overlay */}
                           <div className={`absolute inset-0 bg-black/20 transition-opacity flex items-center justify-center backdrop-blur-[1px] ${currentTrackIndex === index && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                            <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                            <div className="w-12 h-12 rounded-full bg-[var(--os-accent)] flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                               {currentTrackIndex === index && isPlaying ? (
-                                <Pause size={24} fill="black" className="text-black" />
+                                <Pause size={24} fill="white" className="text-white" />
                               ) : (
-                                <Play size={24} fill="black" className="ml-1 text-black" />
+                                <Play size={24} fill="white" className="ml-1 text-white" />
                               )}
                             </div>
                           </div>
                         </div>
-                        <div className={`text-sm font-medium truncate transition-colors ${currentTrackIndex === index ? 'text-emerald-400' : 'text-white group-hover:text-emerald-400'}`}>{item.title}</div>
-                        <div className="text-xs text-gray-500 truncate mt-0.5">{item.artist}</div>
+                        <div className={`text-sm font-medium truncate transition-colors ${currentTrackIndex === index ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-primary)] group-hover:text-[var(--os-accent)]'}`}>{item.title}</div>
+                        <div className="text-xs text-[var(--os-text-muted)] truncate mt-0.5">{item.artist}</div>
                       </div>
                     ))}
                   </div>
@@ -713,29 +713,29 @@ export default function MusicPlayer() {
 
             {activeTab === 'search' && (
               <div className="flex flex-col">
-                <h1 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <h1 className="text-2xl font-bold mb-6 flex items-center gap-3 text-[var(--os-text-primary)]">
                   iTunes Search: "{searchQuery}"
-                  {isSearchingOnline && <RefreshCw size={20} className="animate-spin text-emerald-500" />}
+                  {isSearchingOnline && <RefreshCw size={20} className="animate-spin text-[var(--os-accent)]" />}
                 </h1>
                 <div className="grid grid-cols-4 gap-4">
                   {onlineTracks.map((track) => (
-                    <div key={track.id} className="bg-[#2a2a2a]/50 p-4 rounded-lg hover:bg-[#2a2a2a] group cursor-pointer transition-colors" onClick={() => playTrack(track)}>
+                    <div key={track.id} className="bg-[var(--os-bg-selection)]/50 p-4 rounded-lg hover:bg-[var(--os-bg-selection)] group cursor-pointer transition-colors" onClick={() => playTrack(track)}>
                       <div className="aspect-square rounded-md overflow-hidden relative mb-3 bg-black">
                         <img src={track.cover} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-black">
+                          <div className="w-10 h-10 rounded-full bg-[var(--os-accent)] flex items-center justify-center text-white">
                             <Play size={20} fill="currentColor" className="ml-1" />
                           </div>
                         </div>
                         <div className="absolute bottom-1 right-1 bg-black/60 text-[10px] text-white px-1.5 py-0.5 rounded">30s</div>
                       </div>
-                      <div className="font-medium text-white truncate">{track.title}</div>
-                      <div className="text-xs text-gray-400 truncate">{track.artist}</div>
-                      <div className="text-xs text-gray-500 truncate mt-1">{track.album}</div>
+                      <div className="font-medium text-[var(--os-text-primary)] truncate">{track.title}</div>
+                      <div className="text-xs text-[var(--os-text-secondary)] truncate">{track.artist}</div>
+                      <div className="text-xs text-[var(--os-text-muted)] truncate mt-1">{track.album}</div>
                     </div>
                   ))}
                   {!isSearchingOnline && onlineTracks.length === 0 && (
-                    <div className="col-span-4 text-center text-gray-500 py-10">
+                    <div className="col-span-4 text-center text-[var(--os-text-muted)] py-10">
                       No results found
                     </div>
                   )}
@@ -745,12 +745,12 @@ export default function MusicPlayer() {
 
             {(activeTab === 'hall' || activeTab === 'likes' || activeTab === 'local' || activeTab.startsWith('playlist-')) && (
               <div className="flex flex-col">
-                <h1 className="text-2xl font-bold mb-6">
+                <h1 className="text-2xl font-bold mb-6 text-[var(--os-text-primary)]">
                   {activeTab === 'hall' ? 'Music Hall' : activeTab === 'likes' ? 'Liked Songs' : activeTab === 'local' ? 'Local Files' : playlists.find(p => p.id === activeTab)?.name || 'Playlist'}
                 </h1>
 
                 {activeTab === 'local' && playlist.filter(t => t.isLocal).length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500 border-2 border-dashed border-gray-700 rounded-lg bg-gray-800/20">
+                  <div className="flex flex-col items-center justify-center h-64 text-[var(--os-text-muted)] border-2 border-dashed border-[var(--os-border)] rounded-lg bg-[var(--os-bg-selection)]/20">
                     <Download size={48} className="mb-4 opacity-50" />
                     <p>Drag and drop audio files here</p>
                   </div>
@@ -770,19 +770,19 @@ export default function MusicPlayer() {
                     const isCurrent = currentTrackIndex === realIndex && realIndex !== -1
                     return (
                       <div key={`${track.id}-${i}`}
-                        className={`flex items-center gap-4 p-3 rounded-md hover:bg-[#2a2a2a] group cursor-pointer ${isCurrent ? 'bg-[#2a2a2a]' : ''}`}
+                        className={`flex items-center gap-4 p-3 rounded-md hover:bg-[var(--os-hover-bg)] group cursor-pointer ${isCurrent ? 'bg-[var(--os-bg-selection)]' : ''}`}
                         onClick={() => playTrack(track)}
                         onContextMenu={(e) => {
                           e.preventDefault()
                           setContextMenu({ x: e.clientX, y: e.clientY, track })
                         }}
                       >
-                        <div className="w-6 text-center text-sm text-gray-500">
+                        <div className="w-6 text-center text-sm text-[var(--os-text-muted)]">
                           {isCurrent && isPlaying ? (
                             <div className="flex gap-[2px] justify-center items-end h-3">
-                              <span className="w-0.5 bg-emerald-500 animate-pulse h-2"></span>
-                              <span className="w-0.5 bg-emerald-500 animate-pulse h-3 animation-delay-75"></span>
-                              <span className="w-0.5 bg-emerald-500 animate-pulse h-1 animation-delay-150"></span>
+                              <span className="w-0.5 bg-[var(--os-accent)] animate-pulse h-2"></span>
+                              <span className="w-0.5 bg-[var(--os-accent)] animate-pulse h-3 animation-delay-75"></span>
+                              <span className="w-0.5 bg-[var(--os-accent)] animate-pulse h-1 animation-delay-150"></span>
                             </div>
                           ) : (
                             i + 1
@@ -790,13 +790,13 @@ export default function MusicPlayer() {
                         </div>
                         <img src={track.cover} className="w-10 h-10 rounded object-cover" />
                         <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-medium truncate ${isCurrent ? 'text-emerald-500' : 'text-white'}`}>{track.title}</div>
-                          <div className="text-xs text-gray-500">{track.artist}</div>
+                          <div className={`text-sm font-medium truncate ${isCurrent ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-primary)]'}`}>{track.title}</div>
+                          <div className="text-xs text-[var(--os-text-muted)]">{track.artist}</div>
                         </div>
-                        <div className="text-xs text-gray-500">{track.album}</div>
-                        <div className="text-xs text-gray-500 w-12 text-right">{formatTime(track.duration)}</div>
+                        <div className="text-xs text-[var(--os-text-muted)]">{track.album}</div>
+                        <div className="text-xs text-[var(--os-text-muted)] w-12 text-right">{formatTime(track.duration)}</div>
                         <button
-                          className={`p-2 hover:bg-white/10 rounded-full ${liked[track.id] ? 'text-emerald-500' : 'text-gray-500 opacity-0 group-hover:opacity-100'}`}
+                          className={`p-2 hover:bg-[var(--os-hover-bg)] rounded-full ${liked[track.id] ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-muted)] opacity-0 group-hover:opacity-100'}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             toggleLike(track.id)
@@ -806,7 +806,7 @@ export default function MusicPlayer() {
                         </button>
                         {activeTab.startsWith('playlist-') && (
                           <button
-                            className="p-2 hover:bg-white/10 rounded-full text-gray-500 opacity-0 group-hover:opacity-100 hover:text-red-400"
+                            className="p-2 hover:bg-[var(--os-hover-bg)] rounded-full text-[var(--os-text-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--os-danger)]"
                             onClick={(e) => {
                               e.stopPropagation()
                               removeFromPlaylist(activeTab, track.id)
@@ -828,7 +828,7 @@ export default function MusicPlayer() {
                       return true
                     }).length === 0)
                   ) && activeTab !== 'local' && (
-                      <div className="text-gray-500 text-center py-20">No tracks found</div>
+                      <div className="text-[var(--os-text-muted)] text-center py-20">No tracks found</div>
                     )}
                 </div>
               </div>
@@ -836,15 +836,15 @@ export default function MusicPlayer() {
 
             {activeTab === 'eq' && (
               <div className="flex flex-col h-full">
-                <h1 className="text-2xl font-bold mb-6">{t('music.eq')}</h1>
-                <div className="flex-1 bg-[#2a2a2a]/50 rounded-xl border border-white/5 p-8 flex items-center justify-center">
+                <h1 className="text-2xl font-bold mb-6 text-[var(--os-text-primary)]">{t('music.eq')}</h1>
+                <div className="flex-1 bg-[var(--os-bg-selection)]/50 rounded-xl border border-[var(--os-border)] p-8 flex items-center justify-center">
                   <Equalizer frequencies={EQ_FREQUENCIES} gains={eqGains} onChange={handleEqChange} />
                 </div>
               </div>
             )}
 
             {(activeTab === 'video' || activeTab === 'radio' || activeTab === 'recent') && (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <div className="flex flex-col items-center justify-center h-full text-[var(--os-text-muted)]">
                 <MonitorSpeaker size={48} className="mb-4 opacity-50" />
                 <p>This feature is coming soon...</p>
               </div>
@@ -855,12 +855,12 @@ export default function MusicPlayer() {
       </div>
 
       {/* Player Bar */}
-      <div className="h-20 bg-[#222] border-t border-[#333] flex items-center justify-between px-4 shrink-0 z-30 relative">
+      <div className="h-20 bg-[var(--os-bg-panel)] border-t border-[var(--os-border)] flex items-center justify-between px-4 shrink-0 z-30 relative">
 
         {/* Track Info */}
         <div className="flex items-center gap-3 w-[30%]">
           <div
-            className="w-12 h-12 rounded-md bg-gray-800 overflow-hidden relative group cursor-pointer"
+            className="w-12 h-12 rounded-md bg-[var(--os-bg-selection)] overflow-hidden relative group cursor-pointer"
             onClick={() => setShowDetail(true)}
           >
             <img
@@ -874,15 +874,15 @@ export default function MusicPlayer() {
           </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-white font-medium truncate cursor-pointer hover:underline" onClick={() => setShowDetail(true)}>
+              <span className="text-sm text-[var(--os-text-primary)] font-medium truncate cursor-pointer hover:underline" onClick={() => setShowDetail(true)}>
                 {currentTrack.title}
               </span>
-              <span className="text-[10px] border border-emerald-500 text-emerald-500 px-0.5 rounded ml-1">HQ</span>
+              <span className="text-[10px] border border-[var(--os-accent)] text-[var(--os-accent)] px-0.5 rounded ml-1">HQ</span>
             </div>
-            <div className="text-xs text-gray-500 truncate cursor-pointer hover:underline">{currentTrack.artist}</div>
+            <div className="text-xs text-[var(--os-text-muted)] truncate cursor-pointer hover:underline">{currentTrack.artist}</div>
           </div>
           <button
-            className={`ml-2 transition-colors ${liked[currentTrack.id] ? 'text-emerald-500' : 'text-gray-400 hover:text-white'}`}
+            className={`ml-2 transition-colors ${liked[currentTrack.id] ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]'}`}
             onClick={() => toggleLike(currentTrack.id)}
           >
             <Heart size={16} fill={liked[currentTrack.id] ? "currentColor" : "none"} />
@@ -893,21 +893,21 @@ export default function MusicPlayer() {
         <div className="flex flex-col items-center w-[40%]">
           <div className="flex items-center gap-6 mb-1">
             <button
-              className={`hover:text-white transition-colors ${isShuffled ? 'text-emerald-500' : 'text-gray-400'}`}
+              className={`hover:text-[var(--os-text-primary)] transition-colors ${isShuffled ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)]'}`}
               onClick={toggleShuffle}
             >
               <Shuffle size={16} />
             </button>
-            <button className="text-gray-300 hover:text-white" onClick={playPrev}><SkipBack size={20} fill="currentColor" /></button>
+            <button className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]" onClick={playPrev}><SkipBack size={20} fill="currentColor" /></button>
             <button
-              className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:scale-105 transition-transform text-black"
+              className="w-8 h-8 rounded-full bg-[var(--os-text-primary)] flex items-center justify-center hover:scale-105 transition-transform text-[var(--os-bg-base)]"
               onClick={togglePlay}
             >
               {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
             </button>
-            <button className="text-gray-300 hover:text-white" onClick={() => playNext()}><SkipForward size={20} fill="currentColor" /></button>
+            <button className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]" onClick={() => playNext()}><SkipForward size={20} fill="currentColor" /></button>
             <button
-              className={`hover:text-white transition-colors relative ${repeatMode !== 'off' ? 'text-emerald-500' : 'text-gray-400'}`}
+              className={`hover:text-[var(--os-text-primary)] transition-colors relative ${repeatMode !== 'off' ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)]'}`}
               onClick={toggleRepeat}
             >
               <Repeat size={16} />
@@ -915,24 +915,24 @@ export default function MusicPlayer() {
             </button>
           </div>
           <div className="flex items-center gap-2 w-full max-w-md">
-            <span className="text-[10px] text-gray-500 w-8 text-right">{formatTime(currentTime)}</span>
+            <span className="text-[10px] text-[var(--os-text-muted)] w-8 text-right">{formatTime(currentTime)}</span>
             <input
               type="range"
               min="0"
               max="100"
               value={isNaN(progress) ? 0 : progress}
               onChange={handleSeek}
-              className="flex-1 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white hover:[&::-webkit-slider-thumb]:scale-125 transition-all"
+              className="flex-1 h-1 bg-[var(--os-border-active)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--os-text-primary)] hover:[&::-webkit-slider-thumb]:scale-125 transition-all"
             />
-            <span className="text-[10px] text-gray-500 w-8">{formatTime(duration || currentTrack.duration)}</span>
+            <span className="text-[10px] text-[var(--os-text-muted)] w-8">{formatTime(duration || currentTrack.duration)}</span>
           </div>
         </div>
 
         {/* Volume & More */}
         <div className="flex items-center justify-end gap-3 w-[30%]">
-          <ListMusic size={18} className="text-gray-400 hover:text-white cursor-pointer" />
+          <ListMusic size={18} className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)] cursor-pointer" />
           <div className="flex items-center gap-2 group w-24">
-            <Volume2 size={18} className="text-gray-400" />
+            <Volume2 size={18} className="text-[var(--os-text-secondary)]" />
             <input
               type="range"
               min="0"
@@ -940,11 +940,11 @@ export default function MusicPlayer() {
               step="0.01"
               value={volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="flex-1 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+              className="flex-1 h-1 bg-[var(--os-border-active)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--os-text-primary)] opacity-0 group-hover:opacity-100 transition-opacity"
             />
           </div>
           <button
-            className="text-gray-400 hover:text-white ml-2"
+            className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)] ml-2"
             onClick={() => setShowDetail(true)}
           >
             <Maximize2 size={16} />
@@ -960,21 +960,21 @@ export default function MusicPlayer() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute inset-0 z-40 bg-[#1e1e1e]/95 backdrop-blur-3xl flex flex-col pt-10"
+            className="absolute inset-0 z-40 bg-[var(--os-bg-window)]/95 backdrop-blur-3xl flex flex-col pt-10"
           >
             {/* Overlay Background */}
             <div
               className="absolute inset-0 opacity-30 pointer-events-none blur-[100px]"
-              style={{ background: `radial-gradient(circle at center, ${currentTrackIndex % 2 === 0 ? '#10b981' : '#3b82f6'} 0%, transparent 70%)` }}
+              style={{ background: `radial-gradient(circle at center, ${currentTrackIndex % 2 === 0 ? 'var(--os-accent)' : 'var(--os-accent-dim)'} 0%, transparent 70%)` }}
             />
 
             {/* Overlay Header */}
             <div className="h-16 flex items-center justify-between px-8 shrink-0 z-10">
-              <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setShowDetail(false)} className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]">
                 <ChevronDown size={28} />
               </button>
-              <div className="text-xs text-gray-400 uppercase tracking-widest">Now Playing</div>
-              <button className="text-gray-400 hover:text-white">
+              <div className="text-xs text-[var(--os-text-muted)] uppercase tracking-widest">Now Playing</div>
+              <button className="text-[var(--os-text-secondary)] hover:text-[var(--os-text-primary)]">
                 <MoreHorizontal size={24} />
               </button>
             </div>
@@ -989,7 +989,7 @@ export default function MusicPlayer() {
                   <Visualizer analyser={analyser} isPlaying={isPlaying} />
                 </div>
 
-                <div className={`w-full h-full rounded-full bg-black shadow-2xl flex items-center justify-center border-8 border-[#1a1a1a] z-10 ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
+                <div className={`w-full h-full rounded-full bg-[var(--os-bg-base)] shadow-2xl flex items-center justify-center border-8 border-[var(--os-bg-panel)] z-10 ${isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
                   <div className="w-[70%] h-[70%] rounded-full overflow-hidden relative">
                     <img src={currentTrack.cover} className="w-full h-full object-cover" />
                   </div>
@@ -998,17 +998,17 @@ export default function MusicPlayer() {
 
               {/* Right: Lyrics / Info */}
               <div className="w-[400px] flex flex-col items-start text-left shrink-0">
-                <h2 className="text-4xl font-bold text-white mb-2">{currentTrack.title}</h2>
-                <p className="text-xl text-emerald-400 mb-8">{currentTrack.artist} — {currentTrack.album}</p>
+                <h2 className="text-4xl font-bold text-[var(--os-text-primary)] mb-2">{currentTrack.title}</h2>
+                <p className="text-xl text-[var(--os-accent)] mb-8">{currentTrack.artist} — {currentTrack.album}</p>
 
                 <div className="w-full h-[300px] overflow-hidden mask-image-linear-fade relative">
-                  <div className="text-2xl font-medium text-white/90 leading-relaxed space-y-6">
-                    <p className="text-white">Music is the language of the soul</p>
-                    <p className="text-gray-300">Drifting through the digital waves</p>
-                    <p className="text-gray-300">Code and rhythm intertwine</p>
-                    <p className="text-gray-300">Creating worlds within the mind</p>
-                    <p className="text-gray-400 blur-[1px]">Echoes of a distant time</p>
-                    <p className="text-gray-500 blur-[2px]">Fading into the sublime</p>
+                  <div className="text-2xl font-medium text-[var(--os-text-primary)]/90 leading-relaxed space-y-6">
+                    <p className="text-[var(--os-text-primary)]">Music is the language of the soul</p>
+                    <p className="text-[var(--os-text-secondary)]">Drifting through the digital waves</p>
+                    <p className="text-[var(--os-text-secondary)]">Code and rhythm intertwine</p>
+                    <p className="text-[var(--os-text-secondary)]">Creating worlds within the mind</p>
+                    <p className="text-[var(--os-text-muted)] blur-[1px]">Echoes of a distant time</p>
+                    <p className="text-[var(--os-text-muted)] blur-[2px]">Fading into the sublime</p>
                   </div>
                 </div>
               </div>
@@ -1017,30 +1017,30 @@ export default function MusicPlayer() {
             {/* Overlay Footer Controls (Mirrored state) */}
             <div className="h-24 px-20 flex flex-col justify-center z-10 pb-8">
               <div className="flex items-center gap-4 w-full mb-4">
-                <span className="text-xs text-gray-400">{formatTime(currentTime)}</span>
-                <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
+                <span className="text-xs text-[var(--os-text-muted)]">{formatTime(currentTime)}</span>
+                <div className="flex-1 h-1 bg-[var(--os-border-active)] rounded-full overflow-hidden">
+                  <div className="h-full bg-[var(--os-accent)]" style={{ width: `${progress}%` }} />
                 </div>
-                <span className="text-xs text-gray-400">{formatTime(duration || currentTrack.duration)}</span>
+                <span className="text-xs text-[var(--os-text-muted)]">{formatTime(duration || currentTrack.duration)}</span>
               </div>
 
               <div className="flex items-center justify-center gap-10">
                 <button
-                  className={`hover:text-white transition-colors ${isShuffled ? 'text-emerald-500' : 'text-gray-400'}`}
+                  className={`hover:text-[var(--os-text-primary)] transition-colors ${isShuffled ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)]'}`}
                   onClick={toggleShuffle}
                 >
                   <Shuffle size={20} />
                 </button>
-                <button className="text-white hover:scale-110 transition-transform" onClick={playPrev}><SkipBack size={28} fill="currentColor" /></button>
+                <button className="text-[var(--os-text-primary)] hover:scale-110 transition-transform" onClick={playPrev}><SkipBack size={28} fill="currentColor" /></button>
                 <button
-                  className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center hover:scale-105 transition-transform text-black shadow-lg shadow-emerald-500/20"
+                  className="w-14 h-14 rounded-full bg-[var(--os-accent)] flex items-center justify-center hover:scale-105 transition-transform text-[var(--os-bg-base)] shadow-lg shadow-[var(--os-accent)]/20"
                   onClick={togglePlay}
                 >
                   {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                 </button>
-                <button className="text-white hover:scale-110 transition-transform" onClick={() => playNext()}><SkipForward size={28} fill="currentColor" /></button>
+                <button className="text-[var(--os-text-primary)] hover:scale-110 transition-transform" onClick={() => playNext()}><SkipForward size={28} fill="currentColor" /></button>
                 <button
-                  className={`hover:text-white transition-colors relative ${repeatMode !== 'off' ? 'text-emerald-500' : 'text-gray-400'}`}
+                  className={`hover:text-[var(--os-text-primary)] transition-colors relative ${repeatMode !== 'off' ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-secondary)]'}`}
                   onClick={toggleRepeat}
                 >
                   <Repeat size={20} />
@@ -1061,10 +1061,10 @@ export default function MusicPlayer() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             style={{ top: contextMenu.y, left: contextMenu.x }}
-            className="fixed z-[100] bg-[#2a2a2a] border border-[#333] rounded-md shadow-xl py-1 w-48 overflow-hidden"
+            className="fixed z-[100] bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded-md shadow-xl py-1 w-48 overflow-hidden"
           >
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-sm text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] hover:text-[var(--os-text-primary)] flex items-center gap-2"
               onClick={(e) => {
                 e.stopPropagation()
                 playTrack(contextMenu.track)
@@ -1076,12 +1076,12 @@ export default function MusicPlayer() {
 
             {playlists.length > 0 && (
               <>
-                <div className="h-[1px] bg-[#333] my-1" />
-                <div className="px-4 py-1 text-xs text-gray-500 font-medium">Add to Playlist</div>
+                <div className="h-[1px] bg-[var(--os-border)] my-1" />
+                <div className="px-4 py-1 text-xs text-[var(--os-text-muted)] font-medium">Add to Playlist</div>
                 {playlists.map(pl => (
                   <button
                     key={pl.id}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white flex items-center gap-2 pl-6"
+                    className="w-full text-left px-4 py-2 text-sm text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] hover:text-[var(--os-text-primary)] flex items-center gap-2 pl-6"
                     onClick={(e) => {
                       e.stopPropagation()
                       addToPlaylist(pl.id, contextMenu.track)
@@ -1093,9 +1093,9 @@ export default function MusicPlayer() {
               </>
             )}
 
-            <div className="h-[1px] bg-[#333] my-1" />
+            <div className="h-[1px] bg-[var(--os-border)] my-1" />
             <button
-              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-[#333] hover:text-red-300 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-sm text-[var(--os-danger)] hover:bg-[var(--os-hover-bg)] flex items-center gap-2"
               onClick={(e) => {
                 e.stopPropagation()
                 handleDeleteTrack(contextMenu.track.id)

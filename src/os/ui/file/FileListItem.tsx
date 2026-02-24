@@ -71,12 +71,12 @@ export function FileListItem({
       {renaming && onRename ? (
         <RenameInput
           initialValue={item.name}
-          className="w-full text-xs rounded px-1"
+          className="flex-1 h-6 text-sm rounded px-1"
           onComplete={onRename}
           onCancel={onCancelRename || (() => { })}
         />
       ) : (
-        <span className="text-xs text-white/90 truncate select-none">
+        <span className="text-sm font-medium truncate text-[var(--os-text-primary)]">
           {displayName}
         </span>
       )}

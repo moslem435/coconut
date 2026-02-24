@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
+import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { logger } from '@/os/utils/logger'
 import '@xterm/xterm/css/xterm.css'
 
@@ -17,6 +18,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   const fitAddonRef = useRef<FitAddon | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const processRef = useRef<any>(null)
+  const { mode } = useSystemSettings()
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
@@ -34,6 +36,35 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     })
   }, [instance, isBooting, error, isReady])
 
+  // Theme Update Effect
+  useEffect(() => {
+    if (!xtermRef.current) return
+
+    const isDark = mode === 'dark'
+    xtermRef.current.options.theme = {
+      background: isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+      foreground: isDark ? '#cccccc' : '#333333',
+      cursor: isDark ? '#ffffff' : '#000000',
+      selectionBackground: isDark ? '#264f78' : '#add6ff',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#0dbc79',
+      yellow: '#e5e510',
+      blue: isDark ? '#2472c8' : '#0451a5',
+      magenta: '#bc3fbc',
+      cyan: '#11a8cd',
+      white: '#e5e5e5',
+      brightBlack: '#666666',
+      brightRed: '#f14c4c',
+      brightGreen: '#23d18b',
+      brightYellow: '#f5f543',
+      brightBlue: '#3b8eea',
+      brightMagenta: '#d670d6',
+      brightCyan: '#29b8db',
+      brightWhite: '#e5e5e5',
+    }
+  }, [mode])
+
   // 1. Boot WebContainer
   useEffect(() => {
     logger.debug('[XTerm] Calling WebContainer boot...')
@@ -48,20 +79,21 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return
 
+    const isDark = mode === 'dark'
     const term = new Terminal({
       cursorBlink: true,
       convertEol: true,
       allowTransparency: true,
       theme: {
-        background: 'rgba(30, 30, 30, 0.85)', // Semi-transparent dark
-        foreground: '#cccccc',
-        cursor: '#ffffff',
-        selectionBackground: '#264f78',
+        background: isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        foreground: isDark ? '#cccccc' : '#333333',
+        cursor: isDark ? '#ffffff' : '#000000',
+        selectionBackground: isDark ? '#264f78' : '#add6ff',
         black: '#000000',
         red: '#cd3131',
         green: '#0dbc79',
         yellow: '#e5e510',
-        blue: '#2472c8',
+        blue: isDark ? '#2472c8' : '#0451a5',
         magenta: '#bc3fbc',
         cyan: '#11a8cd',
         white: '#e5e5e5',
@@ -272,30 +304,30 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     >
       {contextMenu && (
         <div
-          className="fixed z-50 bg-[#252526] border border-[#454545] rounded shadow-lg py-1 min-w-[120px]"
+          className="fixed z-50 bg-[var(--os-bg-panel)] border border-[var(--os-border)] rounded shadow-lg py-1 min-w-[120px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
-            className="w-full text-left px-4 py-1 text-sm text-gray-200 hover:bg-[#094771] hover:text-white"
+            className="w-full text-left px-4 py-1 text-sm text-[var(--os-text-primary)] hover:bg-[var(--os-bg-selection)] hover:text-[var(--os-text-primary)]"
             onClick={() => handleAction('copy')}
           >
             Copy
           </button>
           <button
-            className="w-full text-left px-4 py-1 text-sm text-gray-200 hover:bg-[#094771] hover:text-white"
+            className="w-full text-left px-4 py-1 text-sm text-[var(--os-text-primary)] hover:bg-[var(--os-bg-selection)] hover:text-[var(--os-text-primary)]"
             onClick={() => handleAction('paste')}
           >
             Paste
           </button>
-          <div className="h-px bg-[#454545] my-1" />
+          <div className="h-px bg-[var(--os-border)] my-1" />
           <button
-            className="w-full text-left px-4 py-1 text-sm text-gray-200 hover:bg-[#094771] hover:text-white"
+            className="w-full text-left px-4 py-1 text-sm text-[var(--os-text-primary)] hover:bg-[var(--os-bg-selection)] hover:text-[var(--os-text-primary)]"
             onClick={() => handleAction('clear')}
           >
             Clear Buffer
           </button>
           <button
-            className="w-full text-left px-4 py-1 text-sm text-gray-200 hover:bg-[#094771] hover:text-white"
+            className="w-full text-left px-4 py-1 text-sm text-[var(--os-text-primary)] hover:bg-[var(--os-bg-selection)] hover:text-[var(--os-text-primary)]"
             onClick={() => handleAction('reset')}
           >
             Reset

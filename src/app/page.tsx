@@ -5,12 +5,10 @@ import { Suspense, useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Shell from '@/os/system/Shell'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
-import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 
 export default function Home() {
   const [hasBooted, setHasBooted] = useState(true)
   const [isShuttingDown, setIsShuttingDown] = useState(false)
-  const { skipBootSequence } = useSystemSettings()
 
   const closeAllWindows = useWindowStore(state => state.closeAllWindows)
 

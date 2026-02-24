@@ -213,7 +213,7 @@ export default function EmulatorApp() {
     const displayedError = localError || downloadError
 
     return (
-        <div className="flex h-full bg-black text-white overflow-hidden pt-10">
+        <div className="flex h-full bg-[var(--os-bg-window)] text-[var(--os-text-primary)] overflow-hidden pt-10">
             <Script 
                 src="/v86/libv86.js" 
                 strategy="afterInteractive"
@@ -222,7 +222,7 @@ export default function EmulatorApp() {
             />
 
             {/* Sidebar Resource Manager */}
-            <div className="w-64 shrink-0 h-full border-r border-[#333]">
+            <div className="w-64 shrink-0 h-full border-r border-[var(--os-border)] bg-[var(--os-bg-panel)]">
                 <EmulatorSidebar 
                     selectedOS={selectedOS}
                     onSelectOS={(os) => {
@@ -248,24 +248,24 @@ export default function EmulatorApp() {
                 <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
                     {/* Overlay for Status/Download/Error */}
                     {!isRunning && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0a0a0a]">
-                            <div className="flex flex-col items-center gap-4 text-gray-500">
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[var(--os-bg-base)]">
+                            <div className="flex flex-col items-center gap-4 text-[var(--os-text-muted)]">
                                 {isDownloading ? (
                                     <div className="flex flex-col items-center gap-2">
-                                        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                                        <p className="text-blue-400 font-medium">Downloading... {progress}%</p>
-                                        <p className="text-xs text-gray-500">Saved to Local Storage (OPFS)</p>
+                                        <div className="w-12 h-12 border-4 border-[var(--os-accent)]/30 border-t-[var(--os-accent)] rounded-full animate-spin" />
+                                        <p className="text-[var(--os-accent)] font-medium">Downloading... {progress}%</p>
+                                        <p className="text-xs text-[var(--os-text-muted)]">Saved to Local Storage (OPFS)</p>
                                     </div>
                                 ) : (
                                     <>
                                         <Monitor size={64} className="opacity-20" />
                                         <div className="text-center">
-                                            <h3 className="text-lg font-medium text-gray-300">{selectedOS?.name || 'Select OS'}</h3>
-                                            <p className="text-sm text-gray-500 mt-1">
+                                            <h3 className="text-lg font-medium text-[var(--os-text-primary)]">{selectedOS?.name || 'Select OS'}</h3>
+                                            <p className="text-sm text-[var(--os-text-secondary)] mt-1">
                                                 {isLocalReady ? 'Ready to Boot' : 'Download Required'}
                                             </p>
                                             {displayedError && (
-                                                <div className="mt-4 flex items-center justify-center gap-2 text-red-400 text-sm bg-red-900/20 px-4 py-2 rounded">
+                                                <div className="mt-4 flex items-center justify-center gap-2 text-[var(--os-danger)] text-sm bg-[var(--os-danger)]/10 px-4 py-2 rounded">
                                                     <AlertCircle size={16} />
                                                     {displayedError}
                                                 </div>
@@ -295,7 +295,7 @@ export default function EmulatorApp() {
                 </div>
 
                 {/* Terminal Area */}
-                <div className="h-48 shrink-0 bg-black border-t border-[#333]">
+                <div className="h-48 shrink-0 bg-[#1e1e1e] border-t border-[var(--os-border)]">
                     <EmulatorTerminal emulator={emulatorInstance} />
                 </div>
             </div>

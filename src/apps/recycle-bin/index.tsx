@@ -59,31 +59,31 @@ const RecycleBin: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full flex flex-col bg-white pt-10">
+    <div className="h-full w-full flex flex-col bg-[var(--os-bg-window)] pt-10 text-[var(--os-text-primary)]">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 p-2 border-b bg-gray-50 shrink-0">
+      <div className="flex items-center gap-2 p-2 border-b border-[var(--os-border)] bg-[var(--os-bg-panel)] shrink-0">
         <button
           onClick={handleEmpty}
           disabled={deletedFiles.length === 0}
-          className="px-3 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-700 flex items-center gap-2 text-sm disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 rounded bg-[var(--os-danger)]/10 hover:bg-[var(--os-danger)]/20 text-[var(--os-danger)] flex items-center gap-2 text-sm disabled:opacity-50 transition-colors"
         >
           <Ban size={16} /> {t('recycle.empty')}
         </button>
-        <div className="w-px h-6 bg-gray-300 mx-2" />
+        <div className="w-px h-6 bg-[var(--os-border)] mx-2" />
         <button
           onClick={handleRestore}
           disabled={selectedIds.size === 0}
-          className="px-3 py-1.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 flex items-center gap-2 text-sm disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 rounded bg-[var(--os-accent)]/10 hover:bg-[var(--os-accent)]/20 text-[var(--os-accent)] flex items-center gap-2 text-sm disabled:opacity-50 transition-colors"
         >
           <RotateCcw size={16} /> {t('recycle.restore')}
         </button>
         <div className="flex-1" />
-        <span className="text-gray-500 text-sm">{deletedFiles.length} {t('recycle.items')}</span>
+        <span className="text-[var(--os-text-muted)] text-sm">{deletedFiles.length} {t('recycle.items')}</span>
       </div>
 
       {/* Content Area */}
       <div
-        className="flex-1 p-4 overflow-auto bg-white"
+        className="flex-1 p-4 overflow-auto bg-[var(--os-bg-window)]"
         onClick={() => setSelectedIds(new Set())}
       >
         <AnimatePresence mode="popLayout">
@@ -92,15 +92,15 @@ const RecycleBin: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="h-full flex flex-col items-center justify-center text-gray-400 select-none"
+              className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)] select-none"
             >
               <div className="relative mb-4">
-                <Trash2 size={64} className="opacity-20 text-green-500" />
+                <Trash2 size={64} className="opacity-20 text-[var(--os-accent)]" />
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="absolute -right-2 -bottom-2 bg-green-100 text-green-600 rounded-full p-1"
+                  className="absolute -right-2 -bottom-2 bg-[var(--os-accent)]/10 text-[var(--os-accent)] rounded-full p-1"
                 >
                   <RefreshCw size={16} />
                 </motion.div>
@@ -144,7 +144,7 @@ const RecycleBin: React.FC = () => {
                     }}
                     className={`
                     flex flex-col items-center p-2 rounded cursor-pointer border transition-colors
-                    ${selectedIds.has(file.id) ? 'bg-blue-50 border-blue-200 shadow-sm' : 'border-transparent hover:bg-gray-50'}
+                    ${selectedIds.has(file.id) ? 'bg-[var(--os-bg-selection)] border-[var(--os-accent)]/30 shadow-sm' : 'border-transparent hover:bg-[var(--os-hover-bg)]'}
                     `}
                   >
                     <div className="relative">
@@ -156,14 +156,14 @@ const RecycleBin: React.FC = () => {
                         className="mb-2 drop-shadow-sm"
                       />
                       {/* Overlay to show it's deleted */}
-                      <div className="absolute -bottom-1 -right-1 bg-red-100 text-red-500 rounded-full p-0.5 border border-white">
+                      <div className="absolute -bottom-1 -right-1 bg-[var(--os-bg-window)] text-[var(--os-danger)] rounded-full p-0.5 border border-[var(--os-border)]">
                         <Trash2 size={12} />
                       </div>
                     </div>
-                    <div className="text-xs text-center break-all px-1 line-clamp-2 select-none">
+                    <div className="text-xs text-center break-all px-1 line-clamp-2 select-none text-[var(--os-text-primary)]">
                       {getDisplayName(file)}
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1 select-none">
+                    <div className="text-[10px] text-[var(--os-text-muted)] mt-1 select-none">
                       {t('recycle.from')} {getDisplayName(files[file.originalParentId || ''])}
                     </div>
                   </motion.div>

@@ -55,7 +55,7 @@ export default function TaskManager() {
         ctx.clearRect(0, 0, width, height)
         
         // Draw grid
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+        ctx.strokeStyle = 'rgba(128, 128, 128, 0.2)'
         ctx.lineWidth = 1
         for (let i = 0; i <= 4; i++) {
             const y = (height / 4) * i
@@ -67,7 +67,11 @@ export default function TaskManager() {
         
         // Draw CPU line
         if (history.length > 1) {
-            ctx.strokeStyle = '#3b82f6'
+            // Use CSS variable color if possible, but canvas needs explicit color string
+            // We can check computed style or just use a standard accent color
+            const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--os-accent').trim() || '#3b82f6'
+            
+            ctx.strokeStyle = accentColor
             ctx.lineWidth = 2
             ctx.beginPath()
             
@@ -87,7 +91,13 @@ export default function TaskManager() {
             ctx.lineTo(width, height)
             ctx.lineTo(0, height)
             ctx.closePath()
-            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)'
+            
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, accentColor + '33'); // 20% opacity
+            gradient.addColorStop(1, accentColor + '05'); // ~2% opacity
+            
+            ctx.fillStyle = gradient
             ctx.fill()
         }
     }
@@ -100,14 +110,14 @@ export default function TaskManager() {
     }
 
     return (
-        <div className="h-full w-full bg-slate-900 text-slate-200 flex flex-col font-sans text-sm pt-10">
+        <div className="h-full w-full bg-[var(--os-bg-window)] text-[var(--os-text-primary)] flex flex-col font-sans text-sm pt-10">
             {/* Header with CPU Chart */}
-            <div className="p-3 bg-slate-800 border-b border-slate-700">
+            <div className="p-3 bg-[var(--os-bg-panel)] border-b border-[var(--os-border)]">
                 <div className="flex items-center justify-between mb-2">
-                    <div className="font-bold text-slate-100">Processes ({processList.length})</div>
+                    <div className="font-bold">Processes ({processList.length})</div>
                     <div className="flex gap-2">
-                        <div className="px-2 py-1 bg-slate-700 rounded text-xs">CPU: {Math.min(100, Math.round(totalCpu))}%</div>
-                        <div className="px-2 py-1 bg-slate-700 rounded text-xs">Mem: {totalMem} MB</div>
+                        <div className="px-2 py-1 bg-[var(--os-bg-selection)] rounded text-xs text-[var(--os-text-secondary)]">CPU: {Math.min(100, Math.round(totalCpu))}%</div>
+                        <div className="px-2 py-1 bg-[var(--os-bg-selection)] rounded text-xs text-[var(--os-text-secondary)]">Mem: {totalMem} MB</div>
                     </div>
                 </div>
                 {/* CPU Chart */}
@@ -115,14 +125,14 @@ export default function TaskManager() {
                     ref={canvasRef} 
                     width={600} 
                     height={60}
-                    className="w-full h-[60px] bg-slate-950 rounded"
+                    className="w-full h-[60px] bg-[var(--os-bg-base)] rounded border border-[var(--os-border)]"
                 />
             </div>
 
             {/* List */}
             <div className="flex-1 overflow-auto">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-800/50 text-slate-400 sticky top-0">
+                    <thead className="bg-[var(--os-bg-panel)]/50 text-[var(--os-text-muted)] sticky top-0 backdrop-blur-sm">
                         <tr>
                             <th className="p-2 font-medium w-16">PID</th>
                             <th className="p-2 font-medium">Name</th>
@@ -134,19 +144,19 @@ export default function TaskManager() {
                     </thead>
                     <tbody>
                         {processList.map(p => (
-                            <tr key={p.pid} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
-                                <td className="p-2 font-mono text-slate-500">{p.pid}</td>
-                                <td className="p-2 font-medium text-slate-200">
+                            <tr key={p.pid} className="border-b border-[var(--os-border)] hover:bg-[var(--os-hover-bg)] transition-colors">
+                                <td className="p-2 font-mono text-[var(--os-text-muted)]">{p.pid}</td>
+                                <td className="p-2 font-medium text-[var(--os-text-primary)]">
                                     <div className="flex items-center gap-2">
                                         {p.name}
-                                        {p.windowId && <span className="text-[10px] px-1 bg-blue-900/50 text-blue-300 rounded border border-blue-800">GUI</span>}
+                                        {p.windowId && <span className="text-[10px] px-1 bg-[var(--os-accent)]/10 text-[var(--os-accent)] rounded border border-[var(--os-accent)]/30">GUI</span>}
                                     </div>
                                 </td>
                                 <td className="p-2">
                                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                        p.status === 'running' ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' :
-                                        p.status === 'starting' ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-800' :
-                                        'bg-slate-700 text-slate-400'
+                                        p.status === 'running' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                                        p.status === 'starting' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                                        'bg-[var(--os-bg-selection)] text-[var(--os-text-muted)]'
                                     }`}>
                                         {p.status}
                                     </span>
@@ -155,18 +165,18 @@ export default function TaskManager() {
                                     <select 
                                         value={p.priority} 
                                         onChange={(e) => setProcessPriority(p.pid, e.target.value as any)}
-                                        className="bg-slate-800 text-xs rounded border border-slate-700 p-1 outline-none focus:border-blue-500"
+                                        className="bg-[var(--os-bg-input)] text-xs rounded border border-[var(--os-border)] p-1 outline-none focus:border-[var(--os-accent)] text-[var(--os-text-primary)]"
                                     >
                                         <option value="high">High</option>
                                         <option value="normal">Normal</option>
                                         <option value="low">Low</option>
                                     </select>
                                 </td>
-                                <td className="p-2 text-slate-400">{p.memoryUsage} MB</td>
+                                <td className="p-2 text-[var(--os-text-secondary)]">{p.memoryUsage} MB</td>
                                 <td className="p-2 text-right">
                                     <button 
                                         onClick={() => handleEndTask(p.pid, p.windowId)}
-                                        className="p-1 hover:bg-red-900/50 text-slate-500 hover:text-red-400 rounded transition-colors"
+                                        className="p-1 hover:bg-[var(--os-danger)]/10 text-[var(--os-text-muted)] hover:text-[var(--os-danger)] rounded transition-colors"
                                         title="End Task"
                                     >
                                         <XCircle size={16} />
@@ -178,12 +188,12 @@ export default function TaskManager() {
                 </table>
                 
                 {processList.length === 0 && (
-                    <div className="p-8 text-center text-slate-600">No active processes</div>
+                    <div className="p-8 text-center text-[var(--os-text-muted)]">No active processes</div>
                 )}
             </div>
             
             {/* Status Bar */}
-            <div className="p-1 bg-slate-950 text-[10px] text-slate-500 flex justify-between px-3">
+            <div className="p-1 bg-[var(--os-bg-panel)] border-t border-[var(--os-border)] text-[10px] text-[var(--os-text-muted)] flex justify-between px-3">
                 <span>Total Threads: {processList.length * 4 + 12}</span>
                 <span>Kernel: v1.0.1</span>
             </div>

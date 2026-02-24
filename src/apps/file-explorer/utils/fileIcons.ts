@@ -165,7 +165,8 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
     return {
       Icon: Folder,
       backgroundColor: COLORS.yellow,
-      useAppIcon: false
+      useAppIcon: false,
+      color: '#ffffff'
     }
   }
 

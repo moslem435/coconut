@@ -67,10 +67,7 @@ export function RenameInput({ initialValue, className, onComplete, onCancel }: R
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         className={cn(
-          "bg-white dark:bg-[#202020] text-black dark:text-white",
-          "border border-blue-500 outline-none",
-          "selection:bg-blue-500 selection:text-white",
-          "shadow-lg",
+          "bg-[var(--os-bg-input)] border border-[var(--os-accent)] text-[var(--os-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--os-accent)]/20",
           className
         )}
       />

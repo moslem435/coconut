@@ -135,52 +135,52 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
 
   return (
     <div
-      className="h-full w-full flex flex-col bg-white/95 dark:bg-[#1e1e1e]/95 text-black dark:text-gray-200 backdrop-blur-sm pt-10"
+      className="h-full w-full flex flex-col bg-[var(--os-bg-window)]/95 text-[var(--os-text-primary)] backdrop-blur-sm pt-10"
     >
       {/* Menu Bar */}
-      <div className="flex items-center gap-1 p-1 border-b border-gray-300/50 dark:border-white/10 text-xs bg-gray-50/50 dark:bg-white/5">
-        <button onClick={handleNew} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded flex items-center gap-1.5 transition-colors">
+      <div className="flex items-center gap-1 p-1 border-b border-[var(--os-border)] text-xs bg-[var(--os-bg-panel)]/50">
+        <button onClick={handleNew} className="p-1.5 hover:bg-[var(--os-hover-bg)] rounded flex items-center gap-1.5 transition-colors">
           <FilePlus size={14} /> <span>{t('notepad.new')}</span>
         </button>
-        <button onClick={handleOpen} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded flex items-center gap-1.5 transition-colors">
+        <button onClick={handleOpen} className="p-1.5 hover:bg-[var(--os-hover-bg)] rounded flex items-center gap-1.5 transition-colors">
           <FolderOpen size={14} /> <span>Open</span>
         </button>
-        <button onClick={handleSave} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded flex items-center gap-1.5 transition-colors">
+        <button onClick={handleSave} className="p-1.5 hover:bg-[var(--os-hover-bg)] rounded flex items-center gap-1.5 transition-colors">
           <Save size={14} /> <span>{t('notepad.save')}</span>
         </button>
 
-        <div className="w-px h-4 bg-gray-300 dark:bg-white/20 mx-1" />
+        <div className="w-px h-4 bg-[var(--os-border)] mx-1" />
 
-        <button onClick={() => setShowFind(!showFind)} className={`p-1.5 rounded flex items-center gap-1.5 transition-colors ${showFind ? 'bg-blue-100 dark:bg-blue-500/30 text-blue-600 dark:text-blue-300' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}>
+        <button onClick={() => setShowFind(!showFind)} className={`p-1.5 rounded flex items-center gap-1.5 transition-colors ${showFind ? 'bg-[var(--os-bg-selection)] text-[var(--os-accent)]' : 'hover:bg-[var(--os-hover-bg)]'}`}>
           <Search size={14} /> <span>Find</span>
         </button>
-        <button onClick={() => setWordWrap(!wordWrap)} className={`p-1.5 rounded flex items-center gap-1.5 transition-colors ${wordWrap ? 'bg-blue-100 dark:bg-blue-500/30 text-blue-600 dark:text-blue-300' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}>
+        <button onClick={() => setWordWrap(!wordWrap)} className={`p-1.5 rounded flex items-center gap-1.5 transition-colors ${wordWrap ? 'bg-[var(--os-bg-selection)] text-[var(--os-accent)]' : 'hover:bg-[var(--os-hover-bg)]'}`}>
           <Type size={14} /> <span>Wrap</span>
         </button>
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-2 px-2 text-gray-500 dark:text-gray-400">
-          <button onClick={() => setZoom(z => Math.max(z - 10, 50))} className="p-1 hover:text-black dark:hover:text-white"><ZoomOut size={14} /></button>
+        <div className="flex items-center gap-2 px-2 text-[var(--os-text-muted)]">
+          <button onClick={() => setZoom(z => Math.max(z - 10, 50))} className="p-1 hover:text-[var(--os-text-primary)]"><ZoomOut size={14} /></button>
           <span className="w-8 text-center">{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(z + 10, 200))} className="p-1 hover:text-black dark:hover:text-white"><ZoomIn size={14} /></button>
+          <button onClick={() => setZoom(z => Math.min(z + 10, 200))} className="p-1 hover:text-[var(--os-text-primary)]"><ZoomIn size={14} /></button>
         </div>
       </div>
 
       {/* Find Bar */}
       {showFind && (
-        <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-[#2d2d2d] border-b border-gray-300/50 dark:border-white/10 animate-in slide-in-from-top-2">
-          <Search size={14} className="text-gray-500" />
+        <div className="flex items-center gap-2 p-2 bg-[var(--os-bg-panel)] border-b border-[var(--os-border)] animate-in slide-in-from-top-2">
+          <Search size={14} className="text-[var(--os-text-muted)]" />
           <input
             autoFocus
-            className="flex-1 bg-white dark:bg-black/20 border border-gray-300 dark:border-white/10 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 bg-[var(--os-bg-input)] border border-[var(--os-border)] rounded px-2 py-1 text-sm focus:outline-none focus:border-[var(--os-accent)] text-[var(--os-text-primary)]"
             placeholder="Find text..."
             value={findText}
             onChange={e => setFindText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleFind()}
           />
-          <button onClick={handleFind} className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">Next</button>
-          <button onClick={() => setShowFind(false)} className="px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10 rounded"><X size={14} /></button>
+          <button onClick={handleFind} className="px-3 py-1 bg-[var(--os-accent)] text-white rounded text-xs hover:bg-[var(--os-accent-dim)]">Next</button>
+          <button onClick={() => setShowFind(false)} className="px-2 py-1 hover:bg-[var(--os-hover-bg)] rounded"><X size={14} /></button>
         </div>
       )}
 
@@ -191,7 +191,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
           className={`
                 w-full h-full p-4 resize-none bg-transparent border-none focus:ring-0 outline-none
                 ${wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'}
-                font-mono leading-relaxed
+                font-mono leading-relaxed text-[var(--os-text-primary)] placeholder-[var(--os-text-muted)]
             `}
           style={{ fontSize: `${14 * (zoom / 100)}px` }}
           value={content}
@@ -206,7 +206,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
       </div>
 
       {/* Status Bar */}
-      <div className="h-6 bg-gray-100 dark:bg-[#2d2d2d] border-t border-gray-300/50 dark:border-white/10 flex items-center px-2 text-[10px] text-gray-500 dark:text-gray-400 gap-4">
+      <div className="h-6 bg-[var(--os-bg-panel)] border-t border-[var(--os-border)] flex items-center px-2 text-[10px] text-[var(--os-text-muted)] gap-4">
         <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
         <div className="flex-1" />
         <span>UTF-8</span>

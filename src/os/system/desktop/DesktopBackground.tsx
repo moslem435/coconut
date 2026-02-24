@@ -3,21 +3,25 @@
  * 处理壁纸显示和过渡动画
  */
 
-import { useWallpaper, WallpaperConfig } from '@/os/hooks/useWallpaper'
+import { WallpaperConfig, WallpaperState } from '@/os/hooks/useWallpaper'
 
 interface DesktopBackgroundProps {
   wallpaper: WallpaperConfig | null
   isVisible: boolean
+  activeWallpaper: string | null
+  loadedWallpaper: string | null
+  isLoading: boolean
+  getTransitionStyle: (isVisible: boolean) => React.CSSProperties
 }
 
-export function DesktopBackground({ wallpaper, isVisible }: DesktopBackgroundProps) {
-  const {
-    activeWallpaper,
-    loadedWallpaper,
-    isLoading,
-    getTransitionStyle
-  } = useWallpaper(wallpaper)
-
+export function DesktopBackground({ 
+  wallpaper, 
+  isVisible,
+  activeWallpaper,
+  loadedWallpaper,
+  isLoading,
+  getTransitionStyle
+}: DesktopBackgroundProps) {
   return (
     <div
       className="absolute inset-0 transition-opacity duration-1000 ease-out"

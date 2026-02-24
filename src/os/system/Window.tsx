@@ -225,8 +225,8 @@ export default function Window({ id }: WindowProps) {
           backdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
           WebkitBackdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
           boxShadow: isActive
-            ? '0 0 0 1px rgba(255, 255, 255, 0.1), var(--os-shadow-window-active)'
-            : '0 0 0 1px rgba(255, 255, 255, 0.05), var(--os-shadow-window)',
+            ? '0 0 0 1px var(--os-border-active), var(--os-shadow-window-active)'
+            : '0 0 0 1px var(--os-border), var(--os-shadow-window)',
           isolation: 'isolate',
         }}
         onDragStart={(_, info) => handleMainDragStart(info.point.y)}

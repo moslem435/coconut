@@ -133,76 +133,76 @@ export default function Taskbar({
         className="fixed bottom-4 left-1/2 h-14 z-[10000] flex items-center justify-between gap-4 select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 w-fit max-w-[calc(100vw-2rem)]"
         style={{
           backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-        backdropFilter: 'blur(40px) saturate(150%)',
-        WebkitBackdropFilter: 'blur(40px) saturate(150%)'
-      }}
-    >
-      {/* Left: Start & Taskbar Items */}
-      <div className="flex items-center gap-2 h-full py-2">
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--os-border), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(40px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(150%)'
+        }}
+      >
+        {/* Left: Start & Taskbar Items */}
+        <div className="flex items-center gap-2 h-full py-2">
 
-        {/* Start Button */}
-        <Tooltip content={t('start.menu')} side="top" offset={20}>
-          <button
-            ref={startBtnRef}
-            onClick={onStartClick}
-            className="h-10 w-10 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
-            style={{ backgroundColor: 'var(--os-hover-bg)' }}
-          >
-            <Palmtree className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
-          </button>
-        </Tooltip>
+          {/* Start Button */}
+          <Tooltip content={t('start.menu')} side="top" offset={20}>
+            <button
+              ref={startBtnRef}
+              onClick={onStartClick}
+              className="h-10 w-10 flex items-center justify-center rounded-xl transition-all hover:scale-105 active:scale-95 group shadow-sm bg-opacity-50"
+              style={{ backgroundColor: 'var(--os-hover-bg)' }}
+            >
+              <Palmtree className="w-[1.375rem] h-[1.375rem] text-[var(--os-accent)] group-hover:opacity-80 transition-opacity" />
+            </button>
+          </Tooltip>
 
-        {/* Separator - Only show if there are items */}
-        {taskbarItems.length > 0 && (
-          <div className="w-px h-5 bg-[var(--os-border)] opacity-50" />
-        )}
+          {/* Separator - Only show if there are items */}
+          {taskbarItems.length > 0 && (
+            <div className="w-px h-5 bg-[var(--os-border)] opacity-50" />
+          )}
 
-        {/* Window List */}
-        {taskbarItems.map((item) => (
-           <TaskbarItem key={item.id} id={item.id} appId={item.appId} />
-        ))}
-      </div>
+          {/* Window List */}
+          {taskbarItems.map((item) => (
+            <TaskbarItem key={item.id} id={item.id} appId={item.appId} />
+          ))}
+        </div>
 
-      {/* Right: System Tray */}
-      <div className="flex items-center gap-1.5 h-full pl-4 ml-auto relative" style={{ color: 'var(--os-text-secondary)' }}>
-        {/* Separator */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-white/5" />
+        {/* Right: System Tray */}
+        <div className="flex items-center gap-1.5 h-full pl-4 ml-auto relative" style={{ color: 'var(--os-text-secondary)' }}>
+          {/* Separator */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-5 bg-[var(--os-border)]" />
 
-        {/* Language Indicator */}
-        <Tooltip content={t('settings.language')} side="top">
-          <div
-            className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-white/5 cursor-pointer text-xs font-medium tracking-wider transition-colors"
-            onClick={toggleLanguage}
-          >
-            {language === 'en' ? 'EN' : '中'}
-          </div>
-        </Tooltip>
+          {/* Language Indicator */}
+          <Tooltip content={t('settings.language')} side="top">
+            <div
+              className="hidden sm:flex items-center justify-center px-2 py-1 rounded-md hover:bg-[var(--os-hover-bg)] cursor-pointer text-xs font-medium tracking-wider transition-colors"
+              onClick={toggleLanguage}
+            >
+              {language === 'en' ? 'EN' : '中'}
+            </div>
+          </Tooltip>
 
-        {/* Unified Status Pill */}
-        <Tooltip content={t('settings.desc.appearance')} side="top">
-          <div
-            ref={quickSettingsRef}
-            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
-            onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
-          >
-            <Volume2 className="w-4 h-4" />
-            <div className="w-[1px] h-3 bg-white/10" />
-            <Settings2 className="w-4 h-4" />
-          </div>
-        </Tooltip>
+          {/* Unified Status Pill */}
+          <Tooltip content={t('settings.desc.appearance')} side="top">
+            <div
+              ref={quickSettingsRef}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${isQuickSettingsOpen ? 'bg-[var(--os-bg-selection)] text-[var(--os-text-primary)]' : 'hover:bg-[var(--os-hover-bg)]'}`}
+              onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
+            >
+              <Volume2 className="w-4 h-4" />
+              <div className="w-[1px] h-3 bg-[var(--os-border)]" />
+              <Settings2 className="w-4 h-4" />
+            </div>
+          </Tooltip>
 
-        {/* Clock - Action Center Trigger */}
-        <Tooltip content={t('start.notifications')} side="top" offset={20}>
-          <div
-            ref={actionCenterRef}
-            className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-white/10 text-[var(--os-text-primary)]' : 'hover:bg-white/5'}`}
-            onClick={() => setIsActionCenterOpen(!isActionCenterOpen)}
-          >
-            <SystemClock showDate />
-          </div>
-        </Tooltip>
-      </div>
+          {/* Clock - Action Center Trigger */}
+          <Tooltip content={t('start.notifications')} side="top" offset={20}>
+            <div
+              ref={actionCenterRef}
+              className={`flex flex-col items-center justify-center leading-none gap-0.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 min-w-[5rem] ${isActionCenterOpen ? 'bg-[var(--os-bg-selection)] text-[var(--os-text-primary)]' : 'hover:bg-[var(--os-hover-bg)]'}`}
+              onClick={() => setIsActionCenterOpen(!isActionCenterOpen)}
+            >
+              <SystemClock showDate />
+            </div>
+          </Tooltip>
+        </div>
 
       {/* Popups */}
       <StartMenu

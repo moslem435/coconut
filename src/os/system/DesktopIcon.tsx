@@ -16,6 +16,7 @@ interface DesktopIconProps {
     currentGridSize: number
     currentGridPadding: number
     snapToGrid: boolean
+    textColor: string
     onSelect: (id: string, multi?: boolean) => void
     onDragEnd: (id: string, x: number, y: number) => void
     onDragPreview: (preview: { x: number, y: number } | null) => void
@@ -31,6 +32,7 @@ export function DesktopIcon({
     currentGridSize,
     currentGridPadding,
     snapToGrid,
+    textColor,
     onSelect,
     onDragEnd,
     onDragPreview,
@@ -114,6 +116,7 @@ export function DesktopIcon({
                     e.stopPropagation()
                     showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
                 }}
+                textClassName={cn(textColor, "drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]")}
             />
         </motion.div>
     )

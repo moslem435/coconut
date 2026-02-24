@@ -321,7 +321,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   return (
     <div
-      className="h-full flex flex-col bg-[#191919] text-white pt-10 relative"
+      className="h-full flex flex-col bg-[var(--os-bg-window)] text-[var(--os-text-primary)] pt-10 relative"
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* Top Toolbar */}
@@ -361,8 +361,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           />
 
           {isLoading ? (
-            <div className="h-full flex flex-col items-center justify-center text-white/30">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50 mb-4" />
+            <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--os-border-active)] mb-4" />
               <span className="text-sm">Loading...</span>
             </div>
           ) : (

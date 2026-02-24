@@ -160,10 +160,10 @@ export default function FileList({
   if (items.length === 0) {
     return (
       <div
-        className="h-full flex flex-col items-center justify-center text-white/20 select-none"
+        className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)] select-none"
         onClick={() => onSelect('')}
       >
-        <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4">
+        <div className="w-24 h-24 rounded-full bg-[var(--os-hover-bg)] flex items-center justify-center mb-4">
           <Folder size={48} strokeWidth={1.5} className="opacity-50" />
         </div>
         <span className="text-sm font-medium">{t('explorer.empty') || 'This folder is empty'}</span>
@@ -235,9 +235,9 @@ export default function FileList({
                       className={cn(
                         "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
                         isSelected
-                          ? "bg-blue-500/20 border-blue-500/30 shadow-inner"
+                          ? "bg-[var(--os-bg-selection)] border-[var(--os-accent)]/30 shadow-inner"
                           : "",
-                        dropTargetId === node.id && "bg-green-500/20 border-green-500/30",
+                        dropTargetId === node.id && "bg-[var(--os-accent-dim)] border-[var(--os-accent)]/30",
                         draggedIds.includes(node.id) && "opacity-50"
                       )}
                     />
@@ -260,30 +260,30 @@ export default function FileList({
       onClick={() => onSelect('')}
     >
       {/* Table Header */}
-      <div className="flex items-center px-4 py-2 text-xs font-medium text-white/40 border-b border-white/5 select-none shrink-0">
+      <div className="flex items-center px-4 py-2 text-xs font-medium text-[var(--os-text-muted)] border-b border-[var(--os-border)] select-none shrink-0">
         <div
-          className="flex-[2] min-w-[200px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
+          className="flex-[2] min-w-[200px] flex items-center gap-1 cursor-pointer hover:text-[var(--os-text-primary)] transition-colors"
           onClick={() => onSortChange('name')}
         >
           {t('common.name') || 'Name'}
           {sortConfig.field === 'name' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
         <div
-          className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
+          className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-[var(--os-text-primary)] transition-colors"
           onClick={() => onSortChange('date')}
         >
           {t('common.date') || 'Date'}
           {sortConfig.field === 'date' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
         <div
-          className="flex-1 min-w-[80px] flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
+          className="flex-1 min-w-[80px] flex items-center gap-1 cursor-pointer hover:text-[var(--os-text-primary)] transition-colors"
           onClick={() => onSortChange('type')}
         >
           {t('common.type') || 'Type'}
           {sortConfig.field === 'type' && (sortConfig.order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
         </div>
         <div
-          className="w-[80px] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-white transition-colors"
+          className="w-[80px] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-[var(--os-text-primary)] transition-colors"
           onClick={() => onSortChange('size')}
         >
           {t('common.size') || 'Size'}
@@ -326,11 +326,11 @@ export default function FileList({
                 onDoubleClick={() => onDoubleClick(node.id)}
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
-                  "flex items-center px-3 py-1.5 rounded-md text-sm text-white/80 transition-colors cursor-default group",
+                  "flex items-center px-3 py-1.5 rounded-md text-sm text-[var(--os-text-primary)] transition-colors cursor-default group",
                   isSelected
-                    ? "bg-blue-500/20"
-                    : "odd:bg-white/[0.02]",
-                  dropTargetId === node.id && "bg-green-500/20 border border-green-500/30",
+                    ? "bg-[var(--os-bg-selection)]"
+                    : "odd:bg-[var(--os-text-primary)]/[0.02]",
+                  dropTargetId === node.id && "bg-[var(--os-accent-dim)] border border-[var(--os-accent)]/30",
                   draggedIds.includes(node.id) && "opacity-50"
                 )}
               >
@@ -347,13 +347,13 @@ export default function FileList({
                   onCancelRename={() => setRenamingId(null)}
                 />
 
-                <div className="flex-1 min-w-[100px] text-xs text-white/40">
+                <div className="flex-1 min-w-[100px] text-xs text-[var(--os-text-muted)]">
                   {formatTime(node.updatedAt)}
                 </div>
-                <div className="flex-1 min-w-[80px] text-xs text-white/40">
+                <div className="flex-1 min-w-[80px] text-xs text-[var(--os-text-muted)]">
                   {getFileTypeLabel(node)}
                 </div>
-                <div className="w-[80px] text-right text-xs text-white/40 font-mono">
+                <div className="w-[80px] text-right text-xs text-[var(--os-text-muted)] font-mono">
                   {formatSize(node.size)}
                 </div>
               </div>

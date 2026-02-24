@@ -246,24 +246,24 @@ export default function WeatherApp() {
 
   if (weather.loading && !weather.current.temp) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-black/90 text-white">
-        <Loader2 className="animate-spin mb-4 text-blue-400" size={48} />
-        <p className="text-white/50 animate-pulse">{language === 'zh' ? '正在获取天气数据...' : 'Fetching weather data...'}</p>
+      <div className="h-full flex flex-col items-center justify-center bg-[var(--os-bg-window)] text-[var(--os-text-primary)]">
+        <Loader2 className="animate-spin mb-4 text-[var(--os-accent)]" size={48} />
+        <p className="text-[var(--os-text-muted)] animate-pulse">{language === 'zh' ? '正在获取天气数据...' : 'Fetching weather data...'}</p>
       </div>
     )
   }
 
   if (weather.error) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-black/90 text-white p-8 text-center">
-        <AlertCircle size={64} className="text-red-400 mb-4" />
+      <div className="h-full flex flex-col items-center justify-center bg-[var(--os-bg-window)] text-[var(--os-text-primary)] p-8 text-center">
+        <AlertCircle size={64} className="text-[var(--os-danger)] mb-4" />
         <h2 className="text-xl font-bold mb-2">{language === 'zh' ? '获取数据失败' : 'Failed to load weather'}</h2>
         <button 
           onClick={() => {
             setWeather(prev => ({ ...prev, loading: true, error: false }))
             fetchWeatherData(true)
           }}
-          className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          className="px-4 py-2 bg-[var(--os-bg-selection)] hover:bg-[var(--os-hover-bg)] rounded-lg transition-colors"
         >
           {language === 'zh' ? '重试' : 'Retry'}
         </button>

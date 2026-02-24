@@ -17,6 +17,7 @@ interface DesktopIconsProps {
   currentGridPadding: number
   snapToGrid: boolean
   dragPreview: { x: number; y: number } | null
+  textColor: string
   onSelect: (id: string, e?: React.MouseEvent) => void
   onDragEnd: (id: string, x: number, y: number) => void
   onDragPreview: (preview: { x: number; y: number } | null) => void
@@ -34,6 +35,7 @@ export function DesktopIcons({
   currentGridPadding,
   snapToGrid,
   dragPreview,
+  textColor,
   onSelect,
   onDragEnd,
   onDragPreview,
@@ -59,6 +61,7 @@ export function DesktopIcons({
             currentGridSize={currentGridSize}
             currentGridPadding={currentGridPadding}
             snapToGrid={snapToGrid}
+            textColor={textColor}
             onSelect={(id) => {
               if (!isSelected) onSelect(id)
             }}
