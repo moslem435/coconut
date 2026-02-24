@@ -54,8 +54,7 @@ export function AboutPanel() {
                         >
                             <Palmtree size={48} className="text-[var(--os-accent)] relative z-10" />
                         </motion.div>
-                        {/* Shimmer Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
+
                     </div>
                     <h2 className="text-4xl font-bold mb-2 tracking-tight font-display" style={{ color: 'var(--os-text-primary)', fontFamily: 'var(--font-orbitron)' }}>
                         COCONUT <span className="text-[var(--os-accent)]">OS</span>

@@ -22,6 +22,7 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
   const {
     volume, setVolume,
     displayScale, setDisplayScale,
+    brightness, setBrightness,
     useAnimations, setUseAnimations,
     useTaskbarPreviews, setUseTaskbarPreviews,
     theme, setTheme,
@@ -30,7 +31,7 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
 
   const { language, toggleLanguage, t } = useLanguage()
   const menuRef = useRef<HTMLDivElement>(null)
-  const [activeControl, setActiveControl] = useState<'volume' | 'scale'>('volume')
+  const [activeControl, setActiveControl] = useState<'volume' | 'scale' | 'brightness'>('volume')
 
   // Close when clicking outside
   useEffect(() => {
@@ -108,7 +109,9 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
           <div className="flex justify-between items-center mb-4 px-1">
             <h3 className="font-semibold text-sm tracking-wide">{t('quicksettings.title')}</h3>
             <div className="text-xs text-[var(--os-text-muted)]">
-              {activeControl === 'volume' ? `${Math.round(volume)}%` : `${Math.round(displayScale)}%`}
+              {activeControl === 'volume' ? `${Math.round(volume)}%` : 
+               activeControl === 'brightness' ? `${Math.round(brightness)}%` :
+               `${Math.round(displayScale)}%`}
             </div>
           </div>
 
@@ -135,6 +138,28 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
                     setActiveControl('volume')
                   }}
                   className="w-full h-1.5 bg-[var(--os-border)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-[var(--os-accent)] [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Brightness */}
+            <div className="flex items-center gap-3 group">
+              <Tooltip content={t('settings.display.brightness') || "Brightness"} side="left">
+                <div className="p-2 rounded-full text-[var(--os-text-secondary)]">
+                  <Sun size={18} />
+                </div>
+              </Tooltip>
+              <div className="flex-1 h-8 relative flex items-center">
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={brightness}
+                  onChange={(e) => {
+                    setBrightness(parseInt(e.target.value))
+                    setActiveControl('brightness')
+                  }}
+                  className="w-full h-1.5 bg-[var(--os-border)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-[var(--os-text-secondary)] [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
                 />
               </div>
             </div>

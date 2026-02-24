@@ -22,14 +22,14 @@ export function useDesktopInteraction() {
   ) => {
     // 应用快捷方式
     if (item.appId) {
+      const app = APPS_REGISTRY[item.appId]
+      if (!app) return
+
       const isWindowOpen = useWindowStore.getState().windows[item.appId]?.isOpen
-      if (isWindowOpen) {
+      if (isWindowOpen && !app.multiInstance) {
         focusWindow(item.appId)
         return
       }
-
-      const app = APPS_REGISTRY[item.appId]
-      if (!app) return
 
       if (app.splashScreen) {
         setSplashingApp(app)
@@ -39,7 +39,7 @@ export function useDesktopInteraction() {
           app.title,
           app.id,
           app.icon,
-          { ...app.defaultWindowOptions, isDefaultTitle: true }
+          { ...app.defaultWindowOptions, isDefaultTitle: true, multiInstance: app.multiInstance }
         )
       }
       return

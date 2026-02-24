@@ -122,6 +122,7 @@ const en: Record<string, string> = {
     "settings.display.dark": "Dark",
     "settings.display.scale": "Display Scale",
     "settings.display.scale.desc": "Adjust the scaling of system fonts and windows.",
+    "settings.display.brightness": "Brightness",
     "settings.appearance.wallpaper": "Wallpaper",
     "settings.appearance.icons": "Icon Style",
     "settings.appearance.icons.filled": "Modern (Filled)",

@@ -73,13 +73,16 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
         return () => window.removeEventListener('resize', updatePos)
     }, [id, windowState.isOpen, updateTaskbarPosition])
 
-    const handleClick = () => {
+    const handleClick = (e: React.MouseEvent) => {
         // Clear peek
         setHovered(false)
         setPeekWindowId(null)
         if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
 
-        if (windowState.isOpen) {
+        const isShiftClick = e.shiftKey
+        const shouldOpenNew = isShiftClick || (app.multiInstance && !windowState.isOpen)
+
+        if (windowState.isOpen && !isShiftClick) {
             if (isActive && !windowState.isMinimized) {
                 minimizeWindow(id)
             } else {
@@ -91,12 +94,35 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                 const rect = buttonRef.current?.getBoundingClientRect()
                 const taskbarPos = rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined
                 
-                launchApp(app.id, t(`app.${appId}`), app.id, app.icon, {
+                // If multiInstance and shift-click (or forced), generate new ID
+                // BUT keep original ID for the first instance to match pinned item
+                const targetId = (isShiftClick && app.multiInstance) 
+                    ? `${app.id}-${Date.now()}` 
+                    : app.id
+
+                launchApp(targetId, t(`app.${appId}`), app.id, app.icon, {
                     ...app.defaultWindowOptions,
                     taskbarPosition: taskbarPos,
-                    isDefaultTitle: true
+                    isDefaultTitle: true,
+                    multiInstance: app.multiInstance
                 })
             }
+        }
+    }
+
+    const handleAuxClick = (e: React.MouseEvent) => {
+        // Middle click to open new instance
+        if (e.button === 1 && app?.multiInstance) {
+            e.preventDefault()
+            const rect = buttonRef.current?.getBoundingClientRect()
+            const taskbarPos = rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined
+            
+            launchApp(`${app.id}-${Date.now()}`, t(`app.${appId}`), app.id, app.icon, {
+                ...app.defaultWindowOptions,
+                taskbarPosition: taskbarPos,
+                isDefaultTitle: true,
+                multiInstance: true
+            })
         }
     }
 
@@ -120,6 +146,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                 <button
                     ref={buttonRef}
                     onClick={handleClick}
+                    onAuxClick={handleAuxClick}
                     onContextMenu={(e) => {
                         e.preventDefault()
                         useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', {

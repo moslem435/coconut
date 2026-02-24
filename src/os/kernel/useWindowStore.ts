@@ -132,8 +132,14 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
     launchApp: (id, title, appId, icon, options) => {
         const { windows, openWindow } = get()
+        const opts = options as { multiInstance?: boolean } | undefined
 
         if (windows[id]) {
+            if (opts?.multiInstance) {
+                const newId = `${id}-${Date.now()}`
+                openWindow(newId, title, appId, icon, options)
+                return
+            }
             openWindow(id, title, appId, icon, options)
             return
         }

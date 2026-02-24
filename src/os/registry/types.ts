@@ -30,4 +30,6 @@ export interface AppManifest {
     sandbox?: boolean
     /** List of permissions required by the app */
     permissions?: string[]
+    /** If true, allows multiple instances of the app to be open at once */
+    multiInstance?: boolean
 }

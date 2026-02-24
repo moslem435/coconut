@@ -6,7 +6,7 @@ import { ThemeOption } from '../components/ThemeOption'
 
 export function DisplayPanel() {
     const { t } = useLanguage()
-    const { theme, setTheme, displayScale, setDisplayScale } = useSystem()
+    const { theme, setTheme, displayScale, setDisplayScale, brightness, setBrightness } = useSystem()
 
     return (
         <div className="space-y-6">
@@ -43,6 +43,24 @@ export function DisplayPanel() {
                         <span className="text-sm w-12 text-right" style={{ color: 'var(--os-text-secondary)' }}>{displayScale}%</span>
                     </div>
                     <p className="text-xs" style={{ color: 'var(--os-text-muted)' }}>{t('settings.display.scale.desc')}</p>
+                </div>
+            </SettingSection>
+
+            <SettingSection title={t('settings.display.brightness')}>
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <Sun size={20} className="text-[var(--os-text-secondary)]" />
+                        <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={brightness}
+                            onChange={(e) => setBrightness(parseInt(e.target.value))}
+                            className="flex-1 accent-[var(--os-accent)] h-1 rounded-lg appearance-none cursor-pointer"
+                            style={{ backgroundColor: 'var(--os-hover-bg)' }}
+                        />
+                        <span className="text-sm w-12 text-right" style={{ color: 'var(--os-text-secondary)' }}>{brightness}%</span>
+                    </div>
                 </div>
             </SettingSection>
         </div>

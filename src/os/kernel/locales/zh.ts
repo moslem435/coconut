@@ -122,6 +122,7 @@ const zh: Record<string, string> = {
     "settings.display.dark": "深色",
     "settings.display.scale": "显示比例",
     "settings.display.scale.desc": "调整系统字体和窗口大小的缩放比例。",
+    "settings.display.brightness": "亮度控制",
 
     "settings.appearance.wallpaper": "桌面壁纸",
     "settings.appearance.accent": "主题色",

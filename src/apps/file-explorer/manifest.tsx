@@ -22,5 +22,6 @@ export const manifest: AppManifest = {
         height: 600,
         isResizable: true,
         titleBarColor: 'auto'
-    }
+    },
+    multiInstance: true
 }

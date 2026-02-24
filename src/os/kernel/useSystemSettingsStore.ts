@@ -20,6 +20,7 @@ export interface SystemSettings {
     iconTheme: 'filled' | 'line'
     displayScale: number
     volume: number
+    brightness: number
     isMuted: boolean
     snapToGrid: boolean
     showWeatherWidget: boolean
@@ -38,6 +39,7 @@ interface SystemSettingsActions {
     setIconTheme: (theme: 'filled' | 'line') => void
     setDisplayScale: (scale: number) => void
     setVolume: (volume: number) => void
+    setBrightness: (brightness: number) => void
     setMuted: (muted: boolean) => void
     toggleMute: () => void
     setSnapToGrid: (enable: boolean) => void
@@ -61,6 +63,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     iconTheme: 'filled',
     displayScale: 100,
     volume: 75,
+    brightness: 100,
     isMuted: false,
     snapToGrid: true,
     showWeatherWidget: true,
@@ -88,6 +91,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 setIconTheme: (theme) => set({ iconTheme: theme }),
                 setDisplayScale: (scale) => set({ displayScale: scale }),
                 setVolume: (volume) => set({ volume }),
+                setBrightness: (brightness) => set({ brightness }),
                 setMuted: (muted) => set({ isMuted: muted }),
                 toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
                 setSnapToGrid: (enable) => set({ snapToGrid: enable }),
@@ -108,7 +112,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                     // Exclude actions and isSettingsLoaded from persistence
                     const { isSettingsLoaded, setTheme, setAccentColor, setUseTransparency,
                         setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
-                        setIconTheme, setDisplayScale, setVolume, setMuted, toggleMute,
+                        setIconTheme, setDisplayScale, setVolume, setBrightness, setMuted, toggleMute,
                         setSnapToGrid, setShowWeatherWidget, pinApp, unpinApp, setWallpaper, setDevMode,
                         ...settings } = state
                     return settings
@@ -167,6 +171,25 @@ function applyDisplayScale(scale: number) {
     document.documentElement.style.fontSize = `${16 * scale / 100}px`
 }
 
+function applyBrightness(brightness: number) {
+    // 方案: 使用遮罩层模拟
+    // 计算遮罩透明度: 100% 亮度 = 0 透明度, 0% 亮度 = 0.8 透明度 (避免全黑)
+    const opacity = (100 - brightness) / 100 * 0.8; 
+    let overlay = document.getElementById('brightness-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'brightness-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.zIndex = '99999'; // 确保在最顶层
+        overlay.style.pointerEvents = 'none'; // 点击穿透
+        overlay.style.backgroundColor = 'black';
+        overlay.style.transition = 'opacity 0.2s ease';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.opacity = opacity.toString();
+}
+
 // Subscribe to state changes and apply DOM side effects
 if (typeof window !== 'undefined') {
     // Apply initial state on load
@@ -174,6 +197,7 @@ if (typeof window !== 'undefined') {
     applyTheme(initialState.theme, initialState.useTransparency)
     applyAccentColor(initialState.accentColor)
     applyDisplayScale(initialState.displayScale)
+    applyBrightness(initialState.brightness)
 
     // Subscribe to future changes
     useSystemSettingsStore.subscribe(
@@ -190,5 +214,10 @@ if (typeof window !== 'undefined') {
     useSystemSettingsStore.subscribe(
         (state) => state.displayScale,
         (scale) => applyDisplayScale(scale)
+    )
+
+    useSystemSettingsStore.subscribe(
+        (state) => state.brightness,
+        (brightness) => applyBrightness(brightness)
     )
 }

@@ -45,19 +45,22 @@ export function useWindowDrag() {
         onMaximize: () => void,
         onUpdatePosition: (pos: { x: number; y: number }) => void
     ) => {
-        setIsDragging(false)
-        setIsGhostDragging(false)
-        setShowSnapPreview(false)
-
+        const newX = windowPosition.x + offset.x
         const newY = windowPosition.y + offset.y
 
         if (newY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
             onMaximize()
+            setIsDragging(false)
+            setIsGhostDragging(false)
+            setShowSnapPreview(false)
         } else {
             onUpdatePosition({
-                x: windowPosition.x + offset.x,
-                y: Math.max(0, newY)
+                x: Math.round(newX),
+                y: Math.round(Math.max(0, newY))
             })
+            setIsDragging(false)
+            setIsGhostDragging(false)
+            setShowSnapPreview(false)
         }
     }
 
@@ -127,7 +130,7 @@ export function useWindowDrag() {
 
                 onMaximize() // Toggle to restore
                 setTimeout(() => {
-                    onUpdatePosition({ x: newX, y: newY })
+                    onUpdatePosition({ x: Math.round(newX), y: Math.round(newY) })
                 }, 0)
             }
             return
@@ -139,8 +142,8 @@ export function useWindowDrag() {
             onMaximize()
         } else {
             onUpdatePosition({
-                x: windowState.position.x + info.offset.x,
-                y: Math.max(0, newY)
+                x: Math.round(windowState.position.x + info.offset.x),
+                y: Math.round(Math.max(0, newY))
             })
         }
     }

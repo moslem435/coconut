@@ -37,6 +37,7 @@ export function useSystem() {
 
         isMuted: settings.isMuted,
         volume: settings.volume,
+        brightness: settings.brightness,
         language: language,
 
         // Actions
@@ -51,6 +52,7 @@ export function useSystem() {
         setWallpaper: settings.setWallpaper,
 
         setVolume: settings.setVolume,
+        setBrightness: settings.setBrightness,
         toggleMute: settings.toggleMute,
         setLanguage: setLanguage,
         toggleLanguage: toggleLanguage,
