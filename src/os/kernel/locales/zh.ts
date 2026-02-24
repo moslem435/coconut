@@ -422,8 +422,7 @@ const zh: Record<string, string> = {
     "calendar.select.date": "选择日期",
     "calendar.today": "回到今天",
     "calendar.holiday.work": "班",
-    "calendar.holiday.rest": "休",
-    "todo.add_placeholder": "添加待办事项...",
+    "calendar.holiday.rest": "休"
 }
 
 export default zh

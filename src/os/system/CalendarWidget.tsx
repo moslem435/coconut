@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Check, Trash2, Calendar as CalendarIcon, CheckCircle2, Circle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { Solar, Lunar, HolidayUtil } from 'lunar-javascript'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { useTodoStore } from '@/os/kernel/useTodoStore'
 
 export default function CalendarWidget() {
   const { t, language } = useLanguage()
@@ -13,9 +12,6 @@ export default function CalendarWidget() {
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [showYearPicker, setShowYearPicker] = useState(false)
   
-  // Todo State
-  const { todos, addTodo, toggleTodo, deleteTodo, getTodosByDate } = useTodoStore()
-  const [newTodoContent, setNewTodoContent] = useState('')
   const [direction, setDirection] = useState(0) // -1 for left, 1 for right
 
   const { days, monthName, year, currentMonth, currentYear } = useMemo(() => {
@@ -47,12 +43,6 @@ export default function CalendarWidget() {
       const isHoliday = !!holiday
       const isWork = holiday ? holiday.isWork() : false
 
-      // Check if has todos
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
-      const dayTodos = todos.filter(t => t.date === dateStr)
-      const hasTodos = dayTodos.length > 0
-      const hasPendingTodos = dayTodos.some(t => !t.completed)
-
       // Lunar text priority: Festival > Term > Day
       let lunarText = ''
       
@@ -83,9 +73,6 @@ export default function CalendarWidget() {
         lunar: lunarText,
         isHoliday,
         isWork,
-        hasTodos,
-        hasPendingTodos,
-        dateStr,
         gzYear: language === 'zh' ? lunar.getYearInGanZhi() : '',
         gzMonth: language === 'zh' ? lunar.getMonthInGanZhi() : '',
         gzDay: language === 'zh' ? lunar.getDayInGanZhi() : '',
@@ -95,7 +82,7 @@ export default function CalendarWidget() {
     }
 
     return { days, monthName, year, currentMonth: month, currentYear: year }
-  }, [currentDate, language, todos])
+  }, [currentDate, language])
 
   const prevMonth = () => {
     setDirection(-1)
@@ -133,16 +120,7 @@ export default function CalendarWidget() {
     setSelectedDayState(null)
   }, [currentMonth, currentYear])
 
-  // Get todos for active day
-  const activeDateStr = activeDay ? `${year}-${String(currentMonth + 1).padStart(2, '0')}-${String(activeDay.day).padStart(2, '0')}` : ''
-  const activeTodos = useMemo(() => getTodosByDate(activeDateStr), [activeDateStr, todos])
 
-  const handleAddTodo = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newTodoContent.trim() && activeDateStr) {
-      addTodo(newTodoContent.trim(), activeDateStr)
-      setNewTodoContent('')
-    }
-  }
 
   const variants = {
     enter: (direction: number) => ({
@@ -234,13 +212,6 @@ export default function CalendarWidget() {
                       <span className={`text-sm ${d.isToday ? 'font-bold' : ''}`}>{d.day}</span>
                       <span className={`text-[9px] scale-90 ${d.isToday ? 'opacity-90' : 'opacity-60'} truncate w-full px-0.5`}>{d.lunar}</span>
 
-                      {/* Todo Indicator */}
-                      {d.hasTodos && (
-                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                            <div className={`w-1 h-1 rounded-full ${d.isToday ? 'bg-white' : (d.hasPendingTodos ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-muted)]')}`} />
-                        </div>
-                      )}
-
                       {/* Holiday Badge */}
                       {d.isHoliday && (
                         <div className={`absolute top-0 right-0 text-[8px] leading-none px-1 py-0.5 rounded-bl-lg rounded-tr-lg
@@ -260,9 +231,8 @@ export default function CalendarWidget() {
       {/* Divider */}
       <div className="h-px bg-[var(--os-border)]/50 w-full" />
 
-      {/* Todo Section */}
-      <div className="flex flex-col gap-3 flex-1 min-h-[200px]">
-        {/* Selected Date Header */}
+      {/* Date Details */}
+      <div className="flex flex-col pt-2 pb-1">
         <div className="flex items-baseline justify-between">
              <div className="flex flex-col">
                 <span className="text-lg font-bold text-[var(--os-text-primary)]">
@@ -276,63 +246,6 @@ export default function CalendarWidget() {
                     ) : ''}
                 </span>
              </div>
-             <div className="text-xs text-[var(--os-text-muted)] font-mono">
-                {activeTodos.filter(t => t.completed).length}/{activeTodos.length} Done
-             </div>
-        </div>
-
-        {/* Add Todo Input */}
-        <div className="relative group">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--os-text-muted)] group-focus-within:text-[var(--os-accent)] transition-colors">
-                <Plus size={16} />
-            </div>
-            <input 
-                type="text" 
-                value={newTodoContent}
-                onChange={(e) => setNewTodoContent(e.target.value)}
-                onKeyDown={handleAddTodo}
-                placeholder={t('todo.add_placeholder') || "Add a task..."}
-                className="w-full bg-[var(--os-bg-base)]/50 border border-[var(--os-border)] rounded-xl py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:border-[var(--os-accent)] focus:bg-[var(--os-bg-base)] transition-all placeholder:text-[var(--os-text-muted)]/50"
-            />
-        </div>
-
-        {/* Todo List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar -mr-2 pr-2 space-y-1">
-            {activeTodos.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]/40 gap-2 min-h-[100px]">
-                    <CalendarIcon size={32} strokeWidth={1.5} />
-                    <span className="text-xs">No tasks for this day</span>
-                </div>
-            ) : (
-                <AnimatePresence mode='popLayout'>
-                    {activeTodos.map(todo => (
-                        <motion.div
-                            layout
-                            key={todo.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="group flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--os-hover-bg)] transition-colors group"
-                        >
-                            <button 
-                                onClick={() => toggleTodo(todo.id)}
-                                className={`shrink-0 transition-colors ${todo.completed ? 'text-[var(--os-accent)]' : 'text-[var(--os-text-muted)] hover:text-[var(--os-text-primary)]'}`}
-                            >
-                                {todo.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                            </button>
-                            <span className={`flex-1 text-sm truncate ${todo.completed ? 'text-[var(--os-text-muted)] line-through' : 'text-[var(--os-text-primary)]'}`}>
-                                {todo.content}
-                            </span>
-                            <button 
-                                onClick={() => deleteTodo(todo.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:bg-red-500/10 rounded-md transition-all"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            )}
         </div>
       </div>
 

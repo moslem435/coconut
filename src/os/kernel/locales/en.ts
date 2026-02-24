@@ -397,8 +397,7 @@ const en: Record<string, string> = {
     "calendar.select.date": "Select a date",
     "calendar.today": "Back to Today",
     "calendar.holiday.work": "W",
-    "calendar.holiday.rest": "H",
-    "todo.add_placeholder": "Add a task...",
+    "calendar.holiday.rest": "H"
 }
 
 export default en
