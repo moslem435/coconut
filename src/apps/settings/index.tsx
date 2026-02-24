@@ -44,7 +44,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
     const currentCategory = categories.find(c => c.id === activeCategory)
 
     return (
-        <div className="h-full flex bg-[var(--os-bg-base)] text-[var(--os-text-primary)] transition-colors duration-300">
+        <div className="h-full flex bg-transparent text-[var(--os-text-primary)] transition-colors duration-300">
             {/* Sidebar */}
             <SettingSidebar
                 categories={categories}

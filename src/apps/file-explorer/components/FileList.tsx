@@ -141,7 +141,7 @@ export default function FileList({
     return () => observer.disconnect()
   }, [viewMode])
 
-  const GRID_ITEM_WIDTH = 100
+  const GRID_ITEM_WIDTH = 110
   const GRID_GAP = 16 // 1rem
   const GRID_PADDING = 32 // 1rem * 2 (left + right)
 
@@ -151,7 +151,7 @@ export default function FileList({
   const gridVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => gridParentRef.current,
-    estimateSize: () => 140, // Item height + gap
+    estimateSize: () => 150, // Item height + gap
     overscan: 5,
     enabled: viewMode === 'grid'
   })
@@ -202,7 +202,7 @@ export default function FileList({
                   width: '100%',
                   transform: `translateY(${virtualRow.start}px)`,
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${columns}, 100px)`,
+                  gridTemplateColumns: `repeat(${columns}, ${GRID_ITEM_WIDTH}px)`,
                   gap: '16px',
                   padding: '16px', // p-4
                 }}

@@ -7,14 +7,27 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { cn } from '@/lib/utils'
 
+import { useStorageInfo } from '../hooks/useStorageInfo'
+
 interface SidebarProps {
   currentPathId: string
   onNavigate: (id: string) => void
 }
 
+const formatSize = (bytes: number) => {
+  const gb = bytes / (1024 * 1024 * 1024)
+  if (gb >= 1) return `${gb.toFixed(1)}GB`
+  
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1) return `${mb.toFixed(0)}MB`
+  
+  return `${(bytes / 1024).toFixed(0)}KB`
+}
+
 export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
   const { files, mountLocalFolder } = useFileSystemStore()
   const { t } = useLanguage()
+  const { usage, quota, usagePercent } = useStorageInfo()
 
   // Group 1: This System
   const systemItems = [
@@ -32,20 +45,16 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200 group relative",
+        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group relative select-none",
         isActive
-          ? "bg-[var(--os-bg-selection)] text-[var(--os-text-primary)] font-medium shadow-sm"
+          ? "bg-[var(--os-accent)]/10 text-[var(--os-accent)] font-medium"
           : "text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] hover:text-[var(--os-text-primary)]"
       )}
+      title={label}
     >
-      <Icon size={16} className={cn("opacity-80 group-hover:opacity-100", isActive && "text-[var(--os-accent)] opacity-100")} />
-      <span className="truncate flex-1 text-left">{label}</span>
+      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={cn("opacity-70 group-hover:opacity-100 transition-opacity", isActive && "opacity-100")} />
+      <span className="truncate flex-1 text-left text-xs tracking-wide">{label}</span>
       
-      {/* Selection Dot (Purple) */}
-      {isActive && (
-        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-[var(--os-accent)] shadow-[0_0_8px_var(--os-accent)]" />
-      )}
-
       {/* Permission Warning */}
       {/* @ts-ignore - needsPermission added in store but type might not be inferred here yet in some setups */}
       {node?.needsPermission && (
@@ -55,7 +64,7 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
   )
 
   return (
-    <div className="w-56 flex flex-col h-full bg-[var(--os-bg-panel)] border-r border-[var(--os-border)] pt-4 pb-4 select-none">
+    <div className="w-56 flex flex-col h-full bg-[var(--os-hover-bg)]/30 border-r border-[var(--os-border)]/50 pt-4 pb-4 select-none backdrop-blur-md">
       <div className="flex-1 overflow-y-auto px-3 space-y-6 file-manager-scrollbar">
 
         {/* This System Section */}
@@ -129,18 +138,21 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
 
       </div>
 
-      {/* Storage Indicator (Optional) */}
+      {/* Storage Indicator */}
       <div className="mt-auto px-4 py-4 border-t border-[var(--os-border)]">
         <div className="flex items-center gap-2 text-xs text-[var(--os-text-muted)] mb-1">
           <HardDrive size={12} />
           <span>Storage</span>
         </div>
         <div className="h-1 bg-[var(--os-border)] rounded-full overflow-hidden">
-          <div className="h-full w-[45%] bg-[var(--os-accent)]/50 rounded-full" />
+          <div 
+            className="h-full bg-[var(--os-accent)]/50 rounded-full transition-all duration-500" 
+            style={{ width: `${Math.min(100, Math.max(1, usagePercent))}%` }}
+          />
         </div>
         <div className="flex justify-between text-[10px] text-[var(--os-text-muted)] mt-1">
-          <span>24GB used</span>
-          <span>64GB total</span>
+          <span>{formatSize(usage)} used</span>
+          <span>{formatSize(quota)} total</span>
         </div>
       </div>
     </div>

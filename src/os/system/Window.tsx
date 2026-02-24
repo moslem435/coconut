@@ -26,7 +26,7 @@ interface WindowProps {
 
 export default function Window({ id }: WindowProps) {
   const windowState = useWindowStore(useShallow(state => state.windows[id]))
-  const { useAnimations, theme } = useSystemSettings()
+  const { useAnimations, theme, useTransparency } = useSystemSettings()
   const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
   const peekWindowId = useWindowStore(state => state.peekWindowId)
@@ -221,9 +221,15 @@ export default function Window({ id }: WindowProps) {
         style={{
           top: 0,
           left: 0,
-          backgroundColor: 'rgba(var(--os-bg-window-rgb), 0.65)',
-          backdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
-          WebkitBackdropFilter: isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)',
+          backgroundColor: useTransparency 
+            ? 'rgba(var(--os-bg-window-rgb), 0.65)' 
+            : 'var(--os-bg-window)',
+          backdropFilter: useTransparency
+            ? (isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)')
+            : 'none',
+          WebkitBackdropFilter: useTransparency
+            ? (isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)')
+            : 'none',
           boxShadow: isActive
             ? '0 0 0 1px var(--os-border-active), var(--os-shadow-window-active)'
             : '0 0 0 1px var(--os-border), var(--os-shadow-window)',

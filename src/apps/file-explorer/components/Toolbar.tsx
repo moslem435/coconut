@@ -77,7 +77,7 @@ export default function Toolbar({
   ]
 
   return (
-    <div className="relative z-20 h-12 flex items-center gap-3 px-4 border-b border-[var(--os-border)] bg-[var(--os-bg-panel)] backdrop-blur-md shrink-0">
+    <div className="relative z-20 h-14 flex items-center gap-4 px-4 border-b border-[var(--os-border)]/50 shrink-0">
       
       {/* Navigation Controls */}
       <div className="flex items-center gap-1 text-[var(--os-text-secondary)]">

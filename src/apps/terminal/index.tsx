@@ -10,7 +10,7 @@ const XTerm = dynamic(() => import('@/os/components/XTerm'), {
 const Terminal: React.FC = () => {
   return (
     // pt-10 to account for window title bar (App Window Padding Convention)
-    <div className="h-full w-full pt-10 bg-[var(--os-bg-window)]">
+    <div className="h-full w-full pt-10 bg-transparent">
       <XTerm className="h-full w-full" />
     </div>
   )

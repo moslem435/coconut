@@ -64,20 +64,43 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
 
       // 如果是每日壁纸，先获取 URL
       if (wallpaper.type === 'daily') {
-        setIsLoading(true)
-        try {
-          // Add timestamp to prevent browser caching
-          const res = await fetch(`/api/wallpaper?t=${Date.now()}`)
-          const data = await res.json()
-          if (isCancelled) return
-          if (data.url) {
-            targetValue = data.url
+        const today = new Date().toDateString()
+        const cached = localStorage.getItem('os_daily_wallpaper')
+        
+        let shouldUseCache = false
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached)
+            if (parsed.date === today && parsed.url) {
+              targetValue = parsed.url
+              shouldUseCache = true
+            }
+          } catch (e) {
+            // Ignore parse error
           }
-        } catch (error) {
-          console.error('Failed to load daily wallpaper:', error)
-          if (isCancelled) return
-          setIsLoading(false)
-          return
+        }
+
+        if (!shouldUseCache) {
+          setIsLoading(true)
+          try {
+            // Add timestamp to prevent browser caching
+            const res = await fetch(`/api/wallpaper?t=${Date.now()}`)
+            const data = await res.json()
+            if (isCancelled) return
+            if (data.url) {
+              targetValue = data.url
+              // Cache the new url
+              localStorage.setItem('os_daily_wallpaper', JSON.stringify({
+                date: today,
+                url: data.url
+              }))
+            }
+          } catch (error) {
+            console.error('Failed to load daily wallpaper:', error)
+            if (isCancelled) return
+            setIsLoading(false)
+            return
+          }
         }
       }
 

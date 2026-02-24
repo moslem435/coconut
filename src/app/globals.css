@@ -39,6 +39,7 @@
   --os-bg-base: #f5f5f7;
   --os-bg-base-rgb: 245, 245, 247;
   --os-bg-window: #ffffff;
+  --os-bg-window-rgb: 255, 255, 255;
   --os-bg-panel: #ffffff;
   --os-bg-panel-rgb: 255, 255, 255;
 
@@ -114,6 +115,7 @@
   --os-bg-base: #121212;
   --os-bg-base-rgb: 18, 18, 18;
   --os-bg-window: #1e1e1e;
+  --os-bg-window-rgb: 30, 30, 30;
   --os-bg-panel: #252525;
   --os-bg-panel-rgb: 37, 37, 37;
 

@@ -18,7 +18,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   const fitAddonRef = useRef<FitAddon | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const processRef = useRef<any>(null)
-  const { mode } = useSystemSettings()
+  const { theme, useTransparency } = useSystemSettings()
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
@@ -40,9 +40,9 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   useEffect(() => {
     if (!xtermRef.current) return
 
-    const isDark = mode === 'dark'
+    const isDark = theme === 'dark'
     xtermRef.current.options.theme = {
-      background: isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+      background: useTransparency ? 'transparent' : (isDark ? '#1e1e1e' : '#ffffff'),
       foreground: isDark ? '#cccccc' : '#333333',
       cursor: isDark ? '#ffffff' : '#000000',
       selectionBackground: isDark ? '#264f78' : '#add6ff',
@@ -63,7 +63,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
       brightCyan: '#29b8db',
       brightWhite: '#e5e5e5',
     }
-  }, [mode])
+  }, [theme, useTransparency])
 
   // 1. Boot WebContainer
   useEffect(() => {
@@ -79,13 +79,13 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return
 
-    const isDark = mode === 'dark'
+    const isDark = theme === 'dark'
     const term = new Terminal({
       cursorBlink: true,
       convertEol: true,
       allowTransparency: true,
       theme: {
-        background: isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: useTransparency ? 'transparent' : (isDark ? '#1e1e1e' : '#ffffff'),
         foreground: isDark ? '#cccccc' : '#333333',
         cursor: isDark ? '#ffffff' : '#000000',
         selectionBackground: isDark ? '#264f78' : '#add6ff',

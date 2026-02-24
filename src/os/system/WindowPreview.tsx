@@ -1,10 +1,13 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { AppIcon } from '@/os/ui/AppIcon'
 import { APPS_REGISTRY } from '@/os/registry/config'
 
 interface WindowPreviewProps {
+  windowId: string
   appId: string
   title: string
   icon: any
@@ -13,9 +16,10 @@ interface WindowPreviewProps {
   onPeek?: (shouldPeek: boolean) => void
 }
 
-export const WindowPreview = memo(({ appId, title, icon: Icon, isActive, snapshot, onPeek }: WindowPreviewProps) => {
+export const WindowPreview = memo(({ windowId, appId, title, icon: Icon, isActive, snapshot, onPeek }: WindowPreviewProps) => {
   const isSettings = appId === 'settings'
   const { useAnimations } = useSystemSettings()
+  const closeWindow = useWindowStore(state => state.closeWindow)
   
   return (
     <motion.div
@@ -46,6 +50,15 @@ export const WindowPreview = memo(({ appId, title, icon: Icon, isActive, snapsho
                className="drop-shadow-sm"
            />
            <span className="text-[10px] font-medium truncate flex-1 leading-none">{title}</span>
+           <button 
+             className="p-0.5 rounded-sm hover:bg-white/20 transition-colors ml-1 active:scale-90"
+             onClick={(e) => {
+               e.stopPropagation()
+               closeWindow(windowId)
+             }}
+           >
+             <X size={12} />
+           </button>
         </div>
 
         {/* Snapshot or Skeleton */}

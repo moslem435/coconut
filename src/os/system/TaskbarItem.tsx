@@ -103,69 +103,74 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     if (!app) return null
 
     return (
-        <Tooltip
-            content={(!useTaskbarPreviews || !windowState.isOpen) ? title : null}
-            side="top"
-            offset={20}
+        <div
+            className="relative flex flex-col items-center justify-center"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => {
+                setHovered(false)
+                if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                setPeekWindowId(null)
+            }}
         >
-            <button
-                ref={buttonRef}
-                onClick={handleClick}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => {
-                    setHovered(false)
-                    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                    setPeekWindowId(null)
-                }}
-                onContextMenu={(e) => {
-                    e.preventDefault()
-                    useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', {
-                        windowId: windowState.isOpen ? id : undefined,
-                        appId: appId
-                    })
-                }}
-                className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group ${isLoading ? 'animate-pulse cursor-wait' : ''}`}
-                style={{
-                    backgroundColor: isActive && !windowState.isMinimized
-                        ? 'var(--os-accent-dim)' 
-                        : undefined
-                }}
+            <Tooltip
+                content={(!useTaskbarPreviews || !windowState.isOpen) ? title : null}
+                side="top"
+                offset={20}
             >
-                <AppIcon
-                    manifest={app}
-                    icon={icon}
-                    size={32}
-                    className="drop-shadow-sm"
-                />
+                <button
+                    ref={buttonRef}
+                    onClick={handleClick}
+                    onContextMenu={(e) => {
+                        e.preventDefault()
+                        useContextMenuStore.getState().showMenu(e.clientX, e.clientY, 'taskbar-icon', {
+                            windowId: windowState.isOpen ? id : undefined,
+                            appId: appId
+                        })
+                    }}
+                    className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group ${isLoading ? 'animate-pulse cursor-wait' : ''}`}
+                    style={{
+                        backgroundColor: isActive && !windowState.isMinimized
+                            ? 'var(--os-accent-dim)' 
+                            : undefined
+                    }}
+                >
+                    <AppIcon
+                        manifest={app}
+                        icon={icon}
+                        size={32}
+                        className="drop-shadow-sm"
+                    />
 
-                {/* Indicator Dot */}
-                {windowState.isOpen && (
-                    <div className={`absolute -bottom-1.5 w-1 h-1 rounded-full ${isActive && !windowState.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
-                )}
-
-                {/* Window Preview */}
-                <AnimatePresence>
-                    {useTaskbarPreviews && windowState.isOpen && hovered && (
-                        <WindowPreview
-                            appId={appId}
-                            title={title || ''}
-                            icon={icon}
-                            isActive={isActive}
-                            snapshot={snapshot}
-                            onPeek={(shouldPeek) => {
-                                if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                                if (shouldPeek) {
-                                    peekTimeoutRef.current = setTimeout(() => {
-                                        setPeekWindowId(id)
-                                    }, 200)
-                                } else {
-                                    setPeekWindowId(null)
-                                }
-                            }}
-                        />
+                    {/* Indicator Dot */}
+                    {windowState.isOpen && (
+                        <div className={`absolute -bottom-1.5 w-1 h-1 rounded-full ${isActive && !windowState.isMinimized ? 'bg-[var(--os-accent)]' : 'bg-[var(--os-text-secondary)]'}`} />
                     )}
-                </AnimatePresence>
-            </button>
-        </Tooltip>
+                </button>
+            </Tooltip>
+
+            {/* Window Preview */}
+            <AnimatePresence>
+                {useTaskbarPreviews && windowState.isOpen && hovered && (
+                    <WindowPreview
+                        windowId={id}
+                        appId={appId}
+                        title={title || ''}
+                        icon={icon}
+                        isActive={isActive}
+                        snapshot={snapshot}
+                        onPeek={(shouldPeek) => {
+                            if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                            if (shouldPeek) {
+                                peekTimeoutRef.current = setTimeout(() => {
+                                    setPeekWindowId(id)
+                                }, 200)
+                            } else {
+                                setPeekWindowId(null)
+                            }
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+        </div>
     )
 }

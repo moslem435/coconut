@@ -321,7 +321,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   return (
     <div
-      className="h-full flex flex-col bg-[var(--os-bg-window)] text-[var(--os-text-primary)] pt-10 relative"
+      className="h-full flex flex-col bg-transparent text-[var(--os-text-primary)] pt-10 relative"
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* Top Toolbar */}

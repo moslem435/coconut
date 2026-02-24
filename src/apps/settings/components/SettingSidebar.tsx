@@ -12,7 +12,7 @@ export function SettingSidebar({ categories, activeCategory, onCategoryChange }:
     const { t } = useLanguage()
 
     return (
-        <div className="w-64 border-r border-[var(--os-border)] p-4 pt-14 space-y-1 overflow-y-auto shrink-0 bg-[var(--os-bg-panel)]">
+        <div className="w-64 border-r border-[var(--os-border)]/50 p-4 pt-14 space-y-1 overflow-y-auto shrink-0 bg-[var(--os-hover-bg)]/30 backdrop-blur-md">
             <div className="flex items-center gap-3 px-3 py-4 mb-4">
                 <Settings size={24} className="text-[var(--os-accent)]" />
                 <span className="text-lg font-semibold">{t('start.settings')}</span>

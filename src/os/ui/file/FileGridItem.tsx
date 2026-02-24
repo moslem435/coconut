@@ -84,10 +84,18 @@ export function FileGridItem({
           onCancel={onCancelRename || (() => { })}
         />
       ) : (
-        <span className={cn(
-          "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none",
-          textClassName || "text-[var(--os-text-primary)]"
-        )}>
+        <span 
+          className={cn(
+            "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none line-clamp-2 overflow-hidden text-ellipsis",
+            textClassName || "text-[var(--os-text-primary)]"
+          )}
+          title={displayName}
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical'
+          }}
+        >
           {displayName}
         </span>
       )}

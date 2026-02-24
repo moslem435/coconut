@@ -26,7 +26,7 @@ export default function StatusBar({ totalItems, selectedItems }: StatusBarProps)
   }
 
   return (
-    <div className="h-8 bg-[rgba(var(--os-bg-panel-rgb),0.5)] backdrop-blur-md border-t border-white/5 flex items-center px-4 text-xs text-white/50 select-none gap-4">
+    <div className="h-8 border-t border-[var(--os-border)]/30 flex items-center px-4 text-[10px] text-[var(--os-text-muted)] select-none gap-4 bg-[var(--os-hover-bg)]/20">
       <div>
         {totalItems} items
       </div>
