@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Palmtree, Power, Settings } from 'lucide-react'
-import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { Palmtree, Power } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
-import { APPS_REGISTRY } from '@/os/registry/config'
+
+
 import { AppManifest } from '@/os/registry/types'
 import { AppIcon } from '@/os/ui/AppIcon'
 
@@ -21,10 +21,8 @@ interface StartMenuProps {
 export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: StartMenuProps) {
     const { useAnimations } = useSystemSettings()
     const { t } = useLanguage()
-    const openWindow = useWindowStore(state => state.openWindow)
-    const launchApp = useWindowStore(state => state.launchApp)
-    const focusWindow = useWindowStore(state => state.focusWindow)
     const menuRef = useRef<HTMLDivElement>(null)
+
 
     const [position, setPosition] = useState<{ x: number, y: number } | null>(null)
 
@@ -73,26 +71,7 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
         }
     }, [isOpen, toggleRef])
 
-    const handleLaunchApp = (appId: string) => {
-        const app = APPS_REGISTRY[appId]
-        if (!app) return
 
-        // Check if window is open using getState() to avoid subscription
-        const isWindowOpen = useWindowStore.getState().windows[appId]?.isOpen
-
-        if (isWindowOpen) {
-            focusWindow(appId)
-        } else {
-            launchApp(
-                app.id,
-                t(`app.${app.id}`),
-                app.id,
-                app.icon,
-                { ...app.defaultWindowOptions, isDefaultTitle: true }
-            )
-        }
-        onClose()
-    }
 
     const handleShutdown = () => {
         onClose()
@@ -139,28 +118,8 @@ export default function StartMenu({ isOpen, onClose, onShutdown, toggleRef }: St
                         </div>
                     </div>
 
-                    {/* Menu Items */}
-                    <div className="grid grid-cols-4 gap-2 p-2 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {Object.values(APPS_REGISTRY)
-                            .filter(app => !['image-viewer', 'preview-container', 'launcher'].includes(app.id))
-                            .map(app => (
-                                <button
-                                    key={app.id}
-                                    onClick={() => handleLaunchApp(app.id)}
-                                    className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-[var(--os-hover-bg)] transition-colors group"
-                                    title={t(`app.${app.id}`)}
-                                >
-                                    <AppIcon 
-                                        manifest={app} 
-                                        size={32} 
-                                        className="drop-shadow-sm group-hover:scale-110 transition-transform"
-                                    />
-                                    <span className="text-[10px] text-center w-full truncate text-[var(--os-text-primary)]">
-                                        {t(`app.${app.id}`)}
-                                    </span>
-                                </button>
-                            ))}
-                    </div>
+                    {/* Menu Items - REMOVED */}
+
 
                     <div className="h-px w-full bg-[var(--os-border)] my-2" />
 
