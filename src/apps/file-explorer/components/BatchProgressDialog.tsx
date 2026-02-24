@@ -61,7 +61,7 @@ export default function BatchProgressDialog({
         </div>
 
         {/* Operations List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 file-manager-scrollbar">
           {operations.map(op => (
             <div
               key={op.id}

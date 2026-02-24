@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useFileSelection } from '@/os/hooks/useFileSelection'
 import { useDesktopGrid } from '@/os/hooks/useDesktopGrid'
 import { useDesktopInteraction } from '@/os/hooks/useDesktopInteraction'
+import { eventBus } from '@/os/kernel/EventBus'
 
 // Sub-components
 import { DesktopBackground } from './desktop/DesktopBackground'
@@ -75,6 +76,34 @@ export default function Desktop() {
         if (!item) return
         handleIconDoubleClick(item, readFileContent)
     }, [desktopItems, setSelectedIcons, handleIconDoubleClick, readFileContent])
+
+    // Global Error Handling
+    useEffect(() => {
+        const handleError = (event: ErrorEvent) => {
+            eventBus.emit('sys:error', {
+                source: 'window',
+                message: event.message,
+                stack: event.error?.stack,
+                error: event.error
+            })
+        }
+        
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            eventBus.emit('sys:error', {
+                source: 'promise',
+                message: String(event.reason),
+                error: event.reason
+            })
+        }
+
+        window.addEventListener('error', handleError)
+        window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+        return () => {
+            window.removeEventListener('error', handleError)
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+        }
+    }, [])
 
     return (
         <>

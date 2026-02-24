@@ -38,6 +38,19 @@ export interface SystemEvents {
   'system:theme:changed': { theme: 'light' | 'dark' }
   'system:language:changed': { language: string }
   'system:shutdown': {}
+  
+  // 错误与调试
+  'sys:error': { source: string; message: string; stack?: string; error?: any }
+  'sys:warn': { source: string; message: string }
+  
+  // 网络
+  'sys:network': { method: string; url: string; status: number; duration: number; type: 'xhr' | 'fetch' }
+  
+  // 性能
+  'sys:perf': { metric: string; value: number; unit?: string }
+  
+  // 应用日志
+  'app:log': { appId: string; level: 'info' | 'warn' | 'error'; message: string; data?: any }
 }
 
 class EventBus {

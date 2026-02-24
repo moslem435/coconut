@@ -5,7 +5,8 @@ import {
     RefreshCw, Trash2, Download, Power,
     CheckCircle2, AlertTriangle, Info, Loader2,
     Zap, Terminal, FileJson, Save,
-    Music, Phone, X, SkipBack, Pause, SkipForward
+    Music, Phone, X, SkipBack, Pause, SkipForward,
+    AlertCircle, Globe, Gauge, Bug, Filter
 } from 'lucide-react'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
@@ -265,19 +266,36 @@ function StorageTab() {
 }
 
 function LogsTab() {
-    const [logs, setLogs] = useState<{time: string, event: string, data: any}[]>([])
+    const [logs, setLogs] = useState<{
+        id: string,
+        time: string, 
+        event: string, 
+        data: any,
+        category: 'system' | 'app' | 'error' | 'network' | 'perf'
+    }[]>([])
+    const [filter, setFilter] = useState<'all' | 'system' | 'app' | 'error' | 'network' | 'perf'>('all')
     const logsEndRef = useRef<HTMLDivElement>(null)
+    const [expandedId, setExpandedId] = useState<string | null>(null)
 
     useEffect(() => {
         const sub = eventBus.onAny((event, data) => {
+            let category: 'system' | 'app' | 'error' | 'network' | 'perf' = 'system'
+            const eventStr = String(event)
+            
+            if (eventStr.startsWith('sys:error') || eventStr.startsWith('sys:warn')) category = 'error'
+            else if (eventStr.startsWith('sys:network')) category = 'network'
+            else if (eventStr.startsWith('sys:perf')) category = 'perf'
+            else if (eventStr.startsWith('app:') || data?.appId) category = 'app'
+            
             setLogs(prev => {
                 const newLogs = [...prev, {
+                    id: Math.random().toString(36).substr(2, 9),
                     time: new Date().toLocaleTimeString(),
-                    event: String(event),
-                    data
+                    event: eventStr,
+                    data,
+                    category
                 }]
-                // Keep last 100 logs
-                if (newLogs.length > 100) return newLogs.slice(-100)
+                if (newLogs.length > 200) return newLogs.slice(-200)
                 return newLogs
             })
         })
@@ -288,14 +306,37 @@ function LogsTab() {
         if (logsEndRef.current) {
             logsEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
         }
-    }, [logs])
+    }, [logs, filter])
+
+    const filteredLogs = logs.filter(l => filter === 'all' || l.category === filter)
+
+    const getIcon = (category: string) => {
+        switch (category) {
+            case 'error': return <AlertTriangle size={12} className="text-red-500" />
+            case 'network': return <Globe size={12} className="text-blue-500" />
+            case 'perf': return <Gauge size={12} className="text-purple-500" />
+            case 'app': return <Bug size={12} className="text-green-500" />
+            default: return <Activity size={12} className="text-gray-500" />
+        }
+    }
 
     return (
         <div className="space-y-3">
              <div className="flex items-center justify-between p-2 bg-[var(--os-bg-base)] rounded-lg border border-[var(--os-border)]">
-                <div className="flex items-center gap-2 text-xs text-[var(--os-text-secondary)]">
-                    <Activity size={12} />
-                    <span>Watching Global Events</span>
+                <div className="flex gap-2">
+                    {['all', 'system', 'app', 'error', 'network', 'perf'].map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setFilter(f as any)}
+                            className={`px-2 py-1 text-[10px] rounded capitalize transition-colors ${
+                                filter === f 
+                                ? 'bg-[var(--os-accent)] text-white' 
+                                : 'text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)]'
+                            }`}
+                        >
+                            {f}
+                        </button>
+                    ))}
                 </div>
                 <button 
                     onClick={() => setLogs([])}
@@ -306,20 +347,47 @@ function LogsTab() {
                 </button>
             </div>
 
-            <div className="h-[200px] overflow-y-auto custom-scrollbar border border-[var(--os-border)] rounded-lg bg-[var(--os-bg-base)] p-2 font-mono text-[10px]">
-                {logs.length === 0 ? (
+            <div className="h-[300px] overflow-y-auto custom-scrollbar border border-[var(--os-border)] rounded-lg bg-[var(--os-bg-base)] font-mono text-[10px]">
+                {filteredLogs.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-[var(--os-text-secondary)] opacity-50">
-                        No events captured yet
+                        No {filter !== 'all' ? filter : ''} events captured
                     </div>
                 ) : (
-                    <div className="space-y-1">
-                        {logs.map((log, i) => (
-                            <div key={i} className="flex gap-2 hover:bg-[var(--os-hover-bg)] p-0.5 rounded">
-                                <span className="text-gray-500 shrink-0">[{log.time}]</span>
-                                <span className="text-[var(--os-accent)] font-bold shrink-0">{log.event}</span>
-                                <span className="text-[var(--os-text-secondary)] truncate">
-                                    {JSON.stringify(log.data)}
-                                </span>
+                    <div className="divide-y divide-[var(--os-border)]/30">
+                        {filteredLogs.map((log) => (
+                            <div 
+                                key={log.id} 
+                                className={`
+                                    group hover:bg-[var(--os-hover-bg)] transition-colors
+                                    ${expandedId === log.id ? 'bg-[var(--os-hover-bg)]' : ''}
+                                `}
+                            >
+                                <div 
+                                    className="flex items-center gap-2 p-1.5 cursor-pointer"
+                                    onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                                >
+                                    <span className="text-[var(--os-text-secondary)] shrink-0 w-[60px]">{log.time}</span>
+                                    <span className="shrink-0">{getIcon(log.category)}</span>
+                                    <span className={`font-bold shrink-0 ${
+                                        log.category === 'error' ? 'text-red-500' :
+                                        log.category === 'network' ? 'text-blue-500' :
+                                        log.category === 'app' ? 'text-green-500' :
+                                        'text-[var(--os-text-primary)]'
+                                    }`}>
+                                        {log.event}
+                                    </span>
+                                    <span className="text-[var(--os-text-secondary)] truncate flex-1 opacity-70">
+                                        {JSON.stringify(log.data)}
+                                    </span>
+                                </div>
+                                
+                                {expandedId === log.id && (
+                                    <div className="p-2 bg-black/5 border-t border-[var(--os-border)]/30 overflow-x-auto">
+                                        <pre className="text-[var(--os-text-secondary)]">
+                                            {JSON.stringify(log.data, null, 2)}
+                                        </pre>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         <div ref={logsEndRef} />

@@ -178,7 +178,7 @@ export default function FileList({
     return (
       <div
         ref={gridParentRef}
-        className="h-full overflow-y-auto pb-20 custom-scrollbar"
+        className="h-full overflow-y-auto pb-20 file-manager-scrollbar"
         onClick={(e) => onSelect('', e)}
       >
         <div
@@ -292,7 +292,7 @@ export default function FileList({
       </div>
 
       {/* Table Body with Virtual Scrolling */}
-      <div ref={listParentRef} className="flex-1 overflow-y-auto p-1 pb-20 custom-scrollbar">
+      <div ref={listParentRef} className="flex-1 overflow-y-auto p-1 pb-20 file-manager-scrollbar">
         <div
           style={{
             height: `${listVirtualizer.getTotalSize()}px`,

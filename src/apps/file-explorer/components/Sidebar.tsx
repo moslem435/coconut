@@ -50,7 +50,7 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
 
   return (
     <div className="w-56 flex flex-col h-full bg-[rgba(var(--os-bg-panel-rgb),0.3)] backdrop-blur-xl border-r border-white/5 pt-4 pb-4 select-none">
-      <div className="flex-1 overflow-y-auto px-3 space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-3 space-y-6 file-manager-scrollbar">
 
         {/* This System Section */}
         <div>

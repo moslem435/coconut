@@ -71,22 +71,38 @@
   -webkit-mask-image: linear-gradient(to right, transparent, black 40%);
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Global Scrollbar Reset - Hide by default */
+::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
+/* Legacy class - now hidden to satisfy "no scrollbar in other apps" */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
+}
+
+/* File Manager specific scrollbar - Visible */
+.file-manager-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  display: block;
+}
+
+.file-manager-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+.file-manager-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
   border-radius: 3px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+.file-manager-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
 }
 
 /* --- DARK MODE --- */
