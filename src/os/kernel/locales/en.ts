@@ -146,9 +146,7 @@ const en: Record<string, string> = {
     "wallpaper.image.snow": "Snow",
     "wallpaper.image.desert": "Desert",
     "wallpaper.image.city": "City",
-    "wallpaper.video.ocean": "Ocean Waves",
-    "wallpaper.dynamic.daynight": "Dynamic Day/Night",
-    "wallpaper.dynamic.mojave": "macOS Mojave (Simulated)",
+
 
     "color.cyan": "Cyan",
     "color.blue": "Blue",

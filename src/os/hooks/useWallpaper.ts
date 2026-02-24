@@ -118,7 +118,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
       }
 
       // 图片类型壁纸 (daily 和 dynamic-time 最终也是图片)
-      if (['image', 'preset', 'daily', 'dynamic-time'].includes(wallpaper.type)) {
+      if (['image', 'daily', 'dynamic-time'].includes(wallpaper.type)) {
         // 首次加载直接显示
         if (isFirstImageLoad.current) {
           isFirstImageLoad.current = false

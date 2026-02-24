@@ -19,26 +19,6 @@ export const getWallpaperOptions = (t: (key: string) => string) => [
     { name: t('wallpaper.image.snow'), type: 'image' as const, value: '/wallpapers/snow.jpg' },
     { name: t('wallpaper.image.desert'), type: 'image' as const, value: '/wallpapers/desert.jpg' },
     { name: t('wallpaper.image.city'), type: 'image' as const, value: '/wallpapers/city.jpg' },
-    { name: t('wallpaper.video.ocean'), type: 'video' as const, value: '/wallpapers/ocean.mp4' },
-    { 
-        name: t('wallpaper.dynamic.daynight'), 
-        type: 'dynamic-time' as const, 
-        value: JSON.stringify([
-            { time: 6, url: '/wallpapers/city.jpg' },
-            { time: 18, url: '/wallpapers/desert.jpg' },
-            { time: 21, url: '/wallpapers/snow.jpg' }
-        ])
-    },
-    { 
-        name: t('wallpaper.dynamic.mojave'), 
-        type: 'dynamic-time' as const, 
-        value: JSON.stringify([
-            { time: '05:00', url: '/wallpapers/default.jpg' }, // Dawn
-            { time: '07:00', url: '/wallpapers/desert.jpg' },  // Day
-            { time: '17:30', url: '/wallpapers/city.jpg' },    // Sunset
-            { time: '19:00', url: '/wallpapers/snow.jpg' }     // Night
-        ])
-    },
 ]
 
 export const techStack = [
