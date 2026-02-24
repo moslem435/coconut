@@ -137,6 +137,100 @@ export default function CalendarWidget() {
     })
   }
 
+  // --- Enhanced Info Logic ---
+  const [historyEvent, setHistoryEvent] = useState<{ year: string, text: string } | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  // 1. Lunar & Almanac Info
+  const activeDateInfo = useMemo(() => {
+    if (!activeDay || typeof activeDay.day !== 'number') return null
+
+    const date = new Date(year, currentMonth, activeDay.day)
+    const solar = Solar.fromYmd(date.getFullYear(), date.getMonth() + 1, date.getDate())
+    const lunar = solar.getLunar()
+
+    return {
+      yi: lunar.getDayYi(),
+      ji: lunar.getDayJi(),
+      jieqi: lunar.getJieQi(),
+      ganzhi: `${lunar.getYearInGanZhi()}年 ${lunar.getMonthInGanZhi()}月 ${lunar.getDayInGanZhi()}日`,
+      shengxiao: lunar.getYearShengXiao(),
+      astro: solar.getXingZuo()
+    }
+  }, [activeDay, year, currentMonth])
+
+  // 2. Next Holiday Countdown (From Today)
+  const nextHoliday = useMemo(() => {
+    const today = new Date()
+    // Reset time to start of day for accurate day diff
+    today.setHours(0, 0, 0, 0)
+    
+    let d = new Date(today)
+    d.setDate(d.getDate() + 1) // Start looking from tomorrow
+
+    // Look ahead 365 days
+    for (let i = 0; i < 365; i++) {
+      const h = HolidayUtil.getHoliday(d.getFullYear(), d.getMonth() + 1, d.getDate())
+      if (h && !h.isWork()) {
+        const diffTime = d.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        return { name: h.getName(), days: diffDays }
+      }
+      d.setDate(d.getDate() + 1)
+    }
+    return null
+  }, []) // Only calculate on mount (relative to today)
+
+  // 3. On This Day
+  useEffect(() => {
+    if (!activeDay || typeof activeDay.day !== 'number') return
+
+    const date = new Date(year, currentMonth, activeDay.day)
+    const m = date.getMonth() + 1
+    const d = date.getDate()
+    
+    // Fallback events for offline/error mode
+    const fallbacks = [
+      { year: '2024', text: 'Welcome to Portfoliio OS' },
+      { year: '1969', text: 'Apollo 11 lands on the Moon' },
+      { year: '1989', text: 'The World Wide Web is invented' },
+      { year: '1995', text: 'JavaScript is released' },
+      { year: '2013', text: 'React is open-sourced' }
+    ]
+
+    setLoadingHistory(true)
+    setHistoryEvent(null)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000) // 3s timeout
+
+    fetch(`https://history.muffinlabs.com/date/${m}/${d}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.data?.Events?.length > 0) {
+          // Get a deterministic random event based on year/month/day so it doesn't change on re-render/refresh too crazily
+          // Actually random is fine for "discovery"
+          const evt = data.data.Events[Math.floor(Math.random() * data.data.Events.length)]
+          setHistoryEvent({ year: evt.year, text: evt.text })
+        } else {
+          setHistoryEvent(fallbacks[d % fallbacks.length])
+        }
+      })
+      .catch(() => {
+        // Fallback on error/offline
+        setHistoryEvent(fallbacks[d % fallbacks.length])
+      })
+      .finally(() => {
+        clearTimeout(timeoutId)
+        setLoadingHistory(false)
+      })
+
+    return () => {
+      controller.abort()
+      clearTimeout(timeoutId)
+    }
+  }, [activeDay, year, currentMonth])
+
   return (
     <div className="p-4 w-full h-full flex flex-col gap-4">
       {/* Calendar Section */}
@@ -231,8 +325,9 @@ export default function CalendarWidget() {
       {/* Divider */}
       <div className="h-px bg-[var(--os-border)]/50 w-full" />
 
-      {/* Date Details */}
-      <div className="flex flex-col pt-2 pb-1">
+      {/* Date Details & Enhanced Info */}
+      <div className="flex flex-col pt-2 pb-1 gap-3">
+        {/* Header: Date & Lunar */}
         <div className="flex items-baseline justify-between">
              <div className="flex flex-col">
                 <span className="text-lg font-bold text-[var(--os-text-primary)]">
@@ -247,6 +342,66 @@ export default function CalendarWidget() {
                 </span>
              </div>
         </div>
+
+        {/* Enhanced Info Sections */}
+        {activeDateInfo && (
+           <div className="flex flex-col gap-2 animate-in slide-in-from-bottom-2 duration-300">
+              
+              {/* 1. Almanac (Yi/Ji) */}
+              {language === 'zh' && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                   <div className="bg-green-500/5 p-2 rounded-lg border border-green-500/10 flex flex-col gap-0.5">
+                      <span className="text-green-600/80 font-bold text-[10px] uppercase tracking-wider">宜</span>
+                      <span className="text-[var(--os-text-secondary)] truncate" title={activeDateInfo.yi.join(' ')}>
+                        {activeDateInfo.yi.slice(0, 3).join(' ') || '诸事不宜'}
+                      </span>
+                   </div>
+                   <div className="bg-red-500/5 p-2 rounded-lg border border-red-500/10 flex flex-col gap-0.5">
+                      <span className="text-red-600/80 font-bold text-[10px] uppercase tracking-wider">忌</span>
+                      <span className="text-[var(--os-text-secondary)] truncate" title={activeDateInfo.ji.join(' ')}>
+                        {activeDateInfo.ji.slice(0, 3).join(' ') || '诸事不忌'}
+                      </span>
+                   </div>
+                </div>
+              )}
+
+              {/* 3. Solar Term & Ganzhi (More Detail) */}
+              <div className="text-xs text-[var(--os-text-secondary)] bg-[var(--os-bg-base)]/50 p-2 rounded-lg border border-[var(--os-border)]/50 flex justify-between items-center">
+                  <span>{activeDateInfo.ganzhi}</span>
+                  {activeDateInfo.jieqi && (
+                    <span className="text-[var(--os-accent)] font-medium bg-[var(--os-accent)]/10 px-1.5 py-0.5 rounded text-[10px]">
+                        {activeDateInfo.jieqi}
+                    </span>
+                  )}
+              </div>
+
+              {/* 2. Next Holiday Countdown */}
+              {nextHoliday && (
+                  <div className="text-xs flex items-center justify-between bg-[var(--os-bg-base)]/50 p-2 rounded-lg border border-[var(--os-border)]/50">
+                      <span className="opacity-80">距离 <span className="font-bold text-[var(--os-text-primary)] mx-0.5">{nextHoliday.name}</span> 还有</span>
+                      <span className="font-bold text-[var(--os-accent)]">{nextHoliday.days} 天</span>
+                  </div>
+              )}
+
+              {/* 4. On This Day */}
+              <div className="text-xs bg-[var(--os-bg-base)]/50 p-2 rounded-lg border border-[var(--os-border)]/50 min-h-[48px] flex flex-col gap-1 relative overflow-hidden group">
+                  <span className="font-bold opacity-50 text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    <RotateCcw size={8} /> 
+                    {language === 'zh' ? '历史上的今天' : 'On This Day'}
+                  </span>
+                  {loadingHistory ? (
+                      <span className="opacity-50 animate-pulse">Loading...</span>
+                  ) : historyEvent ? (
+                      <div className="flex gap-2">
+                        <span className="font-mono text-[var(--os-accent)] opacity-80 shrink-0">{historyEvent.year}</span>
+                        <span className="line-clamp-2 opacity-90 leading-tight" title={historyEvent.text}>{historyEvent.text}</span>
+                      </div>
+                  ) : (
+                      <span className="opacity-50">No events found</span>
+                  )}
+              </div>
+           </div>
+        )}
       </div>
 
       {/* Pickers Overlay (Simplified for brevity, can be expanded) */}
