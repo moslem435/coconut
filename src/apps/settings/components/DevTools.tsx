@@ -192,11 +192,19 @@ function KernelTab() {
     )
 }
 
+import { useDialogStore } from '@/os/kernel/useDialogStore'
+
 function StorageTab() {
     const { files, createItem } = useFileSystemStore()
+    const { openConfirm } = useDialogStore()
     
-    const handleReset = () => {
-        if (confirm('Are you sure you want to reset the file system? This action cannot be undone.')) {
+    const handleReset = async () => {
+        const confirmed = await openConfirm(
+            'Factory Reset',
+            'Are you sure you want to reset the file system? This action cannot be undone.'
+        )
+
+        if (confirmed) {
             // @ts-ignore
             if (useFileSystemStore.persist) {
                 // @ts-ignore

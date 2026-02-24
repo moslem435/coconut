@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Search, MapPin, Loader2, RefreshCw, AlertCircle, X, LayoutTemplate, Thermometer, Droplets, Wind, Eye, Gauge, Calendar, Bug } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { WeatherState, WeatherCachePayload, getWeatherInfo } from './utils/types'
 import { readWeatherCache, writeWeatherCache, WEATHER_CACHE_TTL } from './utils/cache'
 import { HourlyChart } from './components/HourlyChart'
@@ -219,7 +220,9 @@ export default function WeatherApp() {
       const data = await res.json()
       
       if (!data.results || data.results.length === 0) {
-        alert(language === 'zh' ? '未找到该城市' : 'City not found')
+        useDialogStore.getState().openAlert(
+            language === 'zh' ? '未找到该城市' : 'City not found'
+        )
         setWeather(prev => ({ ...prev, loading: false }))
         return
       }
@@ -232,7 +235,9 @@ export default function WeatherApp() {
     } catch (err) {
       console.error('Search failed:', err)
       setWeather(prev => ({ ...prev, loading: false }))
-      alert(language === 'zh' ? '搜索失败' : 'Search failed')
+      useDialogStore.getState().openAlert(
+          language === 'zh' ? '搜索失败' : 'Search failed'
+      )
     }
   }
 

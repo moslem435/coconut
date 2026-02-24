@@ -5,6 +5,7 @@ import { VSCODE_COLORS } from '../constants'
 import { Menubar } from './Menubar'
 import { useWindowContext } from '@/os/kernel/WindowContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useDialog } from '../hooks/useDialog'
 
 interface TitleBarProps {
   onOpenFile: () => void
@@ -28,6 +29,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onOpenCommandPalette
 }) => {
   const { t } = useLanguage()
+  const { openAlert } = useDialog()
   const windowContext = useWindowContext() // { windowId, dragControls }
   const { minimizeWindow, maximizeWindow, closeWindow, windows } = useWindowStore()
 
@@ -81,10 +83,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     {
       label: t('vscode.help'),
       items: [
-        { label: 'Welcome', action: () => console.log('Welcome - TODO') },
+        { label: 'Welcome', action: () => {} },
         { label: 'Documentation', action: () => window.open('https://code.visualstudio.com/docs', '_blank') },
         { separator: true, label: '' },
-        { label: 'About', action: () => alert('VS Code Lite\nVersion 1.0.0\nBuilt with Monaco Editor') }
+        { label: 'About', action: () => openAlert('VS Code Lite', 'Version 1.0.0\nBuilt with Monaco Editor') }
       ]
     }
   ]

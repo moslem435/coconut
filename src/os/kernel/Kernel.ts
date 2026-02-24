@@ -1,6 +1,7 @@
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { useProcessStore, ProcessPriority } from '@/os/kernel/useProcessStore'
 
 // Types
@@ -233,7 +234,7 @@ class KernelSystem {
             case 'window.close':
                 return 
             case 'alert':
-                alert(`[Sandbox App]: ${args[0]}`)
+                useDialogStore.getState().openAlert('System Alert', args[0] as string)
                 return
             case 'event.subscribe':
                 this.eventBus.subscribe(args[0] as string, source, origin)

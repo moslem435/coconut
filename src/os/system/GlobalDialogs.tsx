@@ -30,26 +30,80 @@ export default function GlobalDialogs() {
 
   if (!request) return null
 
+  // Action Sheet 渲染逻辑
+  if (request.type === 'action-sheet') {
+    return (
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200" onClick={cancel}>
+          <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full max-w-[320px] bg-[#fcfcfc]/95 dark:bg-[#1e1e1e]/95 backdrop-blur-xl border border-[var(--os-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+          >
+              {(request.title || request.message) && (
+                  <div className="px-4 py-3 border-b border-[var(--os-border)] text-left bg-[var(--os-bg-panel)]/50">
+                      {request.title && (
+                          <h3 className="text-[13px] font-semibold text-[var(--os-text-primary)]">
+                              {request.title}
+                          </h3>
+                      )}
+                      {request.message && (
+                          <p className="mt-1 text-[12px] text-[var(--os-text-secondary)]">
+                              {request.message}
+                          </p>
+                      )}
+                  </div>
+              )}
+              
+              <div className="p-1 flex flex-col gap-0.5">
+                  {request.options?.map((option, index) => {
+                      if (option.isCancel) return null
+                      return (
+                        <button
+                            key={index}
+                            onClick={() => {
+                                option.onClick()
+                                cancel()
+                            }}
+                            className={`w-full px-3 py-2 text-[13px] text-left rounded-md transition-colors flex items-center gap-2 ${
+                                option.isDestructive 
+                                    ? 'text-red-500 hover:bg-red-500/10 active:bg-red-500/20' 
+                                    : 'text-[var(--os-text-primary)] hover:bg-[var(--os-hover-bg)] active:bg-[var(--os-active-bg)]'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                      )
+                  })}
+              </div>
+          </motion.div>
+      </div>
+    )
+  }
+
+  // 常规 Alert/Confirm/Prompt 渲染逻辑
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200">
         <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-sm bg-[var(--os-bg-window)]/90 backdrop-blur-xl border border-[var(--os-border)] rounded-xl shadow-2xl overflow-hidden"
+            className="w-full max-w-[320px] bg-[#fcfcfc] dark:bg-[#2c2c2e] rounded-xl shadow-2xl overflow-hidden text-center flex flex-col"
         >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--os-border)] bg-[var(--os-bg-panel)]/50">
-                <span className="font-medium text-[var(--os-text-primary)]">{request.title}</span>
-                <button onClick={cancel} className="text-[var(--os-text-muted)] hover:text-[var(--os-text-primary)] transition-colors">
-                    <X size={16} />
-                </button>
-            </div>
-            
-            <div className="p-4 space-y-4">
+            <div className="p-5 space-y-1">
+                <h3 className="font-semibold text-[17px] leading-6 text-black dark:text-white">
+                    {request.title}
+                </h3>
                 {request.message && (
-                    <p className="text-sm text-[var(--os-text-secondary)] whitespace-pre-wrap">{request.message}</p>
+                    <p className="text-[13px] leading-[18px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                        {request.message}
+                    </p>
                 )}
+            </div>
 
-                {request.type === 'prompt' && (
+            {request.type === 'prompt' && (
+                <div className="px-4 pb-4">
                     <input
                         ref={inputRef}
                         type="text"
@@ -57,26 +111,26 @@ export default function GlobalDialogs() {
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={request.placeholder}
-                        className="w-full px-3 py-2 bg-[var(--os-bg-input)] border border-[var(--os-border)] rounded-md text-[var(--os-text-primary)] placeholder-[var(--os-text-muted)] focus:outline-none focus:border-[var(--os-accent)] focus:ring-1 focus:ring-[var(--os-accent)] transition-all"
+                        className="w-full px-2 py-1 bg-white dark:bg-[#1c1c1e] border border-[#d1d1d6] dark:border-[#3a3a3c] rounded-[4px] text-[13px] text-black dark:text-white placeholder-[#8e8e93] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                     />
-                )}
-
-                <div className="flex justify-end gap-2 pt-2">
-                    {request.type !== 'alert' && (
-                        <button 
-                            onClick={cancel}
-                            className="px-3 py-1.5 text-xs font-medium text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] rounded-md transition-colors"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                    )}
-                    <button 
-                        onClick={() => request.type === 'prompt' ? submit(inputValue) : submit()}
-                        className="px-3 py-1.5 text-xs font-medium bg-[var(--os-accent)] hover:bg-[var(--os-accent-dim)] text-white rounded-md transition-colors shadow-lg shadow-[var(--os-accent)]/20"
-                    >
-                        {t('common.ok')}
-                    </button>
                 </div>
+            )}
+            
+            <div className="flex border-t border-[#3d3d40]/30 divide-x divide-[#3d3d40]/30">
+                {request.type !== 'alert' && (
+                    <button 
+                        onClick={cancel}
+                        className="flex-1 py-3 text-[17px] text-[#007aff] dark:text-[#0a84ff] active:bg-gray-100 dark:active:bg-[#3a3a3c] transition-colors"
+                    >
+                        {t('common.cancel') || 'Cancel'}
+                    </button>
+                )}
+                <button 
+                    onClick={() => request.type === 'prompt' ? submit(inputValue) : submit()}
+                    className={`flex-1 py-3 text-[17px] font-semibold text-[#007aff] dark:text-[#0a84ff] active:bg-gray-100 dark:active:bg-[#3a3a3c] transition-colors ${request.type === 'alert' ? 'w-full' : ''}`}
+                >
+                    {t('common.ok') || 'OK'}
+                </button>
             </div>
         </motion.div>
     </div>

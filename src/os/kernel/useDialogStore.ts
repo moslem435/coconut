@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 
-type DialogType = 'alert' | 'confirm' | 'prompt'
+export type DialogType = 'alert' | 'confirm' | 'prompt' | 'action-sheet'
+
+interface ActionSheetOption {
+  label: string
+  onClick: () => void
+  isDestructive?: boolean
+  isCancel?: boolean
+}
 
 interface DialogRequest {
   type: DialogType
@@ -8,6 +15,7 @@ interface DialogRequest {
   message?: string
   defaultValue?: string
   placeholder?: string
+  options?: ActionSheetOption[]
   resolve: (value: any) => void
 }
 
@@ -20,7 +28,9 @@ interface DialogStore {
   openConfirm: (title: string, message?: string) => Promise<boolean>
   // Returns string if confirmed, null if cancelled
   openPrompt: (title: string, defaultValue?: string, placeholder?: string) => Promise<string | null>
-  
+  // Open Action Sheet
+  openActionSheet: (title: string, message: string, options: ActionSheetOption[]) => void
+
   // Actions called by the UI
   submit: (value?: any) => void
   cancel: () => void
@@ -36,7 +46,10 @@ export const useDialogStore = create<DialogStore>((set, get) => ({
           type: 'alert',
           title,
           message,
-          resolve
+          resolve: (val) => {
+            resolve()
+            set({ request: null })
+          }
         }
       })
     })
@@ -49,7 +62,10 @@ export const useDialogStore = create<DialogStore>((set, get) => ({
           type: 'confirm',
           title,
           message,
-          resolve
+          resolve: (val) => {
+            resolve(val)
+            set({ request: null })
+          }
         }
       })
     })
@@ -63,23 +79,31 @@ export const useDialogStore = create<DialogStore>((set, get) => ({
           title,
           defaultValue,
           placeholder,
-          resolve
+          resolve: (val) => {
+            resolve(val)
+            set({ request: null })
+          }
         }
       })
+    })
+  },
+
+  openActionSheet: (title, message, options) => {
+    set({
+      request: {
+        type: 'action-sheet',
+        title,
+        message,
+        options,
+        resolve: () => set({ request: null })
+      }
     })
   },
 
   submit: (value) => {
     const { request } = get()
     if (request) {
-      if (request.type === 'confirm') {
-        request.resolve(true)
-      } else if (request.type === 'prompt') {
-        request.resolve(value)
-      } else {
-        request.resolve(undefined)
-      }
-      set({ request: null })
+      request.resolve(value ?? true)
     }
   },
 

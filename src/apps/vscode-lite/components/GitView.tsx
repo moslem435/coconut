@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { GitCommit, RefreshCw, Check, MoreHorizontal, Plus, Play } from 'lucide-react'
 import { VSCODE_COLORS } from '../constants'
+import { useDialog } from '../hooks/useDialog'
 
 export const GitView: React.FC = () => {
+    const { openAlert } = useDialog()
     const [message, setMessage] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
 
@@ -13,14 +15,15 @@ export const GitView: React.FC = () => {
         // { file: 'src/components/Button.tsx', status: 'A' },
     ]
 
-    const handleCommit = () => {
-        if (!message) return
+    const handleCommit = async () => {
+        if (!message.trim()) return
         setIsCommitting(true)
-        setTimeout(() => {
-            setIsCommitting(false)
-            setMessage('')
-            alert('Commit support is coming soon!')
-        }, 1000)
+        await openAlert(
+            'Git Commit', 
+            `Simulated commit: "${message}"\n\n(No actual git operations performed in this demo)`
+        )
+        setIsCommitting(false)
+        setMessage('')
     }
 
     return (

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { ProcessControlBlock, ProcessStatus, ProcessPriority } from './process/types'
 import { updateAllProcesses } from './process/simulator'
 import { eventBus } from './EventBus'
@@ -25,88 +26,99 @@ interface ProcessState {
     tick: () => void
 }
 
-export const useProcessStore = create<ProcessState>((set, get) => ({
-    processes: {},
-    nextPid: 1000, // User processes start from 1000
+export const useProcessStore = create<ProcessState>()(
+    persist(
+        (set, get) => ({
+            processes: {},
+            nextPid: 1000, // User processes start from 1000
 
-    // Selectors
-    getProcessList: () => Object.values(get().processes),
-    getTotalCpu: () => Object.values(get().processes).reduce((acc, p) => acc + (p.cpuUsage || 0), 0),
-    getTotalMem: () => Object.values(get().processes).reduce((acc, p) => acc + (p.memoryUsage || 0), 0),
-    getProcessCount: () => Object.keys(get().processes).length,
+            // Selectors
+            getProcessList: () => Object.values(get().processes),
+            getTotalCpu: () => Object.values(get().processes).reduce((acc, p) => acc + (p.cpuUsage || 0), 0),
+            getTotalMem: () => Object.values(get().processes).reduce((acc, p) => acc + (p.memoryUsage || 0), 0),
+            getProcessCount: () => Object.keys(get().processes).length,
 
-    createProcess: (appId, name, windowId) => {
-        const pid = get().nextPid
-        const pcb: ProcessControlBlock = {
-            pid,
-            name,
-            appId,
-            status: 'starting',
-            priority: 'normal',
-            windowId,
-            startTime: Date.now(),
-            memoryUsage: Math.floor(Math.random() * 40) + 20, // 20-60MB initial
-            cpuUsage: 0
+            createProcess: (appId, name, windowId) => {
+                const pid = get().nextPid
+                const pcb: ProcessControlBlock = {
+                    pid,
+                    name,
+                    appId,
+                    status: 'starting',
+                    priority: 'normal',
+                    windowId,
+                    startTime: Date.now(),
+                    memoryUsage: Math.floor(Math.random() * 40) + 20, // 20-60MB initial
+                    cpuUsage: 0
+                }
+
+                set(state => ({
+                    processes: { ...state.processes, [pid]: pcb },
+                    nextPid: state.nextPid + 1
+                }))
+
+                console.log(`[ProcessManager] Created Process ${pid} (${name})`)
+                return pid
+            },
+
+            updateProcessStatus: (pid, status) => {
+                set(state => {
+                    const pcb = state.processes[pid]
+                    if (!pcb) return state
+                    return {
+                        processes: { ...state.processes, [pid]: { ...pcb, status } }
+                    }
+                })
+            },
+
+            setProcessPriority: (pid, priority) => {
+                set(state => {
+                    const pcb = state.processes[pid]
+                    if (!pcb) return state
+                    return {
+                        processes: { ...state.processes, [pid]: { ...pcb, priority } }
+                    }
+                })
+            },
+
+            killProcess: (pid) => {
+                const state = get()
+                const process = state.processes[pid]
+                if (!process) return
+
+                set(state => {
+                    const { [pid]: removed, ...rest } = state.processes
+                    return { processes: rest }
+                })
+
+                console.log(`[ProcessManager] Killed Process ${pid}`)
+                
+                // Emit event so other stores (like WindowStore) can react
+                eventBus.emit('process:killed', { 
+                    pid, 
+                    appId: process.appId,
+                    windowId: process.windowId
+                })
+            },
+
+            getProcessByWindowId: (windowId) => {
+                return Object.values(get().processes).find(p => p.windowId === windowId)
+            },
+
+            tick: () => {
+                // Optimistic update via worker
+                // Logic moved to ProcessWorkerClient
+            }
+        }),
+        {
+            name: 'process-storage',
+            partialize: (state) => ({
+                processes: state.processes,
+                nextPid: state.nextPid
+            })
         }
-
-        set(state => ({
-            processes: { ...state.processes, [pid]: pcb },
-            nextPid: state.nextPid + 1
-        }))
-
-        console.log(`[ProcessManager] Created Process ${pid} (${name})`)
-        return pid
-    },
-
-    updateProcessStatus: (pid, status) => {
-        set(state => {
-            const pcb = state.processes[pid]
-            if (!pcb) return state
-            return {
-                processes: { ...state.processes, [pid]: { ...pcb, status } }
-            }
-        })
-    },
-
-    setProcessPriority: (pid, priority) => {
-        set(state => {
-            const pcb = state.processes[pid]
-            if (!pcb) return state
-            return {
-                processes: { ...state.processes, [pid]: { ...pcb, priority } }
-            }
-        })
-    },
-
-    killProcess: (pid) => {
-        const state = get()
-        const process = state.processes[pid]
-        if (!process) return
-
-        set(state => {
-            const { [pid]: removed, ...rest } = state.processes
-            return { processes: rest }
-        })
-
-        console.log(`[ProcessManager] Killed Process ${pid}`)
-        
-        // Emit event so other stores (like WindowStore) can react
-        eventBus.emit('process:killed', { 
-            pid, 
-            appId: process.appId,
-            windowId: process.windowId
-        })
-    },
-
-    getProcessByWindowId: (windowId) => {
-        return Object.values(get().processes).find(p => p.windowId === windowId)
-    },
-
-    tick: () => {
-        // Optimistic update via worker
-        // Logic moved to ProcessWorkerClient
-    }
-}))
+    )
+)
 
 // --- Worker Integration ---
 

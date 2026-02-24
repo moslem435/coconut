@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { Monitor, AlertCircle } from 'lucide-react'
 import { OS_PRESETS, OSConfig } from './config'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { useImageDownloader } from './hooks/useImageDownloader'
 import { ImageStorage } from './services/ImageStorage'
 import { EmulatorSidebar } from './components/EmulatorSidebar'
@@ -61,7 +62,13 @@ export default function EmulatorApp() {
 
     const handleDeleteLocal = async () => {
         if (!selectedOS || !selectedOS.url) return
-        if (!confirm(t('emulator.confirm_delete'))) return
+        
+        const confirmed = await useDialogStore.getState().openConfirm(
+            t('emulator.delete_cache'),
+            t('emulator.confirm_delete')
+        )
+        
+        if (!confirmed) return
         
         const filename = selectedOS.url.split('/').pop() || 'image.iso'
         try {
