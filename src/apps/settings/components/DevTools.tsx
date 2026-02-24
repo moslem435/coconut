@@ -285,7 +285,9 @@ function LogsTab() {
     }, [])
 
     useEffect(() => {
-        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        if (logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
     }, [logs])
 
     return (

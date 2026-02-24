@@ -357,3 +357,12 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         set({ peekWindowId: id })
     }
 }))
+
+// --- System Integration ---
+
+// Listen for process kill events to ensure windows are closed when their process dies
+eventBus.on('process:killed', ({ windowId }) => {
+    if (windowId) {
+        useWindowStore.getState().closeWindow(windowId)
+    }
+})

@@ -27,7 +27,7 @@ export interface SystemEvents {
   
   // 进程事件
   'process:created': { pid: number; appId: string; name: string }
-  'process:killed': { pid: number; appId: string }
+  'process:killed': { pid: number; appId: string; windowId?: string }
   'process:status:changed': { pid: number; status: string }
   
   // 应用事件

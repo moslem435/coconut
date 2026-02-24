@@ -79,10 +79,22 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
     },
 
     killProcess: (pid) => {
+        const state = get()
+        const process = state.processes[pid]
+        if (!process) return
+
         set(state => {
             const { [pid]: removed, ...rest } = state.processes
-            console.log(`[ProcessManager] Killed Process ${pid}`)
             return { processes: rest }
+        })
+
+        console.log(`[ProcessManager] Killed Process ${pid}`)
+        
+        // Emit event so other stores (like WindowStore) can react
+        eventBus.emit('process:killed', { 
+            pid, 
+            appId: process.appId,
+            windowId: process.windowId
         })
     },
 
