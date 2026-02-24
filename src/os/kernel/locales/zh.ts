@@ -149,6 +149,7 @@ const zh: Record<string, string> = {
     "settings.about.uptime": "运行时间",
     "settings.about.copy": "复制配置信息",
     "settings.about.copied": "已复制!",
+    "settings.about.debug": "调试模式已开启!",
     "settings.about.dev": "开发者模式已开启!",
     "settings.about.powered": "技术栈驱动",
     "settings.dev": "功能开发中...",

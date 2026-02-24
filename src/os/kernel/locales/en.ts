@@ -135,6 +135,7 @@ const en: Record<string, string> = {
     "settings.sound.volume": "Volume",
     "settings.language.select": "Select Language",
     "settings.about.uptime": "Uptime",
+    "settings.about.debug": "Debug Mode Enabled!",
     "settings.about.dev": "Developer Mode Enabled!",
 
     // Wallpaper & Colors

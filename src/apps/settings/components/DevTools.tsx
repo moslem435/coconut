@@ -19,7 +19,7 @@ export function DevTools() {
         <div className="flex flex-col gap-4 p-4 rounded-xl bg-[var(--os-bg-base)]/50 border border-[var(--os-border)] w-full">
             <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-[var(--os-text-secondary)] uppercase tracking-wider">
-                    Developer Tools
+                    Debug Mode
                 </h3>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/20">
                     Active

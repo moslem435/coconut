@@ -11,17 +11,12 @@ import { DevTools } from '../components/DevTools'
 export function AboutPanel() {
     const { t } = useLanguage()
     const { devMode, setDevMode } = useSystemSettingsStore()
-    const [devModeCount, setDevModeCount] = useState(devMode ? 1 : 0)
 
     const [coconuts, setCoconuts] = useState<{ id: number, x: number }[]>([])
 
     // Sync local state with global state
     useEffect(() => {
-        if (devMode) {
-            setDevModeCount(1)
-        } else {
-            setDevModeCount(0)
-        }
+        // No local state needed anymore for simple toggle
     }, [devMode])
 
     const dropCoconut = () => {
@@ -80,10 +75,9 @@ export function AboutPanel() {
                         className="cursor-pointer select-none inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/20 text-[var(--os-accent)] text-xs font-medium hover:bg-[var(--os-accent)]/20 transition-all hover:scale-105 active:scale-95"
                         onClick={() => {
                             if (!devMode) {
-                                if (devModeCount < 1) {
-                                    setDevModeCount(prev => prev + 1)
-                                    setDevMode(true)
-                                }
+                                setDevMode(true)
+                            } else {
+                                setDevMode(false)
                             }
                         }}
                     >
@@ -99,7 +93,7 @@ export function AboutPanel() {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="mt-4 text-sm font-bold text-green-400"
                             >
-                                {t('settings.about.dev')}
+                                {t('settings.about.debug')}
                             </motion.div>
                         )}
                     </AnimatePresence>
