@@ -78,10 +78,6 @@ export const createMountSlice: StateCreator<
     }
 
     try {
-      if (state.getChildren(folderId).length === 0) {
-        get()._setLoading(true)
-      }
-
       logger.debug(`[loadFolderContent] Calling syncService.readDirectory(${fullPath})`)
       const childrenNames = await syncService.readDirectory(fullPath)
       logger.debug(`[loadFolderContent] readDirectory returned:`, childrenNames)
@@ -102,8 +98,6 @@ export const createMountSlice: StateCreator<
       }
     } catch (e) {
       logger.error("Failed to load folder content:", e)
-    } finally {
-      get()._setLoading(false)
     }
   },
 

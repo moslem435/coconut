@@ -36,10 +36,11 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortConfig, setSortConfig] = useState<{ field: SortField, order: SortOrder }>({ field: 'name', order: 'asc' })
   const [searchQuery, setSearchQuery] = useState('')
+  const [isFolderLoading, setIsFolderLoading] = useState(false)
 
   // Stores
   const {
-    files, getChildren, getPath, isLoading, loadFolderContent,
+    files, getChildren, getPath, isLoading: isSystemLoading, loadFolderContent,
     createItem
   } = useFileSystemStore()
   const { setRenamingId } = useUIStore()
@@ -77,7 +78,15 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   // Effects
   useEffect(() => {
-    loadFolderContent(currentPathId)
+    const load = async () => {
+      setIsFolderLoading(true)
+      try {
+        await loadFolderContent(currentPathId)
+      } finally {
+        setIsFolderLoading(false)
+      }
+    }
+    load()
   }, [currentPathId, loadFolderContent])
 
   // Search with Fuse.js
@@ -360,7 +369,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
             onUploadComplete={handleUploadComplete}
           />
 
-          {isLoading ? (
+          {isSystemLoading || isFolderLoading ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--os-border-active)] mb-4" />
               <span className="text-sm">Loading...</span>
