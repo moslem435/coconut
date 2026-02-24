@@ -422,7 +422,17 @@ const zh: Record<string, string> = {
     "calendar.select.date": "选择日期",
     "calendar.today": "回到今天",
     "calendar.holiday.work": "班",
-    "calendar.holiday.rest": "休"
+    "calendar.holiday.rest": "休",
+    "calendar.almanac.yi": "宜",
+    "calendar.almanac.ji": "忌",
+    "calendar.almanac.yi.none": "诸事不宜",
+    "calendar.almanac.ji.none": "诸事不忌",
+    "calendar.holiday.prefix": "距离",
+    "calendar.holiday.middle": "还有",
+    "calendar.holiday.suffix": "天",
+    "calendar.history.title": "历史上的今天",
+    "calendar.history.loading": "加载中...",
+    "calendar.history.empty": "暂无历史事件"
 }
 
 export default zh

@@ -394,10 +394,20 @@ const en: Record<string, string> = {
     "calendar.week.sat": "Sa",
     "calendar.select.month": "Select Month",
     "calendar.select.year": "Select Year",
-    "calendar.select.date": "Select a date",
-    "calendar.today": "Back to Today",
-    "calendar.holiday.work": "W",
-    "calendar.holiday.rest": "H"
+    "calendar.select.date": "Select Date",
+    "calendar.today": "Jump to Today",
+    "calendar.holiday.work": "Work",
+    "calendar.holiday.rest": "Off",
+    "calendar.almanac.yi": "Good for",
+    "calendar.almanac.ji": "Avoid",
+    "calendar.almanac.yi.none": "Nothing specific",
+    "calendar.almanac.ji.none": "Nothing specific",
+    "calendar.holiday.prefix": "Next holiday:",
+    "calendar.holiday.middle": "in",
+    "calendar.holiday.suffix": "days",
+    "calendar.history.title": "On This Day",
+    "calendar.history.loading": "Loading...",
+    "calendar.history.empty": "No events found"
 }
 
 export default en
