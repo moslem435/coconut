@@ -1,17 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Palmtree, Globe, Container, ShieldCheck } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { useSystemSettingsStore } from '@/os/kernel/useSystemSettingsStore'
 import { SettingSection } from '../components/SettingSection'
 import { TechStackGrid } from '../components/TechStackGrid'
 import { DevTools } from '../components/DevTools'
 
 export function AboutPanel() {
     const { t } = useLanguage()
-    const [devModeCount, setDevModeCount] = useState(0)
+    const { devMode, setDevMode } = useSystemSettingsStore()
+    const [devModeCount, setDevModeCount] = useState(devMode ? 1 : 0)
 
     const [coconuts, setCoconuts] = useState<{ id: number, x: number }[]>([])
+
+    // Sync local state with global state
+    useEffect(() => {
+        if (devMode) {
+            setDevModeCount(1)
+        } else {
+            setDevModeCount(0)
+        }
+    }, [devMode])
 
     const dropCoconut = () => {
         const id = Date.now()
@@ -68,7 +79,12 @@ export function AboutPanel() {
                     <div
                         className="cursor-pointer select-none inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/20 text-[var(--os-accent)] text-xs font-medium hover:bg-[var(--os-accent)]/20 transition-all hover:scale-105 active:scale-95"
                         onClick={() => {
-                            if (devModeCount < 1) setDevModeCount(prev => prev + 1)
+                            if (!devMode) {
+                                if (devModeCount < 1) {
+                                    setDevModeCount(prev => prev + 1)
+                                    setDevMode(true)
+                                }
+                            }
                         }}
                     >
                         <span>v1.0.0 (Coco-Alpha)</span>
@@ -77,7 +93,7 @@ export function AboutPanel() {
                     </div>
 
                     <AnimatePresence>
-                        {devModeCount >= 1 && (
+                        {devMode && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -117,7 +133,7 @@ export function AboutPanel() {
 
             {/* Developer Tools */}
             <AnimatePresence>
-                {devModeCount >= 1 && (
+                {devMode && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}

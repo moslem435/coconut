@@ -21,7 +21,7 @@ const DEFAULT_LOCATION = {
 
 export default function WeatherApp() {
   const { language } = useLanguage()
-  const { showWeatherWidget, setShowWeatherWidget } = useSystemSettings()
+  const { showWeatherWidget, setShowWeatherWidget, devMode } = useSystemSettings()
   const [weather, setWeather] = useState<WeatherState>({
     current: { temp: 0, code: 0, humidity: 0, windSpeed: 0, windDirection: 0, pressure: 0, visibility: 0, feelsLike: 0, isDay: 1 },
     forecast: [],
@@ -286,15 +286,17 @@ export default function WeatherApp() {
       {/* Settings Toggle */}
       <div className="absolute top-12 right-6 z-20 flex gap-2">
         <div className="relative">
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className={`flex items-center justify-center w-8 h-8 rounded-full backdrop-blur-md transition-all border border-white/10 ${showDebug ? 'bg-white/30 text-white' : 'bg-black/20 hover:bg-black/30 text-white/70'}`}
-            title="Debug"
-          >
-            <Bug size={14} />
-          </button>
+          {devMode && (
+            <button
+                onClick={() => setShowDebug(!showDebug)}
+                className={`flex items-center justify-center w-8 h-8 rounded-full backdrop-blur-md transition-all border border-white/10 ${showDebug ? 'bg-white/30 text-white' : 'bg-black/20 hover:bg-black/30 text-white/70'}`}
+                title="Debug"
+            >
+                <Bug size={14} />
+            </button>
+          )}
           
-          {showDebug && (
+          {showDebug && devMode && (
             <div className="absolute top-full right-0 mt-2 p-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl w-48 z-50 flex flex-col gap-2 shadow-2xl">
               <div className="text-xs font-medium text-white/50 uppercase tracking-wider mb-1">Time</div>
               <div className="flex gap-2">
