@@ -2,105 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Cloud, CloudRain, Sun, CloudLightning, Wind, Thermometer, MapPin, CloudSnow, CloudFog, CloudDrizzle, Loader2 } from 'lucide-react'
+import { Wind, Thermometer, MapPin, Loader2 } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
-
-// Types
-interface WeatherState {
-  current: {
-    temp: number
-    code: number
-    humidity: number
-    windSpeed: number
-  }
-  forecast: Array<{
-    date: string
-    maxTemp: number
-    minTemp: number
-    code: number
-  }>
-  location: string
-  loading: boolean
-  error: boolean
-  lastUpdated: number | null
-  stale: boolean
-}
-
-// WMO Weather Code Interpretation (0-99)
-const getWeatherInfo = (code: number) => {
-  // Clear Sky
-  if (code === 0) return { icon: Sun, label: { en: 'Clear Sky', zh: '晴朗' }, color: 'text-yellow-400' }
-  // Mainly Clear, Partly Cloudy, Overcast
-  if ([1, 2, 3].includes(code)) return { icon: Cloud, label: { en: 'Cloudy', zh: '多云' }, color: 'text-gray-300' }
-  // Fog
-  if ([45, 48].includes(code)) return { icon: CloudFog, label: { en: 'Foggy', zh: '雾' }, color: 'text-gray-400' }
-  // Drizzle
-  if ([51, 53, 55].includes(code)) return { icon: CloudDrizzle, label: { en: 'Drizzle', zh: '毛毛雨' }, color: 'text-blue-300' }
-  // Freezing Drizzle
-  if ([56, 57].includes(code)) return { icon: CloudDrizzle, label: { en: 'Freezing Drizzle', zh: '冻雨' }, color: 'text-cyan-300' }
-  // Rain
-  if ([61, 63, 65].includes(code)) return { icon: CloudRain, label: { en: 'Rain', zh: '下雨' }, color: 'text-blue-400' }
-  // Freezing Rain
-  if ([66, 67].includes(code)) return { icon: CloudRain, label: { en: 'Freezing Rain', zh: '冻雨' }, color: 'text-cyan-400' }
-  // Snow Fall
-  if ([71, 73, 75].includes(code)) return { icon: CloudSnow, label: { en: 'Snow', zh: '下雪' }, color: 'text-white' }
-  // Snow Grains
-  if (code === 77) return { icon: CloudSnow, label: { en: 'Snow Grains', zh: '雪粒' }, color: 'text-white' }
-  // Rain Showers
-  if ([80, 81, 82].includes(code)) return { icon: CloudRain, label: { en: 'Showers', zh: '阵雨' }, color: 'text-blue-400' }
-  // Snow Showers
-  if ([85, 86].includes(code)) return { icon: CloudSnow, label: { en: 'Snow Showers', zh: '阵雪' }, color: 'text-white' }
-  // Thunderstorm
-  if (code === 95) return { icon: CloudLightning, label: { en: 'Thunderstorm', zh: '雷暴' }, color: 'text-purple-400' }
-  // Thunderstorm with Hail
-  if ([96, 99].includes(code)) return { icon: CloudLightning, label: { en: 'Thunderstorm', zh: '雷暴伴冰雹' }, color: 'text-purple-500' }
-
-  return { icon: Sun, label: { en: 'Unknown', zh: '未知' }, color: 'text-gray-400' }
-}
+import { readWeatherCache, writeWeatherCache, WEATHER_CACHE_TTL } from '@/apps/weather/utils/cache'
+import { WeatherCachePayload, WeatherState as AppWeatherState, getWeatherInfo } from '@/apps/weather/utils/types'
 
 // Default Location (Shanghai)
 const DEFAULT_LOCATION = {
   lat: 31.2304,
   lon: 121.4737,
   city: 'Shanghai'
-}
-
-const WEATHER_CACHE_KEY = 'weather-widget-cache'
-const WEATHER_CACHE_TTL = 5 * 60 * 1000
-
-interface WeatherCachePayload {
-  current: WeatherState['current']
-  forecast: WeatherState['forecast']
-  location: WeatherState['location']
-}
-
-interface WeatherCache {
-  timestamp: number
-  data: WeatherCachePayload
-  latitude: number
-  longitude: number
-  city: string
-}
-
-const readWeatherCache = (): WeatherCache | null => {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem(WEATHER_CACHE_KEY)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (!parsed?.timestamp || !parsed?.data) return null
-    return parsed as WeatherCache
-  } catch {
-    return null
-  }
-}
-
-const writeWeatherCache = (cache: WeatherCache) => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache))
 }
 
 interface WeatherWidgetProps {
@@ -112,9 +26,15 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
   const { launchApp } = useWindowStore()
   const { showMenu } = useContextMenuStore()
   const [mounted, setMounted] = useState(false)
-  const [weather, setWeather] = useState<WeatherState>({
-    current: { temp: 0, code: 0, humidity: 0, windSpeed: 0 },
+  
+  // Use App's WeatherState type
+  const [weather, setWeather] = useState<AppWeatherState>({
+    current: { 
+      temp: 0, code: 0, humidity: 0, windSpeed: 0, 
+      windDirection: 0, pressure: 0, visibility: 0, feelsLike: 0, isDay: 1 
+    },
     forecast: [],
+    hourly: [],
     location: 'Loading...',
     loading: true,
     error: false,
@@ -124,6 +44,31 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
 
   useEffect(() => {
     setMounted(true)
+    
+    // Initial Load
+    loadFromCache()
+    
+    // Listen for cache updates from App
+    const handleCacheUpdate = () => {
+      loadFromCache()
+    }
+    
+    window.addEventListener('weather-cache-update', handleCacheUpdate)
+    window.addEventListener('storage', handleCacheUpdate)
+
+    // Fetch if cache is missing or stale
+    const cached = readWeatherCache()
+    if (!cached || Date.now() - cached.timestamp > WEATHER_CACHE_TTL) {
+       fetchWeatherData()
+    }
+
+    return () => {
+      window.removeEventListener('weather-cache-update', handleCacheUpdate)
+      window.removeEventListener('storage', handleCacheUpdate)
+    }
+  }, [])
+
+  const loadFromCache = () => {
     const cached = readWeatherCache()
     if (cached) {
       const isStale = Date.now() - cached.timestamp > WEATHER_CACHE_TTL
@@ -136,68 +81,79 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
         stale: isStale
       }))
     }
-    fetchWeatherData()
-  }, [])
+  }
 
   const fetchWeatherData = async (force = false) => {
     const cached = readWeatherCache()
     const now = Date.now()
+    
     if (!force && cached && now - cached.timestamp < WEATHER_CACHE_TTL) {
-      setWeather(prev => ({
-        ...prev,
-        ...cached.data,
-        loading: false,
-        error: false,
-        lastUpdated: cached.timestamp,
-        stale: false
-      }))
+      loadFromCache()
       return
     }
+
     try {
+      setWeather(prev => ({ ...prev, loading: true }))
+
+      // 1. Get Location
       let latitude = cached?.latitude ?? DEFAULT_LOCATION.lat
       let longitude = cached?.longitude ?? DEFAULT_LOCATION.lon
       let city = cached?.city ?? DEFAULT_LOCATION.city
 
-      // 1. Try Get Location via API proxy (避免 CORS 和限流问题)
-      try {
-        const locRes = await fetch('/api/weather?type=location')
-        if (locRes.ok) {
-          const locData = await locRes.json()
-          if (locData.latitude && locData.longitude) {
-            latitude = locData.latitude
-            longitude = locData.longitude
-            city = locData.city || city
+      if (!cached) {
+          try {
+            const locRes = await fetch('/api/weather?type=location')
+            if (locRes.ok) {
+              const locData = await locRes.json()
+              if (locData.latitude && locData.longitude) {
+                latitude = locData.latitude
+                longitude = locData.longitude
+                city = locData.city || city
+              }
+            }
+          } catch (e) {
+             console.warn('Location fetch failed', e)
           }
-        }
-      } catch (locErr) {
-        console.warn('Location API failed, using cached/default:', locErr)
-        // Fallback silently to cached or default
       }
 
-      // 2. Get Weather via API proxy
+      // 2. Get Weather via API (Now returns full data compatible with App)
       const weatherRes = await fetch(`/api/weather?type=forecast&lat=${latitude}&lon=${longitude}`)
       if (!weatherRes.ok) throw new Error('Weather fetch failed')
       const weatherData = await weatherRes.json()
 
-      // 3. Transform Data
+      // 3. Transform Data (Replicating App logic for consistency)
+      const currentHour = new Date().getHours()
       const locationName = city || 'Unknown Location'
+      
       const nextData: WeatherCachePayload = {
         current: {
           temp: Math.round(weatherData.current.temperature_2m),
           code: weatherData.current.weather_code,
           humidity: weatherData.current.relative_humidity_2m,
-          windSpeed: Math.round(weatherData.current.wind_speed_10m)
+          windSpeed: Math.round(weatherData.current.wind_speed_10m),
+          windDirection: weatherData.current.wind_direction_10m,
+          pressure: Math.round(weatherData.current.surface_pressure),
+          visibility: Math.round(weatherData.current.visibility / 1000),
+          feelsLike: Math.round(weatherData.current.apparent_temperature),
+          isDay: weatherData.current.is_day
         },
-        forecast: weatherData.daily.time.slice(1, 5).map((date: string, index: number) => ({
+        forecast: weatherData.daily.time.slice(1, 6).map((date: string, index: number) => ({
           date,
           maxTemp: Math.round(weatherData.daily.temperature_2m_max[index + 1]),
           minTemp: Math.round(weatherData.daily.temperature_2m_min[index + 1]),
-          code: weatherData.daily.weather_code[index + 1]
+          code: weatherData.daily.weather_code[index + 1],
+          precipitationProbability: weatherData.daily.precipitation_probability_max?.[index + 1] || 0
+        })),
+        hourly: weatherData.hourly.time.slice(currentHour, currentHour + 24).map((time: string, index: number) => ({
+          time,
+          temp: Math.round(weatherData.hourly.temperature_2m[currentHour + index]),
+          code: weatherData.hourly.weather_code[currentHour + index]
         })),
         location: locationName
       }
 
       const updatedAt = Date.now()
+      
       setWeather({
         ...nextData,
         loading: false,
@@ -205,6 +161,7 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
         lastUpdated: updatedAt,
         stale: false
       })
+      
       writeWeatherCache({
         timestamp: updatedAt,
         data: nextData,
@@ -216,24 +173,18 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
     } catch (err) {
       console.error('Weather widget error:', err)
       if (cached) {
-        setWeather(prev => ({
-          ...prev,
-          ...cached.data,
-          loading: false,
-          error: false,
-          lastUpdated: cached.timestamp,
-          stale: true
-        }))
-        return
+         loadFromCache()
+         setWeather(prev => ({ ...prev, stale: true, loading: false }))
+      } else {
+         setWeather(prev => ({ ...prev, loading: false, error: true }))
       }
-      setWeather(prev => ({ ...prev, loading: false, error: true }))
     }
   }
 
   if (!mounted) return null
 
   // Loading State
-  if (weather.loading) {
+  if (weather.loading && !weather.current.temp) {
     return (
       <div className="absolute top-6 right-6 z-10 p-4 rounded-2xl bg-black/20 backdrop-blur-md border border-white/10 w-64 h-48 flex items-center justify-center">
         <Loader2 className="animate-spin text-white/50" />
@@ -342,9 +293,9 @@ export default function WeatherWidget({ dragConstraintsRef }: WeatherWidgetProps
           </div>
         </div>
 
-        {/* Mini Forecast */}
+        {/* Mini Forecast - Limit to 4 items */}
         <div className="flex justify-between border-t border-white/10 pt-3">
-          {weather.forecast.map((day, i) => {
+          {weather.forecast.slice(0, 4).map((day, i) => {
             const dayInfo = getWeatherInfo(day.code)
             const DayIcon = dayInfo.icon
             const dateObj = new Date(day.date)

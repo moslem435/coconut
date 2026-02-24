@@ -68,7 +68,7 @@ export function AboutPanel() {
                     <div
                         className="cursor-pointer select-none inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--os-accent)]/10 border border-[var(--os-accent)]/20 text-[var(--os-accent)] text-xs font-medium hover:bg-[var(--os-accent)]/20 transition-all hover:scale-105 active:scale-95"
                         onClick={() => {
-                            if (devModeCount < 5) setDevModeCount(prev => prev + 1)
+                            if (devModeCount < 1) setDevModeCount(prev => prev + 1)
                         }}
                     >
                         <span>v1.0.0 (Coco-Alpha)</span>
@@ -77,7 +77,7 @@ export function AboutPanel() {
                     </div>
 
                     <AnimatePresence>
-                        {devModeCount >= 5 && (
+                        {devModeCount >= 1 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -117,7 +117,7 @@ export function AboutPanel() {
 
             {/* Developer Tools */}
             <AnimatePresence>
-                {devModeCount >= 3 && (
+                {devModeCount >= 1 && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}

@@ -19,4 +19,5 @@ export const readWeatherCache = (): WeatherCache | null => {
 export const writeWeatherCache = (cache: WeatherCache) => {
   if (typeof window === 'undefined') return
   localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache))
+  window.dispatchEvent(new Event('weather-cache-update'))
 }
