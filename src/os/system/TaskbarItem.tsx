@@ -47,13 +47,19 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     const setPeekWindowId = useWindowStore(state => state.setPeekWindowId)
 
     const [hovered, setHovered] = useState(false)
+    const hoveredRef = useRef(false)
+
+    const updateHovered = (value: boolean) => {
+        setHovered(value)
+        hoveredRef.current = value
+    }
 
     // Derived Data
     const app = APPS_REGISTRY[appId]
     const title = windowState.isOpen 
         ? (windowState.isDefaultTitle ? t(`app.${appId}`) : windowState.title)
         : t(`app.${appId}`)
-    const icon = windowState.isOpen ? windowState.icon : app?.icon
+    const icon = windowState.icon || app?.icon
 
     // Report Position
     useLayoutEffect(() => {
@@ -75,7 +81,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
 
     const handleClick = (e: React.MouseEvent) => {
         // Clear peek
-        setHovered(false)
+        updateHovered(false)
         setPeekWindowId(null)
         if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
 
@@ -131,9 +137,9 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     return (
         <div
             className="relative flex flex-col items-center justify-center"
-            onMouseEnter={() => setHovered(true)}
+            onMouseEnter={() => updateHovered(true)}
             onMouseLeave={() => {
-                setHovered(false)
+                updateHovered(false)
                 if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
                 setPeekWindowId(null)
             }}
@@ -187,9 +193,16 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                         snapshot={snapshot}
                         onPeek={(shouldPeek) => {
                             if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+                            
+                            // Prevent peeking if we're not hovered anymore (even if component is exiting)
+                            if (shouldPeek && !hoveredRef.current) return
+
                             if (shouldPeek) {
                                 peekTimeoutRef.current = setTimeout(() => {
-                                    setPeekWindowId(id)
+                                    // Double check before setting state
+                                    if (hoveredRef.current) {
+                                        setPeekWindowId(id)
+                                    }
                                 }, 200)
                             } else {
                                 setPeekWindowId(null)

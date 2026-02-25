@@ -1,6 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { useSystemSettingsStore } from '@/os/kernel/useSystemSettingsStore'
 
 export function useWindowSnapshot(id: string) {
     const setSnapshot = useWindowStore(state => state.setSnapshot)
@@ -11,6 +12,10 @@ export function useWindowSnapshot(id: string) {
     const SNAPSHOT_COOLDOWN = 5000
 
     const captureSnapshot = useCallback(async (force = false) => {
+        // Check if previews are enabled
+        const useTaskbarPreviews = useSystemSettingsStore.getState().useTaskbarPreviews
+        if (!useTaskbarPreviews && !force) return
+
         // Prevent concurrent snapshots
         if (isSnapshottingRef.current) return
 

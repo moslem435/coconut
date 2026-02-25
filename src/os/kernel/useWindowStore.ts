@@ -385,12 +385,34 @@ export const useWindowStore = create<WindowStore>()(
         }),
         {
             name: 'window-storage',
-            partialize: (state) => ({
-                windows: state.windows,
-                activeWindowId: state.activeWindowId,
-                maxZIndex: state.maxZIndex,
-                launchingAppIds: state.launchingAppIds
-            }),
+            version: 1,
+            migrate: (persistedState: any, version: number) => {
+                // Sanitize icons from persisted state
+                if (persistedState && typeof persistedState === 'object' && persistedState.windows) {
+                    Object.keys(persistedState.windows).forEach((key) => {
+                        const win = persistedState.windows[key]
+                        if (win && win.icon) {
+                            delete win.icon
+                        }
+                    })
+                }
+                return persistedState
+            },
+            partialize: (state) => {
+                // Exclude icon from persistence as React components cannot be serialized
+                const windowsWithoutIcons = Object.fromEntries(
+                    Object.entries(state.windows).map(([id, win]) => {
+                        const { icon, ...rest } = win
+                        return [id, rest]
+                    })
+                )
+                return {
+                    windows: windowsWithoutIcons,
+                    activeWindowId: state.activeWindowId,
+                    maxZIndex: state.maxZIndex,
+                    launchingAppIds: state.launchingAppIds
+                }
+            },
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     // Reset non-persisted state
