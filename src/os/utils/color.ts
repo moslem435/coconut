@@ -35,7 +35,9 @@ export const getImageBrightness = (src: string): Promise<number> => {
           g = data[x + 1]
           b = data[x + 2]
 
-          avg = Math.floor((r + g + b) / 3)
+          // 使用感知亮度公式 (Perceived brightness)
+          // weights: R=0.299, G=0.587, B=0.114
+          avg = Math.floor(0.299 * r + 0.587 * g + 0.114 * b)
           colorSum += avg
         }
 
@@ -60,7 +62,10 @@ export const getImageBrightness = (src: string): Promise<number> => {
  * @returns boolean
  */
 export const isDarkBrightness = (brightness: number): boolean => {
-  return brightness < 128
+  // 提高阈值：只有非常亮的背景才使用黑色文字
+  // 普通风景照即使天空很亮，平均亮度通常也在 150-180 之间
+  // 我们希望大部分情况下都使用白色文字（带阴影），因为白色文字适应性更强
+  return brightness < 200
 }
 
 /**

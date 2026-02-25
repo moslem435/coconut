@@ -70,10 +70,15 @@ export default function Taskbar({
   const actionCenterRef = useRef<HTMLDivElement>(null)
   const startBtnRef = useRef<HTMLButtonElement>(null)
 
-  const { launchApp } = useWindowStore()
+  const { launchApp, closeWindow } = useWindowStore()
+  const isAIChatOpen = useWindowStore(useShallow(state => !!state.windows['ai-chat']?.isOpen))
 
   const handleAIClick = () => {
-    launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { isSidebar: true })
+    if (isAIChatOpen) {
+      closeWindow('ai-chat')
+    } else {
+      launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { isSidebar: true })
+    }
   }
 
   // Merge pinned apps and open windows
@@ -244,9 +249,9 @@ export default function Taskbar({
         />
 
         {/* Independent AI Assistant Button - Positioned relative to taskbar wrapper */}
-        <div className="absolute -right-16 top-0 h-14 w-14">
+        <div className="absolute -right-16 top-0 h-14 w-14" id="taskbar-ai-button">
           <motion.div
-            className="h-full w-full flex items-center justify-center select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl cursor-pointer"
+            className="group h-full w-full flex items-center justify-center select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl cursor-pointer relative overflow-hidden"
             style={{
               backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--os-border), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
@@ -254,10 +259,14 @@ export default function Taskbar({
               WebkitBackdropFilter: 'blur(40px) saturate(150%)'
             }}
             onClick={handleAIClick}
+            whileHover={{ 
+              scale: 1.05
+            }}
             whileTap={{ scale: 0.95 }}
           >
+            <div className="absolute inset-0 transition-colors duration-200 group-hover:bg-[var(--os-hover-bg)]" />
             <Tooltip content={t('app.ai-chat')} side="top" offset={20}>
-              <div className="relative w-full h-full flex items-center justify-center">
+              <div className="relative w-full h-full flex items-center justify-center z-10">
                 <Sparkles className="w-6 h-6 text-[var(--os-text-primary)]" />
               </div>
             </Tooltip>

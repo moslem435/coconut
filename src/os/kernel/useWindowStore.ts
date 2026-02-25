@@ -47,6 +47,7 @@ interface WindowStore {
     updateWindowPosition: (id: string, position: { x: number; y: number }) => void
     updateWindowSize: (id: string, size: { width: number; height: number }) => void
     updateTaskbarPosition: (id: string, position: { x: number; y: number }) => void
+    updateWindow: (id: string, updates: Partial<WindowState>) => void
     showDesktop: () => void
     setSnapshot: (id: string, dataUrl: string) => void
     getSnapshot: (id: string) => string | undefined
@@ -321,6 +322,20 @@ export const useWindowStore = create<WindowStore>()(
                         windows: {
                             ...state.windows,
                             [id]: { ...win, taskbarPosition: position }
+                        }
+                    }
+                })
+            },
+
+            updateWindow: (id, updates) => {
+                set(state => {
+                    const win = state.windows[id]
+                    if (!win) return state
+
+                    return {
+                        windows: {
+                            ...state.windows,
+                            [id]: { ...win, ...updates }
                         }
                     }
                 })

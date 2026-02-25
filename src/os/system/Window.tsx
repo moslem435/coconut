@@ -1,6 +1,6 @@
 'use client'
 
-import { useDragControls, motion } from 'framer-motion'
+import { useDragControls, motion, AnimatePresence } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
@@ -13,7 +13,7 @@ import { WindowContext } from '@/os/kernel/WindowContext'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState, useEffect } from 'react'
 
 import { WindowGhostDrag } from './window/WindowGhostDrag'
 import { WindowSnapPreview } from './window/WindowSnapPreview'
@@ -25,7 +25,17 @@ interface WindowProps {
 }
 
 export default function Window({ id }: WindowProps) {
-  const windowState = useWindowStore(useShallow(state => state.windows[id]))
+  const storeWindowState = useWindowStore(useShallow(state => state.windows[id]))
+  const [cachedWindowState, setCachedWindowState] = useState(storeWindowState)
+
+  useEffect(() => {
+    if (storeWindowState) {
+      setCachedWindowState(storeWindowState)
+    }
+  }, [storeWindowState])
+
+  const windowState = storeWindowState || cachedWindowState
+
   const { useAnimations, theme, useTransparency } = useSystemSettings()
   const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
@@ -35,7 +45,7 @@ export default function Window({ id }: WindowProps) {
   const minimizeWindow = useWindowStore(state => state.minimizeWindow)
   const maximizeWindow = useWindowStore(state => state.maximizeWindow)
   const focusWindow = useWindowStore(state => state.focusWindow)
-  const updateWindowPosition = useWindowStore(state => state.updateWindowPosition)
+  const updateWindow = useWindowStore(state => state.updateWindow)
 
   const { isResizing, handleResizeStart, windowRef } = useWindowResize(
     id,
@@ -58,6 +68,11 @@ export default function Window({ id }: WindowProps) {
     handleMainDrag,
     handleMainDragEnd
   } = useWindowDrag()
+
+  // New state for sidebar preview
+  const [showSidebarPreview, setShowSidebarPreview] = useState(false)
+  const [isSidebarDragging, setIsSidebarDragging] = useState(false)
+  const [isFreshlyDetached, setIsFreshlyDetached] = useState(false)
 
   const dragControls = useDragControls()
   const ghostDragControls = useDragControls()
@@ -120,28 +135,146 @@ export default function Window({ id }: WindowProps) {
   if (!windowState || !windowState.isOpen) return null
 
   // Special handling for Sidebar mode
+  const [width, setWidth] = useState(400)
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false)
+
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isResizingSidebar) return
+      e.preventDefault()
+      
+      // Calculate max width based on AI button position
+      const aiButton = document.getElementById('taskbar-ai-button')
+      let maxWidth = 800
+      
+      if (aiButton) {
+        const rect = aiButton.getBoundingClientRect()
+        // Ensure sidebar doesn't overlap with AI button (plus some padding)
+        maxWidth = window.innerWidth - rect.right - 24
+      }
+
+      // Calculate new width: window.innerWidth - e.clientX
+      // Clamp it between 300 and calculated maxWidth
+      const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, 300), maxWidth)
+      setWidth(newWidth)
+    }
+
+    const handlePointerUp = () => {
+      setIsResizingSidebar(false)
+      document.body.style.cursor = 'default'
+    }
+
+    if (isResizingSidebar) {
+      window.addEventListener('pointermove', handlePointerMove)
+      window.addEventListener('pointerup', handlePointerUp)
+      document.body.style.cursor = 'ew-resize'
+    }
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      document.body.style.cursor = 'default' // Reset cursor on cleanup just in case
+    }
+  }, [isResizingSidebar])
+
   if (windowState.isSidebar) {
     return (
-      <motion.div
-        id={`window-${id}`}
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed top-0 right-0 h-full w-[400px] z-[5000] bg-[var(--os-bg-window)]/80 backdrop-blur-2xl border-l border-[var(--os-border)] shadow-2xl overflow-hidden flex flex-col"
-        onPointerDown={() => focusWindow(id)}
-      >
-        <WindowContext.Provider value={{
-          windowId: id,
-          dragControls: dragControls // Not draggable, but needed for context
-        }}>
-          {appContent || (
-            <div className="flex items-center justify-center h-full text-red-400">
-              App Component Not Found (ID: {windowState.appId})
-            </div>
-          )}
-        </WindowContext.Provider>
-      </motion.div>
+      <>
+        <WindowGhostDrag
+          isGhostDragging={isSidebarDragging}
+          dragControls={dragControls}
+          targetX={window.innerWidth - width} // Start from current sidebar position
+          targetY={0}
+          width={width}
+          height={window.innerHeight}
+          onDragStart={() => {
+            setIsSidebarDragging(true)
+          }}
+          onDrag={(offset) => {
+            // No-op, just visual feedback
+          }}
+          onDragEnd={(offset) => {
+             setIsSidebarDragging(false)
+             // Only detach if dragged far enough left
+             if (offset.x < -100) {
+                const newX = Math.max(0, window.innerWidth - width - 100 + offset.x)
+                const newY = 50 + offset.y
+                
+                setIsFreshlyDetached(true)
+                updateWindow(id, {
+                  isSidebar: false,
+                  position: { x: newX, y: newY },
+                  size: { width: width, height: window.innerHeight - 100 },
+                  isMaximized: false,
+                  isMinimized: false
+                })
+                setTimeout(() => setIsFreshlyDetached(false), 500)
+             }
+          }}
+        />
+
+        <motion.div
+          id={`window-${id}`}
+          initial={{ x: '100%' }}
+          animate={{ x: 0, width }}
+          exit={{ x: '100%' }}
+          transition={
+            isResizingSidebar 
+              ? { duration: 0 } 
+              : { type: "spring", stiffness: 300, damping: 40 }
+          }
+          className="fixed top-0 right-0 h-full z-[5000] border-l border-[var(--os-border)] shadow-2xl overflow-hidden flex flex-col"
+          style={{
+            backgroundColor: useTransparency 
+              ? 'rgba(var(--os-bg-window-rgb), 0.65)' 
+              : 'var(--os-bg-window)',
+            backdropFilter: useTransparency
+              ? 'blur(40px) saturate(150%)'
+              : 'none',
+            WebkitBackdropFilter: useTransparency
+              ? 'blur(40px) saturate(150%)'
+              : 'none',
+          }}
+          onPointerDown={() => focusWindow(id)}
+        >
+          {/* Resize Handle Area - wider hit area for easier grabbing */}
+          <div 
+            className="absolute left-0 top-0 bottom-0 w-4 -translate-x-2 cursor-ew-resize z-[5001] group flex justify-center"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsResizingSidebar(true)
+            }}
+          >
+              {/* Visual indicator line */}
+              <div className="w-1 h-full group-hover:bg-[var(--os-accent)] transition-colors opacity-0 group-hover:opacity-100" />
+          </div>
+
+          {/* Drag Handle at the top for sidebar - Now triggers Ghost Drag */}
+          <div 
+            className="absolute top-0 left-4 right-0 h-8 z-[5001] cursor-move flex justify-center items-center opacity-0 hover:opacity-100 transition-opacity"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsSidebarDragging(true)
+              dragControls.start(e)
+            }}
+          >
+             <div className="w-12 h-1 bg-[var(--os-border)] rounded-full" />
+          </div>
+
+          <WindowContext.Provider value={{
+            windowId: id,
+            dragControls: dragControls
+          }}>
+            {appContent || (
+              <div className="flex items-center justify-center h-full text-red-400">
+                App Component Not Found (ID: {windowState.appId})
+              </div>
+            )}
+          </WindowContext.Provider>
+        </motion.div>
+      </>
     )
   }
 
@@ -174,8 +307,21 @@ export default function Window({ id }: WindowProps) {
       <WindowSnapPreview show={showSnapPreview} />
       <WindowRestorePreview preview={restorePreview} />
 
+      {/* Sidebar Snap Preview */}
+      <AnimatePresence>
+        {showSidebarPreview && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 40 }} // Increased damping to prevent bounce
+            className="fixed top-0 right-0 w-[400px] h-full z-[4000] bg-[var(--os-accent-dim)] backdrop-blur-md border-l border-[var(--os-accent)] shadow-2xl pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
       <WindowGhostDrag
-        isGhostDragging={isGhostDragging}
+        isGhostDragging={isGhostDragging && !isFreshlyDetached}
         dragControls={ghostDragControls}
         targetX={targetX}
         targetY={targetY}
@@ -183,16 +329,33 @@ export default function Window({ id }: WindowProps) {
         height={windowState.size.height}
         onDragStart={handleGhostDragStart}
         onDrag={(offset) => {
+          const currentX = windowState.position.x + offset.x
           const currentY = windowState.position.y + offset.y
-          handleGhostDrag(currentY, setShowSnapPreview)
+          
+          // Check for right edge snap (Sidebar)
+          // Only for AI Chat window or specifically supported apps
+          if (windowState.appId === 'ai-chat' && currentX + windowState.size.width > window.innerWidth - 50) {
+            setShowSidebarPreview(true)
+            setShowSnapPreview(null) // Disable regular snap preview if showing sidebar preview
+          } else {
+            setShowSidebarPreview(false)
+            handleGhostDrag(currentY, setShowSnapPreview)
+          }
         }}
         onDragEnd={(offset) => {
-          handleGhostDragEnd(
-            offset,
-            windowState.position,
-            () => maximizeWindow(id),
-            (pos) => updateWindowPosition(id, pos)
-          )
+           if (showSidebarPreview) {
+              updateWindow(id, { isSidebar: true })
+              setShowSidebarPreview(false)
+              // Force ghost dragging state to false immediately
+              handleGhostDragEnd(offset, windowState.position, () => {}, () => {}) 
+           } else {
+              handleGhostDragEnd(
+                offset,
+                windowState.position,
+                () => maximizeWindow(id),
+                (pos) => updateWindow(id, { position: pos })
+              )
+           }
         }}
       />
 
@@ -209,7 +372,7 @@ export default function Window({ id }: WindowProps) {
           : { left: -Infinity, top: -20, right: Infinity, bottom: Infinity }
         }
         onPointerDown={() => focusWindow(id)}
-        initial={{
+        initial={isFreshlyDetached ? false : {
           opacity: 0,
           scale: 0.95,
           x: windowState.taskbarPosition?.x
@@ -268,7 +431,7 @@ export default function Window({ id }: WindowProps) {
             info,
             windowState,
             () => maximizeWindow(id),
-            (pos) => updateWindowPosition(id, pos)
+            (pos) => updateWindow(id, { position: pos })
           )
         }}
       >

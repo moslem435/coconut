@@ -45,22 +45,21 @@ export function useWindowDrag() {
         onMaximize: () => void,
         onUpdatePosition: (pos: { x: number; y: number }) => void
     ) => {
+        // Reset states first
+        setIsDragging(false)
+        setIsGhostDragging(false)
+        setShowSnapPreview(false)
+
         const newX = windowPosition.x + offset.x
         const newY = windowPosition.y + offset.y
 
         if (newY <= SYSTEM_CONSTANTS.SNAP_THRESHOLD) {
             onMaximize()
-            setIsDragging(false)
-            setIsGhostDragging(false)
-            setShowSnapPreview(false)
         } else {
             onUpdatePosition({
                 x: Math.round(newX),
                 y: Math.round(Math.max(0, newY))
             })
-            setIsDragging(false)
-            setIsGhostDragging(false)
-            setShowSnapPreview(false)
         }
     }
 
