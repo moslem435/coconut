@@ -25,6 +25,7 @@ export interface WindowState {
     isDefaultTitle?: boolean
     isResizable?: boolean
     hideTitleBar?: boolean
+    isSidebar?: boolean // New property for sidebar mode
 }
 
 interface WindowStore {
@@ -101,7 +102,7 @@ export const useWindowStore = create<WindowStore>()(
                 // 提取组件 props（排除窗口配置属性）
                 const { 
                     size, width, height, isMaximized, isResizable, 
-                    taskbarPosition, titleBarColor, isDefaultTitle, hideTitleBar,
+                    taskbarPosition, titleBarColor, isDefaultTitle, hideTitleBar, isSidebar,
                     ...componentProps 
                 } = options || {}
 
@@ -121,7 +122,8 @@ export const useWindowStore = create<WindowStore>()(
                     titleBarColor,
                     isDefaultTitle,
                     isResizable,
-                    hideTitleBar
+                    hideTitleBar,
+                    isSidebar // Store the sidebar property
                 }
 
                 set(state => ({

@@ -119,6 +119,32 @@ export default function Window({ id }: WindowProps) {
 
   if (!windowState || !windowState.isOpen) return null
 
+  // Special handling for Sidebar mode
+  if (windowState.isSidebar) {
+    return (
+      <motion.div
+        id={`window-${id}`}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed top-0 right-0 h-full w-[400px] z-[5000] bg-[var(--os-bg-window)]/80 backdrop-blur-2xl border-l border-[var(--os-border)] shadow-2xl overflow-hidden flex flex-col"
+        onPointerDown={() => focusWindow(id)}
+      >
+        <WindowContext.Provider value={{
+          windowId: id,
+          dragControls: dragControls // Not draggable, but needed for context
+        }}>
+          {appContent || (
+            <div className="flex items-center justify-center h-full text-red-400">
+              App Component Not Found (ID: {windowState.appId})
+            </div>
+          )}
+        </WindowContext.Provider>
+      </motion.div>
+    )
+  }
+
   const isPeeking = peekWindowId === id
   const isOtherPeeking = peekWindowId !== null && peekWindowId !== id
 
