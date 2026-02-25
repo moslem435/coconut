@@ -8,6 +8,7 @@ import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { Tooltip } from '@/os/ui/Tooltip'
+import { APPS_REGISTRY } from '@/os/registry/config'
 import StartMenu from './StartMenu'
 import { TaskbarItem } from './TaskbarItem'
 
@@ -70,14 +71,25 @@ export default function Taskbar({
   const actionCenterRef = useRef<HTMLDivElement>(null)
   const startBtnRef = useRef<HTMLButtonElement>(null)
 
-  const { launchApp, closeWindow } = useWindowStore()
+  const { launchApp, closeWindow, minimizeWindow, focusWindow } = useWindowStore()
   const isAIChatOpen = useWindowStore(useShallow(state => !!state.windows['ai-chat']?.isOpen))
+  const isAIChatMinimized = useWindowStore(useShallow(state => !!state.windows['ai-chat']?.isMinimized))
+  const isAIChatSidebar = useWindowStore(useShallow(state => !!state.windows['ai-chat']?.isSidebar))
 
   const handleAIClick = () => {
     if (isAIChatOpen) {
-      closeWindow('ai-chat')
+      if (isAIChatMinimized) {
+        focusWindow('ai-chat')
+      } else {
+        // If it's open and not minimized, clicking it should minimize it (toggle behavior)
+        minimizeWindow('ai-chat')
+      }
     } else {
-      launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { isSidebar: true })
+      // Launch as sidebar by default
+      const app = APPS_REGISTRY['ai-chat']
+      if (app) {
+          launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { ...app.defaultWindowOptions, isSidebar: true })
+      }
     }
   }
 

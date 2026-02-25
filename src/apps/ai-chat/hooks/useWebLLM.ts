@@ -1,17 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CreateWebWorkerMLCEngine, MLCEngineInterface, InitProgressCallback } from "@mlc-ai/web-llm";
-
-export interface Message {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-}
+import { Message, ModelConfig } from '../types';
 
 export interface WebLLMState {
     isLoading: boolean;
     isModelLoaded: boolean;
     progress: string;
     progressValue: number; // 0-1
-    messages: Message[];
     error: string | null;
     currentModelId: string | null;
     downloadStats: {
@@ -21,16 +16,6 @@ export interface WebLLMState {
         total: string;
     } | null;
     gpuInfo: string | null;
-}
-
-export interface ModelConfig {
-    id: string;
-    name: string;
-    description: string;
-    size: string;
-    vram: string;
-    recommended?: boolean;
-    sizeBytes?: number; // Approximate size in bytes for calculation
 }
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
@@ -75,7 +60,6 @@ export function useWebLLM() {
         isModelLoaded: false,
         progress: '',
         progressValue: 0,
-        messages: [],
         error: null,
         currentModelId: null,
         downloadStats: null,
@@ -95,7 +79,6 @@ export function useWebLLM() {
             return { supported: false, info: null };
         }
         try {
-            // Explicitly request high performance GPU
             const adapter = await navigator.gpu.requestAdapter({
                 powerPreference: 'high-performance'
             });
@@ -103,11 +86,9 @@ export function useWebLLM() {
             if (!adapter) return { supported: false, info: null };
 
             let info = '';
-            // Try to get adapter info
             if (adapter.info) {
                  info = adapter.info.description || adapter.info.device || '';
                  if (!info) {
-                     // Try other fields if standard ones are empty
                      // @ts-ignore
                      const vendor = adapter.info.vendor || '';
                      // @ts-ignore
@@ -146,7 +127,6 @@ export function useWebLLM() {
         try {
             abortRef.current = false;
             
-            // Check WebGPU support first
             const { supported, info } = await checkWebGPUSupport();
             if (!supported) {
                 throw new Error("ai.error.webgpu_not_supported");
@@ -165,7 +145,6 @@ export function useWebLLM() {
             lastStatsRef.current = null;
             currentSpeedRef.current = 0;
             
-            // Create worker if not exists
             if (!workerRef.current) {
                 const worker = new Worker(
                     new URL('../worker/llm.worker.ts', import.meta.url), 
@@ -177,7 +156,6 @@ export function useWebLLM() {
             const modelConfig = AVAILABLE_MODELS.find(m => m.id === modelId);
             const totalSize = modelConfig?.sizeBytes || 0;
 
-            // Progress callback
             const onProgress: InitProgressCallback = (report) => {
                 if (abortRef.current) return;
                 const now = Date.now();
@@ -193,17 +171,14 @@ export function useWebLLM() {
                 let stats = null;
 
                 if (totalSize > 0 && report.progress > 0 && report.progress < 1) {
-                    // Update Speed/ETA every 0.1s (100ms) for smoother UI
                     if (lastProgressRef.current) {
-                        const timeDiff = (now - lastProgressRef.current.time) / 1000; // seconds
+                        const timeDiff = (now - lastProgressRef.current.time) / 1000;
                         const progressDiff = report.progress - lastProgressRef.current.value;
                         
                         if (timeDiff > 0.1 && progressDiff > 0) { 
                             const bytesDiff = progressDiff * totalSize;
-                            const instantSpeed = bytesDiff / timeDiff; // bytes/sec
+                            const instantSpeed = bytesDiff / timeDiff;
                             
-                            // Simple moving average smoothing (0.2 new, 0.8 old)
-                            // If it's the first calculation, use instant speed directly
                             const newSpeed = currentSpeedRef.current === 0 
                                 ? instantSpeed 
                                 : (currentSpeedRef.current * 0.8 + instantSpeed * 0.2);
@@ -224,7 +199,6 @@ export function useWebLLM() {
                         lastProgressRef.current = { value: report.progress, time: now };
                     }
 
-                    // Always update downloaded amount
                     if (lastStatsRef.current) {
                         stats = {
                             ...lastStatsRef.current,
@@ -242,7 +216,6 @@ export function useWebLLM() {
                 }));
             };
 
-            // Initialize engine
             if (!engineRef.current) {
                 const engine = await CreateWebWorkerMLCEngine(
                     workerRef.current,
@@ -252,7 +225,6 @@ export function useWebLLM() {
                 if (abortRef.current) return;
                 engineRef.current = engine;
             } else {
-                // Reload if engine exists
                 await engineRef.current.reload(modelId, { initProgressCallback: onProgress });
                 if (abortRef.current) return;
             }
@@ -271,7 +243,6 @@ export function useWebLLM() {
             
             let errorMessage = err.message || "Failed to initialize AI engine";
             
-            // Map known errors to translation keys
             if (errorMessage.includes("Unable to find a compatible GPU")) {
                 errorMessage = "ai.error.webgpu_init_failed";
             } else if (errorMessage === "ai.error.webgpu_not_supported") {
@@ -299,7 +270,6 @@ export function useWebLLM() {
             isModelLoaded: false,
             progress: '',
             progressValue: 0,
-            messages: [],
             error: null,
             currentModelId: null,
             downloadStats: null
@@ -313,52 +283,50 @@ export function useWebLLM() {
         setState(prev => ({
             ...prev,
             isModelLoaded: false,
-            currentModelId: null,
-            messages: []
+            currentModelId: null
         }));
     }, []);
 
-    const sendMessage = useCallback(async (content: string) => {
+    const generateResponse = useCallback(async (
+        messages: Message[],
+        onUpdate: (content: string) => void,
+        onFinish: () => void,
+        onError: (err: any) => void,
+        systemPrompt?: string
+    ) => {
         if (!engineRef.current || !state.isModelLoaded) return;
 
-        const newMessages: Message[] = [
-            ...state.messages,
-            { role: 'user', content }
-        ];
-
-        setState(prev => ({
-            ...prev,
-            messages: newMessages,
-            isLoading: true
-        }));
+        setState(prev => ({ ...prev, isLoading: true }));
 
         try {
-            const reply = await engineRef.current.chat.completions.create({
-                messages: newMessages,
-                stream: true // Enable streaming
-            });
-
-            let assistantMessage = '';
-            
-            // Initial empty assistant message
-            setState(prev => ({
-                ...prev,
-                messages: [...newMessages, { role: 'assistant', content: '' }]
+            // Prepend system prompt if exists
+            const chatMessages = messages.map(m => ({
+                role: m.role,
+                content: m.content
             }));
-
-            for await (const chunk of reply) {
-                const delta = chunk.choices[0]?.delta?.content || '';
-                assistantMessage += delta;
-                
-                setState(prev => ({
-                    ...prev,
-                    messages: [
-                        ...newMessages,
-                        { role: 'assistant', content: assistantMessage }
-                    ]
-                }));
+            
+            if (systemPrompt) {
+                // Check if system message already exists
+                const hasSystem = chatMessages.length > 0 && chatMessages[0].role === 'system';
+                if (!hasSystem) {
+                    chatMessages.unshift({ role: 'system', content: systemPrompt });
+                }
             }
 
+            const reply = await engineRef.current.chat.completions.create({
+                messages: chatMessages,
+                stream: true
+            });
+
+            let fullContent = '';
+            
+            for await (const chunk of reply) {
+                const delta = chunk.choices[0]?.delta?.content || '';
+                fullContent += delta;
+                onUpdate(fullContent);
+            }
+
+            onFinish();
             setState(prev => ({ ...prev, isLoading: false }));
         } catch (err: any) {
             console.error("Chat error:", err);
@@ -367,25 +335,14 @@ export function useWebLLM() {
                 isLoading: false,
                 error: err.message || "Failed to generate response"
             }));
+            onError(err);
         }
-    }, [state.messages, state.isModelLoaded]);
-
-    const resetChat = useCallback(async () => {
-        if (engineRef.current) {
-            await engineRef.current.resetChat();
-        }
-        setState(prev => ({
-            ...prev,
-            messages: [],
-            error: null
-        }));
-    }, []);
+    }, [state.isModelLoaded]);
 
     return {
         ...state,
         initEngine,
-        sendMessage,
-        resetChat,
+        generateResponse,
         unloadModel,
         cancelLoading
     };

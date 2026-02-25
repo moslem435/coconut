@@ -138,6 +138,21 @@ export default function Window({ id }: WindowProps) {
   const [width, setWidth] = useState(400)
   const [isResizingSidebar, setIsResizingSidebar] = useState(false)
 
+  // Initialize width to max available space when entering sidebar mode
+  useEffect(() => {
+    if (windowState.isSidebar) {
+      const aiButton = document.getElementById('taskbar-ai-button')
+      let maxWidth = 800
+      
+      if (aiButton) {
+        const rect = aiButton.getBoundingClientRect()
+        // Ensure sidebar doesn't overlap with AI button (plus some padding)
+        maxWidth = window.innerWidth - rect.right - 24
+      }
+      setWidth(maxWidth)
+    }
+  }, [windowState.isSidebar])
+
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       if (!isResizingSidebar) return
@@ -154,8 +169,8 @@ export default function Window({ id }: WindowProps) {
       }
 
       // Calculate new width: window.innerWidth - e.clientX
-      // Clamp it between 300 and calculated maxWidth
-      const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, 300), maxWidth)
+      // Clamp it between 500 and calculated maxWidth to ensure chat area remains usable
+      const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, 500), maxWidth)
       setWidth(newWidth)
     }
 
@@ -216,7 +231,10 @@ export default function Window({ id }: WindowProps) {
         <motion.div
           id={`window-${id}`}
           initial={{ x: '100%' }}
-          animate={{ x: 0, width }}
+          animate={{ 
+            x: windowState.isMinimized ? '100%' : 0, 
+            width 
+          }}
           exit={{ x: '100%' }}
           transition={
             isResizingSidebar 
@@ -248,19 +266,6 @@ export default function Window({ id }: WindowProps) {
           >
               {/* Visual indicator line */}
               <div className="w-1 h-full group-hover:bg-[var(--os-accent)] transition-colors opacity-0 group-hover:opacity-100" />
-          </div>
-
-          {/* Drag Handle at the top for sidebar - Now triggers Ghost Drag */}
-          <div 
-            className="absolute top-0 left-4 right-0 h-8 z-[5001] cursor-move flex justify-center items-center opacity-0 hover:opacity-100 transition-opacity"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setIsSidebarDragging(true)
-              dragControls.start(e)
-            }}
-          >
-             <div className="w-12 h-1 bg-[var(--os-border)] rounded-full" />
           </div>
 
           <WindowContext.Provider value={{

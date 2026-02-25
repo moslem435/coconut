@@ -18,10 +18,10 @@ export const manifest: AppManifest = {
     },
     component: AIChat,
     defaultWindowOptions: {
-        width: 400,
+        width: 800,
         height: '100%',
         titleBarColor: 'auto',
         isSidebar: true, // Enable Copilot mode
-        hideTitleBar: true
+        hideTitleBar: false
     }
 }
