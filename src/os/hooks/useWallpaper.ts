@@ -38,10 +38,10 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
       if (today !== dailyRefreshKey) {
         setDailyRefreshKey(today)
       }
-      
+
       // For dynamic-time, we might need minute-level precision
       // But we use a counter to force re-evaluation every minute
-      setHourRefreshKey(prev => (prev + 1) % 1440) 
+      setHourRefreshKey(prev => (prev + 1) % 1440)
     }
 
     const interval = setInterval(checkTime, 60000)
@@ -66,7 +66,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
       if (wallpaper.type === 'daily') {
         const today = new Date().toDateString()
         const cached = localStorage.getItem('os_daily_wallpaper')
-        
+
         let shouldUseCache = false
         if (cached) {
           try {
@@ -110,28 +110,28 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
           const schedule = JSON.parse(wallpaper.value) as { time: number | string, url: string }[]
           const now = new Date()
           const currentMinutes = now.getHours() * 60 + now.getMinutes()
-          
+
           // 解析并排序所有时间点（统一转换为分钟）
           const normalizedSchedule = schedule.map(item => {
             let minutes = 0
             if (typeof item.time === 'string') {
               const [h, m] = item.time.split(':').map(Number)
-              minutes = h * 60 + (m || 0)
+              minutes = (h || 0) * 60 + (m || 0)
             } else {
               minutes = item.time * 60
             }
             return { ...item, minutes }
           }).sort((a, b) => a.minutes - b.minutes)
-          
+
           // 找到当前时间对应的 slot (currentMinutes >= slot.minutes)
           let activeSlot = normalizedSchedule[normalizedSchedule.length - 1]
-          
+
           for (const slot of normalizedSchedule) {
             if (currentMinutes >= slot.minutes) {
               activeSlot = slot
             }
           }
-          
+
           if (activeSlot && activeSlot.url) {
             targetValue = activeSlot.url
           }
@@ -156,16 +156,16 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
           setIsLoading(false)
           return
         }
-        
+
         // 如果当前已经在显示这个壁纸
         if (activeWallpaper === targetValue) {
-            setIsLoading(false)
-            return
+          setIsLoading(false)
+          return
         }
 
         // 随机选择过渡效果
         const transitions: WallpaperState['transitionType'][] = ['fade', 'zoom-in', 'zoom-out', 'blur']
-        setTransitionType(transitions[Math.floor(Math.random() * transitions.length)])
+        setTransitionType(transitions[Math.floor(Math.random() * transitions.length)] || 'fade')
 
         // 预加载新壁纸
         setIsLoading(true)

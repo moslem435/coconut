@@ -137,9 +137,9 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
 function hexToRgb(hex: string) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
+        r: parseInt(result[1]!, 16),
+        g: parseInt(result[2]!, 16),
+        b: parseInt(result[3]!, 16)
     } : null
 }
 
@@ -174,7 +174,7 @@ function applyDisplayScale(scale: number) {
 function applyBrightness(brightness: number) {
     // 方案: 使用遮罩层模拟
     // 计算遮罩透明度: 100% 亮度 = 0 透明度, 0% 亮度 = 0.8 透明度 (避免全黑)
-    const opacity = (100 - brightness) / 100 * 0.8; 
+    const opacity = (100 - brightness) / 100 * 0.8;
     let overlay = document.getElementById('brightness-overlay');
     if (!overlay) {
         overlay = document.createElement('div');

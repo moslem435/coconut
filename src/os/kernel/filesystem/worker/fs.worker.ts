@@ -42,7 +42,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
         // Initialize Root for IO operations
         let root: FileSystemDirectoryHandle | null = null;
         if (type !== 'computeDiff') {
-             root = await navigator.storage.getDirectory();
+            root = await navigator.storage.getDirectory();
         }
 
         let result;
@@ -56,15 +56,15 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     const buffer = await file.arrayBuffer();
                     result = new Uint8Array(buffer);
                 } catch (readError) {
-                     const accessHandle = await handle.createSyncAccessHandle();
-                     try {
+                    const accessHandle = await handle.createSyncAccessHandle();
+                    try {
                         const fileSize = accessHandle.getSize();
                         const buffer = new Uint8Array(fileSize);
                         accessHandle.read(buffer, { at: 0 });
                         result = buffer;
-                     } finally {
+                    } finally {
                         accessHandle.close();
-                     }
+                    }
                 }
                 break;
             }
@@ -100,10 +100,10 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     if (lockError.name === 'NoModificationAllowedError' || lockError.message.includes('Access Handle')) {
                         const writable = await handle.createWritable();
                         try {
-                             if (typeof content === 'string') {
-                                await writable.write(content);
+                            if (typeof content === 'string') {
+                                await writable.write(content as any);
                             } else {
-                                await writable.write(content);
+                                await writable.write(content as any);
                             }
                         } finally {
                             await writable.close();
@@ -230,51 +230,51 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
 
             case 'computeDiff': {
                 if (!currentFiles || !fsSnapshot || !folderId) throw new Error('Invalid diff arguments');
-                
+
                 const currentMap = new Map(currentFiles.map(f => [f.name, f]));
                 const fsMap = new Map(fsSnapshot.map(f => [f.name, f]));
-                
+
                 const patch = {
-                  toAdd: [] as FileNode[],
-                  toRemove: [] as string[],
-                  toUpdate: [] as Array<{ id: string; updates: Partial<FileNode> }>
+                    toAdd: [] as FileNode[],
+                    toRemove: [] as string[],
+                    toUpdate: [] as Array<{ id: string; updates: Partial<FileNode> }>
                 };
-                
+
                 // 1. Remove (in current but not in fs)
                 for (const [name, file] of currentMap) {
-                  if (!fsMap.has(name)) {
-                    patch.toRemove.push(file.id);
-                  }
+                    if (!fsMap.has(name)) {
+                        patch.toRemove.push(file.id);
+                    }
                 }
-                
+
                 // 2. Add or Update
                 for (const [name, fsEntry] of fsMap) {
-                  const existing = currentMap.get(name);
-                  
-                  if (!existing) {
-                    // New file
-                    patch.toAdd.push({
-                      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                      parentId: folderId,
-                      name,
-                      type: fsEntry.isDirectory ? 'folder' : 'file',
-                      createdAt: Date.now(),
-                      updatedAt: fsEntry.mtime,
-                      size: fsEntry.size || 0,
-                      isMount: false
-                    });
-                  } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== fsEntry.size) {
-                    // Update file
-                    patch.toUpdate.push({
-                      id: existing.id,
-                      updates: {
-                        updatedAt: fsEntry.mtime,
-                        size: fsEntry.size
-                      }
-                    });
-                  }
+                    const existing = currentMap.get(name);
+
+                    if (!existing) {
+                        // New file
+                        patch.toAdd.push({
+                            id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            parentId: folderId,
+                            name,
+                            type: fsEntry.isDirectory ? 'folder' : 'file',
+                            createdAt: Date.now(),
+                            updatedAt: fsEntry.mtime,
+                            size: fsEntry.size || 0,
+                            isMount: false
+                        });
+                    } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== fsEntry.size) {
+                        // Update file
+                        patch.toUpdate.push({
+                            id: existing.id,
+                            updates: {
+                                updatedAt: fsEntry.mtime,
+                                size: fsEntry.size
+                            }
+                        });
+                    }
                 }
-                
+
                 result = patch;
                 break;
             }

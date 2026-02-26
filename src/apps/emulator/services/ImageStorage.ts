@@ -1,4 +1,4 @@
-import { OSConfig } from './config'
+import { OSConfig } from '../config'
 
 export class ImageStorage {
     private static async getRoot() {
@@ -31,8 +31,8 @@ export class ImageStorage {
     }
 
     static async saveStream(
-        filename: string, 
-        stream: ReadableStream<Uint8Array>, 
+        filename: string,
+        stream: ReadableStream<Uint8Array>,
         onProgress?: (received: number, total: number) => void
     ): Promise<void> {
         const root = await this.getRoot()
@@ -42,14 +42,14 @@ export class ImageStorage {
 
         const reader = stream.getReader()
         let receivedLength = 0
-        
+
         try {
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
-                
+
                 if (value) {
-                    await writable.write(value)
+                    await writable.write(value as any)
                     receivedLength += value.length
                     // Total is unknown from stream directly usually, but passed from caller
                     onProgress?.(receivedLength, 0)

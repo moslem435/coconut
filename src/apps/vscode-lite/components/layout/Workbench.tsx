@@ -46,7 +46,7 @@ export const Workbench: React.FC<WorkbenchProps> = ({
                 <ActivityBar activeView={activeView} setActiveView={setActiveView} />
 
                 {/* Resizable Layout */}
-                <PanelGroup direction="horizontal">
+                <PanelGroup orientation="horizontal">
 
                     {/* Sidebar */}
                     <Panel defaultSize={100} minSize={15} collapsible>

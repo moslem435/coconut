@@ -53,7 +53,7 @@ export class FileSystemClient implements IFileSystem {
      */
     unmount(path: string): void {
         const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)/);
-        if (match) {
+        if (match && match[1]) {
             this.mounts.delete(match[1]);
         }
     }
@@ -70,7 +70,7 @@ export class FileSystemClient implements IFileSystem {
         // Check if path implies a mount
         const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
 
-        if (match) {
+        if (match && match[1]) {
             const mountId = match[1];
             const relativePath = match[2] || '/'; // e.g. /docs/file.txt
             const driver = this.mounts.get(mountId);
@@ -224,7 +224,7 @@ export class FileSystemClient implements IFileSystem {
      */
     async verifyPermission(path: string, mode: 'read' | 'readwrite' = 'readwrite'): Promise<boolean> {
         const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-        if (match) {
+        if (match && match[1]) {
             const mountId = match[1];
             const driver = this.mounts.get(mountId);
             if (driver) {
@@ -239,7 +239,7 @@ export class FileSystemClient implements IFileSystem {
      */
     async requestPermission(path: string, mode: 'read' | 'readwrite' = 'readwrite'): Promise<boolean> {
         const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-        if (match) {
+        if (match && match[1]) {
             const mountId = match[1];
             const driver = this.mounts.get(mountId);
             if (driver) {

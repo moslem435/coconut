@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
 import { useLanguageStore } from '@/os/kernel/useLanguageStore';
-import { 
-    Plus, 
-    Trash2, 
-    MessageSquare, 
-    Search, 
-    Settings, 
-    MoreHorizontal, 
-    PanelLeftClose, 
+import {
+    Plus,
+    Trash2,
+    MessageSquare,
+    Search,
+    Settings,
+    MoreHorizontal,
+    PanelLeftClose,
     LogOut,
     Sparkles
 } from 'lucide-react';
@@ -18,17 +18,17 @@ import { useWindowStore } from '@/os/kernel/useWindowStore';
 import { getRelativeDateGroup } from '../utils/date';
 
 function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+    return twMerge(clsx(inputs));
 }
 
 export function Sidebar() {
     const { t } = useLanguageStore();
-    const { 
-        sessions, 
-        currentSessionId, 
-        isSidebarOpen, 
-        createSession, 
-        selectSession, 
+    const {
+        sessions,
+        currentSessionId,
+        isSidebarOpen,
+        createSession,
+        selectSession,
         deleteSession,
         toggleSidebar
     } = useChatStore();
@@ -47,12 +47,12 @@ export function Sidebar() {
         const handlePointerMove = (e: PointerEvent) => {
             if (!isResizing) return;
             e.preventDefault();
-            
+
             // Calculate new width relative to sidebar left edge (assuming sidebar is on left)
             // Since sidebar is in a flex container, we can just use clientX if it's on the left of screen/window
             // But this is inside a window which might be moved.
             // We should use the delta or get the sidebar's bounding rect.
-            
+
             if (sidebarRef.current) {
                 const rect = sidebarRef.current.getBoundingClientRect();
                 const newWidth = e.clientX - rect.left;
@@ -84,8 +84,8 @@ export function Sidebar() {
         toggleSidebar();
         if (appWindow && !appWindow.isMaximized) {
             updateWindow('ai-chat', {
-                size: { 
-                    ...appWindow.size, 
+                size: {
+                    ...appWindow.size,
                     width: appWindow.size.width - sidebarWidth // Use current width
                 }
             });
@@ -94,7 +94,7 @@ export function Sidebar() {
 
     const filteredSessions = useMemo(() => {
         if (!searchQuery.trim()) return sessions;
-        return sessions.filter(s => 
+        return sessions.filter(s =>
             s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             s.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
         );
@@ -102,32 +102,32 @@ export function Sidebar() {
 
     const groupedSessions = useMemo(() => {
         const groups: Record<string, typeof sessions> = {};
-        
+
         filteredSessions.forEach(session => {
             const groupKey = getRelativeDateGroup(session.updatedAt);
             if (!groups[groupKey]) groups[groupKey] = [];
             groups[groupKey].push(session);
         });
-        
+
         // Sort order for keys
         const order = ['ai.date.today', 'ai.date.yesterday', 'ai.date.previous_7_days', 'ai.date.previous_30_days', 'ai.date.older'];
-        
+
         return order
             .filter(key => groups[key] && groups[key].length > 0)
             .map(key => ({
                 title: key,
-                items: groups[key].sort((a, b) => b.updatedAt - a.updatedAt)
+                items: (groups[key] || []).sort((a, b) => b.updatedAt - a.updatedAt)
             }));
     }, [filteredSessions]);
 
     return (
-        <div 
+        <div
             ref={sidebarRef}
             className={cn(
                 "relative flex flex-col h-full bg-transparent ease-in-out overflow-hidden z-20",
                 isSidebarOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-full"
             )}
-            style={{ 
+            style={{
                 width: isSidebarOpen ? sidebarWidth : 0,
                 transition: isResizing ? 'none' : 'width 300ms ease-in-out, opacity 300ms ease-in-out, transform 300ms ease-in-out'
             }}
@@ -136,13 +136,13 @@ export function Sidebar() {
             <div className="p-4 space-y-4" style={{ minWidth: sidebarWidth }}>
                 {/* Logo / Title Area */}
                 <div className="flex items-center justify-between px-1">
-                     <div className="flex items-center gap-2 text-zinc-100">
+                    <div className="flex items-center gap-2 text-zinc-100">
                         <div className="w-8 h-8 flex items-center justify-center">
                             <Sparkles size={18} className="text-zinc-100" />
                         </div>
                         <span className="font-medium tracking-wide text-sm">{t('app.ai-chat')}</span>
-                     </div>
-                     <button 
+                    </div>
+                    <button
                         onClick={handleToggle}
                         className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-zinc-200 transition-colors"
                         title={t('ai.sidebar.close')}
@@ -152,7 +152,7 @@ export function Sidebar() {
                 </div>
 
                 {/* New Chat Button */}
-                <button 
+                <button
                     onClick={() => createSession()}
                     className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-200 rounded-lg transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
                 >
@@ -163,7 +163,7 @@ export function Sidebar() {
                 {/* Search */}
                 <div className="relative group">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
-                    <input 
+                    <input
                         type="text"
                         placeholder={t('ai.sidebar.search')}
                         value={searchQuery}
@@ -187,15 +187,15 @@ export function Sidebar() {
                                     {t(group.title as any)}
                                 </h3>
                                 {group.items.map(session => (
-                                    <div 
+                                    <div
                                         key={session.id}
                                         onMouseEnter={() => setHoveredSessionId(session.id)}
                                         onMouseLeave={() => setHoveredSessionId(null)}
                                         onClick={() => selectSession(session.id)}
                                         className={cn(
                                             "group/item relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all text-sm",
-                                            currentSessionId === session.id 
-                                                ? "bg-white/10 text-zinc-100 font-medium" 
+                                            currentSessionId === session.id
+                                                ? "bg-white/10 text-zinc-100 font-medium"
                                                 : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
                                         )}
                                     >
@@ -206,7 +206,7 @@ export function Sidebar() {
                                             "shrink-0 transition-opacity",
                                             currentSessionId === session.id ? "opacity-100 text-zinc-100" : "opacity-50"
                                         )} />
-                                        
+
                                         <div className="flex-1 min-w-0">
                                             <div className="truncate text-[13px]">{session.title}</div>
                                         </div>
@@ -214,7 +214,7 @@ export function Sidebar() {
                                         {/* Actions - Visible on Hover or Active */}
                                         {(hoveredSessionId === session.id || currentSessionId === session.id) && (
                                             <div className="absolute right-2 flex items-center gap-1">
-                                                <button 
+                                                <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         deleteSession(session.id);
@@ -238,17 +238,17 @@ export function Sidebar() {
             {/* <div className="p-3 border-t border-white/5 bg-transparent" style={{ minWidth: sidebarWidth }}>...</div> */}
 
             {/* Resize Handle / Border */}
-            <div 
+            <div
                 className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-50 group/handle flex justify-end"
                 onPointerDown={(e) => {
                     e.preventDefault();
                     setIsResizing(true);
                 }}
             >
-                 <div className={cn(
-                     "w-[1px] h-full transition-colors duration-200",
-                     isResizing ? "bg-white/40" : "bg-white/5 group-hover/handle:bg-white/20"
-                 )} />
+                <div className={cn(
+                    "w-[1px] h-full transition-colors duration-200",
+                    isResizing ? "bg-white/40" : "bg-white/5 group-hover/handle:bg-white/20"
+                )} />
             </div>
         </div>
     );

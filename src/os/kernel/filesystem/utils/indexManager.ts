@@ -9,7 +9,7 @@ export interface ChildrenIndex {
   [parentId: string]: Set<string>
 }
 
-export type IndexOperation = 
+export type IndexOperation =
   | { type: 'ADD', nodeId: string, parentId: string }
   | { type: 'REMOVE', nodeId: string, parentId: string }
   | { type: 'MOVE', nodeId: string, oldParent: string, newParent: string }
@@ -19,16 +19,16 @@ export type IndexOperation =
  */
 export function buildIndex(files: Record<string, FileNode>): ChildrenIndex {
   const index: ChildrenIndex = {}
-  
+
   Object.values(files).forEach(node => {
     if (node && node.parentId) {
       if (!index[node.parentId]) {
         index[node.parentId] = new Set()
       }
-      index[node.parentId].add(node.id)
+      index[node.parentId]!.add(node.id)
     }
   })
-  
+
   return index
 }
 
@@ -40,7 +40,7 @@ export function updateIndex(
   operation: IndexOperation
 ): ChildrenIndex {
   const newIndex = { ...index }
-  
+
   switch (operation.type) {
     case 'ADD': {
       if (!newIndex[operation.parentId]) {
@@ -54,7 +54,7 @@ export function updateIndex(
       }
       break
     }
-    
+
     case 'REMOVE': {
       const parentSet = newIndex[operation.parentId]
       if (parentSet) {
@@ -63,7 +63,7 @@ export function updateIndex(
       }
       break
     }
-    
+
     case 'MOVE': {
       // 从旧父节点移除
       const oldParentSet = newIndex[operation.oldParent]
@@ -83,7 +83,7 @@ export function updateIndex(
       break
     }
   }
-  
+
   return newIndex
 }
 
@@ -109,7 +109,7 @@ export function collectDescendants(
   index: ChildrenIndex
 ): Set<string> {
   const result = new Set<string>([nodeId])
-  
+
   const traverse = (id: string) => {
     const children = index[id]
     if (children) {
@@ -119,7 +119,7 @@ export function collectDescendants(
       })
     }
   }
-  
+
   traverse(nodeId)
   return result
 }
@@ -134,7 +134,7 @@ export function getChildrenFromIndex(
 ): FileNode[] {
   const childIds = index[parentId]
   if (!childIds) return []
-  
+
   return Array.from(childIds)
     .map(id => files[id])
     .filter((node): node is FileNode => node !== undefined)

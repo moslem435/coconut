@@ -38,7 +38,8 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying }) =
       // Mirrored Visualization
       for (let i = 0; i < bufferLength; i++) {
         // Logarithmic scale for better bass visualization
-        barHeight = (dataArray[i] / 255) * (canvas.height * 0.8)
+        if (!canvas) break; // Extra safety if canvas becomes null
+        barHeight = ((dataArray[i] ?? 0) / 255) * (canvas.height * 0.8)
 
         // Dynamic Gradient
         const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0)

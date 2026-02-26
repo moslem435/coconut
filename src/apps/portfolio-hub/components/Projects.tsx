@@ -25,9 +25,10 @@ export default function Projects({
   const { language } = useSystem()
   const { WORK_ITEMS } = DATA[language]
 
-  const [internalSelectedId, setInternalSelectedId] = useState(WORK_ITEMS[0].id)
+  const [internalSelectedId, setInternalSelectedId] = useState(WORK_ITEMS[0]?.id || '')
   const selectedId = selectedSubProject || internalSelectedId
-  const selectedWork = WORK_ITEMS.find(w => w.id === selectedId) || WORK_ITEMS[0]
+  const fallbackWork = { id: '', title: 'Loading...', type: '', year: '', desc: '', stack: [], color: '' }
+  const selectedWork = WORK_ITEMS.find(w => w.id === selectedId) || WORK_ITEMS[0] || fallbackWork
 
   const handleSelect = (id: string) => {
     setInternalSelectedId(id)

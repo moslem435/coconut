@@ -24,8 +24,8 @@ export function useWindowResize(
         e.preventDefault()
         e.stopPropagation()
 
-        // Don't allow resizing if maximized
-        if (windowState?.isMaximized) return
+        // Don't allow resizing if maximized or if window doesn't exist
+        if (!windowState || windowState.isMaximized || !windowState.size || !windowState.position) return
 
         const startX = e.clientX
         const startY = e.clientY

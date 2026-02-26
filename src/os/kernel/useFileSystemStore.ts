@@ -55,7 +55,6 @@ if (typeof window !== 'undefined') {
 
 // 清理函数（用于测试或热重载）
 export function cleanupFileSystemStore() {
-  syncMiddleware?.cleanup()
 }
 
 // 向后兼容：导出旧的接口类型

@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { X, FileCode, FileText, Image, Music, Film, Box, Layout } from 'lucide-react'
-import { useEditorState } from '../../hooks/useEditorState'
+import { useEditorStateV2 as useEditorState } from '../../hooks/useEditorStateV2'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { EditorComponent } from '../Editor'
 import { VSCODE_COLORS } from '../../constants'
@@ -95,18 +95,23 @@ export const EditorGroup: React.FC = () => {
             {activeFileId && files[activeFileId] && (
                 <div className="h-6 flex items-center px-4 gap-1 bg-[#1e1e1e] text-xs text-[#969696] select-none border-b border-[#2b2b2b] overflow-hidden">
                     {(() => {
-                        const path = []
+                        const path: any[] = []
                         let currentId: string | null = activeFileId
                         while (currentId && files[currentId]) {
-                            path.unshift(files[currentId])
-                            currentId = files[currentId].parentId
+                            const fNode: any = files[currentId]
+                            if (fNode) {
+                                path.unshift(fNode)
+                                currentId = fNode.parentId || null
+                            } else {
+                                break
+                            }
                         }
                         return path.map((item, index) => (
-                            <React.Fragment key={item.id}>
+                            <React.Fragment key={item?.id || index}>
                                 {index > 0 && <span className="opacity-50">›</span>}
                                 <div className="flex items-center gap-1 hover:text-[#cccccc] cursor-pointer transition-colors">
-                                    {index === path.length - 1 && getFileIcon(item.name)}
-                                    <span>{item.name}</span>
+                                    {index === path.length - 1 && getFileIcon(item?.name || '')}
+                                    <span>{item?.name}</span>
                                 </div>
                             </React.Fragment>
                         ))

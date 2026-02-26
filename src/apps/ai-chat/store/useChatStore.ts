@@ -12,7 +12,7 @@ interface ChatStore {
         top_p: number;
         systemPrompt: string;
     };
-    
+
     // Actions
     createSession: (modelId?: string) => string;
     deleteSession: (id: string) => void;
@@ -59,11 +59,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set(state => {
             const sessions = state.sessions.filter(s => s.id !== id);
             storage.saveSessions(sessions);
-            
+
             // If deleting current session, select another one or null
             let currentSessionId = state.currentSessionId;
             if (currentSessionId === id) {
-                currentSessionId = sessions.length > 0 ? sessions[0].id : null;
+                currentSessionId = sessions.length > 0 && sessions[0] ? sessions[0].id : null;
             }
 
             return { sessions, currentSessionId };
@@ -76,7 +76,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     updateSessionTitle: (id, title) => {
         set(state => {
-            const sessions = state.sessions.map(s => 
+            const sessions = state.sessions.map(s =>
                 s.id === id ? { ...s, title } : s
             );
             storage.saveSessions(sessions);
@@ -109,7 +109,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                     updatedAt: Date.now()
                 };
             });
-            
+
             storage.saveSessions(sessions);
             return { sessions };
         });
@@ -119,18 +119,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set(state => {
             const sessions = state.sessions.map(s => {
                 if (s.id !== sessionId) return s;
-                
+
                 const messages = [...s.messages];
                 if (messages.length > 0) {
                     messages[messages.length - 1] = {
                         ...messages[messages.length - 1],
                         content
-                    };
+                    } as Message;
                 }
 
                 return { ...s, messages, updatedAt: Date.now() };
             });
-            
+
             // Don't save to storage on every character update to avoid perf issues
             // Storage sync could be debounced or done on specific events
             return { sessions };
@@ -150,7 +150,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     loadSessions: async () => {
         const sessions = await storage.getSessions();
         set({ sessions });
-        if (sessions.length > 0 && !get().currentSessionId) {
+        if (sessions.length > 0 && sessions[0] && !get().currentSessionId) {
             set({ currentSessionId: sessions[0].id });
         }
     },

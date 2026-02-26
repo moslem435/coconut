@@ -20,13 +20,13 @@ export interface ActionSlice {
     content?: string,
     appId?: string
   ) => string
-  
+
   deleteItem: (id: string) => void
   renameItem: (id: string, newName: string) => void
   moveItem: (id: string, newParentId: string) => void
   updateFileContent: (id: string, content: string) => void
   patchNode: (id: string, updates: Partial<FileNode>) => void
-  
+
   // 内容访问
   readFileContent: (id: string) => Promise<string>
   getFileBlob: (id: string) => Promise<Blob | null>
@@ -49,10 +49,10 @@ export const createActionSlice: StateCreator<
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
-    
+
     // 1. 乐观更新状态
     get()._addFile(newItem)
-    
+
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
     eventBus.emit('fs:file:created', {
@@ -60,34 +60,34 @@ export const createActionSlice: StateCreator<
       path,
       type,
       content
-    })
-    
+    } as any)
+
     return id
   },
-  
+
   deleteItem: (id) => {
     const path = get().resolvePath(id)
     const itemsToDelete = collectDescendants(id, get().childrenIndex)
-    
+
     // 1. 乐观删除
     get()._deleteFiles(Array.from(itemsToDelete))
-    
+
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     eventBus.emit('fs:file:deleted', {
       id,
       path,
       itemsToDelete: Array.from(itemsToDelete)
-    })
+    } as any)
   },
-  
+
   renameItem: (id, newName) => {
     const oldPath = get().resolvePath(id)
     const node = get().files[id]
     if (!node) return
-    
+
     // 1. 乐观更新
     get()._updateFile(id, { name: newName })
-    
+
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const newPath = get().resolvePath(id)
     eventBus.emit('fs:file:renamed', {
@@ -96,19 +96,19 @@ export const createActionSlice: StateCreator<
       newPath,
       oldName: node.name,
       newName
-    })
+    } as any)
   },
-  
+
   moveItem: (id, newParentId) => {
     const oldPath = get().resolvePath(id)
     const node = get().files[id]
     if (!node) return
-    
+
     // 1. 乐观更新
     const newFiles = { ...get().files }
     newFiles[id] = { ...node, parentId: newParentId, updatedAt: Date.now() }
     get()._setFiles(newFiles)
-    
+
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const newPath = get().resolvePath(id)
     eventBus.emit('fs:file:moved', {
@@ -117,34 +117,34 @@ export const createActionSlice: StateCreator<
       newPath,
       oldParentId: node.parentId,
       newParentId
-    })
+    } as any)
   },
-  
+
   updateFileContent: (id, content) => {
     const node = get().files[id]
     if (!node) return
-    
+
     // 1. 更新元数据
     get()._updateFile(id, { updatedAt: Date.now() })
-    
+
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
     eventBus.emit('fs:file:updated', {
       id,
       path,
       content
-    })
+    } as any)
   },
-  
+
   patchNode: (id, updates) => {
     get()._updateFile(id, updates)
   },
-  
+
   // 读取文件内容（委托给 syncService）
   readFileContent: async (id) => {
     const path = get().resolvePath(id)
     if (!path) return ''
-    
+
     try {
       return await syncService.readContent(path)
     } catch (e) {
@@ -157,7 +157,7 @@ export const createActionSlice: StateCreator<
   getFileBlob: async (id) => {
     const path = get().resolvePath(id)
     if (!path) return null
-    
+
     try {
       return await syncService.getFileBlob(path)
     } catch (e) {

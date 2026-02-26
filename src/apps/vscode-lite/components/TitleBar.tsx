@@ -29,7 +29,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onOpenCommandPalette
 }) => {
   const { t } = useLanguage()
-  const { openAlert } = useDialog()
+  const { alert } = useDialog()
   const windowContext = useWindowContext() // { windowId, dragControls }
   const { minimizeWindow, maximizeWindow, closeWindow, windows } = useWindowStore()
 
@@ -83,10 +83,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     {
       label: t('vscode.help'),
       items: [
-        { label: 'Welcome', action: () => {} },
+        { label: 'Welcome', action: () => { } },
         { label: 'Documentation', action: () => window.open('https://code.visualstudio.com/docs', '_blank') },
         { separator: true, label: '' },
-        { label: 'About', action: () => openAlert('VS Code Lite', 'Version 1.0.0\nBuilt with Monaco Editor') }
+        { label: 'About', action: () => alert('Version 1.0.0\nBuilt with Monaco Editor', 'VS Code Lite') }
       ]
     }
   ]

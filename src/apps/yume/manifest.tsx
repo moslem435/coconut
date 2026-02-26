@@ -20,8 +20,6 @@ export const manifest: AppManifest = {
         width: 1024,
         height: 768,
         titleBarColor: 'auto',
-        isResizable: true,
-        isMaximizable: true,
-        isMinimizable: true
+        isResizable: true
     }
 }

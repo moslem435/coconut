@@ -44,26 +44,26 @@ export function AppearancePanel() {
                             className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${wallpaper?.value === wp.value ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-transparent hover:border-[var(--os-text-secondary)]'
                                 }`}
                         >
-                            {['image', 'video', 'dynamic-time'].includes(wp.type) ? (
-                                wp.type === 'video' ? (
+                            {['image', 'video', 'dynamic-time'].includes(wp.type as string) ? (
+                                (wp.type as string) === 'video' ? (
                                     <video
-                                         src={wp.value}
-                                         muted
-                                         loop
-                                         autoPlay
-                                         playsInline
-                                         className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                     />
+                                        src={wp.value}
+                                        muted
+                                        loop
+                                        autoPlay
+                                        playsInline
+                                        className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                    />
                                 ) : (
                                     <img
                                         src={(() => {
-                                            if (wp.type === 'dynamic-time') {
+                                            if ((wp as any).type === 'dynamic-time') {
                                                 try {
-                                                    const schedule = JSON.parse(wp.value);
+                                                    const schedule = JSON.parse((wp as any).value);
                                                     return schedule[0]?.url || '/wallpapers/default.jpg';
                                                 } catch { return '/wallpapers/default.jpg'; }
                                             }
-                                            return wp.value === 'daily' ? '/wallpapers/default.jpg' : wp.value;
+                                            return (wp as any).value === 'daily' ? '/wallpapers/default.jpg' : (wp as any).value;
                                         })()}
                                         className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                         alt={wp.name}

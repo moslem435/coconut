@@ -54,11 +54,11 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
             try {
                 const store = useFileSystemStore.getState()
                 const path = store.resolvePath(fileId)
-                if(!path) throw new Error('File not found')
-                
+                if (!path) throw new Error('File not found')
+
                 const buffer = await fs.readFile(path)
                 const text = new TextDecoder().decode(buffer)
-                
+
                 // Large file protection
                 if (text.length > 500000) {
                     setContent(text.slice(0, 500000) + '\n\n...[File too large, truncated]...')
@@ -68,9 +68,10 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
 
                 // Highlight code
                 const language = getLanguage(name)
+                const grammar = Prism.languages[language] || Prism.languages.javascript || {}
                 const highlighted = Prism.highlight(
                     text.length > 500000 ? text.slice(0, 500000) : text,
-                    Prism.languages[language] || Prism.languages.javascript,
+                    grammar,
                     language
                 )
                 setHighlightedCode(highlighted)
@@ -105,7 +106,7 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
                     <span className="text-sm text-white/70 font-medium">{name}</span>
                     <span className="text-xs text-white/40">{content.length} chars</span>
                 </div>
-                <button 
+                <button
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/10 text-xs text-white/60 hover:text-white transition-colors"
                 >
@@ -113,7 +114,7 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
                     {copied ? 'Copied' : 'Copy'}
                 </button>
             </div>
-            
+
             <div className="flex-1 overflow-auto relative font-mono text-sm selection:bg-blue-500/30 flex">
                 {/* Line Numbers */}
                 <div className="sticky left-0 bg-[#1e1e1e] border-r border-white/5 px-3 py-4 text-right text-white/30 select-none shrink-0 min-w-[3rem]">
@@ -121,10 +122,10 @@ const CodePreview = ({ fileId, name }: { fileId: string; name: string }) => {
                         <div key={i} className="leading-relaxed">{i + 1}</div>
                     ))}
                 </div>
-                
+
                 {/* Code Content */}
                 <pre className="p-4 leading-relaxed min-w-0 flex-1 tab-[4]">
-                    <code 
+                    <code
                         dangerouslySetInnerHTML={{ __html: highlightedCode }}
                         className={`language-${getLanguage(name)}`}
                     />

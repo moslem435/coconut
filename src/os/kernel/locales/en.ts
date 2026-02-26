@@ -422,15 +422,9 @@ const en: Record<string, string> = {
     "vscode.problems": "Problems",
 
     // File Explorer
-    "explorer.root": "Root",
     "explorer.this_system": "THIS SYSTEM",
     "explorer.mounted_drives": "MOUNTED DRIVES",
     "explorer.cloud": "CLOUD",
-    "explorer.desktop": "Desktop",
-    "explorer.documents": "Documents",
-    "explorer.downloads": "Downloads",
-    "explorer.pictures": "Pictures",
-    "explorer.music": "Music",
     "explorer.delete_confirm": "Are you sure you want to delete these items?",
     "explorer.permission_denied": "Permission denied",
     "explorer.empty": "This folder is empty",

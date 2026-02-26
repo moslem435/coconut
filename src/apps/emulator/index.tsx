@@ -22,15 +22,15 @@ export default function EmulatorApp() {
     const { t } = useLanguage()
     const [isRunning, setIsRunning] = useState(false)
     const [isStarting, setIsStarting] = useState(false)
-    const [selectedOS, setSelectedOS] = useState<OSConfig | null>(OS_PRESETS[0])
+    const [selectedOS, setSelectedOS] = useState<OSConfig | null | undefined>(OS_PRESETS[0])
     const [customUrl, setCustomUrl] = useState('')
     const [v86Loaded, setV86Loaded] = useState(false)
     const [localError, setLocalError] = useState<string | null>(null)
     const [isLocalReady, setIsLocalReady] = useState(false)
     const [emulatorInstance, setEmulatorInstance] = useState<any>(null)
-    
+
     const { progress, isDownloading, error: downloadError, downloadImage } = useImageDownloader()
-    
+
     const emulatorRef = useRef<any>(null)
     const screenRef = useRef<HTMLDivElement>(null)
 
@@ -43,7 +43,7 @@ export default function EmulatorApp() {
                 setIsLocalReady(false)
                 return
             }
-            
+
             const filename = selectedOS.url.split('/').pop() || 'image.iso'
             const exists = await ImageStorage.checkExists(filename)
             setIsLocalReady(exists)
@@ -62,14 +62,14 @@ export default function EmulatorApp() {
 
     const handleDeleteLocal = async () => {
         if (!selectedOS || !selectedOS.url) return
-        
+
         const confirmed = await useDialogStore.getState().openConfirm(
             t('emulator.delete_cache'),
             t('emulator.confirm_delete')
         )
-        
+
         if (!confirmed) return
-        
+
         const filename = selectedOS.url.split('/').pop() || 'image.iso'
         try {
             await ImageStorage.deleteFile(filename)
@@ -99,10 +99,10 @@ export default function EmulatorApp() {
             setIsStarting(false)
             return
         }
-        
+
         // Priority: Custom URL -> Local File -> Remote URL (fallback)
         // But here we enforce Local-First for presets
-        
+
         let bootSource: any = {}
         const filename = selectedOS.url.split('/').pop() || 'image.iso'
 
@@ -153,14 +153,14 @@ export default function EmulatorApp() {
             }
 
             if (emulatorRef.current) emulatorRef.current.destroy()
-            
-            console.log('Starting v86 with config:', { 
-                ...config, 
+
+            console.log('Starting v86 with config:', {
+                ...config,
                 cdrom: config.cdrom ? 'Present' : 'None',
                 hda: config.hda ? 'Present' : 'None',
                 fda: config.fda ? 'Present' : 'None'
             })
-            
+
             // Wait for DOM update to ensure container has size
             await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -183,12 +183,12 @@ export default function EmulatorApp() {
                     console.error('v86 download error:', e)
                     setLocalError('Emulator download error: ' + (e?.message || 'Unknown'))
                 })
-                
+
                 setIsRunning(true)
                 setLocalError(null)
             } catch (initErr: any) {
-                 console.error('V86 init error:', initErr)
-                 throw initErr
+                console.error('V86 init error:', initErr)
+                throw initErr
             }
 
         } catch (err: any) {
@@ -221,8 +221,8 @@ export default function EmulatorApp() {
 
     return (
         <div className="flex h-full bg-[var(--os-bg-window)] text-[var(--os-text-primary)] overflow-hidden pt-10">
-            <Script 
-                src="/v86/libv86.js" 
+            <Script
+                src="/v86/libv86.js"
                 strategy="afterInteractive"
                 onLoad={() => setV86Loaded(true)}
                 onError={() => setLocalError('Failed to load emulator core.')}
@@ -230,8 +230,8 @@ export default function EmulatorApp() {
 
             {/* Sidebar Resource Manager */}
             <div className="w-64 shrink-0 h-full border-r border-[var(--os-border)] bg-[var(--os-bg-panel)]">
-                <EmulatorSidebar 
-                    selectedOS={selectedOS}
+                <EmulatorSidebar
+                    selectedOS={selectedOS || null}
                     onSelectOS={(os) => {
                         setSelectedOS(os)
                         setCustomUrl('')
@@ -283,10 +283,10 @@ export default function EmulatorApp() {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* v86 Screen Container */}
-                    <div 
-                        ref={screenRef} 
+                    <div
+                        ref={screenRef}
                         id="screen_container"
                         className="w-full h-full flex items-center justify-center bg-black"
                     >

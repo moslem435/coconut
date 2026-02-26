@@ -12,7 +12,7 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 export function useFileOperations() {
   const { deleteItem, moveItem } = useFileSystemStore()
   const { clipboard, setClipboard, pasteItems } = useClipboardStore()
-  const { showDialog } = useDialogStore()
+  const { openConfirm } = useDialogStore()
   const { t } = useLanguage()
 
   const handleCopy = useCallback((selectedIds: string[]) => {
@@ -40,11 +40,10 @@ export function useFileOperations() {
   const handleDelete = useCallback(async (selectedIds: string[]) => {
     if (selectedIds.length === 0) return
 
-    const confirmed = await showDialog({
-      title: t('file_explorer.delete_confirm_title'),
-      message: t('file_explorer.delete_confirm_message', { count: selectedIds.length }),
-      type: 'confirm'
-    })
+    const confirmed = await openConfirm(
+      t('file_explorer.delete_confirm_title'),
+      t('file_explorer.delete_confirm_message', { count: selectedIds.length })
+    )
 
     if (confirmed) {
       try {
@@ -53,7 +52,7 @@ export function useFileOperations() {
         console.error('Delete failed:', error)
       }
     }
-  }, [deleteItem, showDialog, t])
+  }, [deleteItem, openConfirm, t])
 
   const handleMove = useCallback(async (itemIds: string[], targetFolderId: string) => {
     try {

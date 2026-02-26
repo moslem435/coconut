@@ -39,7 +39,11 @@ export function useDesktopInteraction() {
           app.title,
           app.id,
           app.icon,
-          { ...app.defaultWindowOptions, isDefaultTitle: true, multiInstance: app.multiInstance }
+          {
+            ...app.defaultWindowOptions as any,
+            isDefaultTitle: true,
+            multiInstance: app.multiInstance
+          }
         )
       }
       return
@@ -63,10 +67,10 @@ export function useDesktopInteraction() {
     // 文件
     if (item.type === 'file') {
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)
-      
+
       if (isImage) {
         const content = await readFileContent(item.id)
-        
+
         launchApp(
           'preview-' + item.id,
           item.name,
@@ -97,7 +101,10 @@ export function useDesktopInteraction() {
         splashingApp.title,
         splashingApp.id,
         splashingApp.icon,
-        { ...splashingApp.defaultWindowOptions, isDefaultTitle: true }
+        {
+          ...splashingApp.defaultWindowOptions as any,
+          isDefaultTitle: true
+        }
       )
       setSplashingApp(null)
     }

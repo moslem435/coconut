@@ -447,15 +447,9 @@ const zh: Record<string, string> = {
     "vscode.problems": "问题",
 
     // File Explorer
-    "explorer.root": "根目录",
     "explorer.this_system": "此系统",
     "explorer.mounted_drives": "挂载盘",
     "explorer.cloud": "云盘",
-    "explorer.desktop": "桌面",
-    "explorer.documents": "文档",
-    "explorer.downloads": "下载",
-    "explorer.pictures": "图片",
-    "explorer.music": "音乐",
     "explorer.delete_confirm": "确定要删除这些项目吗？",
     "explorer.permission_denied": "访问被拒绝",
     "explorer.empty": "此文件夹为空",

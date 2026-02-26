@@ -37,16 +37,16 @@ export function createSyncMiddleware(
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
   const operationQueue: SyncOperation[] = []
   const inFlightOps = new Map<string, SyncOperation>()
-  
+
   // Serial Queue to prevent race conditions
   let syncChain = Promise.resolve()
 
   const queueOperation = (op: SyncOperation) => {
     syncChain = syncChain
-        .then(() => executeOperation(op))
-        .catch(err => {
-            console.error(`[SyncMiddleware] Op ${op.type}:${op.id} failed:`, err)
-        })
+      .then(() => executeOperation(op))
+      .catch(err => {
+        console.error(`[SyncMiddleware] Op ${op.type}:${op.id} failed:`, err)
+      })
   }
 
   // 监听文件系统操作事件
@@ -60,7 +60,7 @@ export function createSyncMiddleware(
     }
     queueOperation(operation)
   })
-  
+
   eventBus.on('fs:file:deleted', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
@@ -71,7 +71,7 @@ export function createSyncMiddleware(
     }
     queueOperation(operation)
   })
-  
+
   eventBus.on('fs:file:renamed', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
@@ -82,7 +82,7 @@ export function createSyncMiddleware(
     }
     queueOperation(operation)
   })
-  
+
   eventBus.on('fs:file:moved', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
@@ -93,7 +93,7 @@ export function createSyncMiddleware(
     }
     queueOperation(operation)
   })
-  
+
   eventBus.on('fs:file:updated', (data: any) => {
     const operation: SyncOperation = {
       id: data.id,
@@ -104,14 +104,14 @@ export function createSyncMiddleware(
     }
     queueOperation(operation)
   })
-  
+
   /**
    * 执行同步操作
    */
   async function executeOperation(operation: SyncOperation) {
     try {
       inFlightOps.set(operation.id, operation)
-      
+
       switch (operation.type) {
         case 'create':
           await syncService.syncCreate(
@@ -120,11 +120,11 @@ export function createSyncMiddleware(
             operation.payload.content
           )
           break
-        
+
         case 'delete':
           await syncService.syncDelete(operation.payload.path)
           break
-        
+
         case 'rename':
         case 'move':
           await syncService.syncRename(
@@ -132,7 +132,7 @@ export function createSyncMiddleware(
             operation.payload.newPath
           )
           break
-        
+
         case 'update':
           await syncService.syncUpdate(
             operation.payload.path,
@@ -140,20 +140,20 @@ export function createSyncMiddleware(
           )
           break
       }
-      
+
       inFlightOps.delete(operation.id)
       console.log(`[SyncMiddleware] Operation ${operation.type} succeeded for ${operation.id}`)
-      
+
     } catch (error) {
       console.error(`[SyncMiddleware] Operation ${operation.type} failed:`, error)
-      
+
       // 重试逻辑
       if (operation.retries < finalConfig.maxRetries) {
         operation.retries++
         const delay = finalConfig.retryDelay * Math.pow(2, operation.retries - 1)
-        
+
         console.log(`[SyncMiddleware] Retrying operation ${operation.type} in ${delay}ms (attempt ${operation.retries}/${finalConfig.maxRetries})`)
-        
+
         setTimeout(() => {
           executeOperation(operation)
         }, delay)
@@ -165,38 +165,38 @@ export function createSyncMiddleware(
       }
     }
   }
-  
+
   /**
    * 回滚操作
    */
   function rollbackOperation(operation: SyncOperation) {
     const store = storeGetter()
-    
+
     switch (operation.type) {
       case 'create':
         // 删除创建的文件
         store._deleteFiles([operation.payload.id])
         console.log(`[SyncMiddleware] Rolled back create: deleted ${operation.payload.id}`)
         break
-      
+
       case 'delete':
         // 删除操作失败，文件可能已经不存在，无需回滚
         console.log(`[SyncMiddleware] Delete operation failed, no rollback needed`)
         break
-      
+
       case 'rename':
       case 'move':
         // 恢复操作已在 ActionSlice 中处理
         console.log(`[SyncMiddleware] Rename/move rollback handled by ActionSlice`)
         break
-      
+
       case 'update':
         // 更新失败，元数据已更新但内容未同步
         console.log(`[SyncMiddleware] Update operation failed, metadata may be inconsistent`)
         break
     }
   }
-  
+
   /**
    * 获取队列状态
    */
@@ -207,16 +207,8 @@ export function createSyncMiddleware(
       operations: Array.from(inFlightOps.values())
     }
   }
-  
+
   return {
     getQueueStatus,
-    cleanup: () => {
-      // 清理事件监听器
-      eventBus.off('fs:file:created')
-      eventBus.off('fs:file:deleted')
-      eventBus.off('fs:file:renamed')
-      eventBus.off('fs:file:moved')
-      eventBus.off('fs:file:updated')
-    }
   }
 }

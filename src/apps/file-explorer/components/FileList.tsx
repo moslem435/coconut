@@ -126,18 +126,18 @@ export default function FileList({
 
   useEffect(() => {
     if (!gridParentRef.current || viewMode !== 'grid') return
-    
+
     const updateWidth = () => {
       if (gridParentRef.current) {
         setContainerWidth(gridParentRef.current.clientWidth)
       }
     }
-    
+
     updateWidth()
-    
+
     const observer = new ResizeObserver(updateWidth)
     observer.observe(gridParentRef.current)
-    
+
     return () => observer.disconnect()
   }, [viewMode])
 
@@ -174,7 +174,7 @@ export default function FileList({
   // Grid view - virtualized
   if (viewMode === 'grid') {
     const virtualRows = gridVirtualizer.getVirtualItems()
-    
+
     return (
       <div
         ref={gridParentRef}
@@ -191,7 +191,7 @@ export default function FileList({
           {virtualRows.map((virtualRow) => {
             const startIndex = virtualRow.index * columns
             const rowItems = items.slice(startIndex, Math.min(startIndex + columns, items.length))
-            
+
             return (
               <div
                 key={virtualRow.index}
@@ -218,7 +218,7 @@ export default function FileList({
                       renaming={renamingId === node.id}
                       onRename={(newName) => {
                         if (newName && newName !== node.name) {
-                          renameItem(node.id, newName).catch(console.error)
+                          renameItem(node.id, newName)
                         }
                         setRenamingId(null)
                       }}
@@ -302,6 +302,7 @@ export default function FileList({
         >
           {virtualItems.map((virtualItem) => {
             const node = items[virtualItem.index]
+            if (!node) return null
             const isSelected = selectedIds.includes(node.id)
 
             return (
@@ -340,7 +341,7 @@ export default function FileList({
                   renaming={renamingId === node.id}
                   onRename={(newName) => {
                     if (newName && newName !== node.name) {
-                      renameItem(node.id, newName).catch(console.error)
+                      renameItem(node.id, newName)
                     }
                     setRenamingId(null)
                   }}

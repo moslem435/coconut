@@ -33,9 +33,10 @@ export class NativeDriver implements IFileSystem {
     static async restoreMounts(): Promise<Map<string, FileSystemDirectoryHandle>> {
         const mounts = new Map<string, FileSystemDirectoryHandle>()
         const allEntries = await entries()
-        
+
         for (const [key, value] of allEntries) {
-            if (typeof key === 'string' && key.startsWith('mount-') && value instanceof FileSystemDirectoryHandle) {
+            if (typeof key === 'string' && key.startsWith('mount-') &&
+                (typeof FileSystemDirectoryHandle !== 'undefined' && value instanceof FileSystemDirectoryHandle)) {
                 const id = key.replace('mount-', '')
                 // Note: We cannot verify permission here without user gesture.
                 // We just return the handle. The UI must handle 'permission denied' later.
@@ -64,11 +65,11 @@ export class NativeDriver implements IFileSystem {
             if (isLast) {
                 // If it's the last part, we try to get it as file OR directory
                 try {
-                    return await current.getDirectoryHandle(part, { create: false })
+                    return await current.getDirectoryHandle(part || '', { create: false })
                 } catch {
                     // Not a directory, try get file
                     try {
-                        return await current.getFileHandle(part, { create })
+                        return await current.getFileHandle(part || '', { create })
                     } catch (e) {
                         // If we are creating a directory, the loop logic needs to know
                         // But getDirectoryHandle with create=true handles that. 
@@ -76,7 +77,7 @@ export class NativeDriver implements IFileSystem {
                         // Special handling for mkdir might use getDirectoryHandle directly.
                         if (create) {
                             // Default to file if we are creating and it's the target
-                            return await current.getFileHandle(part, { create: true })
+                            return await current.getFileHandle(part || '', { create: true })
                         }
                         throw e
                     }
@@ -89,7 +90,7 @@ export class NativeDriver implements IFileSystem {
                 // However, FSA's getDirectoryHandle has {create: boolean}.
 
                 try {
-                    current = await current.getDirectoryHandle(part, { create })
+                    current = await current.getDirectoryHandle(part || '', { create })
                 } catch (e) {
                     throw new Error(`Path not found: ${parts.slice(0, i + 1).join('/')}`)
                 }
@@ -110,7 +111,7 @@ export class NativeDriver implements IFileSystem {
         let current = this.rootHandle
 
         for (const part of parts) {
-            current = await current.getDirectoryHandle(part)
+            current = await current.getDirectoryHandle(part || '')
         }
 
         return { parent: current, name }
@@ -211,7 +212,7 @@ export class NativeDriver implements IFileSystem {
             if (!recursive) {
                 // Check existence first if strict? FSA 'create' will just open/create.
             }
-            current = await current.getDirectoryHandle(part, { create: true })
+            current = await current.getDirectoryHandle(part || '', { create: true })
         }
     }
 

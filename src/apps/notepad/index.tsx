@@ -50,7 +50,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
       const lines = val.substr(0, sel).split('\n')
       setCursorPos({
         line: lines.length,
-        col: lines[lines.length - 1].length + 1
+        col: (lines[lines.length - 1] || '').length + 1
       })
     }
   }

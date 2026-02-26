@@ -37,8 +37,8 @@ interface WindowStore {
     launchingAppIds: string[]
 
     // Actions
-    openWindow: (id: string, title: string, appId: string, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; isDefaultTitle?: boolean; hideTitleBar?: boolean; [key: string]: unknown }) => void
-    launchApp: (id: string, title: string, appId: string, icon?: AppIcon, options?: unknown) => void
+    openWindow: (id: string, title: string, appId: string, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; isSidebar?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; isDefaultTitle?: boolean; hideTitleBar?: boolean;[key: string]: unknown }) => void
+    launchApp: (id: string, title: string, appId: string, icon?: AppIcon, options?: any) => void
     closeWindow: (id: string) => void
     closeAllWindows: () => void
     minimizeWindow: (id: string) => void
@@ -101,10 +101,10 @@ export const useWindowStore = create<WindowStore>()(
                 const centeredY = Math.max(0, (screenHeight - windowHeight) / 2 - 40)
 
                 // 提取组件 props（排除窗口配置属性）
-                const { 
-                    size, width, height, isMaximized, isResizable, 
+                const {
+                    size, width, height, isMaximized, isResizable,
                     taskbarPosition, titleBarColor, isDefaultTitle, hideTitleBar, isSidebar,
-                    ...componentProps 
+                    ...componentProps
                 } = options || {}
 
                 const newWindow: WindowState = {
@@ -160,7 +160,7 @@ export const useWindowStore = create<WindowStore>()(
 
             closeWindow: (id) => {
                 const window = get().windows[id]
-                
+
                 set(state => {
                     const { [id]: removed, ...remaining } = state.windows
                     const nextActive = state.activeWindowId === id ? null : state.activeWindowId
@@ -189,10 +189,10 @@ export const useWindowStore = create<WindowStore>()(
                         eventBus.emit('app:closed', { appId: window.appId, windowId: id })
                     }
                 })
-                
+
                 // 清理所有快照
                 get().snapshotCache.clear()
-                
+
                 set({ windows: {}, activeWindowId: null, maxZIndex: 100 })
             },
 
@@ -200,7 +200,7 @@ export const useWindowStore = create<WindowStore>()(
                 const { activeWindowId, maxZIndex, windows } = get()
                 const targetWindow = windows[id]
                 if (!targetWindow) return
-                
+
                 // 优化：如果已经是顶层且活跃，跳过更新
                 if (activeWindowId === id && !targetWindow.isMinimized && targetWindow.zIndex === maxZIndex) {
                     return
@@ -210,9 +210,9 @@ export const useWindowStore = create<WindowStore>()(
                 const sortedWindows = Object.values(windows)
                     .filter(w => !w.isMinimized)
                     .sort((a, b) => b.zIndex - a.zIndex)
-                
+
                 const needsUpdate = sortedWindows.slice(0, VIRTUAL_Z_INDEX_THRESHOLD).some(w => w.id === id)
-                
+
                 if (needsUpdate || sortedWindows.length <= VIRTUAL_Z_INDEX_THRESHOLD) {
                     const newZ = maxZIndex + 1
                     set(state => ({
@@ -359,7 +359,7 @@ export const useWindowStore = create<WindowStore>()(
 
             setSnapshot: (id, dataUrl) => {
                 const cache = get().snapshotCache
-                
+
                 // LRU 策略：如果超过最大数量，删除最旧的
                 if (cache.size >= MAX_SNAPSHOTS && !cache.has(id)) {
                     const firstKey = cache.keys().next().value
@@ -367,7 +367,7 @@ export const useWindowStore = create<WindowStore>()(
                         cache.delete(firstKey)
                     }
                 }
-                
+
                 cache.set(id, dataUrl)
             },
 

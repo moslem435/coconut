@@ -4,7 +4,7 @@ import { VSCODE_COLORS } from '../constants'
 import { useDialog } from '../hooks/useDialog'
 
 export const GitView: React.FC = () => {
-    const { openAlert } = useDialog()
+    const { alert } = useDialog()
     const [message, setMessage] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
 
@@ -18,9 +18,9 @@ export const GitView: React.FC = () => {
     const handleCommit = async () => {
         if (!message.trim()) return
         setIsCommitting(true)
-        await openAlert(
-            'Git Commit', 
-            `Simulated commit: "${message}"\n\n(No actual git operations performed in this demo)`
+        await alert(
+            `Simulated commit: "${message}"\n\n(No actual git operations performed in this demo)`,
+            'Git Commit'
         )
         setIsCommitting(false)
         setMessage('')

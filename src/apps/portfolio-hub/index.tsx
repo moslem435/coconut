@@ -190,9 +190,9 @@ function PortfolioContent() {
                 exit={{ opacity: 0, y: -10 }}
                 className="h-full"
               >
-                {project.id === "02" ? (
+                {project?.id === "02" ? (
                   <About />
-                ) : project.id === "03" ? (
+                ) : project?.id === "03" ? (
                   <Logs />
                 ) : (
                   <Projects onSelect={setSelectedSubProject} />
@@ -322,14 +322,14 @@ function PortfolioContent() {
                   transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                   className="flex flex-col h-full justify-between"
                 >
-                  {project.id === "01" && <Projects activeProject={activeProject} onProjectChange={setActiveProject} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
-                  {project.id === "02" && <About />}
-                  {project.id === "03" && <Logs />}
-                  {project.id === "04" && <Lab />}
-                  {project.id === "05" && <MusicPlayer />}
-                  {project.id === "06" && <Contact />}
-                  {project.id === "07" && <Resume />}
-                  {project.id === "08" && <Services />}
+                  {project?.id === "01" && <Projects activeProject={activeProject} onProjectChange={setActiveProject} selectedSubProject={selectedSubProject} onSubProjectChange={setSelectedSubProject} />}
+                  {project?.id === "02" && <About />}
+                  {project?.id === "03" && <Logs />}
+                  {project?.id === "04" && <Lab />}
+                  {project?.id === "05" && <MusicPlayer />}
+                  {project?.id === "06" && <Contact />}
+                  {project?.id === "07" && <Resume />}
+                  {project?.id === "08" && <Services />}
                 </motion.div>
               </AnimatePresence>
             </div>

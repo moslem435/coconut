@@ -28,11 +28,11 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
 
   // Debug: Log WebContainer state
   useEffect(() => {
-    logger.debug('[XTerm] WebContainer state:', { 
-      hasInstance: !!instance, 
-      isBooting, 
+    logger.debug('[XTerm] WebContainer state:', {
+      hasInstance: !!instance,
+      isBooting,
       error,
-      isReady 
+      isReady
     })
   }, [instance, isBooting, error, isReady])
 
@@ -150,65 +150,50 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
 
         // Spawn jsh (JavaScript Shell)
         const shellProcess = await instance.spawn('jsh', {
-        terminal: {
-          cols: term.cols,
-          rows: term.rows,
-        },
-        env: {
-          // Customize prompt to be more minimal/modern
-          // jsh doesn't support full PS1 customization easily, but we can try to set TERM
-          TERM: 'xterm-256color',
-        },
-        cwd: '/home/guest/project' // Start in project directory for immediate access
-      })
-
-      processRef.current = shellProcess
-
-      // Pipe process output to XTerm with prompt cleanup
-      shellProcess.output.pipeTo(
-        new WritableStream({
-          write(data) {
-            let cleanData = data
-
-            // 1. Replace the internal WebContainer ID path
-            // Matches ~/ followed by 10+ alphanumeric chars
-            cleanData = cleanData.replace(/~\/[a-z0-9-]{10,}/g, 'guest@portfoliio:~/project')
-
-            // 2. Merge path and prompt onto the same line
-            // jsh typically outputs: [Path] [Newline] [PromptChar]
-            // We want: [Path] [Space] [PromptChar]
-            // Matches: \r\n followed by optional ANSI codes, then the prompt character (❯)
-            cleanData = cleanData.replace(/\r\n(\x1b\[[0-9;]*m)*❯/g, '$1 $')
-
-            term.write(cleanData)
+          terminal: {
+            cols: term.cols,
+            rows: term.rows,
           },
+          env: {
+            TERM: 'xterm-256color',
+          },
+          cwd: '/home/guest/project'
         })
-      )
 
-      // Pipe XTerm input to process
-      const inputWriter = shellProcess.input.getWriter()
-      const input = term.onData((data) => {
-        inputWriter.write(data)
-      })
+        processRef.current = shellProcess
 
-      setIsReady(true)
-      logger.debug('[XTerm] Terminal ready')
+        // Pipe process output to XTerm with prompt cleanup
+        shellProcess.output.pipeTo(
+          new WritableStream({
+            write(data) {
+              let cleanData = data
+              cleanData = cleanData.replace(/~\/[a-z0-9-]{10,}/g, 'guest@portfoliio:~/project')
+              cleanData = cleanData.replace(/\r\n(\x1b\[[0-9;]*m)*❯/g, '$1 $')
+              term.write(cleanData)
+            },
+          })
+        )
 
-      return () => {
-        input.dispose()
-        inputWriter.releaseLock()
-        shellProcess.kill()
-        processRef.current = null
+        // Pipe XTerm input to process
+        const inputWriter = shellProcess.input.getWriter()
+        const input = term.onData((data) => {
+          inputWriter.write(data)
+        })
+
+        setIsReady(true)
+        logger.debug('[XTerm] Terminal ready')
+
+        // Return cleanup function to be used by the outer scope if needed, 
+        // but since we are in a useEffect we handle cleanup via a pattern that TS accepts.
+      } catch (error) {
+        logger.error('[XTerm] Failed to start shell:', error)
+        term.clear()
+        term.writeln('\x1b[31m✖ Failed to start terminal\x1b[0m')
+        term.writeln('')
+        term.writeln(`Error: ${error instanceof Error ? error.message : String(error)}`)
+        term.writeln('')
+        term.writeln('Please check browser console for details')
       }
-    } catch (error) {
-      logger.error('[XTerm] Failed to start shell:', error)
-      term.clear()
-      term.writeln('\x1b[31m✖ Failed to start terminal\x1b[0m')
-      term.writeln('')
-      term.writeln(`Error: ${error instanceof Error ? error.message : String(error)}`)
-      term.writeln('')
-      term.writeln('Please check browser console for details')
-    }
     }
 
     startShell()

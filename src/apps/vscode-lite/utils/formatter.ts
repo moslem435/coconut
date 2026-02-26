@@ -1,7 +1,7 @@
 // 按需加载 Prettier
 
 type ParserType = 'typescript' | 'babel' | 'css' | 'html' | 'markdown'
-type Plugin = unknown
+type Plugin = any
 
 const parserCache = new Map<ParserType, unknown>()
 
@@ -11,7 +11,7 @@ export async function formatCode(
 ): Promise<string> {
   // 动态导入 Prettier
   const { format } = await import('prettier/standalone')
-  
+
   // 根据文件扩展名确定 parser
   const ext = fileName.split('.').pop()?.toLowerCase()
   let parser: ParserType | undefined
@@ -26,7 +26,7 @@ export async function formatCode(
       ])
       parserCache.set('typescript', [parserTS, parserEstree])
     }
-    plugins = parserCache.get('typescript')!
+    plugins = parserCache.get('typescript') as Array<Plugin>
   } else if (ext === 'js' || ext === 'jsx') {
     parser = 'babel'
     if (!parserCache.has('babel')) {
@@ -36,28 +36,28 @@ export async function formatCode(
       ])
       parserCache.set('babel', [parserBabel, parserEstree])
     }
-    plugins = parserCache.get('babel')!
+    plugins = parserCache.get('babel') as Array<Plugin>
   } else if (ext === 'css' || ext === 'scss') {
     parser = 'css'
     if (!parserCache.has('css')) {
       const parserCSS = await import('prettier/plugins/postcss')
       parserCache.set('css', [parserCSS])
     }
-    plugins = parserCache.get('css')!
+    plugins = parserCache.get('css') as Array<Plugin>
   } else if (ext === 'html') {
     parser = 'html'
     if (!parserCache.has('html')) {
       const parserHTML = await import('prettier/plugins/html')
       parserCache.set('html', [parserHTML])
     }
-    plugins = parserCache.get('html')!
+    plugins = parserCache.get('html') as Array<Plugin>
   } else if (ext === 'md') {
     parser = 'markdown'
     if (!parserCache.has('markdown')) {
       const parserMD = await import('prettier/plugins/markdown')
       parserCache.set('markdown', [parserMD])
     }
-    plugins = parserCache.get('markdown')!
+    plugins = parserCache.get('markdown') as Array<Plugin>
   }
 
   if (!parser) {

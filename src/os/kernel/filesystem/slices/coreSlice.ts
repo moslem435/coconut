@@ -15,7 +15,7 @@ export interface CoreSlice {
   rootId: string
   isLoading: boolean
   childrenIndex: ChildrenIndex
-  
+
   // 纯状态更新方法（内部使用，前缀 _）
   _setFiles: (files: Record<string, FileNode>) => void
   _addFile: (file: FileNode) => void
@@ -23,7 +23,7 @@ export interface CoreSlice {
   _deleteFiles: (ids: string[]) => void
   _setLoading: (loading: boolean) => void
   _rebuildIndex: () => void
-  
+
   // 查询方法（无副作用）
   getItem: (id: string) => FileNode | undefined
   getChildren: (parentId: string) => FileNode[]
@@ -38,25 +38,25 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
   rootId: INITIAL_ROOT_ID,
   isLoading: true,
   childrenIndex: indexManager.buildIndex(INITIAL_FILES),
-  
+
   // 纯状态更新方法
   _setFiles: (files) => set({
     files,
     childrenIndex: indexManager.buildIndex(files)
   }),
-  
+
   _addFile: (file) => set((state) => ({
     files: { ...state.files, [file.id]: file },
     childrenIndex: indexManager.updateIndex(
       state.childrenIndex,
-      { type: 'ADD', nodeId: file.id, parentId: file.parentId }
+      { type: 'ADD', nodeId: file.id, parentId: file.parentId || state.rootId }
     )
   })),
-  
+
   _updateFile: (id, updates) => set((state) => {
     const node = state.files[id]
     if (!node) return state
-    
+
     return {
       files: {
         ...state.files,
@@ -64,11 +64,11 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
       }
     }
   }),
-  
+
   _deleteFiles: (ids) => set((state) => {
     const newFiles = { ...state.files }
     let newIndex = state.childrenIndex
-    
+
     ids.forEach(id => {
       const node = newFiles[id]
       if (node?.parentId) {
@@ -80,19 +80,19 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
       delete newFiles[id]
       delete newIndex[id]
     })
-    
+
     return { files: newFiles, childrenIndex: newIndex }
   }),
-  
+
   _setLoading: (loading) => set({ isLoading: loading }),
-  
+
   _rebuildIndex: () => set((state) => ({
     childrenIndex: indexManager.buildIndex(state.files)
   })),
-  
+
   // 查询方法
   getItem: (id) => get().files[id],
-  
+
   getChildren: (parentId) => {
     const state = get()
     return indexManager.getChildrenFromIndex(
@@ -101,7 +101,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
       parentId
     )
   },
-  
+
   getPath: (id) => {
     const files = get().files
     const path: FileNode[] = []
@@ -115,7 +115,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
 
     return path
   },
-  
+
   resolvePath: (id) => {
     const state = get()
     const node = state.files[id]
@@ -136,7 +136,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
 
     return '/' + pathNodes.slice(1).map(n => n.name).join('/')
   },
-  
+
   getNodeByPath: (path) => {
     const state = get()
     if (!path || path === '/') return state.files[state.rootId]

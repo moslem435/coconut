@@ -225,7 +225,17 @@ export default function MusicPlayer() {
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const { analyser, setFilterGain } = useAudioSystem(audioRef)
-  const currentTrack = playlist[currentTrackIndex] || playlist[0]
+
+  const DEFAULT_TRACK = {
+    id: 'empty',
+    title: 'No Track',
+    artist: 'Unknown',
+    album: '',
+    cover: '',
+    url: '',
+    duration: 0
+  }
+  const currentTrack = playlist[currentTrackIndex] || playlist[0] || DEFAULT_TRACK
 
   // Persistence
   useEffect(() => {
@@ -450,7 +460,7 @@ export default function MusicPlayer() {
   const handleDeleteTrack = (id: string) => {
     const newPlaylist = playlist.filter(t => t.id !== id)
     setPlaylist(newPlaylist)
-    if (currentTrack.id === id) {
+    if (currentTrack?.id === id) {
       playNext()
     }
     setContextMenu(null)
@@ -672,7 +682,7 @@ export default function MusicPlayer() {
                       </button>
                     </div>
                     <img
-                      src={INITIAL_TRACKS[0].cover}
+                      src={INITIAL_TRACKS[0]?.cover}
                       className="absolute right-0 top-0 h-full w-2/3 object-cover mask-image-linear-fade opacity-60 group-hover:scale-105 transition-transform duration-700"
                       alt="Banner"
                     />

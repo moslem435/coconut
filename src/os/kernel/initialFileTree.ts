@@ -277,39 +277,6 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    // Sample Images
-    'gallery-abstract': {
-        id: 'gallery-abstract',
-        parentId: 'pictures',
-        name: 'abstract.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    },
-    'gallery-colorful': {
-        id: 'gallery-colorful',
-        parentId: 'pictures',
-        name: 'colorful.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    },
-    'gallery-gradient': {
-        id: 'gallery-gradient',
-        parentId: 'pictures',
-        name: 'gradient.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    },
-    'gallery-cars': {
-        id: 'gallery-cars',
-        parentId: 'pictures',
-        name: 'cars.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    },
     // Sample Files
     'welcome-txt': {
         id: 'welcome-txt',

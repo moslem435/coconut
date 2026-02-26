@@ -92,10 +92,10 @@ export const useProcessStore = create<ProcessState>()(
                 })
 
                 console.log(`[ProcessManager] Killed Process ${pid}`)
-                
+
                 // Emit event so other stores (like WindowStore) can react
-                eventBus.emit('process:killed', { 
-                    pid, 
+                eventBus.emit('process:killed', {
+                    pid,
                     appId: process.appId,
                     windowId: process.windowId
                 })
@@ -130,24 +130,24 @@ if (typeof window !== 'undefined') {
     worker.onmessage = (e) => {
         const { processes } = e.data
         const store = useProcessStore.getState()
-        
+
         // Update store with calculated metrics
         // We need to merge metrics back carefully to not overwrite other state changes
         // But since this is a simulation, we assume process list stability for now or just update metrics
-        
+
         // Optimization: Convert array back to map
         const updatedMap = { ...store.processes }
-        
+
         processes.forEach((p: ProcessControlBlock) => {
             if (updatedMap[p.pid]) {
-                updatedMap[p.pid] = { 
-                    ...updatedMap[p.pid], 
-                    cpuUsage: p.cpuUsage, 
-                    memoryUsage: p.memoryUsage 
-                }
+                updatedMap[p.pid] = {
+                    ...updatedMap[p.pid],
+                    cpuUsage: p.cpuUsage,
+                    memoryUsage: p.memoryUsage
+                } as any
             }
         })
-        
+
         useProcessStore.setState({ processes: updatedMap })
     }
 

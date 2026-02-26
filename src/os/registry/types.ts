@@ -17,14 +17,16 @@ export interface AppManifest {
     /** Optional splash screen component, rendered before window opens */
     splashScreen?: ComponentType<{ onComplete: () => void }>
     defaultWindowOptions?: {
-        width?: number
-        height?: number
+        width?: number | string
+        height?: number | string
         isMaximized?: boolean
         isResizable?: boolean
         /** Content color theme for the title bar text/icons */
         titleBarColor?: 'light' | 'dark' | 'auto'
         /** If true, the OS title bar is hidden. App must handle dragging. */
         hideTitleBar?: boolean
+        /** Optional copilot mode / sidebar window state */
+        isSidebar?: boolean
     }
     /** If true, runs the app in an iframe sandbox */
     sandbox?: boolean
@@ -32,4 +34,7 @@ export interface AppManifest {
     permissions?: string[]
     /** If true, allows multiple instances of the app to be open at once */
     multiInstance?: boolean
+    version?: string
+    description?: string
+    category?: string
 }

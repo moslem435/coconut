@@ -71,7 +71,7 @@ export const createMountSlice: StateCreator<
     const state = get()
     const fullPath = state.resolvePath(folderId)
     logger.debug(`[loadFolderContent] Loading content for ${folderId}, path: ${fullPath}`)
-    
+
     if (!fullPath || !fullPath.startsWith('/mnt/')) {
       logger.debug(`[loadFolderContent] Skipping non-mount path: ${fullPath}`)
       return
@@ -84,7 +84,7 @@ export const createMountSlice: StateCreator<
 
       // 获取当前子节点
       const currentChildren = Object.values(get().files).filter(f => f.parentId === folderId)
-      
+
       // 动态判断是否使用 Worker
       const useWorker = childrenNames.length > WORKER_THRESHOLD
       logger.debug(`[loadFolderContent] File count: ${childrenNames.length}, using Worker: ${useWorker}`)
@@ -186,12 +186,13 @@ async function loadFolderContentWithWorker(
   get: any
 ) {
   logger.debug(`[loadFolderContentWithWorker] Processing ${childrenNames.length} files`)
-  
+
   // 1. 获取所有文件的 stats
   const statPromises = childrenNames.map(async (name) => {
     const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
     try {
       const stats = await syncService.getStats(childPath)
+      if (!stats) return null
       return {
         name,
         isDirectory: stats.isDirectory,
@@ -203,14 +204,14 @@ async function loadFolderContentWithWorker(
       return null
     }
   })
-  
+
   const fsSnapshot = (await Promise.all(statPromises)).filter(Boolean) as Array<{
     name: string
     isDirectory: boolean
     mtime: number
     size?: number
   }>
-  
+
   // 2. 使用 Worker 计算 Diff
   try {
     const patch = await fileSystemWorker.computeDiff({
@@ -219,31 +220,31 @@ async function loadFolderContentWithWorker(
       folderId,
       fullPath
     })
-    
+
     logger.debug(`[loadFolderContentWithWorker] Patch: +${patch.toAdd.length} -${patch.toRemove.length} ~${patch.toUpdate.length}`)
-    
+
     // 3. 应用 Patch
     if (patch.toAdd.length > 0 || patch.toRemove.length > 0 || patch.toUpdate.length > 0) {
       const newFiles = { ...get().files }
-      
+
       // 删除
       patch.toRemove.forEach(id => {
         delete newFiles[id]
       })
-      
+
       // 添加（替换临时 ID）
       patch.toAdd.forEach(file => {
         const realId = uuidv4()
         newFiles[realId] = { ...file, id: realId }
       })
-      
+
       // 更新
       patch.toUpdate.forEach(({ id, updates }) => {
         if (newFiles[id]) {
           newFiles[id] = { ...newFiles[id], ...updates }
         }
       })
-      
+
       get()._setFiles(newFiles)
     }
   } catch (error) {
@@ -264,13 +265,13 @@ async function loadFolderContentSync(
   get: any
 ) {
   logger.debug(`[loadFolderContentSync] Processing ${childrenNames.length} files`)
-  
+
   const currentChildrenMap = new Map(currentChildren.map(c => [c.name, c]))
   const fsNamesSet = new Set(childrenNames)
-  
+
   const newFiles = { ...get().files }
   let hasChanges = false
-  
+
   // 1. 删除不存在的文件
   for (const child of currentChildren) {
     if (!fsNamesSet.has(child.name)) {
@@ -279,7 +280,7 @@ async function loadFolderContentSync(
       hasChanges = true
     }
   }
-  
+
   // 2. 添加新文件和更新现有文件
   const statPromises = childrenNames.map(async (name) => {
     const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
@@ -291,14 +292,14 @@ async function loadFolderContentSync(
       return null
     }
   })
-  
+
   const results = await Promise.all(statPromises)
-  
+
   for (const res of results) {
     if (!res || !res.stats) continue
     const { name, stats } = res
     const existingNode = currentChildrenMap.get(name)
-    
+
     if (existingNode) {
       if (existingNode.updatedAt !== stats.mtime) {
         newFiles[existingNode.id] = {
@@ -323,7 +324,7 @@ async function loadFolderContentSync(
       hasChanges = true
     }
   }
-  
+
   if (hasChanges) {
     logger.debug(`[loadFolderContentSync] Updating state with changes`)
     get()._setFiles(newFiles)

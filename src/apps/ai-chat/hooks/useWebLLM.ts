@@ -116,27 +116,27 @@ export function useWebLLM() {
             const adapter = await navigator.gpu.requestAdapter({
                 powerPreference: 'high-performance'
             });
-            
+
             if (!adapter) return { supported: false, info: null };
 
             let info = '';
             if (adapter.info) {
-                 info = adapter.info.description || adapter.info.device || '';
-                 if (!info) {
-                     // @ts-ignore
-                     const vendor = adapter.info.vendor || '';
-                     // @ts-ignore
-                     const arch = adapter.info.architecture || '';
-                     if (vendor || arch) {
-                         info = `${vendor} ${arch}`.trim();
-                     }
-                 }
+                info = adapter.info.description || adapter.info.device || '';
+                if (!info) {
+                    // @ts-ignore
+                    const vendor = adapter.info.vendor || '';
+                    // @ts-ignore
+                    const arch = adapter.info.architecture || '';
+                    if (vendor || arch) {
+                        info = `${vendor} ${arch}`.trim();
+                    }
+                }
             } else if ('requestAdapterInfo' in adapter) {
-                 // @ts-ignore
-                 const adapterInfo = await adapter.requestAdapterInfo();
-                 info = adapterInfo.description || adapterInfo.device || '';
+                // @ts-ignore
+                const adapterInfo = await adapter.requestAdapterInfo();
+                info = adapterInfo.description || adapterInfo.device || '';
             }
-            
+
             if (!info) {
                 info = 'WebGPU Adapter (Unknown)';
             }
@@ -160,28 +160,28 @@ export function useWebLLM() {
     const initEngine = useCallback(async (modelId: string) => {
         try {
             abortRef.current = false;
-            
+
             const { supported, info } = await checkWebGPUSupport();
             if (!supported) {
                 throw new Error("ai.error.webgpu_not_supported");
             }
 
-            setState(prev => ({ 
-                ...prev, 
-                isLoading: true, 
-                error: null, 
+            setState(prev => ({
+                ...prev,
+                isLoading: true,
+                error: null,
                 currentModelId: modelId,
                 downloadStats: null,
                 gpuInfo: info
             }));
-            
+
             lastProgressRef.current = null;
             lastStatsRef.current = null;
             currentSpeedRef.current = 0;
-            
+
             if (!workerRef.current) {
                 const worker = new Worker(
-                    new URL('../worker/llm.worker.ts', import.meta.url), 
+                    new URL('../worker/llm.worker.ts', import.meta.url),
                     { type: 'module' }
                 );
                 workerRef.current = worker;
@@ -193,7 +193,7 @@ export function useWebLLM() {
             const onProgress: InitProgressCallback = (report) => {
                 if (abortRef.current) return;
                 const now = Date.now();
-                
+
                 const formatBytes = (bytes: number) => {
                     if (bytes === 0) return '0 B';
                     const k = 1024;
@@ -208,15 +208,15 @@ export function useWebLLM() {
                     if (lastProgressRef.current) {
                         const timeDiff = (now - lastProgressRef.current.time) / 1000;
                         const progressDiff = report.progress - lastProgressRef.current.value;
-                        
-                        if (timeDiff > 0.1 && progressDiff > 0) { 
+
+                        if (timeDiff > 0.1 && progressDiff > 0) {
                             const bytesDiff = progressDiff * totalSize;
                             const instantSpeed = bytesDiff / timeDiff;
-                            
-                            const newSpeed = currentSpeedRef.current === 0 
-                                ? instantSpeed 
+
+                            const newSpeed = currentSpeedRef.current === 0
+                                ? instantSpeed
                                 : (currentSpeedRef.current * 0.8 + instantSpeed * 0.2);
-                            
+
                             currentSpeedRef.current = newSpeed;
 
                             const remainingBytes = (1 - report.progress) * totalSize;
@@ -226,7 +226,7 @@ export function useWebLLM() {
                                 speed: `${formatBytes(newSpeed)}/s`,
                                 eta: `${Math.ceil(etaSeconds)}s`
                             };
-                            
+
                             lastProgressRef.current = { value: report.progress, time: now };
                         }
                     } else {
@@ -269,9 +269,9 @@ export function useWebLLM() {
                 if (abortRef.current) return;
             }
 
-            setState(prev => ({ 
-                ...prev, 
-                isLoading: false, 
+            setState(prev => ({
+                ...prev,
+                isLoading: false,
                 isModelLoaded: true,
                 progress: 'Model Loaded',
                 progressValue: 1
@@ -280,19 +280,19 @@ export function useWebLLM() {
         } catch (err: any) {
             if (abortRef.current) return;
             console.error("Failed to init WebLLM:", err);
-            
+
             let errorMessage = err.message || "Failed to initialize AI engine";
-            
+
             if (errorMessage.includes("Unable to find a compatible GPU")) {
                 errorMessage = "ai.error.webgpu_init_failed";
             } else if (errorMessage === "ai.error.webgpu_not_supported") {
                 // Keep the key thrown above
             }
-            
-            setState(prev => ({ 
-                ...prev, 
-                isLoading: false, 
-                error: errorMessage 
+
+            setState(prev => ({
+                ...prev,
+                isLoading: false,
+                error: errorMessage
             }));
         }
     }, []);
@@ -318,7 +318,7 @@ export function useWebLLM() {
 
     const unloadModel = useCallback(async () => {
         if (engineRef.current) {
-             await engineRef.current.unload();
+            await engineRef.current.unload();
         }
         setState(prev => ({
             ...prev,
@@ -356,8 +356,8 @@ export function useWebLLM() {
                 role: m.role,
                 content: m.content
             }));
-            
-            if (systemPrompt && !supportsTools) {
+
+            if (systemPrompt) {
                 // Check if system message already exists
                 const hasSystem = chatMessages.length > 0 && chatMessages[0].role === 'system';
                 if (!hasSystem) {
@@ -365,9 +365,8 @@ export function useWebLLM() {
                 }
             }
 
-            let fullContent = '';
-            let toolCalls: any[] = [];
-            
+            let totalInteractionContent = ''; // NEW: Cumulative content across the loop
+
             // Loop for handling tool calls (max 5 iterations to prevent infinite loops)
             for (let i = 0; i < 5; i++) {
                 const completionParams: any = {
@@ -381,19 +380,19 @@ export function useWebLLM() {
                     completionParams.tool_choice = "auto";
                 }
 
-                const reply = await engineRef.current.chat.completions.create(completionParams);
+                const reply: any = await engineRef.current.chat.completions.create(completionParams);
 
-                fullContent = '';
-                toolCalls = [];
-                let currentToolCall: any = null;
+                let fullContent = '';
+                let toolCalls: any[] = [];
 
                 for await (const chunk of reply) {
                     const delta = chunk.choices[0]?.delta;
-                    
+
                     // Handle content
                     if (delta?.content) {
                         fullContent += delta.content;
-                        onUpdate(fullContent);
+                        totalInteractionContent += delta.content;
+                        onUpdate(totalInteractionContent);
                     }
 
                     // Handle tool calls
@@ -433,13 +432,18 @@ export function useWebLLM() {
                     tool_calls: toolCalls
                 });
 
+                // Add a newline to separate thoughts between tool calls if there was content
+                if (fullContent) {
+                    totalInteractionContent += '\n\n';
+                }
+
                 // Execute tools
                 for (const toolCall of toolCalls) {
                     const functionName = toolCall.function.name;
                     const functionArgs = JSON.parse(toolCall.function.arguments);
-                    
+
                     console.log(`[AI-Chat] Executing tool: ${functionName}`, functionArgs);
-                    
+
                     let result = '';
                     if (systemToolsImplementation[functionName]) {
                         try {
@@ -457,8 +461,12 @@ export function useWebLLM() {
                         tool_call_id: toolCall.id,
                         content: String(result)
                     });
+
+                    // Optional: You could append tool results to totalInteractionContent if you want them visible
+                    // totalInteractionContent += `*已执行: ${functionName}*\n`;
+                    // onUpdate(totalInteractionContent);
                 }
-                
+
                 // Continue loop to generate response based on tool results
             }
 
@@ -483,14 +491,14 @@ export function useWebLLM() {
                 await caches.delete(`webllm/model/${modelId}`);
                 // Also try to delete wasm cache if specific to model
                 await caches.delete(`webllm/wasm/${modelId}`);
-                
+
                 // Note: This is a best-effort cleanup based on WebLLM's caching strategy.
                 // Complete cleanup might require clearing IndexedDB 'webllm/model' database if used.
                 // However, deleting cache storage is usually sufficient to free up space.
-                
+
                 // Try to clear IndexedDB if possible (requires manual DB operations)
                 // For now, we rely on cache API.
-                
+
                 return true;
             }
             return false;

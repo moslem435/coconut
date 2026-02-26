@@ -37,14 +37,14 @@ export default function PhotoGallery() {
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (selectedIndex < images.length - 1) {
-      setSelectedId(images[selectedIndex + 1].id)
+      setSelectedId(images[selectedIndex + 1]?.id || null)
     }
   }
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (selectedIndex > 0) {
-      setSelectedId(images[selectedIndex - 1].id)
+      setSelectedId(images[selectedIndex - 1]?.id || null)
     }
   }
 
@@ -160,17 +160,17 @@ export default function PhotoGallery() {
               {lightboxSrc ? (
                 <img
                   src={lightboxSrc}
-                  alt={getDisplayName(images[selectedIndex])}
+                  alt={getDisplayName(images[selectedIndex] || { id: 'unknown' })}
                   className="max-w-full max-h-[80vh] object-contain"
                 />
               ) : (
                 <div className="w-[80vw] h-[60vh] flex flex-col items-center justify-center bg-[var(--os-bg-base)]">
                   <ImageIcon size={64} className="text-[var(--os-text-muted)] mb-4" />
-                  <span className="text-xl text-[var(--os-text-muted)]">{getDisplayName(images[selectedIndex])}</span>
+                  <span className="text-xl text-[var(--os-text-muted)]">{getDisplayName(images[selectedIndex] || { id: 'unknown' })}</span>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                <p className="text-white font-medium">{getDisplayName(images[selectedIndex])}</p>
+                <p className="text-white font-medium">{getDisplayName(images[selectedIndex] || { id: 'unknown' })}</p>
               </div>
             </motion.div>
           </motion.div>

@@ -25,15 +25,15 @@ const AudioPreview = ({ fileId, name }: { fileId: string; name: string }) => {
 
     useEffect(() => {
         let objectUrl: string | null = null
-        
+
         const init = async () => {
             if (!containerRef.current) return
 
             try {
                 const store = useFileSystemStore.getState()
                 const path = store.resolvePath(fileId)
-                if(!path) throw new Error('File not found')
-                
+                if (!path) throw new Error('File not found')
+
                 // Use streaming blob
                 const blob = await fs.getFileBlob(path)
                 objectUrl = URL.createObjectURL(blob)
@@ -62,6 +62,7 @@ const AudioPreview = ({ fileId, name }: { fileId: string; name: string }) => {
                     setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0)
                 })
 
+                // @ts-ignore - seek event might be missing from types but exists
                 wavesurferRef.current.on('seek', () => {
                     setCurrentTime(wavesurferRef.current?.getCurrentTime() || 0)
                 })
@@ -147,12 +148,12 @@ const AudioPreview = ({ fileId, name }: { fileId: string; name: string }) => {
                         <button onClick={toggleMute} className="text-white/60 hover:text-white transition-colors">
                             {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                         </button>
-                        <input 
-                            type="range" 
-                            min="0" 
-                            max="1" 
-                            step="0.05" 
-                            value={isMuted ? 0 : volume} 
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={isMuted ? 0 : volume}
                             onChange={handleVolumeChange}
                             className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white opacity-50 group-hover:opacity-100 transition-opacity"
                         />
@@ -160,7 +161,7 @@ const AudioPreview = ({ fileId, name }: { fileId: string; name: string }) => {
 
                     {/* Center: Playback */}
                     <div className="flex items-center gap-4">
-                        <button 
+                        <button
                             onClick={() => {
                                 wavesurferRef.current?.stop()
                                 setIsPlaying(false)
@@ -170,15 +171,15 @@ const AudioPreview = ({ fileId, name }: { fileId: string; name: string }) => {
                         >
                             <RotateCcw size={18} />
                         </button>
-                        
-                        <button 
+
+                        <button
                             onClick={togglePlay}
                             className="w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95"
                         >
                             {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                         </button>
 
-                        <button 
+                        <button
                             onClick={() => handleSpeedChange(1.5)}
                             className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors text-xs font-bold"
                             title="1.5x Speed"

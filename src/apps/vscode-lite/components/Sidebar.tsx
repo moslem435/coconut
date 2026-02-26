@@ -105,7 +105,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
   const { rootId, createItem, renameItem, deleteItem, files, readFileContent } = useFileSystemStore()
   const { activeFileId, openFile: openFileInEditor, getFileContent } = useEditorStateV2()
-  
+
   const onFileSelect = async (id: string) => {
     const cachedContent = getFileContent(id)
     if (cachedContent !== undefined) {
@@ -134,13 +134,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
     if (action === 'new_file') {
       const name = await dialog.prompt('Enter file name:', 'Untitled.ts', 'New File')
       if (name) {
-        // If target is file, allow creating in parent? Or just in folder?
-        // If target is folder, create in it. If file, create in parent.
         const targetNode = files[targetId]
-        const parentId = (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId
-        await createItem(parentId, name, 'file', '')
+        const parentId = targetNode ? (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId : rootId
+        await createItem(parentId as string, name, 'file', '')
         // Auto expand
-        if (targetNode.type === 'folder') {
+        if (targetNode?.type === 'folder') {
           setExpandedFolders(prev => ({ ...prev, [targetId]: true }))
         }
       }
@@ -149,22 +147,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
       const name = await dialog.prompt('Enter folder name:', 'New Folder', 'New Folder')
       if (name) {
         const targetNode = files[targetId]
-        const parentId = (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId
-        await createItem(parentId, name, 'folder')
-        if (targetNode.type === 'folder') {
+        const parentId = targetNode ? (targetNode.type === 'folder' ? targetId : targetNode.parentId) || rootId : rootId
+        await createItem(parentId as string, name, 'folder')
+        if (targetNode?.type === 'folder') {
           setExpandedFolders(prev => ({ ...prev, [targetId]: true }))
         }
       }
     }
     if (action === 'rename') {
       const targetNode = files[targetId]
+      if (!targetNode) return
       const newName = await dialog.prompt('Enter new name:', targetNode.name, 'Rename')
       if (newName && newName !== targetNode.name) {
         await renameItem(targetId, newName)
       }
     }
     if (action === 'delete') {
-      const confirmed = await dialog.confirm(`Are you sure you want to delete '${files[targetId].name}'?`, 'Delete File')
+      const targetNode = files[targetId]
+      if (!targetNode) return
+      const confirmed = await dialog.confirm(`Are you sure you want to delete '${targetNode.name}'?`, 'Delete File')
 
       if (confirmed) {
         await deleteItem(targetId)
@@ -233,12 +234,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView }) => {
     >
       <div className="h-9 px-4 flex items-center justify-between text-xs uppercase tracking-wider text-gray-400 font-medium group shrink-0">
         <span>{t('vscode.explorer')}</span>
-        <MoreHorizontal 
-          size={14} 
-          className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
-          onClick={() => console.log('Explorer actions - TODO')}
-          title="More Actions..."
-        />
+        <div title="More Actions...">
+          <MoreHorizontal
+            size={14}
+            className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity"
+            onClick={() => console.log('Explorer actions - TODO')}
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">

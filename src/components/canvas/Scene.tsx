@@ -26,13 +26,13 @@ function ResponsiveCamera({ targetWidth = 6.5, minZ = 10 }) {
 
     const aspect = size.width / size.height
     const vFov = camera.fov * Math.PI / 180
-    
+
     // Calculate required distance to fit targetWidth
     // formula: distance = width / (2 * tan(fov/2) * aspect)
     const distForWidth = targetWidth / (2 * Math.tan(vFov / 2) * aspect)
-    
+
     const finalZ = Math.max(minZ, distForWidth)
-    
+
     camera.position.z = finalZ
     camera.updateProjectionMatrix()
   }, [size, camera, targetWidth, minZ])
@@ -42,7 +42,7 @@ function ResponsiveCamera({ targetWidth = 6.5, minZ = 10 }) {
 
 function MovingSpot({ color }: { color: string }) {
   const spotRef = useRef<THREE.SpotLight>(null)
-  
+
   useFrame(({ clock }) => {
     if (spotRef.current) {
       const t = clock.getElapsedTime() * 0.5
@@ -52,12 +52,12 @@ function MovingSpot({ color }: { color: string }) {
   })
 
   return (
-    <spotLight 
+    <spotLight
       ref={spotRef}
-      position={[10, 10, 10]} 
-      angle={0.5} 
-      penumbra={1} 
-      intensity={20} 
+      position={[10, 10, 10]}
+      angle={0.5}
+      penumbra={1}
+      intensity={20}
       color={color}
     />
   )
@@ -91,15 +91,15 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
             Z=10 is a good standard distance for full-height objects.
         */}
         <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={40} />
-        
+
         <ResponsiveCamera targetWidth={6.5} minZ={10} />
-        
+
         {/* Dynamic Lighting based on Project Color */}
         <ambientLight intensity={0.2} />
-        
-        <MovingSpot color={project.color} />
-        
-        <pointLight position={[-10, -5, -10]} intensity={10} color={project.accent} />
+
+        <MovingSpot color={project?.color || '#ffffff'} />
+
+        <pointLight position={[-10, -5, -10]} intensity={10} color={project?.accent || '#ffffff'} />
 
         {/* The Main Stage */}
         <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
@@ -113,20 +113,20 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
 
         {/* Post Processing Effects - Restored */}
         {useAnimations && (
-        <EffectComposer multisampling={0}>
-           <ChromaticAberration 
-             offset={new Vector2(0.002, 0.002)}
-             radialModulation={false}
-             modulationOffset={0}
-           />
-           <Bloom 
-             luminanceThreshold={0.2} 
-             mipmapBlur 
-             intensity={1.5} 
-             radius={0.4}
-           />
-           <Noise opacity={0.1} />
-           <Glitch 
+          <EffectComposer multisampling={0}>
+            <ChromaticAberration
+              offset={new Vector2(0.002, 0.002)}
+              radialModulation={false}
+              modulationOffset={0}
+            />
+            <Bloom
+              luminanceThreshold={0.2}
+              mipmapBlur
+              intensity={1.5}
+              radius={0.4}
+            />
+            <Noise opacity={0.1} />
+            <Glitch
               delay={new Vector2(0, 0)} // No random glitches
               duration={new Vector2(0.1, 0.2)}
               strength={new Vector2(0.1, 0.2)}
@@ -134,7 +134,7 @@ export default function Scene({ activeProjectIndex, isPortalActive, onPortalComp
               active={glitchActive}
               ratio={0.85}
             />
-        </EffectComposer>
+          </EffectComposer>
         )}
       </Canvas>
     </div>

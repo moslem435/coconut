@@ -18,15 +18,16 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
     const [rotation, setRotation] = useState(0)
 
     useEffect(() => {
+        let objectUrl: string | null = null
+
         // If we have a direct src (e.g. http url), use it
         if (initialSrc) {
             setSrc(initialSrc)
-            return
+            return () => { }
         }
 
         // If we have a fileId, we need to load it from the FS
         if (fileId) {
-            let objectUrl: string | null = null
             setLoading(true)
 
             const loadFile = async () => {
@@ -59,11 +60,11 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
             }
 
             loadFile()
+        }
 
-            // Cleanup
-            return () => {
-                if (objectUrl) URL.revokeObjectURL(objectUrl)
-            }
+        // Cleanup
+        return () => {
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
         }
     }, [initialSrc, fileId])
 
@@ -97,21 +98,21 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
                         <>
                             {/* Controls Bar */}
                             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-md rounded-full border border-white/10 shadow-xl transition-opacity hover:opacity-100 opacity-80">
-                                <button 
+                                <button
                                     onClick={() => zoomOut()}
                                     className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors"
                                     title="Zoom Out"
                                 >
                                     <ZoomOut size={18} />
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => resetTransform()}
                                     className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors"
                                     title="Reset"
                                 >
                                     <Maximize size={18} />
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => zoomIn()}
                                     className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors"
                                     title="Zoom In"
@@ -119,7 +120,7 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
                                     <ZoomIn size={18} />
                                 </button>
                                 <div className="w-px h-4 bg-white/20 mx-1" />
-                                <button 
+                                <button
                                     onClick={() => setRotation(r => r + 90)}
                                     className="p-1.5 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors"
                                     title="Rotate"
@@ -144,13 +145,13 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
                     )}
                 </TransformWrapper>
             </div>
-            
+
             {/* Background Grid Pattern */}
-            <div className="absolute inset-0 pointer-events-none opacity-10" 
-                style={{ 
-                    backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', 
-                    backgroundSize: '20px 20px' 
-                }} 
+            <div className="absolute inset-0 pointer-events-none opacity-10"
+                style={{
+                    backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+                    backgroundSize: '20px 20px'
+                }}
             />
         </div>
     )
