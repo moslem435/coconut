@@ -48,7 +48,7 @@ export function useDesktopGrid({ desktopItems, selectedIcons }: UseDesktopGridPr
         }
         // 2. If SOME items are missing positions (newly added files), assign them free spots
         else if (missingPositionIds.length > 0) {
-            let newPositions = { ...iconPositions }
+            const newPositions = { ...iconPositions }
 
             missingPositionIds.forEach(id => {
                 // Find a free spot for this new item
@@ -83,7 +83,7 @@ export function useDesktopGrid({ desktopItems, selectedIcons }: UseDesktopGridPr
         const itemsToMove = selectedIcons.includes(id) ? selectedIcons : [id]
 
         // Create a copy of positions to update
-        let newPositions = { ...currentPositions }
+        const newPositions = { ...currentPositions }
 
         // We process the primary dragged item LAST to ensure it lands exactly where dropped (if snapping allows)
         // Actually, order doesn't matter much for collision if we use findFreePosition carefully,

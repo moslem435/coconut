@@ -90,7 +90,7 @@ export const useMonacoIntellisenseV2 = (monaco: Monaco | null) => {
           const uri = monaco.Uri.parse(`file:///${file.id}`)
           
           // 检查模型是否已存在
-          let model = monaco.editor.getModel(uri)
+          const model = monaco.editor.getModel(uri)
           if (!model) {
             // 使用 extraLib 而不是 createModel（更轻量）
             monaco.languages.typescript.typescriptDefaults.addExtraLib(

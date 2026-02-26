@@ -31,9 +31,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     currentSessionId: null,
     isSidebarOpen: true,
     modelSettings: {
-        temperature: 0.7,
-        top_p: 1.0,
-        systemPrompt: "You are a helpful AI assistant running locally in the browser.\n\nYou have access to system tools to control the OS, including:\n- Changing themes, wallpapers, and volume\n- Launching and closing apps\n- Creating and reading files\n\nWhen a user asks to perform these actions, USE THE AVAILABLE TOOLS. Do not ask for permission, just do it.\n\nIf the user asks to create an app or write code:\n1. Generate the full code in a single code block.\n2. Use 'tsx' for React components.\n3. The user has a 'Run App' button to execute your code immediately.\n\nYou are the OS Controller. Be helpful, concise, and proactive."
+        temperature: 0.5,
+        top_p: 0.9,
+        systemPrompt: "You are a helpful assistant living in a web-based OS. You can chat with users normally. You also have access to system tools (theme, wallpaper, apps). Only use tools when explicitly requested."
     },
 
     createSession: (modelId = 'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC') => {

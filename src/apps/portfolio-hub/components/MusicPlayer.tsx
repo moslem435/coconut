@@ -162,7 +162,7 @@ export default function RadioDeck() {
    // Handle Track Change Control
    const changeTrack = (direction: 'next' | 'prev') => {
       soundManager.playClick()
-      let nextIndex = direction === 'next'
+      const nextIndex = direction === 'next'
          ? (currentTrack + 1) % TRACKS.length
          : (currentTrack - 1 + TRACKS.length) % TRACKS.length
 

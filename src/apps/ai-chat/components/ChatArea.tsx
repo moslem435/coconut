@@ -780,6 +780,11 @@ export function ChatArea() {
                                             ? msg.content.replace(/<think>[\s\S]*?<\/think>/, '').trim()
                                             : msg.content;
 
+                                        // Filter out empty JSON arrays or null content
+                                        if (mainContent === '[]' || mainContent === '[""]' || !mainContent) {
+                                            return isLoading ? '...' : null;
+                                        }
+
                                         return (
                                             <>
                                                 {thinkContent && <ThinkingProcess content={thinkContent} />}

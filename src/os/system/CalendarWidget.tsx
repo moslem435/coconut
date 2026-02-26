@@ -173,7 +173,7 @@ export default function CalendarWidget() {
     // Reset time to start of day for accurate day diff
     today.setHours(0, 0, 0, 0)
 
-    let d = new Date(today)
+    const d = new Date(today)
     d.setDate(d.getDate() + 1) // Start looking from tomorrow
 
     // Look ahead 365 days

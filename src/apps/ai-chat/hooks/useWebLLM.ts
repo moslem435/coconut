@@ -116,27 +116,27 @@ export function useWebLLM() {
             const adapter = await navigator.gpu.requestAdapter({
                 powerPreference: 'high-performance'
             });
-
+            
             if (!adapter) return { supported: false, info: null };
 
             let info = '';
             if (adapter.info) {
-                info = adapter.info.description || adapter.info.device || '';
-                if (!info) {
-                    // @ts-ignore
-                    const vendor = adapter.info.vendor || '';
-                    // @ts-ignore
-                    const arch = adapter.info.architecture || '';
-                    if (vendor || arch) {
-                        info = `${vendor} ${arch}`.trim();
-                    }
-                }
+                 info = adapter.info.description || adapter.info.device || '';
+                 if (!info) {
+                     // @ts-ignore
+                     const vendor = adapter.info.vendor || '';
+                     // @ts-ignore
+                     const arch = adapter.info.architecture || '';
+                     if (vendor || arch) {
+                         info = `${vendor} ${arch}`.trim();
+                     }
+                 }
             } else if ('requestAdapterInfo' in adapter) {
-                // @ts-ignore
-                const adapterInfo = await adapter.requestAdapterInfo();
-                info = adapterInfo.description || adapterInfo.device || '';
+                 // @ts-ignore
+                 const adapterInfo = await adapter.requestAdapterInfo();
+                 info = adapterInfo.description || adapterInfo.device || '';
             }
-
+            
             if (!info) {
                 info = 'WebGPU Adapter (Unknown)';
             }
@@ -160,28 +160,28 @@ export function useWebLLM() {
     const initEngine = useCallback(async (modelId: string) => {
         try {
             abortRef.current = false;
-
+            
             const { supported, info } = await checkWebGPUSupport();
             if (!supported) {
                 throw new Error("ai.error.webgpu_not_supported");
             }
 
-            setState(prev => ({
-                ...prev,
-                isLoading: true,
-                error: null,
+            setState(prev => ({ 
+                ...prev, 
+                isLoading: true, 
+                error: null, 
                 currentModelId: modelId,
                 downloadStats: null,
                 gpuInfo: info
             }));
-
+            
             lastProgressRef.current = null;
             lastStatsRef.current = null;
             currentSpeedRef.current = 0;
-
+            
             if (!workerRef.current) {
                 const worker = new Worker(
-                    new URL('../worker/llm.worker.ts', import.meta.url),
+                    new URL('../worker/llm.worker.ts', import.meta.url), 
                     { type: 'module' }
                 );
                 workerRef.current = worker;
@@ -193,7 +193,7 @@ export function useWebLLM() {
             const onProgress: InitProgressCallback = (report) => {
                 if (abortRef.current) return;
                 const now = Date.now();
-
+                
                 const formatBytes = (bytes: number) => {
                     if (bytes === 0) return '0 B';
                     const k = 1024;
@@ -208,15 +208,15 @@ export function useWebLLM() {
                     if (lastProgressRef.current) {
                         const timeDiff = (now - lastProgressRef.current.time) / 1000;
                         const progressDiff = report.progress - lastProgressRef.current.value;
-
-                        if (timeDiff > 0.1 && progressDiff > 0) {
+                        
+                        if (timeDiff > 0.1 && progressDiff > 0) { 
                             const bytesDiff = progressDiff * totalSize;
                             const instantSpeed = bytesDiff / timeDiff;
-
-                            const newSpeed = currentSpeedRef.current === 0
-                                ? instantSpeed
+                            
+                            const newSpeed = currentSpeedRef.current === 0 
+                                ? instantSpeed 
                                 : (currentSpeedRef.current * 0.8 + instantSpeed * 0.2);
-
+                            
                             currentSpeedRef.current = newSpeed;
 
                             const remainingBytes = (1 - report.progress) * totalSize;
@@ -226,7 +226,7 @@ export function useWebLLM() {
                                 speed: `${formatBytes(newSpeed)}/s`,
                                 eta: `${Math.ceil(etaSeconds)}s`
                             };
-
+                            
                             lastProgressRef.current = { value: report.progress, time: now };
                         }
                     } else {
@@ -269,9 +269,9 @@ export function useWebLLM() {
                 if (abortRef.current) return;
             }
 
-            setState(prev => ({
-                ...prev,
-                isLoading: false,
+            setState(prev => ({ 
+                ...prev, 
+                isLoading: false, 
                 isModelLoaded: true,
                 progress: 'Model Loaded',
                 progressValue: 1
@@ -280,19 +280,19 @@ export function useWebLLM() {
         } catch (err: any) {
             if (abortRef.current) return;
             console.error("Failed to init WebLLM:", err);
-
+            
             let errorMessage = err.message || "Failed to initialize AI engine";
-
+            
             if (errorMessage.includes("Unable to find a compatible GPU")) {
                 errorMessage = "ai.error.webgpu_init_failed";
             } else if (errorMessage === "ai.error.webgpu_not_supported") {
                 // Keep the key thrown above
             }
-
-            setState(prev => ({
-                ...prev,
-                isLoading: false,
-                error: errorMessage
+            
+            setState(prev => ({ 
+                ...prev, 
+                isLoading: false, 
+                error: errorMessage 
             }));
         }
     }, []);
@@ -318,7 +318,7 @@ export function useWebLLM() {
 
     const unloadModel = useCallback(async () => {
         if (engineRef.current) {
-            await engineRef.current.unload();
+             await engineRef.current.unload();
         }
         setState(prev => ({
             ...prev,
@@ -349,19 +349,63 @@ export function useWebLLM() {
                 "Llama-3-8B-Instruct-q4f32_1-MLC",
                 "Llama-3-8B-Instruct-q4f16_1-MLC"
             ];
+            
             const supportsTools = state.currentModelId && modelsWithFunctionCalling.includes(state.currentModelId);
 
             // Prepend system prompt if exists
-            const chatMessages: any[] = messages.map(m => ({
-                role: m.role,
-                content: m.content
-            }));
-
+            const chatMessages: any[] = messages.map(m => {
+                const msg: any = {
+                    role: m.role,
+                    content: m.content
+                };
+                // @ts-ignore
+                if (m.tool_calls) msg.tool_calls = m.tool_calls;
+                // @ts-ignore
+                if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+                return msg;
+            });
+            
+            // If tools are supported, we CANNOT pass a custom system prompt as the first message
+            // for Hermes-2-Pro and potentially other models when tools are enabled.
+            // The system prompt is baked into the model's template or handled differently.
+            // OR we need to let the engine handle it via init options, but for now,
+            // let's try to MERGE the system prompt into the first user message if tools are active.
+            
             if (systemPrompt) {
-                // Check if system message already exists
-                const hasSystem = chatMessages.length > 0 && chatMessages[0].role === 'system';
-                if (!hasSystem) {
-                    chatMessages.unshift({ role: 'system', content: systemPrompt });
+                if (supportsTools) {
+                    // Strategy: Prepend to the first user message instead of a separate system message
+                    // This avoids the "CustomSystemPromptError"
+                    const firstUserMsgIndex = chatMessages.findIndex(m => m.role === 'user');
+                    if (firstUserMsgIndex !== -1) {
+                        // Avoid double prepending if it's already there (rudimentary check)
+                        // Also, only prepend if the system prompt is actually meaningful and not just a generic one
+                        // For now, we'll simplify: ONLY prepend if the user is asking for a tool action explicitly
+                        // Or just keep it very minimal to avoid confusing the model
+                        
+                        // Let's try NOT prepending the system prompt at all for now, to see if it fixes the "silence" issue.
+                        // Hermes-2-Pro is smart enough to use tools without explicit instruction if tools are provided.
+                        
+                        // IF we must prepend, keep it super short.
+                        // chatMessages[firstUserMsgIndex].content = `${systemPrompt}\n\n--- User Request ---\n${chatMessages[firstUserMsgIndex].content}`;
+                    } else {
+                        // Fallback if no user message found (rare)
+                        // chatMessages.unshift({ role: 'user', content: `${systemPrompt}\n\n(Waiting for user input)` });
+                    }
+                } else {
+                    // Standard behavior for non-tool models
+                    const hasSystem = chatMessages.length > 0 && chatMessages[0].role === 'system';
+                    if (!hasSystem) {
+                        chatMessages.unshift({ role: 'system', content: systemPrompt });
+                    }
+                }
+            }
+
+            // Ensure we don't have a 'system' role message if tools are enabled
+            // This is a safety cleanup just in case
+            if (supportsTools) {
+                const systemIdx = chatMessages.findIndex(m => m.role === 'system');
+                if (systemIdx !== -1) {
+                    chatMessages.splice(systemIdx, 1);
                 }
             }
 
@@ -375,25 +419,35 @@ export function useWebLLM() {
                 };
 
                 if (supportsTools) {
+                    // Force the model to use tools if intent is clear
                     // @ts-ignore
                     completionParams.tools = systemToolsDefinitions;
-                    completionParams.tool_choice = "auto";
+                    // "auto" means the model can choose to use a tool or just chat
+                    completionParams.tool_choice = "auto"; 
                 }
 
-                const reply: any = await engineRef.current.chat.completions.create(completionParams);
+                const reply = await engineRef.current.chat.completions.create(completionParams);
 
                 let fullContent = '';
-                let toolCalls: any[] = [];
+                const toolCalls: any[] = [];
+                const currentToolCall: any = null;
 
                 for await (const chunk of reply) {
                     const delta = chunk.choices[0]?.delta;
-
+                    
                     // Handle content
-                    if (delta?.content) {
-                        fullContent += delta.content;
-                        totalInteractionContent += delta.content;
-                        onUpdate(totalInteractionContent);
+                if (delta?.content) {
+                    fullContent += delta.content;
+                    totalInteractionContent += delta.content;
+                    
+                    // Filter out technical artifacts like empty arrays from streaming
+                    // We also filter out standalone newlines that might precede tool calls
+                    if (totalInteractionContent.trim() === '[]' || totalInteractionContent.trim() === '[' || totalInteractionContent.trim() === '') {
+                         // Do not update UI with empty JSON
+                    } else {
+                         onUpdate(totalInteractionContent);
                     }
+                }
 
                     // Handle tool calls
                     if (delta?.tool_calls) {
@@ -422,6 +476,12 @@ export function useWebLLM() {
 
                 // If no tool calls, we are done
                 if (toolCalls.length === 0) {
+                    // Safety check: if content is suspiciously empty or just brackets, and we expected action
+                    if (totalInteractionContent.trim() === '[]' || totalInteractionContent.trim() === '') {
+                        // Retry logic or fallback message
+                        const fallbackMsg = "Sorry, I couldn't process that request. Could you please rephrase it?";
+                        onUpdate(fallbackMsg);
+                    }
                     break;
                 }
 
@@ -431,7 +491,7 @@ export function useWebLLM() {
                     content: fullContent || null,
                     tool_calls: toolCalls
                 });
-
+                
                 // Add a newline to separate thoughts between tool calls if there was content
                 if (fullContent) {
                     totalInteractionContent += '\n\n';
@@ -441,9 +501,9 @@ export function useWebLLM() {
                 for (const toolCall of toolCalls) {
                     const functionName = toolCall.function.name;
                     const functionArgs = JSON.parse(toolCall.function.arguments);
-
+                    
                     console.log(`[AI-Chat] Executing tool: ${functionName}`, functionArgs);
-
+                    
                     let result = '';
                     if (systemToolsImplementation[functionName]) {
                         try {
@@ -461,12 +521,8 @@ export function useWebLLM() {
                         tool_call_id: toolCall.id,
                         content: String(result)
                     });
-
-                    // Optional: You could append tool results to totalInteractionContent if you want them visible
-                    // totalInteractionContent += `*已执行: ${functionName}*\n`;
-                    // onUpdate(totalInteractionContent);
                 }
-
+                
                 // Continue loop to generate response based on tool results
             }
 
@@ -491,14 +547,14 @@ export function useWebLLM() {
                 await caches.delete(`webllm/model/${modelId}`);
                 // Also try to delete wasm cache if specific to model
                 await caches.delete(`webllm/wasm/${modelId}`);
-
+                
                 // Note: This is a best-effort cleanup based on WebLLM's caching strategy.
                 // Complete cleanup might require clearing IndexedDB 'webllm/model' database if used.
                 // However, deleting cache storage is usually sufficient to free up space.
-
+                
                 // Try to clear IndexedDB if possible (requires manual DB operations)
                 // For now, we rely on cache API.
-
+                
                 return true;
             }
             return false;
