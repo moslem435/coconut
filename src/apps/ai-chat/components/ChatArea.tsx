@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
+import { useLanguageStore } from '@/os/kernel/useLanguageStore';
 import { useWebLLM, AVAILABLE_MODELS } from '../hooks/useWebLLM';
 import { useWindowStore } from '@/os/kernel/useWindowStore';
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -23,7 +25,15 @@ import {
     Zap,
     Copy,
     Check,
-    Pencil
+    Pencil,
+    Play,
+    Trash2,
+    X,
+    HardDrive,
+    Cloud,
+    ChevronDown,
+    ChevronRight,
+    Lightbulb
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -32,7 +42,33 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Thinking Process Component
+function ThinkingProcess({ content }: { content: string }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { t } = useLanguageStore();
+    
+    return (
+        <div className="mb-4 rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+            <button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors text-left"
+            >
+                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <Lightbulb size={14} className={cn("text-amber-500/80", isExpanded && "text-amber-400")} />
+                <span>{t('ai.msg.thinking')}</span>
+            </button>
+            
+            {isExpanded && (
+                <div className="px-4 py-3 text-xs text-zinc-400 border-t border-white/5 font-mono leading-relaxed bg-black/20 whitespace-pre-wrap">
+                    {content.trim()}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function ChatArea() {
+    const { t } = useLanguageStore();
     const { 
         currentSessionId, 
         sessions, 
@@ -44,12 +80,47 @@ export function ChatArea() {
         toggleSidebar
     } = useChatStore();
     
-    // Window management for detach
+    // Window management
     const updateWindow = useWindowStore(state => state.updateWindow);
+    const launchApp = useWindowStore(state => state.launchApp);
     const windowState = useWindowStore(state => state.windows['ai-chat']);
     const isSidebar = windowState?.isSidebar;
     
-    // Handle toggle sidebar with window resize
+    // File system for saving apps
+    const createFile = useFileSystemStore(state => state.createItem);
+
+    // ... (keep existing detach logic)
+
+    const handleRunApp = async (code: string, language: string) => {
+        if (language !== 'tsx' && language !== 'jsx' && language !== 'javascript' && language !== 'typescript' && language !== 'js' && language !== 'ts') {
+            return;
+        }
+
+        // 1. Create a temporary file
+        const timestamp = Date.now();
+        const fileName = `ai-app-${timestamp}.tsx`;
+        // const filePath = `/home/user/apps/${fileName}`;
+        
+        // Ensure directory exists (simulation for now, or assume /home/user/apps exists)
+        // For MVP, we'll rely on the fact that we can create file content directly or pass it
+        
+        try {
+            // Option A: Save to file then launch
+            // createFile('/home/user/apps', fileName, 'file', code);
+            
+            // Option B: Launch directly with code content (Simpler for now)
+            launchApp(
+                `code-runner-${timestamp}`, 
+                'AI App Preview', 
+                'code-runner', 
+                undefined, 
+                { code }
+            );
+        } catch (e) {
+            console.error("Failed to run app:", e);
+        }
+    };
+
     const handleToggleSidebar = () => {
         toggleSidebar();
         if (windowState && !windowState.isMaximized) {
@@ -86,11 +157,12 @@ export function ChatArea() {
         progress, 
         progressValue, 
         isModelLoaded, 
-        initEngine,
-        cancelLoading,
-        downloadStats,
-        error: engineError,
-        currentModelId
+        initEngine, 
+        cancelLoading, 
+        downloadStats, 
+        error: engineError, 
+        currentModelId,
+        deleteModel
     } = useWebLLM();
 
     const [input, setInput] = useState('');
@@ -106,6 +178,77 @@ export function ChatArea() {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState('');
     const titleInputRef = useRef<HTMLInputElement>(null);
+
+    // Model Manager State
+    const [modelTab, setModelTab] = useState<'all' | 'downloaded'>('all');
+    const [cachedModels, setCachedModels] = useState<Set<string>>(new Set());
+
+    // Check for cached models on mount and when menu opens
+    useEffect(() => {
+        const checkCachedModels = async () => {
+            if ('caches' in window) {
+                try {
+                    const keys = await caches.keys();
+                    const cachedIds = new Set<string>();
+                    
+                    // Strategy 1: Check cache names (WebLLM often uses 'webllm/model' or 'webllm/wasm')
+                    // But importantly, we need to inspect the CONTENTS of 'webllm/model'
+                    
+                    let modelCache: Cache | null = null;
+                    if (keys.includes('webllm/model')) {
+                         modelCache = await caches.open('webllm/model');
+                    } else if (keys.includes('webllm/config')) { // Newer versions might use config
+                         modelCache = await caches.open('webllm/config');
+                    }
+                    
+                    if (modelCache) {
+                         const requests = await modelCache.keys();
+                         // The URLs usually contain the model ID or parts of it.
+                         // e.g. https://.../Llama-3-8B-Instruct-q4f32_1-MLC/params_shard_0.bin
+                         
+                         AVAILABLE_MODELS.forEach(model => {
+                             // Check if ANY file related to this model exists in the cache
+                             const hasFile = requests.some(req => req.url.includes(model.id));
+                             if (hasFile) {
+                                 cachedIds.add(model.id);
+                             }
+                         });
+                    }
+                    
+                    // Fallback: Check for individual cache keys if strategy changed
+                    keys.forEach(key => {
+                        AVAILABLE_MODELS.forEach(model => {
+                            if (key.includes(model.id)) {
+                                cachedIds.add(model.id);
+                            }
+                        });
+                    });
+
+                    setCachedModels(cachedIds);
+                } catch (e) {
+                    console.error("Failed to check cache:", e);
+                }
+            }
+        };
+        
+        if (isModelMenuOpen) {
+            checkCachedModels();
+        }
+    }, [isModelMenuOpen]);
+
+    const handleDeleteModel = async (e: React.MouseEvent, modelId: string) => {
+        e.stopPropagation();
+        if (window.confirm(t('ai.model.delete_confirm').replace('{modelId}', modelId))) {
+             const success = await deleteModel(modelId);
+             if (success) {
+                 setCachedModels(prev => {
+                     const next = new Set(prev);
+                     next.delete(modelId);
+                     return next;
+                 });
+             }
+        }
+    };
 
     useEffect(() => {
         if (currentSession) {
@@ -202,18 +345,26 @@ export function ChatArea() {
 
     const handleInitModel = (modelId?: string) => {
         // Default model or from settings
-        initEngine(modelId || 'Llama-3-8B-Instruct-q4f32_1-MLC');
+        initEngine(modelId || 'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC');
     };
 
     if (!currentSession) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center bg-transparent text-zinc-500 select-none">
-                <p className="text-sm font-medium">Select or create a chat to begin</p>
+                <p className="text-sm font-medium">{t('ai.msg.select_to_begin')}</p>
             </div>
         );
     }
 
-    const currentModelName = AVAILABLE_MODELS.find(m => m.id === currentModelId)?.name || 'No Model Loaded';
+    const currentModelName = AVAILABLE_MODELS.find(m => m.id === currentModelId)?.name || t('ai.header.no_model_loaded');
+
+    // Filter models based on tab
+    const visibleModels = AVAILABLE_MODELS.filter(m => {
+        if (modelTab === 'downloaded') {
+            return cachedModels.has(m.id);
+        }
+        return true;
+    });
 
     return (
         <div className={cn(
@@ -252,7 +403,7 @@ export function ChatArea() {
                             onDoubleClick={() => setIsEditingTitle(true)}
                         >
                             <span className="font-medium text-zinc-200 truncate max-w-[200px] text-sm select-none">
-                                {currentSession?.title || 'New Chat'}
+                                {currentSession?.title || t('ai.sidebar.new_chat')}
                             </span>
                             <Pencil size={12} className="text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -276,7 +427,7 @@ export function ChatArea() {
                         <button 
                             onClick={handleDetach}
                             className="p-2 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-zinc-200 transition-colors"
-                            title="Detach to Window"
+                            title={t('ai.header.detach')}
                         >
                             <ArrowUpRightFromSquare size={16} />
                         </button>
@@ -285,47 +436,166 @@ export function ChatArea() {
                     <div className="relative">
                         <button 
                             onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-transparent hover:bg-white/5 border border-transparent hover:border-white/5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all"
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-lg bg-transparent hover:bg-white/5 border border-transparent hover:border-white/5 text-xs font-medium transition-all",
+                                isModelMenuOpen ? "bg-white/5 text-zinc-200" : "text-zinc-400 hover:text-zinc-200"
+                            )}
                         >
                             <Settings size={14} />
-                            <span>Models</span>
+                            <span>{t('ai.header.models')}</span>
                         </button>
                     
                     {isModelMenuOpen && (
                         <>
                             <div 
-                                className="fixed inset-0 z-40" 
+                                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" 
                                 onClick={() => setIsModelMenuOpen(false)}
                             />
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-2 z-50 max-h-[400px] overflow-y-auto custom-scrollbar ring-1 ring-black/50">
-                                <div className="text-[10px] font-bold text-zinc-600 px-3 py-2 uppercase tracking-widest">Select Model</div>
-                                {AVAILABLE_MODELS.map(model => (
+                            <div className="absolute right-0 top-full mt-2 w-[480px] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-0 z-50 max-h-[600px] flex flex-col overflow-hidden ring-1 ring-black/50 animate-in fade-in zoom-in-95 duration-200">
+                                {/* Header */}
+                                <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+                                            <HardDrive size={18} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-zinc-100">{t('ai.header.model_manager')}</h3>
+                                            <p className="text-[11px] text-zinc-500">{t('ai.header.manage_models')}</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsModelMenuOpen(false)}
+                                        className="p-2 rounded-lg hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className="flex px-4 pt-3 gap-4 border-b border-white/5 shrink-0">
                                     <button
-                                        key={model.id}
-                                        onClick={() => {
-                                            handleInitModel(model.id);
-                                            setIsModelMenuOpen(false);
-                                        }}
-                                        disabled={isLoading}
+                                        onClick={() => setModelTab('all')}
                                         className={cn(
-                                            "w-full text-left px-3 py-3 rounded-lg text-xs transition-all mb-1 group border",
-                                            currentModelId === model.id 
-                                                ? "bg-white/10 border-white/10 text-zinc-200" 
-                                                : "border-transparent text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                                            "pb-3 text-xs font-medium transition-colors relative",
+                                            modelTab === 'all' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
                                         )}
                                     >
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium text-sm">{model.name}</span>
-                                            {model.recommended && (
-                                                <span className="text-[9px] bg-white/10 text-zinc-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Rec</span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[10px] opacity-60">
-                                            <span className="px-1.5 py-0.5 rounded bg-white/5">{model.vram} VRAM</span>
-                                            <span className="px-1.5 py-0.5 rounded bg-white/5">{model.size}</span>
-                                        </div>
+                                        {t('ai.model.tab.all')}
+                                        {modelTab === 'all' && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
+                                        )}
                                     </button>
-                                ))}
+                                    <button
+                                        onClick={() => setModelTab('downloaded')}
+                                        className={cn(
+                                            "pb-3 text-xs font-medium transition-colors relative flex items-center gap-1.5",
+                                            modelTab === 'downloaded' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                                        )}
+                                    >
+                                        {t('ai.model.tab.downloaded')}
+                                        <span className="bg-white/10 text-zinc-400 px-1.5 py-0.5 rounded-full text-[9px]">{cachedModels.size}</span>
+                                        {modelTab === 'downloaded' && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* List */}
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                    {visibleModels.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
+                                            <Cloud size={32} className="mb-3 opacity-20" />
+                                            <p className="text-sm">{t('ai.model.no_models')}</p>
+                                        </div>
+                                    ) : (
+                                        visibleModels.map(model => {
+                                            const isDownloaded = cachedModels.has(model.id);
+                                            const isActive = currentModelId === model.id;
+                                            
+                                            return (
+                                                <div
+                                                    key={model.id}
+                                                    className={cn(
+                                                        "group relative flex items-start gap-3 p-3 rounded-xl transition-all border",
+                                                        isActive 
+                                                            ? "bg-indigo-500/10 border-indigo-500/20" 
+                                                            : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/5"
+                                                    )}
+                                                >
+                                                    {/* Selection Indicator */}
+                                                    {isActive && (
+                                                        <div className="absolute left-0 top-3 bottom-3 w-1 bg-indigo-500 rounded-r-full" />
+                                                    )}
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className={cn(
+                                                                "font-medium text-sm truncate",
+                                                                isActive ? "text-indigo-200" : "text-zinc-200"
+                                                            )}>
+                                                                {model.name}
+                                                            </span>
+                                                            {model.recommended && (
+                                                                <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-emerald-500/20">
+                                                                    {t('ai.model.recommended')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <p className="text-xs text-zinc-500 mb-2 leading-relaxed">
+                                                            {t(model.description as any)}
+                                                        </p>
+
+                                                        <div className="flex items-center gap-3 text-[10px] font-mono opacity-80">
+                                                            <div className="flex items-center gap-1.5 text-zinc-400">
+                                                                <Zap size={10} />
+                                                                <span>{model.vram} {t('ai.model.vram')}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 text-zinc-400">
+                                                                <Download size={10} />
+                                                                <span>{model.size}</span>
+                                                            </div>
+                                                            {isDownloaded && (
+                                                                <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/5 px-1.5 py-0.5 rounded">
+                                                                    <Check size={10} />
+                                                                    <span>{t('ai.model.tab.downloaded')}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-2 shrink-0">
+                                                        <button
+                                                            onClick={() => {
+                                                                handleInitModel(model.id);
+                                                                setIsModelMenuOpen(false);
+                                                            }}
+                                                            disabled={isLoading}
+                                                            className={cn(
+                                                                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                                                                isActive
+                                                                    ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20"
+                                                                    : "bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
+                                                            )}
+                                                        >
+                                                            {isActive ? t('ai.model.active') : (isDownloaded ? t('ai.model.switch') : t('ai.model.download'))}
+                                                        </button>
+                                                        
+                                                        {isDownloaded && !isActive && (
+                                                            <button
+                                                                onClick={(e) => handleDeleteModel(e, model.id)}
+                                                                className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors self-end"
+                                                                title={t('ai.model.delete')}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
                             </div>
                         </>
                     )}
@@ -337,34 +607,70 @@ export function ChatArea() {
             <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar pb-32">
                 {currentSession.messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full select-none pb-20">
-                        {/* Loading State - Center Prominent */}
+                        {/* Loading State - Circular Progress */}
                         {isLoading && !isModelLoaded && (
                             <div className="flex flex-col items-center gap-6 max-w-sm w-full animate-in fade-in duration-500">
-                                <div className="relative w-20 h-20">
-                                    <div className="absolute inset-0 border-4 border-zinc-800 rounded-full" />
-                                    <div 
-                                        className="absolute inset-0 border-4 border-t-indigo-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin" 
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="text-xs font-mono text-zinc-500">{Math.round(progressValue * 100)}%</span>
+                                <div className="relative w-32 h-32 flex items-center justify-center">
+                                    {/* Background Circle */}
+                                    <svg className="w-full h-full transform -rotate-90">
+                                        <circle
+                                            cx="64"
+                                            cy="64"
+                                            r="58"
+                                            fill="transparent"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                            className="text-zinc-800"
+                                        />
+                                        {/* Progress Circle */}
+                                        <circle
+                                            cx="64"
+                                            cy="64"
+                                            r="58"
+                                            fill="transparent"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                            strokeDasharray={364}
+                                            strokeDashoffset={364 - (364 * progressValue)}
+                                            strokeLinecap="round"
+                                            className="text-indigo-500 transition-all duration-300 ease-out"
+                                        />
+                                    </svg>
+                                    
+                                    {/* Center Text */}
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-3xl font-light text-zinc-200">
+                                            {Math.round(progressValue * 100)}
+                                            <span className="text-sm font-normal text-zinc-500 ml-0.5">%</span>
+                                        </span>
                                     </div>
                                 </div>
+
                                 <div className="text-center space-y-2">
-                                    <h3 className="text-lg font-medium text-zinc-200">Initializing AI Model</h3>
+                                    <h3 className="text-lg font-medium text-zinc-200">
+                                        {progressValue === 1 ? t('ai.loading.finalizing') : t('ai.loading.downloading')}
+                                    </h3>
                                     <p className="text-sm text-zinc-500 max-w-[280px]">
-                                        Downloading and compiling WebGPU shaders. This happens locally on your device.
+                                        {/* If downloading, show generic 'Downloading' message instead of technical progress */}
+                                        {(progress && (progress.startsWith('Fetching') || progress.includes('param cache'))) 
+                                            ? t('ai.loading.downloading') 
+                                            : (progress || t('ai.loading.init'))
+                                        }
                                     </p>
                                     {downloadStats && (
-                                        <p className="text-xs font-mono text-zinc-600 pt-2">
-                                            {downloadStats.downloaded} / {downloadStats.total} ({downloadStats.speed})
-                                        </p>
+                                        <div className="flex items-center justify-center gap-3 text-xs font-mono text-zinc-400 bg-white/5 py-1.5 px-3 rounded-full">
+                                            <span>{downloadStats.downloaded} / {downloadStats.total}</span>
+                                            <span className="w-1 h-1 rounded-full bg-zinc-600" />
+                                            <span>{downloadStats.speed}</span>
+                                        </div>
                                     )}
                                 </div>
+                                
                                 <button 
                                     onClick={cancelLoading}
-                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                    className="text-xs text-red-400 hover:text-red-300 transition-colors px-4 py-2 hover:bg-red-500/10 rounded-lg"
                                 >
-                                    Cancel
+                                    {t('ai.loading.cancel')}
                                 </button>
                             </div>
                         )}
@@ -382,11 +688,10 @@ export function ChatArea() {
                                 
                                 <div className="space-y-2">
                                     <h2 className="text-2xl font-medium text-zinc-100">
-                                        Local AI Assistant
+                                        {t('ai.welcome.title')}
                                     </h2>
-                                    <p className="text-zinc-500 leading-relaxed">
-                                        This AI runs entirely in your browser using WebGPU. <br/>
-                                        Your data never leaves your device.
+                                    <p className="text-zinc-500 leading-relaxed whitespace-pre-line">
+                                        {t('ai.welcome.subtitle')}
                                     </p>
                                 </div>
 
@@ -396,7 +701,7 @@ export function ChatArea() {
                                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl transition-all shadow-lg shadow-white/5 font-medium text-sm group"
                                     >
                                         <Download size={16} className="text-zinc-600 group-hover:text-zinc-900" />
-                                        <span>Load Default Model</span>
+                                        <span>{t('ai.welcome.load_default')}</span>
                                     </button>
                                     
                                     <button
@@ -404,7 +709,7 @@ export function ChatArea() {
                                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
                                     >
                                         <Settings size={16} className="text-zinc-500" />
-                                        <span>Choose Model...</span>
+                                        <span>{t('ai.welcome.choose_model')}</span>
                                     </button>
                                 </div>
                             </div>
@@ -419,15 +724,15 @@ export function ChatArea() {
                                     </div>
                                 </div>
                                 <h2 className="text-xl font-medium mb-2 text-zinc-200">
-                                    How can I help you today?
+                                    {t('ai.welcome.ready_title')}
                                 </h2>
                                 
                                 <div className="grid grid-cols-2 gap-3 mt-8 max-w-lg w-full px-4">
                                     {[
-                                        { icon: Code2, label: "Write Code", desc: "Generate a React component" },
-                                        { icon: PenTool, label: "Creative Writing", desc: "Draft a blog post" },
-                                        { icon: BrainCircuit, label: "Explain Concept", desc: "How does quantum computing work?" },
-                                        { icon: Zap, label: "Brainstorm", desc: "Ideas for a marketing campaign" }
+                                        { icon: Code2, label: t('ai.action.write_code'), desc: t('ai.action.write_code_desc') },
+                                        { icon: PenTool, label: t('ai.action.creative_writing'), desc: t('ai.action.creative_writing_desc') },
+                                        { icon: BrainCircuit, label: t('ai.action.explain_concept'), desc: t('ai.action.explain_concept_desc') },
+                                        { icon: Zap, label: t('ai.action.brainstorm'), desc: t('ai.action.brainstorm_desc') }
                                     ].map((item, i) => (
                                         <button 
                                             key={i}
@@ -466,33 +771,92 @@ export function ChatArea() {
                                 : "text-zinc-300 pl-0"
                         )}>
                             <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
-                                <ReactMarkdown 
-                                    remarkPlugins={[remarkGfm]}
-                                    rehypePlugins={[rehypeHighlight]}
-                                    components={{
-                                        code({node, inline, className, children, ...props}: any) {
-                                            const match = /language-(\w+)/.exec(className || '')
-                                            return !inline && match ? (
-                                                <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                                                    <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
-                                                        <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
+                                {msg.role === 'assistant' && msg.content && (
+                                    (() => {
+                                        // Check for thinking tags
+                                        const thinkMatch = msg.content.match(/<think>([\s\S]*?)<\/think>/);
+                                        const thinkContent = thinkMatch ? thinkMatch[1] : null;
+                                        const mainContent = thinkMatch 
+                                            ? msg.content.replace(/<think>[\s\S]*?<\/think>/, '').trim() 
+                                            : msg.content;
+
+                                        return (
+                                            <>
+                                                {thinkContent && <ThinkingProcess content={thinkContent} />}
+                                                <ReactMarkdown 
+                                                    remarkPlugins={[remarkGfm]}
+                                                    rehypePlugins={[rehypeHighlight]}
+                                                    components={{
+                                                        code({node, inline, className, children, ...props}: any) {
+                                                            const match = /language-(\w+)/.exec(className || '')
+                                                            const codeContent = String(children).replace(/\n$/, '');
+                                                            // Check if it's runnable code (React/JS/TS)
+                                                            const isRunable = match && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts'].includes(match[1]));
+
+                                                            return !inline && match ? (
+                                                                <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                                    <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                                        <span className="text-[10px] text-zinc-500 font-mono uppercase">{match[1]}</span>
+                                                                        {isRunable && (
+                                                                            <button 
+                                                                                onClick={() => handleRunApp(codeContent, match[1])}
+                                                                                className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium transition-colors border border-emerald-500/20"
+                                                                                title="Run this code as an app"
+                                                                            >
+                                                                                <Play size={10} className="fill-current" />
+                                                                                {t('ai.msg.run_app')}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="p-4 overflow-x-auto">
+                                                                        <code className={className} {...props}>
+                                                                            {children}
+                                                                        </code>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                                    {children}
+                                                                </code>
+                                                            )
+                                                        }
+                                                    }}
+                                                >
+                                                    {mainContent || (isLoading ? '...' : '')}
+                                                </ReactMarkdown>
+                                            </>
+                                        );
+                                    })()
+                                )}
+                                {msg.role !== 'assistant' && (
+                                    <ReactMarkdown 
+                                        remarkPlugins={[remarkGfm]}
+                                        rehypePlugins={[rehypeHighlight]}
+                                        components={{
+                                            code({node, inline, className, children, ...props}: any) {
+                                                const match = /language-(\w+)/.exec(className || '')
+                                                return !inline && match ? (
+                                                    <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                        <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                            <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
+                                                        </div>
+                                                        <div className="p-4 overflow-x-auto">
+                                                            <code className={className} {...props}>
+                                                                {children}
+                                                            </code>
+                                                        </div>
                                                     </div>
-                                                    <div className="p-4 overflow-x-auto">
-                                                        <code className={className} {...props}>
-                                                            {children}
-                                                        </code>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
-                                                    {children}
-                                                </code>
-                                            )
-                                        }
-                                    }}
-                                >
-                                    {msg.content || (msg.role === 'assistant' && isLoading ? '...' : '')}
-                                </ReactMarkdown>
+                                                ) : (
+                                                    <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                        {children}
+                                                    </code>
+                                                )
+                                            }
+                                        }}
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
+                                )}
                             </div>
 
                             {/* Copy Button for AI Messages */}
@@ -501,17 +865,17 @@ export function ChatArea() {
                                     <button
                                         onClick={() => handleCopyMessage(msg.content, msg.id)}
                                         className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1.5"
-                                        title="Copy message"
+                                        title={t('ai.msg.copy')}
                                     >
                                         {copiedMessageId === msg.id ? (
                                             <>
                                                 <Check size={14} className="text-emerald-500" />
-                                                <span className="text-[10px] text-emerald-500">Copied</span>
+                                                <span className="text-[10px] text-emerald-500">{t('ai.msg.copied')}</span>
                                             </>
                                         ) : (
                                             <>
                                                 <Copy size={14} />
-                                                <span className="text-[10px]">Copy</span>
+                                                <span className="text-[10px]">{t('ai.msg.copy')}</span>
                                             </>
                                         )}
                                     </button>
@@ -528,13 +892,13 @@ export function ChatArea() {
                     <div className="max-w-xl mx-auto bg-red-500/5 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-red-200 backdrop-blur-sm">
                         <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-400" />
                         <div className="flex-1">
-                            <h3 className="font-medium text-sm mb-1 text-red-400">Engine Error</h3>
+                            <h3 className="font-medium text-sm mb-1 text-red-400">{t('ai.loading.engine_error')}</h3>
                             <p className="text-xs opacity-80">{engineError}</p>
                             <button 
                                 onClick={() => handleInitModel()}
                                 className="mt-3 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-xs font-medium text-red-400 transition-colors"
                             >
-                                Retry Initialization
+                                {t('ai.loading.retry')}
                             </button>
                         </div>
                     </div>
@@ -559,7 +923,7 @@ export function ChatArea() {
                             onKeyDown={handleKeyDown}
                             onFocus={() => setIsComposing(true)}
                             onBlur={() => setIsComposing(false)}
-                            placeholder={isModelLoaded ? "Message AI..." : "Please load a model to start chatting"}
+                            placeholder={isModelLoaded ? t('ai.input.placeholder') : t('ai.input.placeholder_disabled')}
                             disabled={!isModelLoaded && !isLoading}
                             className={cn(
                                 "w-full bg-transparent text-zinc-100 pl-5 pr-14 py-4 max-h-[200px] min-h-[56px] resize-none outline-none custom-scrollbar text-[15px] leading-relaxed transition-colors",
@@ -573,7 +937,7 @@ export function ChatArea() {
                                 <button 
                                     onClick={cancelLoading}
                                     className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/5 transition-all"
-                                    title="Stop generation"
+                                    title={t('ai.loading.cancel')}
                                 >
                                     <StopCircle size={18} />
                                 </button>
@@ -596,7 +960,7 @@ export function ChatArea() {
                     
                     <div className="text-center mt-3">
                         <p className="text-[10px] text-zinc-600 font-medium">
-                            AI can make mistakes. Check important info.
+                            {t('ai.input.footer')}
                         </p>
                     </div>
                 </div>

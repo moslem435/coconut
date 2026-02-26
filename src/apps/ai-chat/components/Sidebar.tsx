@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
+import { useLanguageStore } from '@/os/kernel/useLanguageStore';
 import { 
     Plus, 
     Trash2, 
@@ -21,6 +22,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export function Sidebar() {
+    const { t } = useLanguageStore();
     const { 
         sessions, 
         currentSessionId, 
@@ -102,13 +104,13 @@ export function Sidebar() {
         const groups: Record<string, typeof sessions> = {};
         
         filteredSessions.forEach(session => {
-            const group = getRelativeDateGroup(session.updatedAt);
-            if (!groups[group]) groups[group] = [];
-            groups[group].push(session);
+            const groupKey = getRelativeDateGroup(session.updatedAt);
+            if (!groups[groupKey]) groups[groupKey] = [];
+            groups[groupKey].push(session);
         });
-
+        
         // Sort order for keys
-        const order = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
+        const order = ['ai.date.today', 'ai.date.yesterday', 'ai.date.previous_7_days', 'ai.date.previous_30_days', 'ai.date.older'];
         
         return order
             .filter(key => groups[key] && groups[key].length > 0)
@@ -138,12 +140,12 @@ export function Sidebar() {
                         <div className="w-8 h-8 flex items-center justify-center">
                             <Sparkles size={18} className="text-zinc-100" />
                         </div>
-                        <span className="font-medium tracking-wide text-sm">AI Assistant</span>
+                        <span className="font-medium tracking-wide text-sm">{t('app.ai-chat')}</span>
                      </div>
                      <button 
                         onClick={handleToggle}
                         className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-zinc-200 transition-colors"
-                        title="Close Sidebar"
+                        title={t('ai.sidebar.close')}
                     >
                         <PanelLeftClose size={18} />
                     </button>
@@ -155,7 +157,7 @@ export function Sidebar() {
                     className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-200 rounded-lg transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
                 >
                     <Plus size={16} className="text-zinc-400 group-hover:text-zinc-200 transition-colors" />
-                    <span>New Chat</span>
+                    <span>{t('ai.sidebar.new_chat')}</span>
                 </button>
 
                 {/* Search */}
@@ -163,7 +165,7 @@ export function Sidebar() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
                     <input 
                         type="text"
-                        placeholder="Search..."
+                        placeholder={t('ai.sidebar.search')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-transparent border-b border-white/10 focus:border-white/20 py-2 pl-9 pr-3 text-sm text-zinc-200 placeholder:text-zinc-700 outline-none transition-all"
@@ -175,14 +177,14 @@ export function Sidebar() {
             <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar" style={{ minWidth: sidebarWidth }}>
                 {groupedSessions.length === 0 ? (
                     <div className="text-center py-10">
-                        <p className="text-xs text-zinc-700">No chats found</p>
+                        <p className="text-xs text-zinc-700">{t('ai.sidebar.no_chats')}</p>
                     </div>
                 ) : (
                     <div className="space-y-6">
                         {groupedSessions.map((group) => (
                             <div key={group.title} className="space-y-1">
                                 <h3 className="px-3 text-[10px] font-medium text-zinc-500 uppercase tracking-widest mb-2 sticky top-0 py-1 z-10">
-                                    {group.title}
+                                    {t(group.title as any)}
                                 </h3>
                                 {group.items.map(session => (
                                     <div 
@@ -218,7 +220,7 @@ export function Sidebar() {
                                                         deleteSession(session.id);
                                                     }}
                                                     className="p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/item:opacity-100"
-                                                    title="Delete chat"
+                                                    title={t('ai.sidebar.delete')}
                                                 >
                                                     <Trash2 size={13} />
                                                 </button>

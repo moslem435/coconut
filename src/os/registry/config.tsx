@@ -30,6 +30,7 @@ register(require('@/apps/task-manager/manifest').manifest)
 register(require('@/apps/emulator/manifest').manifest)
 register(require('@/apps/ai-chat/manifest').manifest)
 register(require('@/apps/yume/manifest').manifest)
+register(require('@/apps/code-runner/manifest').manifest)
 
 
 // Register Internal Utility Apps (Components used as apps)

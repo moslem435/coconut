@@ -46,6 +46,7 @@
     "react-dropzone": "^15.0.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.6.2",
+    "react-runner": "^1.0.5",
     "react-virtualized-auto-sizer": "^2.0.2",
     "react-window": "^2.2.6",
     "react-zoom-pan-pinch": "^3.7.0",
