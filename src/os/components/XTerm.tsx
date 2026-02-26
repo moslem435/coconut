@@ -1,3 +1,22 @@
+/**
+ * XTerm 终端组件
+ * 
+ * 功能：
+ * - 集成 xterm.js 提供完整的终端模拟器功能
+ * - 连接 WebContainer 实现浏览器内的 Shell 环境
+ * - 支持主题切换、透明度、自适应调整大小
+ * - 提供右键菜单（复制、粘贴、清屏、重置）
+ * 
+ * 技术栈：
+ * - xterm.js：终端渲染引擎
+ * - WebContainer：浏览器内的 Node.js 运行时
+ * - FitAddon：自适应终端尺寸
+ * - WebLinksAddon：URL 链接识别与点击
+ * 
+ * @author System
+ * @created 2024
+ */
+
 import React, { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -7,26 +26,48 @@ import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { logger } from '@/os/utils/logger'
 import '@xterm/xterm/css/xterm.css'
 
+/**
+ * XTerm 组件属性
+ */
 interface XTermProps {
+  /** 自定义 CSS 类名 */
   className?: string
+  /** 自定义样式 */
   style?: React.CSSProperties
 }
 
+/**
+ * XTerm 终端组件
+ * 
+ * 生命周期：
+ * 1. 启动 WebContainer
+ * 2. 初始化 xterm.js 实例
+ * 3. 连接 Shell 进程（jsh）
+ * 4. 监听窗口大小变化并自适应
+ * 
+ * @param props - 组件属性
+ */
 const XTerm: React.FC<XTermProps> = ({ className, style }) => {
+  // DOM 引用
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const processRef = useRef<any>(null)
+  const processRef = useRef<any>(null) // Shell 进程引用
+
+  // 系统设置
   const { theme, useTransparency } = useSystemSettings()
 
-  // Context Menu State
+  // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
 
+  // WebContainer 状态
   const { instance, boot, isBooting, error } = useWebContainerStore()
   const [isReady, setIsReady] = useState(false)
 
-  // Debug: Log WebContainer state
+  /**
+   * 调试日志：记录 WebContainer 状态变化
+   */
   useEffect(() => {
     logger.debug('[XTerm] WebContainer state:', {
       hasInstance: !!instance,
@@ -36,7 +77,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     })
   }, [instance, isBooting, error, isReady])
 
-  // Theme Update Effect
+  /**
+   * 主题更新：动态切换终端配色方案
+   * 支持深色/浅色主题，以及透明背景
+   */
   useEffect(() => {
     if (!xtermRef.current) return
 
@@ -65,7 +109,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     }
   }, [theme, useTransparency])
 
-  // 1. Boot WebContainer
+  /**
+   * 步骤 1：启动 WebContainer
+   * WebContainer 是浏览器内的 Node.js 运行时，需要先启动才能运行 Shell
+   */
   useEffect(() => {
     logger.debug('[XTerm] Calling WebContainer boot...')
     boot().then(() => {
@@ -75,7 +122,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     })
   }, [boot])
 
-  // 2. Initialize XTerm
+  /**
+   * 步骤 2：初始化 xterm.js 实例
+   * 配置终端外观、字体、颜色主题等
+   */
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return
 
@@ -134,10 +184,22 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     }
   }, [])
 
-  // 3. Connect WebContainer to XTerm
+  /**
+   * 步骤 3：连接 WebContainer 到 XTerm
+   * 启动 jsh（JavaScript Shell）并建立输入输出管道
+   */
   useEffect(() => {
     if (!instance || !xtermRef.current || isReady) return
 
+    /**
+     * 启动 Shell 进程
+     * 
+     * 流程：
+     * 1. 清空终端并显示启动信息
+     * 2. 使用 WebContainer 的 spawn API 启动 jsh
+     * 3. 建立双向数据流：Shell 输出 → XTerm，XTerm 输入 → Shell
+     * 4. 清理提示符格式（替换随机路径为友好名称）
+     */
     const startShell = async () => {
       const term = xtermRef.current!
 
@@ -200,7 +262,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   }, [instance, isReady])
 
 
-  // 4. Handle resize with ResizeObserver
+  /**
+   * 步骤 4：处理终端尺寸自适应
+   * 使用 ResizeObserver 监听容器大小变化，自动调整终端行列数
+   */
   useEffect(() => {
     if (!terminalRef.current || !fitAddonRef.current) return
 
@@ -209,9 +274,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         if (!fitAddonRef.current || !xtermRef.current) return
 
         try {
+          // 调整终端尺寸以适应容器
           fitAddonRef.current.fit()
 
-          // Resize the pty if connected
+          // 同步调整 Shell 进程的 PTY 尺寸
           if (processRef.current) {
             processRef.current.resize({
               cols: xtermRef.current.cols,
@@ -219,7 +285,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
             })
           }
         } catch (e) {
-          // Ignore resize errors during dispose
+          // 忽略销毁时的调整错误
         }
       })
     })
@@ -229,19 +295,33 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
     return () => observer.disconnect()
   }, [])
 
-  // 5. Context Menu Handler
+  /**
+   * 步骤 5：右键菜单处理
+   * 显示上下文菜单（复制、粘贴、清屏、重置）
+   */
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY })
   }
 
-  // Close context menu on click elsewhere
+  /**
+   * 点击其他区域时关闭右键菜单
+   */
   useEffect(() => {
     const handleClick = () => setContextMenu(null)
     window.addEventListener('click', handleClick)
     return () => window.removeEventListener('click', handleClick)
   }, [])
 
+  /**
+   * 处理右键菜单操作
+   * 
+   * @param action - 操作类型
+   *   - copy: 复制选中文本到剪贴板
+   *   - paste: 从剪贴板粘贴文本
+   *   - clear: 清空终端缓冲区
+   *   - reset: 硬重置终端状态
+   */
   const handleAction = (action: 'copy' | 'paste' | 'clear' | 'reset') => {
     if (!xtermRef.current) return
 

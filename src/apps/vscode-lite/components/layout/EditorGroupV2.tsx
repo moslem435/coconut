@@ -1,3 +1,23 @@
+/**
+ * 编辑器组 V2
+ * 
+ * 功能：
+ * - 管理多个打开的文件标签页
+ * - 显示文件路径面包屑导航
+ * - 支持标签页切换、关闭
+ * - 显示未保存状态（白点标记）
+ * - 集成 Monaco Editor 进行代码编辑
+ * 
+ * 架构：
+ * - 标签栏：显示所有打开的文件，支持点击切换
+ * - 面包屑：显示当前文件的完整路径
+ * - 编辑器区域：Monaco Editor 实例
+ * - 空状态：未打开文件时的提示界面
+ * 
+ * @author System
+ * @created 2024
+ */
+
 'use client'
 
 import React from 'react'
@@ -7,24 +27,33 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { EditorComponent } from '../Editor'
 import { getFileIcon } from '../../utils/fileIcons'
 
+/**
+ * 编辑器组组件
+ * 
+ * 负责协调文件标签、面包屑导航和编辑器实例
+ */
 export const EditorGroupV2: React.FC = () => {
+  // 编辑器状态管理
   const {
-    openFiles,
-    activeFileId,
-    setActiveFile,
-    closeFile,
-    openFile,
-    updateContent,
-    saveFile,
-    getFileContent,
-    isDirty
+    openFiles,          // 所有打开的文件 ID 列表
+    activeFileId,       // 当前激活的文件 ID
+    setActiveFile,      // 切换激活文件
+    closeFile,          // 关闭文件
+    openFile,           // 打开文件
+    updateContent,      // 更新文件内容
+    saveFile,           // 保存文件
+    getFileContent,     // 获取文件内容
+    isDirty             // 检查文件是否有未保存的修改
   } = useEditorStateV2()
 
+  // 文件系统访问
   const { files, readFileContent, updateFileContent } = useFileSystemStore()
 
-
-
-  // 保存文件
+  /**
+   * 保存文件到文件系统
+   * 
+   * @param fileId - 文件 ID
+   */
   const handleSave = async (fileId: string) => {
     const content = getFileContent(fileId)
     if (content !== undefined) {

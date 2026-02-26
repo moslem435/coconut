@@ -1,3 +1,30 @@
+/**
+ * 桌面组件
+ * 
+ * 功能：
+ * - 显示桌面背景（壁纸、渐变、纯色）
+ * - 管理桌面图标的布局和交互
+ * - 支持图标拖拽、选择、双击打开
+ * - 显示桌面小部件（天气等）
+ * - 处理右键菜单
+ * - 应用启动动画（Splash Screen）
+ * 
+ * 架构：
+ * - DesktopBackground：背景层（壁纸、动态壁纸）
+ * - DesktopIcons：图标层（文件、文件夹、应用快捷方式）
+ * - DesktopWidgets：小部件层（天气、时钟等）
+ * - SplashScreenPortal：启动动画层
+ * 
+ * 性能优化：
+ * - 使用 useMemo 缓存桌面项目列表
+ * - 使用 useCallback 优化事件处理函数
+ * - 图标位置计算采用网格布局算法
+ * - 背景亮度分析用于自适应文字颜色
+ * 
+ * @author System
+ * @created 2024
+ */
+
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
@@ -10,30 +37,42 @@ import { useWallpaper } from '@/os/hooks/useWallpaper'
 import { getImageBrightness, getColorBrightness, isDarkBrightness } from '@/os/utils/color'
 import { eventBus } from '@/os/kernel/EventBus'
 
-// Sub-components
+// 子组件
 import { DesktopBackground } from './desktop/DesktopBackground'
 import { DesktopIcons } from './desktop/DesktopIcons'
 import { DesktopWidgets } from './desktop/DesktopWidgets'
 import { SplashScreenPortal } from './desktop/SplashScreenPortal'
 
+/**
+ * 桌面主组件
+ * 
+ * 负责协调背景、图标、小部件和启动动画的显示
+ */
 export default function Desktop() {
-    // System settings
+    // 系统设置
     const {
-        snapToGrid, wallpaper, showWeatherWidget
+        snapToGrid,           // 是否启用网格对齐
+        wallpaper,            // 壁纸配置
+        showWeatherWidget     // 是否显示天气小部件
     } = useSystemSettings()
 
-    // Wallpaper Hook
+    // 壁纸管理
     const {
-        activeWallpaper,
-        loadedWallpaper,
-        isLoading: isWallpaperLoading,
-        getTransitionStyle
+        activeWallpaper,        // 当前激活的壁纸 URL
+        loadedWallpaper,        // 已加载的壁纸 URL
+        isLoading: isWallpaperLoading,  // 壁纸加载状态
+        getTransitionStyle      // 获取过渡动画样式
     } = useWallpaper(wallpaper)
 
-    // Background Brightness State
+    // 背景亮度状态（用于自适应文字颜色）
     const [isDarkBackground, setIsDarkBackground] = useState(true)
 
-    // Calculate background brightness
+    /**
+     * 计算背景亮度
+     * 
+     * 根据壁纸类型（图片、纯色、渐变）分析亮度，
+     * 自动调整图标文字颜色（深色背景用白字，浅色背景用黑字）
+     */
     useEffect(() => {
         if (!activeWallpaper) return
 
@@ -66,10 +105,10 @@ export default function Desktop() {
         checkBrightness()
     }, [activeWallpaper, wallpaper?.type])
 
-    // Context Menu
+    // 右键菜单
     const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
 
-    // File System
+    // 文件系统
     const { isLoading, files, readFileContent } = useFileSystemStore(
         useShallow(state => ({
             isLoading: state.isLoading,
@@ -78,44 +117,63 @@ export default function Desktop() {
         }))
     )
 
+    /**
+     * 桌面项目列表
+     * 筛选出 parentId 为 'desktop' 的文件和文件夹
+     */
     const desktopItems = useMemo(() =>
         Object.values(files).filter(f => f.parentId === 'desktop'),
         [files]
     )
 
-    // Selection State
+    // 图标选择状态
     const { selectedIds: selectedIcons, handleSelect, clearSelection, setSelectedIds: setSelectedIcons } = useFileSelection(desktopItems)
 
-    // Custom Hooks
+    // 桌面网格布局
     const {
-        iconPositions, isLayoutReady, handleDragEnd,
-        currentGridSize, currentGridPadding, scaleFactor
+        iconPositions,        // 图标位置映射表
+        isLayoutReady,        // 布局是否就绪
+        handleDragEnd,        // 拖拽结束处理
+        currentGridSize,      // 当前网格大小
+        currentGridPadding,   // 当前网格间距
+        scaleFactor           // 缩放因子
     } = useDesktopGrid({ desktopItems, selectedIcons })
 
+    // 桌面交互（双击打开、启动动画）
     const {
-        splashingApp,
-        handleDoubleClick: handleIconDoubleClick,
-        handleSplashComplete
+        splashingApp,                     // 正在启动的应用
+        handleDoubleClick: handleIconDoubleClick,  // 双击处理
+        handleSplashComplete              // 启动动画完成
     } = useDesktopInteraction()
 
-    // Local State
+    // 本地状态
     const [dragPreview, setDragPreview] = useState<{ x: number, y: number } | null>(null)
     const [mounted, setMounted] = useState(false)
     const [isDesktopVisible, setIsDesktopVisible] = useState(false)
     const desktopRef = useRef<HTMLDivElement | null>(null)
 
-    // Initialization - 合并初始化逻辑
+    /**
+     * 初始化：设置挂载状态和可见性
+     */
     useEffect(() => {
         setMounted(true)
         setIsDesktopVisible(true)
     }, [])
 
-    // Interaction Handlers - 使用 useCallback 优化
+    /**
+     * 图标点击处理（支持多选）
+     * 使用 useCallback 避免不必要的重新渲染
+     */
     const handleIconClick = useCallback((id: string, e: React.MouseEvent) => {
         e.stopPropagation()
         handleSelect(id, e)
     }, [handleSelect])
 
+    /**
+     * 图标双击处理（打开文件或应用）
+     * 
+     * @param id - 图标 ID
+     */
     const handleDoubleClick = useCallback((id: string) => {
         setSelectedIcons([])
         const item = desktopItems.find(i => i.id === id)
@@ -123,7 +181,10 @@ export default function Desktop() {
         handleIconDoubleClick(item, readFileContent)
     }, [desktopItems, setSelectedIcons, handleIconDoubleClick, readFileContent])
 
-    // Global Error Handling
+    /**
+     * 全局错误处理
+     * 捕获未处理的异常和 Promise 拒绝，发送到事件总线
+     */
     useEffect(() => {
         const handleError = (event: ErrorEvent) => {
             eventBus.emit('sys:error', {

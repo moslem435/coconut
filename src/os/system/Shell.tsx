@@ -1,3 +1,30 @@
+/**
+ * Shell 组件 - 操作系统外壳
+ * 
+ * 功能：
+ * - 系统初始化（内核、文件系统、进程管理）
+ * - 窗口管理（创建、销毁、层级控制）
+ * - 任务栏（应用启动、窗口切换、系统托盘）
+ * - 桌面环境（图标、壁纸、小部件）
+ * - 全局快捷键
+ * - 上下文菜单
+ * - 全局对话框（提示、确认、输入）
+ * 
+ * 架构层次（从下到上）：
+ * 1. Desktop Layer (z-0)：桌面背景和图标
+ * 2. Window Layer (z-100~5000)：应用窗口
+ * 3. Taskbar Layer (z-200)：任务栏
+ * 4. Dialog Layer (z-99999)：全局对话框
+ * 
+ * 性能优化：
+ * - 使用 useShallow 只订阅窗口 ID 列表，避免窗口状态变化导致 Shell 重渲染
+ * - AnimatePresence 管理窗口的进入/退出动画
+ * - 进程管理采用定时器轮询（2 秒间隔）
+ * 
+ * @author System
+ * @created 2024
+ */
+
 import { useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -7,34 +34,54 @@ import { useShallow } from 'zustand/react/shallow'
 import { Kernel } from '@/os/kernel/Kernel'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { logger } from '@/os/utils/logger'
-import { Zap } from 'lucide-react'
 
-// Components
+// 组件
 import Taskbar from './Taskbar'
 import ContextMenu from './ContextMenu'
 import Desktop from './Desktop'
 import Window from './Window'
 import GlobalShortcuts from './GlobalShortcuts'
-
 import GlobalDialogs from './GlobalDialogs'
 
+/**
+ * Shell 组件属性
+ */
 interface ShellProps {
+  /** 关机回调函数 */
   onShutdown?: () => void
 }
 
+/**
+ * Shell 主组件
+ * 
+ * 负责协调桌面、窗口、任务栏和全局功能
+ */
 export default function Shell({ onShutdown }: ShellProps) {
-  // Optimize: Only subscribe to the list of window IDs.
-  // Shell will only re-render when a window is added or removed.
+  /**
+   * 性能优化：只订阅窗口 ID 列表
+   * Shell 只在窗口添加或删除时重新渲染，窗口内部状态变化不会触发
+   */
   const windowIds = useWindowStore(useShallow(state => Object.keys(state.windows)))
 
-  // VFS Sync
+  // 文件系统初始化
   const { initialize } = useFileSystemStore()
 
-  // 合并初始化逻辑
+  /**
+   * 系统初始化
+   * 
+   * 流程：
+   * 1. 启动内核（事件总线、系统服务）
+   * 2. 初始化虚拟文件系统（VFS）
+   * 3. 启动进程管理器定时器（2 秒轮询）
+   */
   useEffect(() => {
+    // 初始化内核
     Kernel.init()
+    
+    // 初始化文件系统
     initialize().catch(logger.error)
 
+    // 启动进程管理器定时器
     const interval = setInterval(() => {
       useProcessStore.getState().tick()
     }, 2000)
@@ -42,28 +89,31 @@ export default function Shell({ onShutdown }: ShellProps) {
     return () => clearInterval(interval)
   }, [initialize])
 
+  // 开始菜单状态
   const { isStartMenuOpen, toggleStartMenu, setStartMenuOpen } = useSystemStore()
 
+  /**
+   * 开始按钮点击处理
+   */
   const handleStartClick = () => {
     toggleStartMenu()
   }
 
   return (
     <>
-      {/* 1. Desktop Layer (Always Present) */}
+      {/* 1. 桌面层（始终存在，z-0） */}
       <div className="fixed inset-0 z-0">
         <Desktop />
       </div>
 
-      {/* 2. Window Manager / App Layer */}
+      {/* 2. 窗口管理层（z-100~5000） */}
       <AnimatePresence>
-        {/* Windows */}
         {windowIds.map(id => (
           <Window key={id} id={id} />
         ))}
       </AnimatePresence>
 
-      {/* Status Bar - z-[200] */}
+      {/* 3. 任务栏（z-200） */}
       <Taskbar
         onStartClick={handleStartClick}
         isStartMenuOpen={isStartMenuOpen}
@@ -71,11 +121,13 @@ export default function Shell({ onShutdown }: ShellProps) {
         onShutdown={onShutdown}
       />
 
-      {/* Context Menu */}
+      {/* 4. 右键菜单 */}
       <ContextMenu />
 
-      {/* Global Dialogs - z-[99999] */}
+      {/* 5. 全局对话框（z-99999） */}
       <GlobalDialogs />
+      
+      {/* 6. 全局快捷键 */}
       <GlobalShortcuts />
     </>
   )

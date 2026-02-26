@@ -60,6 +60,14 @@ export const useEditorStateV2 = create<EditorStateV2>((set, get) => ({
     }
   }),
 
+  /**
+   * 关闭文件
+   * 
+   * 从打开列表中移除文件，清理缓存和元数据。
+   * 如果关闭的是当前激活文件，则切换到最后一个打开的文件。
+   * 
+   * @param fileId - 文件 ID
+   */
   closeFile: (fileId) => set((state) => {
     const newOpenFiles = state.openFiles.filter(id => id !== fileId)
     const { [fileId]: removed, ...remainingMetadata } = state.fileMetadata
@@ -81,8 +89,21 @@ export const useEditorStateV2 = create<EditorStateV2>((set, get) => ({
     }
   }),
 
+  /**
+   * 设置激活文件
+   * 
+   * @param fileId - 文件 ID
+   */
   setActiveFile: (fileId) => set({ activeFileId: fileId }),
 
+  /**
+   * 更新文件内容
+   * 
+   * 更新 LRU 缓存中的内容，并标记文件为 dirty（如果内容与保存的内容不同）。
+   * 
+   * @param fileId - 文件 ID
+   * @param content - 新内容
+   */
   updateContent: (fileId, content) => set((state) => {
     const existing = state.fileMetadata[fileId]
     if (!existing) return state
@@ -102,6 +123,13 @@ export const useEditorStateV2 = create<EditorStateV2>((set, get) => ({
     }
   }),
 
+  /**
+   * 保存文件
+   * 
+   * 将当前内容标记为已保存，清除 dirty 标记。
+   * 
+   * @param fileId - 文件 ID
+   */
   saveFile: (fileId) => set((state) => {
     const existing = state.fileMetadata[fileId]
     const content = fileContentCache.get(fileId)
@@ -119,14 +147,39 @@ export const useEditorStateV2 = create<EditorStateV2>((set, get) => ({
     }
   }),
 
+  /**
+   * 获取文件内容
+   * 
+   * 从 LRU 缓存中读取文件内容
+   * 
+   * @param fileId - 文件 ID
+   * @returns 文件内容或 undefined
+   */
   getFileContent: (fileId) => fileContentCache.get(fileId),
 
+  /**
+   * 检查文件是否有未保存的修改
+   * 
+   * @param fileId - 文件 ID
+   * @returns 是否 dirty
+   */
   isDirty: (fileId) => get().fileMetadata[fileId]?.isDirty ?? false,
 
+  /**
+   * 获取所有有未保存修改的文件
+   * 
+   * @returns 文件 ID 列表
+   */
   getDirtyFiles: () => {
     const { fileMetadata } = get()
     return Object.keys(fileMetadata).filter(id => fileMetadata[id]?.isDirty)
   },
 
+  /**
+   * 设置光标位置
+   * 
+   * @param ln - 行号
+   * @param col - 列号
+   */
   setCursorPosition: (ln, col) => set({ cursorPosition: { ln, col } })
 }))
