@@ -1,9 +1,12 @@
 export interface Message {
     id: string;
-    role: 'user' | 'assistant' | 'system';
+    role: 'user' | 'assistant' | 'system' | 'tool';
     content: string;
     timestamp: number;
     error?: boolean;
+    mode?: 'chat' | 'control' | 'builder';
+    tool_calls?: any[];
+    tool_call_id?: string;
 }
 
 export interface ChatSession {
@@ -40,7 +43,14 @@ export interface ChatState {
     deleteSession: (id: string) => void;
     selectSession: (id: string) => void;
     updateSessionTitle: (id: string, title: string) => void;
-    addMessage: (sessionId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
+    addMessage: (
+        sessionId: string, 
+        role: 'user' | 'assistant' | 'system' | 'tool', 
+        content: string, 
+        mode?: 'chat' | 'control' | 'builder',
+        tool_calls?: any[],
+        tool_call_id?: string
+    ) => void;
     updateLastMessage: (sessionId: string, content: string) => void;
     setSidebarOpen: (isOpen: boolean) => void;
     updateModelSettings: (settings: Partial<ChatState['modelSettings']>) => void;

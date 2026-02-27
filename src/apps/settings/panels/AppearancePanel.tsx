@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Box, Shapes, Loader2 } from 'lucide-react'
 import { useSystem } from '@/os/sdk'
 import { useLanguage } from '@/os/kernel/LanguageContext'
@@ -23,6 +23,41 @@ export function AppearancePanel() {
 
     const accentColors = getAccentColors(t)
     const wallpaperOptions = getWallpaperOptions(t)
+    
+    // Local state for color picker to prevent lag
+    const [localColor, setLocalColor] = useState(accentColor)
+    const timeoutRef = useRef<NodeJS.Timeout>()
+
+    // Sync local color when external changes happen
+    useEffect(() => {
+        if (!timeoutRef.current) {
+            setLocalColor(accentColor)
+        }
+    }, [accentColor])
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current)
+            }
+        }
+    }, [])
+
+    const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newColor = e.target.value
+        setLocalColor(newColor)
+        
+        // Debounce the actual system update
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
+        
+        timeoutRef.current = setTimeout(() => {
+            setAccentColor(newColor)
+            timeoutRef.current = undefined
+        }, 50) // 50ms delay for smoother dragging
+    }
 
     const handleWallpaperSelect = (wp: any) => {
         if (wp.value === 'daily') {
@@ -108,7 +143,8 @@ export function AppearancePanel() {
             </SettingSection>
 
             <SettingSection title={t('settings.appearance.accent')}>
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-3 flex-wrap items-center">
+                    {/* Default Colors */}
                     {accentColors.map((color) => (
                         <Tooltip key={color.value} content={color.name} side="top">
                             <button
@@ -122,6 +158,36 @@ export function AppearancePanel() {
                             />
                         </Tooltip>
                     ))}
+
+                    {/* Custom Color Picker */}
+                    <div className="w-px h-8 bg-[var(--os-border)] mx-2" />
+                    
+                    <div className="flex items-center gap-3">
+                        <Tooltip content={t('settings.appearance.customColor')} side="top">
+                            <label className={`relative flex items-center justify-center w-10 h-10 rounded-full overflow-hidden border-2 transition-all hover:scale-110 active:scale-95 cursor-pointer ${
+                                !accentColors.some(c => c.value === accentColor) ? 'scale-110 border-[var(--os-text-primary)]' : 'border-transparent'
+                            }`}>
+                                <input
+                                    type="color"
+                                    value={localColor}
+                                    onChange={handleColorChange}
+                                    className="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 p-0 border-0 cursor-pointer opacity-0"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-br from-red-500 via-green-500 to-blue-500" />
+                            </label>
+                        </Tooltip>
+                        
+                        {!accentColors.some(c => c.value === accentColor) && (
+                            <div className="flex flex-col">
+                                <span className="text-xs font-medium text-[var(--os-text-primary)]">
+                                    {t('settings.appearance.customColor')}
+                                </span>
+                                <span className="text-[10px] text-[var(--os-text-secondary)] font-mono uppercase">
+                                    {localColor}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </SettingSection>
 

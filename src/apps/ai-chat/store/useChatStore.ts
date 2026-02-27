@@ -18,8 +18,15 @@ interface ChatStore {
     deleteSession: (id: string) => void;
     selectSession: (id: string) => void;
     updateSessionTitle: (id: string, title: string) => void;
-    addMessage: (sessionId: string, role: 'user' | 'assistant' | 'system', content: string) => void;
-    updateLastMessage: (sessionId: string, content: string) => void;
+    addMessage: (
+        sessionId: string, 
+        role: 'user' | 'assistant' | 'system' | 'tool', 
+        content: string, 
+        mode?: 'chat' | 'control' | 'builder',
+        tool_calls?: any[],
+        tool_call_id?: string
+    ) => void;
+    updateLastMessage: (sessionId: string, updates: Partial<Omit<Message, 'id' | 'timestamp'>>) => void;
     toggleSidebar: () => void;
     updateModelSettings: (settings: Partial<ChatStore['modelSettings']>) => void;
     loadSessions: () => Promise<void>;
@@ -84,7 +91,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         });
     },
 
-    addMessage: (sessionId, role, content) => {
+    addMessage: (sessionId, role, content, mode, tool_calls, tool_call_id) => {
         set(state => {
             const sessions = state.sessions.map(s => {
                 if (s.id !== sessionId) return s;
@@ -93,7 +100,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                     id: uuidv4(),
                     role,
                     content,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    mode,
+                    tool_calls,
+                    tool_call_id
                 };
 
                 // Auto-generate title for first user message
@@ -115,7 +125,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         });
     },
 
-    updateLastMessage: (sessionId, content) => {
+    updateLastMessage: (sessionId, updates) => {
         set(state => {
             const sessions = state.sessions.map(s => {
                 if (s.id !== sessionId) return s;
@@ -124,7 +134,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 if (messages.length > 0) {
                     messages[messages.length - 1] = {
                         ...messages[messages.length - 1],
-                        content
+                        ...updates
                     } as Message;
                 }
 

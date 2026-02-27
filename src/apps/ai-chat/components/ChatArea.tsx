@@ -33,13 +33,58 @@ import {
     Cloud,
     ChevronDown,
     ChevronRight,
-    Lightbulb
+    Lightbulb,
+    MessageSquare,
+    Settings2,
+    Hammer,
+    Terminal
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
+}
+
+// Tool Call Card Component
+function ToolCallCard({ toolName, args, result }: { toolName: string, args: any, result?: string }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="my-2 rounded-lg border border-white/10 bg-black/20 overflow-hidden">
+            <div
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <Terminal size={14} className="text-emerald-400" />
+                <span className="text-xs font-mono text-emerald-300 flex-1">
+                    {toolName}
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                    {isExpanded ? 'Hide' : 'Show'}
+                </span>
+            </div>
+
+            {isExpanded && (
+                <div className="p-3 border-t border-white/5 space-y-2">
+                    <div>
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Arguments</div>
+                        <pre className="text-[10px] font-mono text-zinc-300 bg-black/30 p-2 rounded overflow-x-auto">
+                            {JSON.stringify(args, null, 2)}
+                        </pre>
+                    </div>
+                    {result && (
+                        <div>
+                            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Result</div>
+                            <pre className="text-[10px] font-mono text-zinc-300 bg-black/30 p-2 rounded overflow-x-auto max-h-32">
+                                {result}
+                            </pre>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
 }
 
 // Thinking Process Component
@@ -72,6 +117,7 @@ export function ChatArea() {
     const {
         currentSessionId,
         sessions,
+        createSession,
         addMessage,
         updateLastMessage,
         updateSessionTitle,
@@ -171,6 +217,11 @@ export function ChatArea() {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [isComposing, setIsComposing] = useState(false);
 
+    // --- Streaming isolation from Zustand ---
+    // During generation, content lives ONLY in local state (no Zustand writes).
+    // This prevents any OS component from re-rendering while the LLM is streaming.
+    const [streamingMessage, setStreamingMessage] = useState<Partial<any> | null>(null);
+
     // Copy state
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -178,6 +229,9 @@ export function ChatArea() {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState('');
     const titleInputRef = useRef<HTMLInputElement>(null);
+
+    // Chat Mode State
+    const [chatMode, setChatMode] = useState<'chat' | 'control' | 'builder'>('chat');
 
     // Model Manager State
     const [modelTab, setModelTab] = useState<'all' | 'downloaded'>('all');
@@ -310,12 +364,38 @@ export function ChatArea() {
             return;
         }
 
-        const userContent = input;
+        let userContent = input.trim();
+
+        // Handle Slash Commands
+        if (userContent.startsWith('/')) {
+            const command = userContent.split(' ')[0]!.toLowerCase();
+            const rest = userContent.slice(command.length).trim();
+
+            if (command === '/chat') {
+                setChatMode('chat');
+                setInput('');
+                return; // Just switch mode, don't send
+            } else if (command === '/control' || command === '/sys') {
+                setChatMode('control');
+                setInput('');
+                return;
+            } else if (command === '/builder' || command === '/build') {
+                setChatMode('builder');
+                setInput('');
+                return;
+            } else if (command === '/clear') {
+                // Clear command logic would go here if exposed
+                return;
+            }
+            // If it's a command with content (e.g. "/theme dark"), we might want to process it
+            // For now, we'll just send it as a message if it's not a mode switch
+        }
+
         setInput('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
         // 1. Add user message
-        addMessage(currentSessionId, 'user', userContent);
+        addMessage(currentSessionId, 'user', userContent, chatMode);
 
         // 2. Add placeholder assistant message
         addMessage(currentSessionId, 'assistant', '');
@@ -327,12 +407,32 @@ export function ChatArea() {
             { id: 'temp-user', role: 'user' as const, content: userContent, timestamp: Date.now() }
         ];
 
+        // Reset streaming state for this new generation
+        setStreamingMessage({ content: '' });
+
         await generateResponse(
             messagesForEngine,
-            (content) => updateLastMessage(currentSessionId, content),
-            () => { }, // onFinish
-            (err) => updateLastMessage(currentSessionId, `Error: ${err.message || 'Unknown error'}`),
-            modelSettings.systemPrompt
+            // onUpdate: ONLY update local state — zero Zustand writes during streaming
+            (updates) => {
+                const patch = typeof updates === 'string' ? { content: updates } : updates;
+                setStreamingMessage(prev => ({ ...(prev ?? {}), ...patch }));
+            },
+            // onNewMessage: tool results and intermediate assistant turns go to store
+            (msg) => addMessage(currentSessionId, msg.role, msg.content, chatMode, msg.tool_calls, msg.tool_call_id),
+            // onFinish: write final content to store ONCE, then clear local state
+            () => {
+                setStreamingMessage(prev => {
+                    if (prev) updateLastMessage(currentSessionId, prev);
+                    return null;
+                });
+            },
+            // onError: write error to store, clear local state
+            (err) => {
+                setStreamingMessage(null);
+                updateLastMessage(currentSessionId, { content: `Error: ${err.message || 'Unknown error'}` });
+            },
+            modelSettings.systemPrompt,
+            chatMode
         );
     };
 
@@ -350,8 +450,29 @@ export function ChatArea() {
 
     if (!currentSession) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center bg-transparent text-zinc-500 select-none">
+            <div className="flex-1 flex flex-col items-center justify-center bg-transparent text-zinc-500 select-none space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-2">
+                    <Bot size={32} className="text-zinc-600" />
+                </div>
                 <p className="text-sm font-medium">{t('ai.msg.select_to_begin')}</p>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => createSession(currentModelId || undefined)}
+                        className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-indigo-500/20"
+                    >
+                        <MessageSquare size={16} />
+                        {t('ai.sidebar.new_chat')}
+                    </button>
+                    {!isSidebarOpen && (
+                        <button
+                            onClick={handleToggleSidebar}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-white/5"
+                        >
+                            <PanelLeft size={16} />
+                            Open Sidebar
+                        </button>
+                    )}
+                </div>
             </div>
         );
     }
@@ -750,145 +871,178 @@ export function ChatArea() {
                     </div>
                 )}
 
-                {currentSession.messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={cn(
-                            "flex gap-4 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
-                            msg.role === 'user' ? "justify-end" : "justify-start"
-                        )}
-                    >
-                        {msg.role === 'assistant' && (
-                            <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1">
-                                <Sparkles size={18} className="text-zinc-400" />
-                            </div>
-                        )}
+                {/* Merge store messages with live streaming content.
+                    During generation the last assistant placeholder is overridden by
+                    streamingMessage so Zustand is NEVER written to mid-stream. */}
+                {(() => {
+                    const msgs = currentSession.messages;
+                    const displayMessages = streamingMessage !== null
+                        ? msgs.map((m, i) =>
+                            i === msgs.length - 1 && m.role === 'assistant'
+                                ? { ...m, ...streamingMessage }
+                                : m
+                        )
+                        : msgs;
 
-                        <div className={cn(
-                            "flex-1 min-w-0 px-5 py-3 max-w-[85%] group/msg relative",
-                            msg.role === 'user'
-                                ? "bg-white/10 text-zinc-100 rounded-2xl rounded-tr-sm border border-white/5"
-                                : "text-zinc-300 pl-0"
-                        )}>
-                            <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
-                                {msg.role === 'assistant' && msg.content && (
-                                    (() => {
-                                        // Check for thinking tags
-                                        const thinkMatch = msg.content.match(/<think>([\s\S]*?)<\/think>/);
-                                        const thinkContent = thinkMatch ? thinkMatch[1] : null;
-                                        const mainContent = thinkMatch
-                                            ? msg.content.replace(/<think>[\s\S]*?<\/think>/, '').trim()
-                                            : msg.content;
-
-                                        // Filter out empty JSON arrays or null content
-                                        if (mainContent === '[]' || mainContent === '[""]' || !mainContent) {
-                                            return isLoading ? '...' : null;
-                                        }
-
-                                        return (
-                                            <>
-                                                {thinkContent && <ThinkingProcess content={thinkContent} />}
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm]}
-                                                    rehypePlugins={[rehypeHighlight]}
-                                                    components={{
-                                                        code({ node, inline, className, children, ...props }: any) {
-                                                            const match = /language-(\w+)/.exec(className || '')
-                                                            const codeContent = String(children).replace(/\n$/, '');
-                                                            // Check if it's runnable code (React/JS/TS)
-                                                            const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts'].includes(match[1]));
-
-                                                            return !inline && match ? (
-                                                                <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                                                                    <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
-                                                                        <span className="text-[10px] text-zinc-500 font-mono uppercase">{match[1]}</span>
-                                                                        {isRunable && (
-                                                                            <button
-                                                                                onClick={() => handleRunApp(codeContent, match[1] || '')}
-                                                                                className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium transition-colors border border-emerald-500/20"
-                                                                                title="Run this code as an app"
-                                                                            >
-                                                                                <Play size={10} className="fill-current" />
-                                                                                {t('ai.msg.run_app')}
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="p-4 overflow-x-auto">
-                                                                        <code className={className} {...props}>
-                                                                            {children}
-                                                                        </code>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
-                                                                    {children}
-                                                                </code>
-                                                            )
-                                                        }
-                                                    }}
-                                                >
-                                                    {mainContent || (isLoading ? '...' : '')}
-                                                </ReactMarkdown>
-                                            </>
-                                        );
-                                    })()
-                                )}
-                                {msg.role !== 'assistant' && (
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        rehypePlugins={[rehypeHighlight]}
-                                        components={{
-                                            code({ node, inline, className, children, ...props }: any) {
-                                                const match = /language-(\w+)/.exec(className || '')
-                                                return !inline && match ? (
-                                                    <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                                                        <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
-                                                            <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
-                                                        </div>
-                                                        <div className="p-4 overflow-x-auto">
-                                                            <code className={className} {...props}>
-                                                                {children}
-                                                            </code>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
-                                                        {children}
-                                                    </code>
-                                                )
-                                            }
-                                        }}
-                                    >
-                                        {msg.content}
-                                    </ReactMarkdown>
-                                )}
-                            </div>
-
-                            {/* Copy Button for AI Messages */}
-                            {msg.role === 'assistant' && !isLoading && (
-                                <div className="absolute -bottom-6 left-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-2">
-                                    <button
-                                        onClick={() => handleCopyMessage(msg.content, msg.id)}
-                                        className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1.5"
-                                        title={t('ai.msg.copy')}
-                                    >
-                                        {copiedMessageId === msg.id ? (
-                                            <>
-                                                <Check size={14} className="text-emerald-500" />
-                                                <span className="text-[10px] text-emerald-500">{t('ai.msg.copied')}</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy size={14} />
-                                                <span className="text-[10px]">{t('ai.msg.copy')}</span>
-                                            </>
-                                        )}
-                                    </button>
+                    return displayMessages.map((msg) => (
+                        <div
+                            key={msg.id}
+                            className={cn(
+                                "flex gap-4 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
+                                msg.role === 'user' ? "justify-end" : "justify-start"
+                            )}
+                        >
+                            {msg.role === 'assistant' && (
+                                <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1">
+                                    <Sparkles size={18} className="text-zinc-400" />
                                 </div>
                             )}
+
+                            <div className={cn(
+                                "flex-1 min-w-0 px-5 py-3 max-w-[85%] group/msg relative",
+                                msg.role === 'user'
+                                    ? "bg-white/10 text-zinc-100 rounded-2xl rounded-tr-sm border border-white/5"
+                                    : "text-zinc-300 pl-0 rounded-2xl rounded-tl-sm border bg-transparent border-transparent"
+                            )}>
+                                <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
+                                    {msg.role === 'assistant' && msg.content && (
+                                        (() => {
+                                            // Check for thinking tags
+                                            const thinkMatch = msg.content.match(/<think>([\s\S]*?)<\/think>/);
+                                            const thinkContent = thinkMatch ? thinkMatch[1] : null;
+                                            const mainContent = thinkMatch
+                                                ? msg.content.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+                                                : msg.content;
+
+                                            // Filter out empty JSON arrays or null content
+                                            if (mainContent === '[]' || mainContent === '[""]' || !mainContent) {
+                                                if (msg.tool_calls && msg.tool_calls.length > 0) {
+                                                    // Only show tool calls if main content is empty
+                                                } else {
+                                                    return isLoading ? '...' : null;
+                                                }
+                                            }
+
+                                            return (
+                                                <>
+                                                    {thinkContent && <ThinkingProcess content={thinkContent} />}
+
+                                                    {/* Tool Calls Visualization */}
+                                                    {msg.tool_calls && msg.tool_calls.map((toolCall: any, index: number) => {
+                                                        // Find corresponding tool result if available (usually in next messages)
+                                                        // For simplicity in this view, we might not link them perfectly yet
+                                                        // But we can show the call itself
+                                                        return (
+                                                            <ToolCallCard
+                                                                key={toolCall.id || index}
+                                                                toolName={toolCall.function.name}
+                                                                args={JSON.parse(toolCall.function.arguments || '{}')}
+                                                            />
+                                                        );
+                                                    })}
+
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        rehypePlugins={[rehypeHighlight]}
+                                                        components={{
+                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                const match = /language-(\w+)/.exec(className || '')
+                                                                const codeContent = String(children).replace(/\n$/, '');
+                                                                // Check if it's runnable code (React/JS/TS)
+                                                                const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts'].includes(match[1]));
+
+                                                                return !inline && match ? (
+                                                                    <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                                        <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                                            <span className="text-[10px] text-zinc-500 font-mono uppercase">{match[1]}</span>
+                                                                            {isRunable && (
+                                                                                <button
+                                                                                    onClick={() => handleRunApp(codeContent, match[1] || '')}
+                                                                                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium transition-colors border border-emerald-500/20"
+                                                                                    title="Run this code as an app"
+                                                                                >
+                                                                                    <Play size={10} className="fill-current" />
+                                                                                    {t('ai.msg.run_app')}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="p-4 overflow-x-auto">
+                                                                            <code className={className} {...props}>
+                                                                                {children}
+                                                                            </code>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                                        {children}
+                                                                    </code>
+                                                                )
+                                                            }
+                                                        }}
+                                                    >
+                                                        {mainContent || (isLoading ? '...' : '')}
+                                                    </ReactMarkdown>
+                                                </>
+                                            );
+                                        })()
+                                    )}
+                                    {msg.role !== 'assistant' && (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            rehypePlugins={[rehypeHighlight]}
+                                            components={{
+                                                code({ node, inline, className, children, ...props }: any) {
+                                                    const match = /language-(\w+)/.exec(className || '')
+                                                    return !inline && match ? (
+                                                        <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                            <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                                <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
+                                                            </div>
+                                                            <div className="p-4 overflow-x-auto">
+                                                                <code className={className} {...props}>
+                                                                    {children}
+                                                                </code>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                            {children}
+                                                        </code>
+                                                    )
+                                                }
+                                            }}
+                                        >
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                    )}
+                                </div>
+
+                                {/* Copy Button for AI Messages */}
+                                {msg.role === 'assistant' && !isLoading && (
+                                    <div className="absolute -bottom-6 left-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleCopyMessage(msg.content, msg.id)}
+                                            className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1.5"
+                                            title={t('ai.msg.copy')}
+                                        >
+                                            {copiedMessageId === msg.id ? (
+                                                <>
+                                                    <Check size={14} className="text-emerald-500" />
+                                                    <span className="text-[10px] text-emerald-500">{t('ai.msg.copied')}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy size={14} />
+                                                    <span className="text-[10px]">{t('ai.msg.copy')}</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ));
+                })()}
 
                 {/* Loading Indicator / Progress - REMOVED, now in center */}
 
@@ -915,7 +1069,45 @@ export function ChatArea() {
             {/* Input Area */}
             <div className="absolute bottom-0 left-0 right-0 p-6 pt-10 pointer-events-none">
                 <div className="max-w-3xl mx-auto relative pointer-events-auto">
-                    {/* Old button removed */}
+                    {/* Mode Selector */}
+                    <div className="flex items-center gap-2 mb-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
+                        <button
+                            onClick={() => setChatMode('chat')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                                chatMode === 'chat'
+                                    ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shadow-lg shadow-indigo-500/5"
+                                    : "bg-black/20 text-zinc-500 border-white/5 hover:bg-white/5 hover:text-zinc-300 hover:border-white/10"
+                            )}
+                        >
+                            <MessageSquare size={13} />
+                            <span>{t('ai.mode.chat') || 'Chat'}</span>
+                        </button>
+                        <button
+                            onClick={() => setChatMode('control')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                                chatMode === 'control'
+                                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20 shadow-lg shadow-emerald-500/5"
+                                    : "bg-black/20 text-zinc-500 border-white/5 hover:bg-white/5 hover:text-zinc-300 hover:border-white/10"
+                            )}
+                        >
+                            <Settings2 size={13} />
+                            <span>{t('ai.mode.control') || 'Control'}</span>
+                        </button>
+                        <button
+                            onClick={() => setChatMode('builder')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                                chatMode === 'builder'
+                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/20 shadow-lg shadow-amber-500/5"
+                                    : "bg-black/20 text-zinc-500 border-white/5 hover:bg-white/5 hover:text-zinc-300 hover:border-white/10"
+                            )}
+                        >
+                            <Hammer size={13} />
+                            <span>{t('ai.mode.builder') || 'Builder'}</span>
+                        </button>
+                    </div>
 
                     <div className={cn(
                         "relative bg-black/40 hover:bg-black/60 focus-within:bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 transition-all duration-300",

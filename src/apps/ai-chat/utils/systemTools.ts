@@ -160,7 +160,10 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    appId: { type: 'string', description: 'The application ID (e.g., "calculator", "vscode-lite")' },
+                    appId: { 
+                        type: 'string', 
+                        description: 'The application ID. Available apps: "vscode-lite" (Code Editor), "terminal" (Terminal), "file-explorer" (Files), "settings" (Settings), "portfolio-hub" (Portfolio), "notepad" (Text Editor), "music-player" (Music), "photo-gallery" (Photos), "weather" (Weather), "task-manager" (Task Manager), "ai-chat" (AI Assistant), "code-runner" (Code Runner), "yume" (Dream Log), "emulator" (Game Emulator).' 
+                    },
                     params: { type: 'object', description: 'Optional parameters to pass to the app' }
                 },
                 required: ['appId']
@@ -188,5 +191,51 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             description: 'List all running applications and processes',
             parameters: { type: 'object', properties: {} }
         }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'create_file',
+            description: 'Create a file in the file system',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path' },
+                    content: { type: 'string', description: 'The file content' }
+                },
+                required: ['path', 'content']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'list_directory',
+            description: 'List files in a directory',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The directory path' }
+                },
+                required: ['path']
+            }
+        }
     }
 ];
+
+export const TOOL_CATEGORIES = {
+    chat: [],
+    control: [
+        'set_theme', 
+        'set_wallpaper', 
+        'set_volume', 
+        'get_system_status', 
+        'launch_app', 
+        'close_app', 
+        'get_running_apps'
+    ],
+    builder: [
+        'create_file',
+        'list_directory'
+    ]
+};
