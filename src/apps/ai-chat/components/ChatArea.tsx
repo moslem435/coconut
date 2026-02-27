@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
-import { useLanguageStore } from '@/os/kernel/useLanguageStore';
+import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
 import { useWebLLM, AVAILABLE_MODELS } from '../hooks/useWebLLM';
-import { useWindowStore } from '@/os/kernel/useWindowStore';
-import { useFileSystemStore } from '@/os/kernel/useFileSystemStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -90,7 +88,7 @@ function ToolCallCard({ toolName, args, result }: { toolName: string, args: any,
 // Thinking Process Component
 function ThinkingProcess({ content }: { content: string }) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const { t } = useLanguageStore();
+    const { t } = useTranslation();
 
     return (
         <div className="mb-4 rounded-lg border border-white/10 bg-white/5 overflow-hidden">
@@ -113,7 +111,7 @@ function ThinkingProcess({ content }: { content: string }) {
 }
 
 export function ChatArea() {
-    const { t } = useLanguageStore();
+    const { t } = useTranslation();
     const {
         currentSessionId,
         sessions,
@@ -127,13 +125,9 @@ export function ChatArea() {
     } = useChatStore();
 
     // Window management
-    const updateWindow = useWindowStore(state => state.updateWindow);
-    const launchApp = useWindowStore(state => state.launchApp);
-    const windowState = useWindowStore(state => state.windows['ai-chat']);
+    const { update: updateWindow, launch: launchApp } = useWindow();
+    const windowState = useWindowState('ai-chat');
     const isSidebar = windowState?.isSidebar;
-
-    // File system for saving apps
-    const createFile = useFileSystemStore(state => state.createItem);
 
     // ... (keep existing detach logic)
 
@@ -221,6 +215,7 @@ export function ChatArea() {
     // During generation, content lives ONLY in local state (no Zustand writes).
     // This prevents any OS component from re-rendering while the LLM is streaming.
     const [streamingMessage, setStreamingMessage] = useState<Partial<any> | null>(null);
+    const streamingMessageRef = useRef<Partial<any> | null>(null);
 
     // Copy state
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -409,25 +404,30 @@ export function ChatArea() {
 
         // Reset streaming state for this new generation
         setStreamingMessage({ content: '' });
+        streamingMessageRef.current = { content: '' };
 
         await generateResponse(
             messagesForEngine,
             // onUpdate: ONLY update local state — zero Zustand writes during streaming
             (updates) => {
                 const patch = typeof updates === 'string' ? { content: updates } : updates;
+                streamingMessageRef.current = { ...(streamingMessageRef.current ?? {}), ...patch };
                 setStreamingMessage(prev => ({ ...(prev ?? {}), ...patch }));
             },
             // onNewMessage: tool results and intermediate assistant turns go to store
             (msg) => addMessage(currentSessionId, msg.role, msg.content, chatMode, msg.tool_calls, msg.tool_call_id),
             // onFinish: write final content to store ONCE, then clear local state
             () => {
-                setStreamingMessage(prev => {
-                    if (prev) updateLastMessage(currentSessionId, prev);
-                    return null;
-                });
+                const finalMessage = streamingMessageRef.current;
+                if (finalMessage) {
+                    updateLastMessage(currentSessionId, finalMessage);
+                }
+                streamingMessageRef.current = null;
+                setStreamingMessage(null);
             },
             // onError: write error to store, clear local state
             (err) => {
+                streamingMessageRef.current = null;
                 setStreamingMessage(null);
                 updateLastMessage(currentSessionId, { content: `Error: ${err.message || 'Unknown error'}` });
             },

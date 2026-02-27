@@ -578,7 +578,8 @@ export function useWebLLM() {
                             // --- RETRY LOGIC FOR NATIVE TOOL FAILURES ---
                             // If we are in control mode, and using native tools, and failed to get a result:
                             // Try ONE MORE TIME with manual JSON injection.
-                            if (mode === 'control' && supportsTools && !chatMessages[chatMessages.length - 1].content.includes('[System Control Mode]')) {
+                            // Optimization: Only retry if the content is completely empty. If there's partial content, it might just be a refusal.
+                            if (mode === 'control' && supportsTools && !chatMessages[chatMessages.length - 1].content.includes('[System Control Mode]') && trimmedContent === '') {
                                 console.warn("[AI-Chat] Native tool call failed. Retrying with manual JSON injection...");
 
                                 // Inject manual prompt into the last user message
@@ -702,21 +703,10 @@ export function useWebLLM() {
                 // In control mode: after executing tools, break immediately.
                 // This prevents the model from hallucinating and calling additional unrelated tools.
                 if (mode === 'control') {
-                    // Generate a brief non-streamed confirmation message in the user's language
-                    const confirmParams: any = {
-                        messages: [...chatMessages, { role: 'user', content: '用一句话简短确认操作已完成（使用用户的语言回复）。' }],
-                        stream: false,
-                    };
-                    try {
-                        const confirmReply = await engineRef.current!.chat.completions.create(confirmParams) as any;
-                        const confirmContent = confirmReply?.choices?.[0]?.message?.content || '';
-                        if (confirmContent.trim()) {
-                            onUpdate({ content: confirmContent });
-                        }
-                    } catch (_) {
-                        // Ignore confirmation errors silently — the tool result message is enough
-                    }
-                    break; // Stop the loop — control mode only does ONE round of tool calls
+                    // Optimization: Do NOT ask LLM for confirmation. Just finish.
+                    // The UI will show the tool result, which is sufficient.
+                    // This saves ~2-5 seconds of latency.
+                    break; 
                 }
 
                 // Continue loop to generate response based on tool results

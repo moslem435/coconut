@@ -1,9 +1,5 @@
 
-import { useSystemSettingsStore, ThemeMode, Wallpaper } from '@/os/kernel/useSystemSettingsStore';
-import { useWindowStore } from '@/os/kernel/useWindowStore';
-import { useFileSystemStore } from '@/os/kernel/useFileSystemStore';
-import { useProcessStore } from '@/os/kernel/useProcessStore';
-import { v4 as uuidv4 } from 'uuid';
+import { System, ThemeMode } from '@/os/sdk';
 
 // Define the tool structure expected by OpenAI/WebLLM
 export interface ToolDefinition {
@@ -19,27 +15,24 @@ export interface ToolDefinition {
 export const systemToolsImplementation: Record<string, Function> = {
     // --- System Settings ---
     set_theme: (args: { mode: ThemeMode }) => {
-        useSystemSettingsStore.getState().setTheme(args.mode);
+        System.settings.setTheme(args.mode);
         return `Theme set to ${args.mode}`;
     },
     
     set_wallpaper: (args: { url: string }) => {
-        useSystemSettingsStore.getState().setWallpaper({
-            type: 'image',
-            value: args.url
-        });
+        System.settings.setWallpaper(args.url);
         return `Wallpaper set to image: ${args.url}`;
     },
     
     set_volume: (args: { level: number }) => {
         const volume = Math.max(0, Math.min(100, args.level));
-        useSystemSettingsStore.getState().setVolume(volume);
+        System.settings.setVolume(volume);
         return `Volume set to ${volume}%`;
     },
     
     get_system_status: () => {
-        const settings = useSystemSettingsStore.getState();
-        const processes = useProcessStore.getState().getProcessList();
+        const settings = System.settings.getSettings();
+        const processes = System.process.list();
         
         return JSON.stringify({
             theme: settings.theme,
@@ -52,26 +45,17 @@ export const systemToolsImplementation: Record<string, Function> = {
     // --- App Management ---
     launch_app: (args: { appId: string, params?: any }) => {
         const { appId, params } = args;
-        const windowId = `${appId}-${uuidv4().slice(0, 8)}`;
-        
-        // Basic app launch logic
-        useWindowStore.getState().launchApp(
-            windowId, 
-            appId, // Title will be handled by window manager or registry
-            appId, 
-            undefined, // Icon
-            params
-        );
+        const windowId = System.process.launch(appId, params);
         return `Launched app: ${appId} (Window ID: ${windowId})`;
     },
     
     close_app: (args: { windowId: string }) => {
-        useWindowStore.getState().closeWindow(args.windowId);
+        System.window.close(args.windowId);
         return `Closed window: ${args.windowId}`;
     },
     
     get_running_apps: () => {
-        const apps = useProcessStore.getState().getProcessList().map(p => ({
+        const apps = System.process.list().map(p => ({
             pid: p.pid,
             name: p.name,
             windowId: p.windowId
@@ -80,23 +64,22 @@ export const systemToolsImplementation: Record<string, Function> = {
     },
 
     // --- File System ---
-    create_file: (args: { path: string, content: string }) => {
-        const fs = useFileSystemStore.getState();
-        // Simple implementation: assume path is like '/home/user/file.txt'
-        // For now, we might need to resolve parent ID manually or use a helper
-        // This is a simplified version. In a real OS, we'd have `fs.writeFile(path)`
-        
-        // TODO: Implement proper path resolution in FileSystemStore
-        // For this MVP, we'll try to create in root or desktop if path is simple
-        
-        // Fallback: just return a message saying "File created" (simulation)
-        // until FS store supports path-based creation directly
-        return `[System] File creation at '${args.path}' is simulating. Content length: ${args.content.length}`;
+    create_file: async (args: { path: string, content: string }) => {
+        try {
+            await System.fs.writeFile(args.path, args.content);
+            return `File created at '${args.path}'`;
+        } catch (e) {
+            return `Error creating file: ${e}`;
+        }
     },
     
     list_directory: (args: { path: string }) => {
-        // Simulation
-        return `Listing directory ${args.path}: [file1.txt, app.tsx]`;
+        try {
+            const files = System.fs.readDir(args.path);
+            return JSON.stringify(files.map(f => f.name));
+        } catch (e) {
+            return `Error listing directory: ${e}`;
+        }
     }
 };
 

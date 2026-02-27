@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
-import { useLanguageStore } from '@/os/kernel/useLanguageStore';
+import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
 import {
     Plus,
     Trash2,
@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useWindowStore } from '@/os/kernel/useWindowStore';
 import { getRelativeDateGroup } from '../utils/date';
 
 function cn(...inputs: ClassValue[]) {
@@ -22,7 +21,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export function Sidebar() {
-    const { t } = useLanguageStore();
+    const { t } = useTranslation();
     const {
         sessions,
         currentSessionId,
@@ -33,8 +32,8 @@ export function Sidebar() {
         toggleSidebar
     } = useChatStore();
 
-    const { updateWindow, windows } = useWindowStore();
-    const appWindow = windows['ai-chat'];
+    const { update: updateWindow } = useWindow();
+    const appWindow = useWindowState('ai-chat');
     const [searchQuery, setSearchQuery] = useState('');
     const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
 

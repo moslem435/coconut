@@ -15,6 +15,14 @@ export type { ThemeMode, SystemSettings } from '@/os/kernel/SystemSettingsContex
 // Hooks
 // ============================================================================
 
+export { useFileSystem } from './hooks/useFileSystem'
+export { useProcess } from './hooks/useProcess'
+
+// ============================================================================
+// Imperative API
+// ============================================================================
+export { System } from './system'
+
 /**
  * Access system-wide settings like theme, volume, and accent color.
  */
@@ -68,6 +76,8 @@ export function useWindow() {
     const closeWindow = useWindowStore(state => state.closeWindow)
     const minimizeWindow = useWindowStore(state => state.minimizeWindow)
     const maximizeWindow = useWindowStore(state => state.maximizeWindow)
+    const updateWindow = useWindowStore(state => state.updateWindow)
+    const launchApp = useWindowStore(state => state.launchApp)
 
     // Safe helper to check if a window is open
     const isWindowOpen = useCallback((id: string) => {
@@ -79,6 +89,8 @@ export function useWindow() {
         close: closeWindow,
         minimize: minimizeWindow,
         maximize: maximizeWindow,
+        update: updateWindow,
+        launch: launchApp,
         isOpen: isWindowOpen,
     }
 }
@@ -89,4 +101,12 @@ export function useWindow() {
  */
 export function useWindowState(id: string) {
     return useWindowStore(useShallow(state => state.windows[id]))
+}
+
+/**
+ * Hook for internationalization.
+ */
+export function useTranslation() {
+    const { t, language } = useLanguage()
+    return { t, language }
 }
