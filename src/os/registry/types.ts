@@ -37,4 +37,6 @@ export interface AppManifest {
     version?: string
     description?: string
     category?: string
+    /** If set, the app will open this URL in a new tab instead of opening a window */
+    externalUrl?: string
 }

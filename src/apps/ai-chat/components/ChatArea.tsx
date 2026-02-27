@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
-import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
+import { useTranslation, useWindow } from '@/os/sdk';
+import { useWindowStore } from '@/os/kernel/useWindowStore';
+import { useShallow } from 'zustand/react/shallow';
+import { useWindowContext } from '@/os/kernel/WindowContext';
 import { useWebLLM, AVAILABLE_MODELS } from '../hooks/useWebLLM';
+import { useCloudLLM, CLOUD_MODELS, testCloudConnection } from '../hooks/useCloudLLM';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -27,6 +31,9 @@ import {
     Play,
     Trash2,
     X,
+    Minus,
+    Maximize2,
+    Minimize2,
     HardDrive,
     Cloud,
     ChevronDown,
@@ -121,40 +128,39 @@ export function ChatArea() {
         updateSessionTitle,
         modelSettings,
         isSidebarOpen,
-        toggleSidebar
+        toggleSidebar,
+        aiProvider,
+        cloudConfig,
+        setAiProvider,
+        updateCloudConfig,
+        setCurrentLocalModelId
     } = useChatStore();
 
     // Window management
-    const { update: updateWindow, launch: launchApp } = useWindow();
-    const windowState = useWindowState('ai-chat');
-    const isSidebar = windowState?.isSidebar;
+    const { update: updateWindow, launch: launchApp, minimize, maximize, close } = useWindow();
+    const windowContext = useWindowContext();
+    const { isSidebar, isMaximized } = useWindowStore(useShallow(state => ({
+        isSidebar: state.windows['ai-chat']?.isSidebar,
+        isMaximized: state.windows['ai-chat']?.isMaximized
+    })));
 
     // ... (keep existing detach logic)
 
     const handleRunApp = async (code: string, language: string) => {
-        if (language !== 'tsx' && language !== 'jsx' && language !== 'javascript' && language !== 'typescript' && language !== 'js' && language !== 'ts') {
+        const supportedLangs = ['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts', 'html'];
+        if (!supportedLangs.includes(language)) {
             return;
         }
 
-        // 1. Create a temporary file
         const timestamp = Date.now();
-        const fileName = `ai-app-${timestamp}.tsx`;
-        // const filePath = `/home/user/apps/${fileName}`;
-
-        // Ensure directory exists (simulation for now, or assume /home/user/apps exists)
-        // For MVP, we'll rely on the fact that we can create file content directly or pass it
 
         try {
-            // Option A: Save to file then launch
-            // createFile('/home/user/apps', fileName, 'file', code);
-
-            // Option B: Launch directly with code content (Simpler for now)
             launchApp(
                 `code-runner-${timestamp}`,
                 'AI App Preview',
                 'code-runner',
                 undefined,
-                { code }
+                { code, language }
             );
         } catch (e) {
             console.error("Failed to run app:", e);
@@ -163,6 +169,7 @@ export function ChatArea() {
 
     const handleToggleSidebar = () => {
         toggleSidebar();
+        const windowState = useWindowStore.getState().windows['ai-chat'];
         if (windowState && !windowState.isMaximized && windowState.size) {
             updateWindow('ai-chat', {
                 size: {
@@ -191,6 +198,10 @@ export function ChatArea() {
 
     const currentSession = sessions.find(s => s.id === currentSessionId);
 
+    const webLLM = useWebLLM();
+    const cloudLLM = useCloudLLM();
+    const activeLLM = aiProvider === 'cloud' ? cloudLLM : webLLM;
+
     const {
         generateResponse,
         isLoading,
@@ -203,13 +214,30 @@ export function ChatArea() {
         error: engineError,
         currentModelId,
         deleteModel
-    } = useWebLLM();
+    } = activeLLM as typeof webLLM;
 
     const [input, setInput] = useState('');
-    const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [isComposing, setIsComposing] = useState(false);
+
+    // Sync local model ID to global store for Sidebar
+    useEffect(() => {
+        if (activeLLM.currentModelId) {
+            setCurrentLocalModelId(activeLLM.currentModelId);
+        }
+    }, [activeLLM.currentModelId, setCurrentLocalModelId]);
+
+    // Listen for model load requests from Sidebar
+    useEffect(() => {
+        const handleLoadModel = (e: CustomEvent<{ modelId: string }>) => {
+            if (e.detail?.modelId) {
+                initEngine(e.detail.modelId);
+            }
+        };
+        window.addEventListener('ai-chat:load-model', handleLoadModel as EventListener);
+        return () => window.removeEventListener('ai-chat:load-model', handleLoadModel as EventListener);
+    }, [initEngine]);
 
     // --- Streaming isolation from Zustand ---
     // During generation, content lives ONLY in local state (no Zustand writes).
@@ -227,77 +255,6 @@ export function ChatArea() {
 
     // Chat Mode State
     const [chatMode, setChatMode] = useState<'chat' | 'control' | 'builder'>('chat');
-
-    // Model Manager State
-    const [modelTab, setModelTab] = useState<'all' | 'downloaded'>('all');
-    const [cachedModels, setCachedModels] = useState<Set<string>>(new Set());
-
-    // Check for cached models on mount and when menu opens
-    useEffect(() => {
-        const checkCachedModels = async () => {
-            if ('caches' in window) {
-                try {
-                    const keys = await caches.keys();
-                    const cachedIds = new Set<string>();
-
-                    // Strategy 1: Check cache names (WebLLM often uses 'webllm/model' or 'webllm/wasm')
-                    // But importantly, we need to inspect the CONTENTS of 'webllm/model'
-
-                    let modelCache: Cache | null = null;
-                    if (keys.includes('webllm/model')) {
-                        modelCache = await caches.open('webllm/model');
-                    } else if (keys.includes('webllm/config')) { // Newer versions might use config
-                        modelCache = await caches.open('webllm/config');
-                    }
-
-                    if (modelCache) {
-                        const requests = await modelCache.keys();
-                        // The URLs usually contain the model ID or parts of it.
-                        // e.g. https://.../Llama-3-8B-Instruct-q4f32_1-MLC/params_shard_0.bin
-
-                        AVAILABLE_MODELS.forEach(model => {
-                            // Check if ANY file related to this model exists in the cache
-                            const hasFile = requests.some(req => req.url.includes(model.id));
-                            if (hasFile) {
-                                cachedIds.add(model.id);
-                            }
-                        });
-                    }
-
-                    // Fallback: Check for individual cache keys if strategy changed
-                    keys.forEach(key => {
-                        AVAILABLE_MODELS.forEach(model => {
-                            if (key.includes(model.id)) {
-                                cachedIds.add(model.id);
-                            }
-                        });
-                    });
-
-                    setCachedModels(cachedIds);
-                } catch (e) {
-                    console.error("Failed to check cache:", e);
-                }
-            }
-        };
-
-        if (isModelMenuOpen) {
-            checkCachedModels();
-        }
-    }, [isModelMenuOpen]);
-
-    const handleDeleteModel = async (e: React.MouseEvent, modelId: string) => {
-        e.stopPropagation();
-        if (window.confirm(t('ai.model.delete_confirm').replace('{modelId}', modelId))) {
-            const success = await deleteModel(modelId);
-            if (success) {
-                setCachedModels(prev => {
-                    const next = new Set(prev);
-                    next.delete(modelId);
-                    return next;
-                });
-            }
-        }
-    };
 
     useEffect(() => {
         if (currentSession) {
@@ -432,7 +389,8 @@ export function ChatArea() {
                 updateLastMessage(currentSessionId, { content: `Error: ${err.message || 'Unknown error'}` });
             },
             modelSettings.systemPrompt,
-            chatMode
+            chatMode,
+            aiProvider === 'cloud' ? cloudConfig : undefined
         );
     };
 
@@ -480,24 +438,25 @@ export function ChatArea() {
     const currentModelName = AVAILABLE_MODELS.find(m => m.id === currentModelId)?.name || t('ai.header.no_model_loaded');
 
     // Filter models based on tab
-    const visibleModels = AVAILABLE_MODELS.filter(m => {
-        if (modelTab === 'downloaded') {
-            return cachedModels.has(m.id);
-        }
-        return true;
-    });
+    // Removed local filtering logic as it's now in Sidebar
 
     return (
         <div className={cn(
             "flex-1 flex flex-col h-full relative overflow-hidden transition-all duration-300 ease-in-out bg-transparent"
         )}>
             {/* Header */}
-            <header className={cn(
-                "h-16 flex items-center justify-between px-6 z-10 shrink-0",
+            <header
+                onPointerDown={(e) => {
+                    if (windowContext?.dragControls) {
+                        windowContext.dragControls.start(e);
+                    }
+                }}
+                className={cn(
+                "h-16 flex items-center justify-between px-6 z-10 shrink-0 select-none",
                 isSidebar && "pt-0",
                 !isSidebar && "pt-0"
             )}>
-                <div className="flex items-center gap-3 min-w-0 px-1 py-1.5">
+                <div className="flex items-center gap-3 min-w-0 px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
                     {/* Show sidebar toggle button if sidebar is closed */}
                     {!isSidebarOpen && (
                         <button
@@ -543,7 +502,7 @@ export function ChatArea() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
                     {isSidebar && (
                         <button
                             onClick={handleDetach}
@@ -554,178 +513,36 @@ export function ChatArea() {
                         </button>
                     )}
 
-                    <div className="relative">
-                        <button
-                            onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
-                            className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-lg bg-transparent hover:bg-white/5 border border-transparent hover:border-white/5 text-xs font-medium transition-all",
-                                isModelMenuOpen ? "bg-white/5 text-zinc-200" : "text-zinc-400 hover:text-zinc-200"
-                            )}
-                        >
-                            <Settings size={14} />
-                            <span>{t('ai.header.models')}</span>
-                        </button>
-
-                        {isModelMenuOpen && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
-                                    onClick={() => setIsModelMenuOpen(false)}
-                                />
-                                <div className="absolute right-0 top-full mt-2 w-[480px] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-0 z-50 max-h-[600px] flex flex-col overflow-hidden ring-1 ring-black/50 animate-in fade-in zoom-in-95 duration-200">
-                                    {/* Header */}
-                                    <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
-                                                <HardDrive size={18} />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-medium text-zinc-100">{t('ai.header.model_manager')}</h3>
-                                                <p className="text-[11px] text-zinc-500">{t('ai.header.manage_models')}</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setIsModelMenuOpen(false)}
-                                            className="p-2 rounded-lg hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-
-                                    {/* Tabs */}
-                                    <div className="flex px-4 pt-3 gap-4 border-b border-white/5 shrink-0">
-                                        <button
-                                            onClick={() => setModelTab('all')}
-                                            className={cn(
-                                                "pb-3 text-xs font-medium transition-colors relative",
-                                                modelTab === 'all' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                                            )}
-                                        >
-                                            {t('ai.model.tab.all')}
-                                            {modelTab === 'all' && (
-                                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => setModelTab('downloaded')}
-                                            className={cn(
-                                                "pb-3 text-xs font-medium transition-colors relative flex items-center gap-1.5",
-                                                modelTab === 'downloaded' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                                            )}
-                                        >
-                                            {t('ai.model.tab.downloaded')}
-                                            <span className="bg-white/10 text-zinc-400 px-1.5 py-0.5 rounded-full text-[9px]">{cachedModels.size}</span>
-                                            {modelTab === 'downloaded' && (
-                                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    {/* List */}
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                                        {visibleModels.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-                                                <Cloud size={32} className="mb-3 opacity-20" />
-                                                <p className="text-sm">{t('ai.model.no_models')}</p>
-                                            </div>
-                                        ) : (
-                                            visibleModels.map(model => {
-                                                const isDownloaded = cachedModels.has(model.id);
-                                                const isActive = currentModelId === model.id;
-
-                                                return (
-                                                    <div
-                                                        key={model.id}
-                                                        className={cn(
-                                                            "group relative flex items-start gap-3 p-3 rounded-xl transition-all border",
-                                                            isActive
-                                                                ? "bg-indigo-500/10 border-indigo-500/20"
-                                                                : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/5"
-                                                        )}
-                                                    >
-                                                        {/* Selection Indicator */}
-                                                        {isActive && (
-                                                            <div className="absolute left-0 top-3 bottom-3 w-1 bg-indigo-500 rounded-r-full" />
-                                                        )}
-
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className={cn(
-                                                                    "font-medium text-sm truncate",
-                                                                    isActive ? "text-indigo-200" : "text-zinc-200"
-                                                                )}>
-                                                                    {model.name}
-                                                                </span>
-                                                                {model.recommended && (
-                                                                    <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-emerald-500/20">
-                                                                        {t('ai.model.recommended')}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-
-                                                            <p className="text-xs text-zinc-500 mb-2 leading-relaxed">
-                                                                {t(model.description as any)}
-                                                            </p>
-
-                                                            <div className="flex items-center gap-3 text-[10px] font-mono opacity-80">
-                                                                <div className="flex items-center gap-1.5 text-zinc-400">
-                                                                    <Zap size={10} />
-                                                                    <span>{model.vram} {t('ai.model.vram')}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5 text-zinc-400">
-                                                                    <Download size={10} />
-                                                                    <span>{model.size}</span>
-                                                                </div>
-                                                                {isDownloaded && (
-                                                                    <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/5 px-1.5 py-0.5 rounded">
-                                                                        <Check size={10} />
-                                                                        <span>{t('ai.model.tab.downloaded')}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex flex-col gap-2 shrink-0">
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleInitModel(model.id);
-                                                                    setIsModelMenuOpen(false);
-                                                                }}
-                                                                disabled={isLoading}
-                                                                className={cn(
-                                                                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
-                                                                    isActive
-                                                                        ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20"
-                                                                        : "bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
-                                                                )}
-                                                            >
-                                                                {isActive ? t('ai.model.active') : (isDownloaded ? t('ai.model.switch') : t('ai.model.download'))}
-                                                            </button>
-
-                                                            {isDownloaded && !isActive && (
-                                                                <button
-                                                                    onClick={(e) => handleDeleteModel(e, model.id)}
-                                                                    className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors self-end"
-                                                                    title={t('ai.model.delete')}
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    {!isSidebar && (
+                        <div className="flex items-center h-8 ml-2 border-l border-white/10 pl-2 gap-1">
+                            <button
+                                className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors"
+                                onClick={() => minimize('ai-chat')}
+                                title="Minimize"
+                            >
+                                <Minus size={14} />
+                            </button>
+                            <button
+                                className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors"
+                                onClick={() => maximize('ai-chat')}
+                                title={isMaximized ? "Restore" : "Maximize"}
+                            >
+                                {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                            </button>
+                            <button
+                                className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg text-zinc-400 transition-colors"
+                                onClick={() => close('ai-chat')}
+                                title="Close"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </header>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar pb-32">
+            <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar pb-64">
                 {currentSession.messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full select-none pb-20">
                         {/* Loading State - Circular Progress */}
@@ -826,7 +643,7 @@ export function ChatArea() {
                                     </button>
 
                                     <button
-                                        onClick={() => setIsModelMenuOpen(true)}
+                                        onClick={() => toggleSidebar()}
                                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
                                     >
                                         <Settings size={16} className="text-zinc-500" />
@@ -908,10 +725,10 @@ export function ChatArea() {
                                     {msg.role === 'assistant' && msg.content && (
                                         (() => {
                                             // Check for thinking tags
-                                            const thinkMatch = msg.content.match(/<think>([\s\S]*?)<\/think>/);
+                                            const thinkMatch = msg.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
                                             const thinkContent = thinkMatch ? thinkMatch[1] : null;
                                             const mainContent = thinkMatch
-                                                ? msg.content.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+                                                ? msg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim()
                                                 : msg.content;
 
                                             // Filter out empty JSON arrays or null content
@@ -947,9 +764,17 @@ export function ChatArea() {
                                                         components={{
                                                             code({ node, inline, className, children, ...props }: any) {
                                                                 const match = /language-(\w+)/.exec(className || '')
-                                                                const codeContent = String(children).replace(/\n$/, '');
+                                                                // Recursively extract plain text from React node tree
+                                                                // (needed because rehype-highlight converts code to styled spans)
+                                                                const extractText = (node: any): string => {
+                                                                    if (typeof node === 'string') return node;
+                                                                    if (Array.isArray(node)) return node.map(extractText).join('');
+                                                                    if (node?.props?.children) return extractText(node.props.children);
+                                                                    return '';
+                                                                };
+                                                                const codeContent = extractText(children).replace(/\n$/, '');
                                                                 // Check if it's runnable code (React/JS/TS)
-                                                                const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts'].includes(match[1]));
+                                                                const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts', 'html'].includes(match[1]));
 
                                                                 return !inline && match ? (
                                                                     <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
@@ -1067,7 +892,7 @@ export function ChatArea() {
             </div>
 
             {/* Input Area */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 pt-10 pointer-events-none">
+            <div className="absolute bottom-0 left-0 right-0 p-6 pt-20 pointer-events-none bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent z-10">
                 <div className="max-w-3xl mx-auto relative pointer-events-auto">
                     {/* Mode Selector */}
                     <div className="flex items-center gap-2 mb-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">

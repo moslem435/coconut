@@ -18,22 +18,22 @@ export const systemToolsImplementation: Record<string, Function> = {
         System.settings.setTheme(args.mode);
         return `Theme set to ${args.mode}`;
     },
-    
+
     set_wallpaper: (args: { url: string }) => {
         System.settings.setWallpaper(args.url);
         return `Wallpaper set to image: ${args.url}`;
     },
-    
+
     set_volume: (args: { level: number }) => {
         const volume = Math.max(0, Math.min(100, args.level));
         System.settings.setVolume(volume);
         return `Volume set to ${volume}%`;
     },
-    
+
     get_system_status: () => {
         const settings = System.settings.getSettings();
         const processes = System.process.list();
-        
+
         return JSON.stringify({
             theme: settings.theme,
             volume: settings.volume,
@@ -48,12 +48,12 @@ export const systemToolsImplementation: Record<string, Function> = {
         const windowId = System.process.launch(appId, params);
         return `Launched app: ${appId} (Window ID: ${windowId})`;
     },
-    
+
     close_app: (args: { windowId: string }) => {
         System.window.close(args.windowId);
         return `Closed window: ${args.windowId}`;
     },
-    
+
     get_running_apps: () => {
         const apps = System.process.list().map(p => ({
             pid: p.pid,
@@ -72,7 +72,7 @@ export const systemToolsImplementation: Record<string, Function> = {
             return `Error creating file: ${e}`;
         }
     },
-    
+
     list_directory: (args: { path: string }) => {
         try {
             const files = System.fs.readDir(args.path);
@@ -143,9 +143,9 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    appId: { 
-                        type: 'string', 
-                        description: 'The application ID. Available apps: "vscode-lite" (Code Editor), "terminal" (Terminal), "file-explorer" (Files), "settings" (Settings), "portfolio-hub" (Portfolio), "notepad" (Text Editor), "music-player" (Music), "photo-gallery" (Photos), "weather" (Weather), "task-manager" (Task Manager), "ai-chat" (AI Assistant), "code-runner" (Code Runner), "yume" (Dream Log), "emulator" (Game Emulator).' 
+                    appId: {
+                        type: 'string',
+                        description: 'The application ID. Available apps: "vscode-lite" (Code Editor), "terminal" (Terminal), "file-explorer" (Files), "settings" (Settings), "portfolio-hub" (Portfolio), "notepad" (Text Editor), "music-player" (Music), "photo-gallery" (Photos), "weather" (Weather), "task-manager" (Task Manager), "ai-chat" (AI Assistant), "code-runner" (Code Runner), "yume" (Dream Log), "emulator" (Game Emulator).'
                     },
                     params: { type: 'object', description: 'Optional parameters to pass to the app' }
                 },
@@ -209,16 +209,17 @@ export const systemToolsDefinitions: ToolDefinition[] = [
 export const TOOL_CATEGORIES = {
     chat: [],
     control: [
-        'set_theme', 
-        'set_wallpaper', 
-        'set_volume', 
-        'get_system_status', 
-        'launch_app', 
-        'close_app', 
+        'set_theme',
+        'set_wallpaper',
+        'set_volume',
+        'get_system_status',
+        'launch_app',
+        'close_app',
         'get_running_apps'
     ],
     builder: [
         'create_file',
-        'list_directory'
+        'list_directory',
+        'launch_app'
     ]
 };

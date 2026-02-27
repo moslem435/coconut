@@ -7,12 +7,13 @@ import * as Lucide from 'lucide-react';
 import * as FramerMotion from 'framer-motion';
 
 // --- Types ---
-type RunMode = 'react' | 'wasm' | 'node';
+type RunMode = 'react' | 'html' | 'node';
 
 interface CodeRunnerProps {
     filePath?: string;
-    code?: string; 
-    mode?: RunMode; // Explicit mode override
+    code?: string;
+    language?: string; // Passed from AI Chat run button
+    mode?: RunMode;    // Explicit mode override
 }
 
 // --- React Scope ---
@@ -27,12 +28,34 @@ const scope = {
     ...FramerMotion
 };
 
-// --- WASM Runner Component ---
+// --- HTML Preview via iframe ---
+const HtmlRunner = ({ code }: { code: string }) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    useEffect(() => {
+        if (!iframeRef.current || !code) return;
+        const blob = new Blob([code], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        iframeRef.current.src = url;
+        return () => URL.revokeObjectURL(url);
+    }, [code]);
+
+    return (
+        <iframe
+            ref={iframeRef}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+            title="HTML Preview"
+        />
+    );
+};
+
+// --- WASM / Node Runner ---
 const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) => {
     const [output, setOutput] = useState<string[]>([]);
     const [isRunning, setIsRunning] = useState(false);
     const { instance } = useWebContainerStore();
-    
+
     useEffect(() => {
         const run = async () => {
             if (!instance) return;
@@ -40,20 +63,12 @@ const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) =>
             setOutput(['Initializing WebContainer for WASM/Node execution...']);
 
             try {
-                // If it's a file path, we might want to execute it directly if it's a binary
-                // But here we assume 'code' contains a script or we are running a node script
-                
-                // 1. Write code to a temp file
                 const scriptPath = 'runner-script.js';
                 await instance.fs.writeFile(scriptPath, code || '');
-                
-                // 2. Spawn node process
                 const process = await instance.spawn('node', [scriptPath]);
-                
+
                 process.output.pipeTo(new WritableStream({
-                    write(data) {
-                        setOutput(prev => [...prev, data]);
-                    }
+                    write(data) { setOutput(prev => [...prev, data]); }
                 }));
 
                 const exitCode = await process.exit;
@@ -65,9 +80,7 @@ const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) =>
             }
         };
 
-        if (code && instance) {
-            run();
-        }
+        if (code && instance) run();
     }, [code, instance]);
 
     if (!instance) {
@@ -76,20 +89,30 @@ const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) =>
 
     return (
         <div className="bg-black text-green-400 font-mono p-4 h-full overflow-auto whitespace-pre-wrap">
-            {output.map((line, i) => (
-                <div key={i}>{line}</div>
-            ))}
+            {output.map((line, i) => <div key={i}>{line}</div>)}
             {isRunning && <div className="animate-pulse">_</div>}
         </div>
     );
 };
 
+// --- Detect run mode from language or file extension ---
+function detectMode(language?: string, filePath?: string, code?: string): RunMode {
+    if (language === 'html') return 'html';
+    if (language === 'tsx' || language === 'jsx') return 'react';
+    if (filePath?.endsWith('.html')) return 'html';
+    if (filePath?.endsWith('.wasm')) return 'node';
+    if (filePath?.endsWith('.js') && code?.includes('process.stdout')) return 'node';
+    return 'react';
+}
+
 // --- Main Component ---
-export default function CodeRunner({ filePath, code: initialCode, mode: initialMode }: CodeRunnerProps) {
+export default function CodeRunner({ filePath, code: initialCode, language, mode: initialMode }: CodeRunnerProps) {
     const [code, setCode] = useState<string>(initialCode || '');
     const [error, setError] = useState<string | null>(null);
     const { readFileContent } = useFileSystemStore();
-    const [mode, setMode] = useState<RunMode>(initialMode || 'react');
+    const [mode, setMode] = useState<RunMode>(
+        initialMode || detectMode(language, filePath, initialCode)
+    );
 
     useEffect(() => {
         const loadCode = async () => {
@@ -97,23 +120,17 @@ export default function CodeRunner({ filePath, code: initialCode, mode: initialM
                 try {
                     const content = await readFileContent(filePath);
                     setCode(content);
-                    
-                    // Auto-detect mode if not provided
                     if (!initialMode) {
-                        if (filePath.endsWith('.wasm')) setMode('wasm');
-                        else if (filePath.endsWith('.js') && content.includes('process.stdout')) setMode('node');
-                        else setMode('react');
+                        setMode(detectMode(language, filePath, content));
                     }
                 } catch (e: any) {
                     setError(`Failed to read file: ${e.message}`);
                 }
             }
         };
-        
-        if (filePath && !initialCode) {
-            loadCode();
-        }
-    }, [filePath, initialCode, readFileContent, initialMode]);
+
+        if (filePath && !initialCode) loadCode();
+    }, [filePath, initialCode, readFileContent, initialMode, language]);
 
     if (error) {
         return (
@@ -127,7 +144,7 @@ export default function CodeRunner({ filePath, code: initialCode, mode: initialM
         );
     }
 
-    if (!code && mode !== 'wasm') {
+    if (!code && mode !== 'node') {
         return (
             <div className="h-full w-full flex items-center justify-center text-zinc-500">
                 <div className="text-center">
@@ -139,16 +156,17 @@ export default function CodeRunner({ filePath, code: initialCode, mode: initialM
     }
 
     return (
-        <div className="h-full w-full bg-white dark:bg-zinc-900 overflow-auto flex flex-col">
+        <div className="h-full w-full bg-white dark:bg-zinc-900 overflow-auto flex flex-col pt-10">
             {/* Toolbar */}
-            <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 gap-4 bg-zinc-50 dark:bg-zinc-900">
+            <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 gap-4 bg-zinc-50 dark:bg-zinc-900 shrink-0">
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-zinc-500 uppercase">Mode:</span>
-                    <select 
-                        value={mode} 
+                    <select
+                        value={mode}
                         onChange={(e) => setMode(e.target.value as RunMode)}
-                        className="bg-transparent text-sm border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
+                        className="bg-transparent dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
                     >
+                        <option value="html">HTML Preview</option>
                         <option value="react">React Preview</option>
                         <option value="node">Node.js / WASM (WebContainer)</option>
                     </select>
@@ -156,12 +174,14 @@ export default function CodeRunner({ filePath, code: initialCode, mode: initialM
             </div>
 
             {/* Runner Area */}
-            <div className="flex-1 relative">
-                {mode === 'react' ? (
+            <div className="flex-1 relative overflow-hidden">
+                {mode === 'html' ? (
+                    <HtmlRunner code={code} />
+                ) : mode === 'react' ? (
                     <div className="p-4 h-full">
-                        <Runner 
-                            code={code} 
-                            scope={scope} 
+                        <Runner
+                            code={code}
+                            scope={scope}
                             onRendered={(error) => {
                                 if (error) setError(error.toString());
                             }}

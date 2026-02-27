@@ -1,27 +1,31 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { ChatSession, Message } from '../types';
+import { ChatSession, Message, CloudConfig } from '../types';
 import { storage } from '../utils/storage';
 
 interface ChatStore {
     sessions: ChatSession[];
     currentSessionId: string | null;
     isSidebarOpen: boolean;
+    aiProvider: 'local' | 'cloud';
+    cloudConfig: CloudConfig;
     modelSettings: {
         temperature: number;
         top_p: number;
         systemPrompt: string;
     };
+    currentLocalModelId: string | null;
 
     // Actions
+    setCurrentLocalModelId: (id: string | null) => void;
     createSession: (modelId?: string) => string;
     deleteSession: (id: string) => void;
     selectSession: (id: string) => void;
     updateSessionTitle: (id: string, title: string) => void;
     addMessage: (
-        sessionId: string, 
-        role: 'user' | 'assistant' | 'system' | 'tool', 
-        content: string, 
+        sessionId: string,
+        role: 'user' | 'assistant' | 'system' | 'tool',
+        content: string,
         mode?: 'chat' | 'control' | 'builder',
         tool_calls?: any[],
         tool_call_id?: string
@@ -29,19 +33,37 @@ interface ChatStore {
     updateLastMessage: (sessionId: string, updates: Partial<Omit<Message, 'id' | 'timestamp'>>) => void;
     toggleSidebar: () => void;
     updateModelSettings: (settings: Partial<ChatStore['modelSettings']>) => void;
+    setAiProvider: (provider: 'local' | 'cloud') => void;
+    updateCloudConfig: (config: Partial<CloudConfig>) => void;
     loadSessions: () => Promise<void>;
     clearHistory: () => Promise<void>;
+}
+
+const CLOUD_CONFIG_KEY = 'ai-chat-cloud-config';
+const AI_PROVIDER_KEY = 'ai-chat-provider';
+
+function loadCloudConfig(): CloudConfig {
+    try {
+        const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch { }
+    return { provider: 'gemini', apiKey: '', modelId: 'gemini-2.0-flash' };
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
     sessions: [],
     currentSessionId: null,
     isSidebarOpen: true,
+    aiProvider: (localStorage.getItem(AI_PROVIDER_KEY) as 'local' | 'cloud') || 'local',
+    cloudConfig: loadCloudConfig(),
     modelSettings: {
         temperature: 0.5,
         top_p: 0.9,
         systemPrompt: "You are a helpful assistant living in a web-based OS. You can chat with users normally. You also have access to system tools (theme, wallpaper, apps). Only use tools when explicitly requested."
     },
+    currentLocalModelId: null,
+
+    setCurrentLocalModelId: (id) => set({ currentLocalModelId: id }),
 
     createSession: (modelId = 'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC') => {
         const newSession: ChatSession = {
@@ -155,6 +177,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set(state => ({
             modelSettings: { ...state.modelSettings, ...settings }
         }));
+    },
+
+    setAiProvider: (provider) => {
+        localStorage.setItem(AI_PROVIDER_KEY, provider);
+        set({ aiProvider: provider });
+    },
+
+    updateCloudConfig: (config) => {
+        set(state => {
+            const newConfig = { ...state.cloudConfig, ...config };
+            localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(newConfig));
+            return { cloudConfig: newConfig };
+        });
     },
 
     loadSessions: async () => {

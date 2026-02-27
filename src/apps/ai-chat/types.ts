@@ -18,6 +18,15 @@ export interface ChatSession {
     modelId: string;
 }
 
+export type CloudProvider = 'gemini' | 'openai';
+
+export interface CloudConfig {
+    provider: CloudProvider;
+    apiKey: string;
+    modelId: string;
+    baseUrl?: string; // for OpenAI-compatible endpoints
+}
+
 export interface ModelConfig {
     id: string;
     name: string;
@@ -37,16 +46,16 @@ export interface ChatState {
         top_p: number;
         systemPrompt: string;
     };
-    
+
     // Actions
     createSession: (modelId?: string) => string;
     deleteSession: (id: string) => void;
     selectSession: (id: string) => void;
     updateSessionTitle: (id: string, title: string) => void;
     addMessage: (
-        sessionId: string, 
-        role: 'user' | 'assistant' | 'system' | 'tool', 
-        content: string, 
+        sessionId: string,
+        role: 'user' | 'assistant' | 'system' | 'tool',
+        content: string,
         mode?: 'chat' | 'control' | 'builder',
         tool_calls?: any[],
         tool_call_id?: string

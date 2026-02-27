@@ -11,6 +11,7 @@ export const manifest: AppManifest = {
     id: 'yume',
     title: 'Yume',
     icon: Globe,
+    externalUrl: 'http://yume.noktt.cn',
     theme: {
         backgroundColor: '#ffffff',
         iconColor: '#000000',

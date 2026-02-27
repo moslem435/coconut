@@ -85,6 +85,11 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
         setPeekWindowId(null)
         if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
 
+        if (app.externalUrl) {
+            window.open(app.externalUrl, '_blank')
+            return
+        }
+
         const isShiftClick = e.shiftKey
         const shouldOpenNew = isShiftClick || (app.multiInstance && !windowState.isOpen)
 

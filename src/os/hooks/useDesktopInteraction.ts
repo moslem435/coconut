@@ -25,6 +25,11 @@ export function useDesktopInteraction() {
       const app = APPS_REGISTRY[item.appId]
       if (!app) return
 
+      if (app.externalUrl) {
+        window.open(app.externalUrl, '_blank')
+        return
+      }
+
       const isWindowOpen = useWindowStore.getState().windows[item.appId]?.isOpen
       if (isWindowOpen && !app.multiInstance) {
         focusWindow(item.appId)

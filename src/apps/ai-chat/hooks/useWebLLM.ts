@@ -334,7 +334,8 @@ export function useWebLLM() {
         onFinish: () => void,
         onError: (err: any) => void,
         systemPrompt?: string,
-        mode: 'chat' | 'control' | 'builder' = 'chat'
+        mode: 'chat' | 'control' | 'builder' = 'chat',
+        _cloudConfig?: any  // ignored in local mode, for interface compatibility
     ) => {
         if (!engineRef.current || !state.isModelLoaded) return;
 
@@ -376,7 +377,15 @@ export function useWebLLM() {
             const modeSystemPrompts = {
                 chat: "", // Default behavior
                 control: "You are a system control assistant for a web OS. Respond in the same language the user speaks (Chinese users → reply in Chinese). RULES: 1) If the user asks a QUESTION (e.g. 'what can you do?', '你有什么功能?'), answer it directly in text — do NOT call any tools. 2) Only call a tool when the user EXPLICITLY requests an action (e.g. '切换暗色主题', 'set volume to 50'). 3) When calling a tool, call EXACTLY ONE tool that matches the request. 4) NEVER call unrelated tools.",
-                builder: "You are an application builder assistant. Your goal is to help users create files and list directories. When creating code files, ensure the code is complete and functional."
+                builder: `You are an expert app builder assistant. Respond in the same language as the user (Chinese users → reply in Chinese).
+
+When a user asks you to CREATE an app, game, website, or tool:
+1. Reply briefly confirming what you will build.
+2. Output a SINGLE, complete, self-contained HTML file in a markdown code block tagged as \`\`\`html
+3. The HTML must include ALL CSS and JavaScript inline. Use canvas, DOM APIs, or CDN libraries (e.g. p5.js via CDN). Make it visually polished and fully functional.
+4. After the code block, add a short usage tip.
+
+Do NOT use any tools. Just output the code directly in your response.`
             };
 
             const effectiveSystemPrompt = mode !== 'chat' ? modeSystemPrompts[mode] : systemPrompt;
@@ -394,8 +403,11 @@ export function useWebLLM() {
                 let systemContent = effectiveSystemPrompt;
 
                 if (supportsTools) {
-                    // Enhance system prompt with tool hints
-                    systemContent += `\n\nCRITICAL: CONTROL MODE ACTIVE. If user asks a question → answer in text, NO tools. If user requests an action → call EXACTLY ONE matching tool, then stop.`;
+                    // Enhance system prompt with mode-specific tool hints
+                    if (mode === 'control') {
+                        systemContent += `\n\nCRITICAL: CONTROL MODE ACTIVE. If user asks a question → answer in text, NO tools. If user requests an action → call EXACTLY ONE matching tool, then stop.`;
+                    }
+                    // builder mode: NO tool hint - we want pure text code generation
 
                     // CRITICAL FIX: Hermes-2-Pro and some other models THROW ERROR if 'system' role is used with tools.
                     // We must PREPEND the system prompt to the LATEST USER message instead.
@@ -453,17 +465,15 @@ export function useWebLLM() {
                     // Filter tools based on mode
                     let allowedToolNames: string[] = [];
                     if (mode === 'control') allowedToolNames = TOOL_CATEGORIES.control;
-                    else if (mode === 'builder') allowedToolNames = TOOL_CATEGORIES.builder;
+                    // builder mode intentionally gets NO tools - pure text code generation
 
                     const filteredTools = systemToolsDefinitions.filter(t =>
                         allowedToolNames.includes(t.function.name)
                     );
 
                     if (filteredTools.length > 0) {
-                        // Force the model to use tools if intent is clear
                         // @ts-ignore
                         completionParams.tools = filteredTools;
-                        // "auto" means the model can choose to use a tool or just chat
                         completionParams.tool_choice = "auto";
                     }
                 }
@@ -643,8 +653,10 @@ export function useWebLLM() {
                                 let fallbackMsg = "Sorry, I couldn't process that request. Could you please rephrase it?";
                                 if (mode === 'control') {
                                     fallbackMsg = "I couldn't identify a valid system command. Please be more specific (e.g., 'Switch to dark mode', 'Set volume to 50%').";
+                                } else if (mode === 'builder') {
+                                    fallbackMsg = "I need more details to build that app. Please describe what you want (e.g., '创建一个贪吃蛇游戏' or 'Create a todo app with dark theme').";
                                 }
-                                console.warn("[AI-Chat] Empty response from model in control mode. Input messages:", chatMessages);
+                                console.warn("[AI-Chat] Empty response from model. Mode:", mode, "Input messages:", chatMessages);
                                 onUpdate({ content: fallbackMsg });
                             }
                         }

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
-import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
+import { useTranslation, useWindow } from '@/os/sdk';
+import { useWindowStore } from '@/os/kernel/useWindowStore';
 import {
     Plus,
     Trash2,
@@ -10,11 +11,14 @@ import {
     MoreHorizontal,
     PanelLeftClose,
     LogOut,
-    Sparkles
+    Sparkles,
+    Sliders
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { getRelativeDateGroup } from '../utils/date';
+import { AVAILABLE_MODELS } from '../hooks/useWebLLM';
+import { CLOUD_MODELS, testCloudConnection } from '../hooks/useCloudLLM';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -29,13 +33,137 @@ export function Sidebar() {
         createSession,
         selectSession,
         deleteSession,
-        toggleSidebar
+        toggleSidebar,
+        aiProvider,
+        setAiProvider,
+        cloudConfig,
+        updateCloudConfig,
+        currentLocalModelId
     } = useChatStore();
 
+    const deleteModel = async (modelId: string) => {
+        try {
+            if ('caches' in window) {
+                await caches.delete(`webllm/model/${modelId}`);
+                await caches.delete(`webllm/wasm/${modelId}`);
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Failed to delete model:", e);
+            return false;
+        }
+    };
+
     const { update: updateWindow } = useWindow();
-    const appWindow = useWindowState('ai-chat');
     const [searchQuery, setSearchQuery] = useState('');
     const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
+    const [sidebarMode, setSidebarMode] = useState<'chat' | 'settings'>('chat');
+
+    // Model Manager State
+    const [modelTab, setModelTab] = useState<'all' | 'downloaded' | 'cloud'>('all');
+    const [cachedModels, setCachedModels] = useState<Set<string>>(new Set());
+    const [cloudTestState, setCloudTestState] = useState<{ loading: boolean; message: string; ok: boolean | null }>({ loading: false, message: '', ok: null });
+    const [showApiKey, setShowApiKey] = useState(false);
+
+    // Check for cached models on mount and when menu opens
+    useEffect(() => {
+        const checkCachedModels = async () => {
+            if ('caches' in window) {
+                try {
+                    const keys = await caches.keys();
+                    const cachedIds = new Set<string>();
+
+                    // Strategy 1: Check cache names (WebLLM often uses 'webllm/model' or 'webllm/wasm')
+                    // But importantly, we need to inspect the CONTENTS of 'webllm/model'
+
+                    let modelCache: Cache | null = null;
+                    if (keys.includes('webllm/model')) {
+                        modelCache = await caches.open('webllm/model');
+                    } else if (keys.includes('webllm/config')) { // Newer versions might use config
+                        modelCache = await caches.open('webllm/config');
+                    }
+
+                    if (modelCache) {
+                        const requests = await modelCache.keys();
+                        // The URLs usually contain the model ID or parts of it.
+                        // e.g. https://.../Llama-3-8B-Instruct-q4f32_1-MLC/params_shard_0.bin
+
+                        AVAILABLE_MODELS.forEach(model => {
+                            // Check if ANY file related to this model exists in the cache
+                            const hasFile = requests.some(req => req.url.includes(model.id));
+                            if (hasFile) {
+                                cachedIds.add(model.id);
+                            }
+                        });
+                    }
+
+                    // Fallback: Check for individual cache keys if strategy changed
+                    keys.forEach(key => {
+                        AVAILABLE_MODELS.forEach(model => {
+                            if (key.includes(model.id)) {
+                                cachedIds.add(model.id);
+                            }
+                        });
+                    });
+
+                    setCachedModels(cachedIds);
+                } catch (e) {
+                    console.error("Failed to check cache:", e);
+                }
+            }
+        };
+
+        if (sidebarMode === 'settings') {
+            checkCachedModels();
+        }
+    }, [sidebarMode]);
+
+    // Filter models based on tab
+    const visibleModels = useMemo(() => AVAILABLE_MODELS.filter(m => {
+        if (modelTab === 'downloaded') {
+            return cachedModels.has(m.id);
+        }
+        return true;
+    }), [modelTab, cachedModels]);
+
+    const handleInitModel = (modelId: string) => {
+        // This just sets the provider, actual loading happens in ChatArea via useWebLLM
+        // But we need to signal intent. For now, let's assume selecting it is enough if we use currentLocalModelId store
+        // However, useWebLLM handles initEngine. We might need to expose that or just rely on ChatArea to pick up changes?
+        // Actually, initEngine is imperative.
+        // For this refactor, we'll update the config in store if we had one, or just let the user know.
+        // Since we can't easily call initEngine from here without moving useWebLLM up or using a global event,
+        // we might need a way to trigger it.
+        // A simple way is to use the existing `updateCloudConfig` or similar for local models?
+        // Wait, `currentLocalModelId` in store is just state? No, it's from useWebLLM hook usually.
+        // Let's look at useChatStore... it doesn't store currentLocalModelId for local.
+        // We might need to dispatch an event or use a store field that ChatArea reacts to.
+        
+        // For now, let's just select it in UI and maybe emit an event or update a store value?
+        // The original code called `initEngine(modelId)` directly in ChatArea.
+        // We can use the EventBus or just add `selectedLocalModelId` to store and have ChatArea useEffect on it.
+        
+        // Let's use a custom event for now to keep it simple without changing store schema too much yet
+        // Or better, just close the sidebar and let ChatArea handle it? No, we want it in sidebar.
+        
+        // Actually, we can just trigger a window event that ChatArea listens to?
+        window.dispatchEvent(new CustomEvent('ai-chat:load-model', { detail: { modelId } }));
+    };
+
+    const handleDeleteModel = async (e: React.MouseEvent, modelId: string) => {
+        e.stopPropagation();
+        if (window.confirm(t('ai.model.delete_confirm').replace('{modelId}', modelId))) {
+            const success = await deleteModel(modelId);
+            if (success) {
+                setCachedModels(prev => {
+                    const next = new Set(prev);
+                    next.delete(modelId);
+                    return next;
+                });
+            }
+        }
+    };
 
     // Sidebar resize state
     const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -81,6 +209,7 @@ export function Sidebar() {
 
     const handleToggle = () => {
         toggleSidebar();
+        const appWindow = useWindowStore.getState().windows['ai-chat'];
         if (appWindow && !appWindow.isMaximized) {
             updateWindow('ai-chat', {
                 size: {
@@ -150,91 +279,338 @@ export function Sidebar() {
                     </button>
                 </div>
 
-                {/* New Chat Button */}
-                <button
-                    onClick={() => createSession()}
-                    className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-200 rounded-lg transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
-                >
-                    <Plus size={16} className="text-zinc-400 group-hover:text-zinc-200 transition-colors" />
-                    <span>{t('ai.sidebar.new_chat')}</span>
-                </button>
-
-                {/* Search */}
-                <div className="relative group">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
-                    <input
-                        type="text"
-                        placeholder={t('ai.sidebar.search')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-transparent border-b border-white/10 focus:border-white/20 py-2 pl-9 pr-3 text-sm text-zinc-200 placeholder:text-zinc-700 outline-none transition-all"
-                    />
+                {/* Mode Switcher */}
+                <div className="flex p-1 bg-white/5 rounded-lg border border-white/5">
+                    <button
+                        onClick={() => setSidebarMode('chat')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all",
+                            sidebarMode === 'chat'
+                                ? "bg-white/10 text-zinc-100 shadow-sm"
+                                : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <MessageSquare size={14} />
+                        {t('ai.sidebar.chats')}
+                    </button>
+                    <button
+                        onClick={() => setSidebarMode('settings')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all",
+                            sidebarMode === 'settings'
+                                ? "bg-white/10 text-zinc-100 shadow-sm"
+                                : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <Sliders size={14} />
+                        {t('ai.header.models')}
+                    </button>
                 </div>
-            </div>
 
-            {/* Scrollable List */}
-            <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar" style={{ minWidth: sidebarWidth }}>
-                {groupedSessions.length === 0 ? (
-                    <div className="text-center py-10">
-                        <p className="text-xs text-zinc-700">{t('ai.sidebar.no_chats')}</p>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        {groupedSessions.map((group) => (
-                            <div key={group.title} className="space-y-1">
-                                <h3 className="px-3 text-[10px] font-medium text-zinc-500 uppercase tracking-widest mb-2 sticky top-0 py-1 z-10">
-                                    {t(group.title as any)}
-                                </h3>
-                                {group.items.map(session => (
-                                    <div
-                                        key={session.id}
-                                        onMouseEnter={() => setHoveredSessionId(session.id)}
-                                        onMouseLeave={() => setHoveredSessionId(null)}
-                                        onClick={() => selectSession(session.id)}
-                                        className={cn(
-                                            "group/item relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all text-sm",
-                                            currentSessionId === session.id
-                                                ? "bg-white/10 text-zinc-100 font-medium"
-                                                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-                                        )}
-                                    >
-                                        {currentSessionId === session.id && (
-                                            <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-zinc-100 rounded-full" />
-                                        )}
-                                        <MessageSquare size={14} className={cn(
-                                            "shrink-0 transition-opacity",
-                                            currentSessionId === session.id ? "opacity-100 text-zinc-100" : "opacity-50"
-                                        )} />
+                {sidebarMode === 'chat' && (
+                    <>
+                        {/* New Chat Button */}
+                        <button
+                            onClick={() => createSession()}
+                            className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-200 rounded-lg transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
+                        >
+                            <Plus size={16} className="text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+                            <span>{t('ai.sidebar.new_chat')}</span>
+                        </button>
 
-                                        <div className="flex-1 min-w-0">
-                                            <div className="truncate text-[13px]">{session.title}</div>
-                                        </div>
-
-                                        {/* Actions - Visible on Hover or Active */}
-                                        {(hoveredSessionId === session.id || currentSessionId === session.id) && (
-                                            <div className="absolute right-2 flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteSession(session.id);
-                                                    }}
-                                                    className="p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/item:opacity-100"
-                                                    title={t('ai.sidebar.delete')}
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
+                        {/* Search */}
+                        <div className="relative group">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
+                            <input
+                                type="text"
+                                placeholder={t('ai.sidebar.search')}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-transparent border-b border-white/10 focus:border-white/20 py-2 pl-9 pr-3 text-sm text-zinc-200 placeholder:text-zinc-700 outline-none transition-all"
+                            />
+                        </div>
+                    </>
                 )}
             </div>
 
-            {/* Bottom User / Settings Area - REMOVED */}
-            {/* <div className="p-3 border-t border-white/5 bg-transparent" style={{ minWidth: sidebarWidth }}>...</div> */}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar" style={{ minWidth: sidebarWidth }}>
+                {sidebarMode === 'chat' ? (
+                    /* ── Chat List ── */
+                    groupedSessions.length === 0 ? (
+                        <div className="text-center py-10">
+                            <p className="text-xs text-zinc-700">{t('ai.sidebar.no_chats')}</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {groupedSessions.map((group) => (
+                                <div key={group.title} className="space-y-1">
+                                    <h3 className="px-3 text-[10px] font-medium text-zinc-500 uppercase tracking-widest mb-2 sticky top-0 py-1 z-10">
+                                        {t(group.title as any)}
+                                    </h3>
+                                    {group.items.map(session => (
+                                        <div
+                                            key={session.id}
+                                            onMouseEnter={() => setHoveredSessionId(session.id)}
+                                            onMouseLeave={() => setHoveredSessionId(null)}
+                                            onClick={() => selectSession(session.id)}
+                                            className={cn(
+                                                "group/item relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all text-sm",
+                                                currentSessionId === session.id
+                                                    ? "bg-white/10 text-zinc-100 font-medium"
+                                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                                            )}
+                                        >
+                                            {currentSessionId === session.id && (
+                                                <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-zinc-100 rounded-full" />
+                                            )}
+                                            <MessageSquare size={14} className={cn(
+                                                "shrink-0 transition-opacity",
+                                                currentSessionId === session.id ? "opacity-100 text-zinc-100" : "opacity-50"
+                                            )} />
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="truncate text-[13px]">{session.title}</div>
+                                            </div>
+
+                                            {/* Actions - Visible on Hover or Active */}
+                                            {(hoveredSessionId === session.id || currentSessionId === session.id) && (
+                                                <div className="absolute right-2 flex items-center gap-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteSession(session.id);
+                                                        }}
+                                                        className="p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/item:opacity-100"
+                                                        title={t('ai.sidebar.delete')}
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )
+                ) : (
+                    /* ── Settings / Model Panel ── */
+                    <div className="space-y-6 pb-10">
+                        {/* Tabs */}
+                        <div className="flex border-b border-white/5 pb-1">
+                            <button
+                                onClick={() => { setModelTab('all'); setAiProvider('local'); }}
+                                className={cn(
+                                    "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
+                                    modelTab === 'all' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                                )}
+                            >
+                                {t('ai.model.tab.all')}
+                                {modelTab === 'all' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => { setModelTab('downloaded'); setAiProvider('local'); }}
+                                className={cn(
+                                    "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
+                                    modelTab === 'downloaded' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                                )}
+                            >
+                                {t('ai.model.tab.downloaded')}
+                                {modelTab === 'downloaded' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => { setModelTab('cloud'); setAiProvider('cloud'); }}
+                                className={cn(
+                                    "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
+                                    modelTab === 'cloud' ? "text-amber-300" : "text-zinc-500 hover:text-zinc-300"
+                                )}
+                            >
+                                Cloud
+                                {modelTab === 'cloud' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-t-full" />
+                                )}
+                            </button>
+                        </div>
+
+                        {modelTab === 'cloud' ? (
+                            /* ── Cloud Config Panel ── */
+                            <div className="space-y-4">
+                                {/* Provider selector */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Service</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {(['gemini', 'openai'] as const).map(p => (
+                                            <button
+                                                key={p}
+                                                onClick={() => updateCloudConfig({ provider: p, modelId: CLOUD_MODELS[p][0]!.id })}
+                                                className={cn(
+                                                    "py-2 rounded-lg text-xs font-medium border transition-all text-center",
+                                                    cloudConfig.provider === p
+                                                        ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                )}
+                                            >
+                                                {p === 'gemini' ? 'Gemini' : 'OpenAI'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Model selector */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Model</label>
+                                    <div className="space-y-1">
+                                        {CLOUD_MODELS[cloudConfig.provider].map(m => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => updateCloudConfig({ modelId: m.id })}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
+                                                    cloudConfig.modelId === m.id
+                                                        ? "bg-amber-500/10 text-amber-200 border-amber-500/20"
+                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                )}
+                                            >
+                                                <span className="font-medium truncate">{m.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* API Key */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">API Key</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showApiKey ? 'text' : 'password'}
+                                            value={cloudConfig.apiKey}
+                                            onChange={e => updateCloudConfig({ apiKey: e.target.value })}
+                                            placeholder={cloudConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-10 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                        />
+                                        <button
+                                            onClick={() => setShowApiKey(v => !v)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]"
+                                        >
+                                            {showApiKey ? 'Hide' : 'Show'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Test + Activate */}
+                                <div className="flex flex-col gap-2 pt-2">
+                                    <button
+                                        onClick={async () => {
+                                            setCloudTestState({ loading: true, message: 'Testing...', ok: null });
+                                            const result = await testCloudConnection(cloudConfig);
+                                            setCloudTestState({ loading: false, message: result.message, ok: result.ok });
+                                        }}
+                                        disabled={!cloudConfig.apiKey || cloudTestState.loading}
+                                        className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 text-xs font-medium transition-colors disabled:opacity-40"
+                                    >
+                                        {cloudTestState.loading ? 'Testing...' : 'Test Connection'}
+                                    </button>
+                                    <button
+                                        onClick={() => { setAiProvider('cloud'); }}
+                                        disabled={!cloudConfig.apiKey}
+                                        className="w-full py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-xs font-medium transition-colors disabled:opacity-40"
+                                    >
+                                        {aiProvider === 'cloud' ? '✓ Active' : 'Activate Cloud'}
+                                    </button>
+                                </div>
+
+                                {/* Test result */}
+                                {cloudTestState.message && (
+                                    <div className={cn(
+                                        "px-3 py-2 rounded-lg text-xs font-medium break-words",
+                                        cloudTestState.ok ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+                                    )}>
+                                        {cloudTestState.message}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            /* ── Local Model List ── */
+                            <div className="space-y-2">
+                                {visibleModels.length === 0 ? (
+                                    <div className="text-center py-8 text-zinc-500">
+                                        <p className="text-xs">{t('ai.model.no_models')}</p>
+                                    </div>
+                                ) : (
+                                    visibleModels.map(model => {
+                                        const isDownloaded = cachedModels.has(model.id);
+                                        const isActive = currentLocalModelId === model.id;
+
+                                        return (
+                                            <div
+                                                key={model.id}
+                                                className={cn(
+                                                    "group relative flex flex-col gap-2 p-3 rounded-xl transition-all border",
+                                                    isActive
+                                                        ? "bg-indigo-500/10 border-indigo-500/20"
+                                                        : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/5"
+                                                )}
+                                            >
+                                                {/* Selection Indicator */}
+                                                {isActive && (
+                                                    <div className="absolute left-0 top-3 bottom-3 w-0.5 bg-indigo-500 rounded-r-full" />
+                                                )}
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={cn(
+                                                            "font-medium text-xs truncate",
+                                                            isActive ? "text-indigo-200" : "text-zinc-200"
+                                                        )}>
+                                                            {model.name}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 text-[9px] font-mono opacity-60 mb-2">
+                                                        <span>{model.vram} {t('ai.model.vram')}</span>
+                                                        <span>•</span>
+                                                        <span>{model.size}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleInitModel(model.id)}
+                                                        disabled={false} // Todo: check loading
+                                                        className={cn(
+                                                            "flex-1 py-1.5 rounded-md text-[10px] font-medium transition-colors border",
+                                                            isActive
+                                                                ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
+                                                                : "bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
+                                                        )}
+                                                    >
+                                                        {isActive ? t('ai.model.active') : (isDownloaded ? t('ai.model.switch') : t('ai.model.download'))}
+                                                    </button>
+
+                                                    {isDownloaded && !isActive && (
+                                                        <button
+                                                            onClick={(e) => handleDeleteModel(e, model.id)}
+                                                            className="p-1.5 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                            title={t('ai.model.delete')}
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Resize Handle / Border */}
             <div

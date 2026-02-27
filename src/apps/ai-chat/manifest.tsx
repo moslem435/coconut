@@ -22,6 +22,6 @@ export const manifest: AppManifest = {
         height: 800,
         titleBarColor: 'auto',
         isSidebar: true, // Enable Copilot mode
-        hideTitleBar: false
+        hideTitleBar: true
     }
 }
