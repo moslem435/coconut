@@ -46,6 +46,7 @@ export const createActionSlice: StateCreator<
       name,
       type,
       appId,
+      content: content || '', // Optimistically store content
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
@@ -124,8 +125,11 @@ export const createActionSlice: StateCreator<
     const node = get().files[id]
     if (!node) return
 
-    // 1. 更新元数据
-    get()._updateFile(id, { updatedAt: Date.now() })
+    // 1. 更新元数据和内容
+    get()._updateFile(id, { 
+        updatedAt: Date.now(),
+        content // Update content in memory
+    })
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
@@ -142,6 +146,12 @@ export const createActionSlice: StateCreator<
 
   // 读取文件内容（委托给 syncService）
   readFileContent: async (id) => {
+    // 1. Try to read from memory first (Optimistic)
+    const node = get().files[id]
+    if (node && node.content !== undefined) {
+      return node.content
+    }
+
     const path = get().resolvePath(id)
     if (!path) return ''
 

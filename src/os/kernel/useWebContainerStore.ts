@@ -30,11 +30,17 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   // New: Explicit Sync Methods for VFS (Optimized)
   syncFile: async (path, content) => {
     const { instance, isSyncingFromWC } = get()
-    if (!instance || isSyncingFromWC) return
+    if (!instance) return
+    
+    // If we are currently processing a change originating from WC, do not sync back to WC
+    if (isSyncingFromWC) {
+      // console.log('[VFS->WC] Skipped sync (loop prevention):', path)
+      return
+    }
 
     const wcPath = `/home/guest${path}`
     try {
-      console.log('[VFS->WC] writeFile:', wcPath)
+      // console.log('[VFS->WC] writeFile:', wcPath)
       await instance.fs.writeFile(wcPath, content)
     } catch (e) {
       console.warn('[VFS->WC] writeFile failed:', e)
@@ -43,11 +49,16 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
   syncMkdir: async (path) => {
     const { instance, isSyncingFromWC } = get()
-    if (!instance || isSyncingFromWC) return
+    if (!instance) return
+
+    if (isSyncingFromWC) {
+       // console.log('[VFS->WC] Skipped mkdir (loop prevention):', path)
+       return
+    }
 
     const wcPath = `/home/guest${path}`
     try {
-      console.log('[VFS->WC] mkdir:', wcPath)
+      // console.log('[VFS->WC] mkdir:', wcPath)
       await instance.fs.mkdir(wcPath, { recursive: true })
     } catch (e) {
       console.warn('[VFS->WC] mkdir failed:', e)
@@ -73,6 +84,21 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   boot: async () => {
     const { instance, isBooting } = get()
     if (instance) return
+    
+    // Check if a boot process is already in progress (globally)
+    if (bootPromise) {
+        // Wait for the existing promise to resolve
+        try {
+            const webcontainer = await bootPromise;
+            // Update state with the already booted instance
+            set({ instance: webcontainer, isBooting: false });
+            return;
+        } catch (e) {
+            // If the previous boot failed, we might want to retry, but bootPromise is reset on failure below.
+            // So if we are here, it means we are in a retry loop or concurrent call.
+        }
+    }
+
     if (isBooting) return
 
     set({ isBooting: true, error: null })

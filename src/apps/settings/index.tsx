@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Palette, Monitor, Volume2, Globe, User, Database, Info } from 'lucide-react'
+import { Palette, Monitor, Volume2, Globe, User, Database, Info, Network } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { SettingCategory } from './types'
 import { SettingSidebar } from './components/SettingSidebar'
@@ -11,6 +11,7 @@ import { AppearancePanel } from './panels/AppearancePanel'
 import { SoundPanel } from './panels/SoundPanel'
 import { LanguagePanel } from './panels/LanguagePanel'
 import { AccountPanel } from './panels/AccountPanel'
+import { NetworkPanel } from './panels/NetworkPanel'
 import { DataPanel } from './panels/DataPanel'
 import { AboutPanel } from './panels/AboutPanel'
 
@@ -24,6 +25,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
         { id: 'appearance', label: t('settings.appearance'), icon: Palette, description: t('settings.desc.appearance') },
         { id: 'sound', label: t('settings.sound'), icon: Volume2, description: t('settings.desc.sound') },
         { id: 'language', label: t('settings.language'), icon: Globe, description: t('settings.desc.language') },
+        { id: 'network', label: t('settings.network'), icon: Network, description: t('settings.desc.network') },
         { id: 'account', label: t('settings.account'), icon: User, description: t('settings.desc.account') },
         { id: 'data', label: t('settings.data'), icon: Database, description: t('settings.desc.data') },
         { id: 'about', label: t('settings.about'), icon: Info, description: t('settings.desc.about') },
@@ -35,6 +37,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
         appearance: AppearancePanel,
         sound: SoundPanel,
         language: LanguagePanel,
+        network: NetworkPanel,
         account: AccountPanel,
         data: DataPanel,
         about: AboutPanel

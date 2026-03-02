@@ -463,7 +463,7 @@ export function Sidebar() {
 
                                 {/* Model selector */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Model</label>
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Model Preset</label>
                                     <div className="space-y-1">
                                         {CLOUD_MODELS[cloudConfig.provider].map(m => (
                                             <button
@@ -481,6 +481,34 @@ export function Sidebar() {
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Custom Model & Base URL (OpenAI only) */}
+                                {cloudConfig.provider === 'openai' && (
+                                    <>
+                                        <div className="space-y-1.5 pt-2 border-t border-white/5">
+                                            <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Custom Model ID</label>
+                                            <input
+                                                type="text"
+                                                value={cloudConfig.modelId}
+                                                onChange={e => updateCloudConfig({ modelId: e.target.value })}
+                                                placeholder="e.g. deepseek-chat"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Base URL</label>
+                                            <input
+                                                type="text"
+                                                value={cloudConfig.baseUrl || ''}
+                                                onChange={e => updateCloudConfig({ baseUrl: e.target.value })}
+                                                placeholder="https://api.openai.com/v1"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                            />
+                                            <p className="text-[9px] text-zinc-600">Default: https://api.openai.com/v1</p>
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* API Key */}
                                 <div className="space-y-1.5">

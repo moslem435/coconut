@@ -72,6 +72,7 @@ export function useDesktopInteraction() {
     // 文件
     if (item.type === 'file') {
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)
+      const isWebApp = /\.web$/i.test(item.name)
 
       if (isImage) {
         const content = await readFileContent(item.id)
@@ -83,6 +84,22 @@ export function useDesktopInteraction() {
           undefined,
           { size: { width: 600, height: 400 }, src: content }
         )
+      } else if (isWebApp) {
+        try {
+          const content = await readFileContent(item.id)
+          const data = JSON.parse(content)
+          if (data.url) {
+            launchApp(
+              'browser-' + item.id,
+              data.name || item.name.replace('.web', ''),
+              'browser',
+              undefined, // Use default icon
+              { url: data.url }
+            )
+          }
+        } catch (e) {
+          console.error('Failed to parse web app file', e)
+        }
       } else {
         launchApp(
           'notepad-' + item.id,

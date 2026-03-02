@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { RefreshCw, FolderPlus, Terminal, ArrowDownAZ, Grid3X3, Palette, Monitor, Info } from 'lucide-react'
+import { RefreshCw, FolderPlus, Terminal, ArrowDownAZ, Grid3X3, Palette, Monitor, Globe } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -7,8 +7,9 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useDesktopStore } from '@/os/kernel/useDesktopStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { findFreePosition, GRID_SIZE, GRID_PADDING } from '@/os/utils/grid'
-import { ContextMenuData, Position } from '@/os/kernel/useContextMenuStore'
+import { Position } from '@/os/kernel/useContextMenuStore'
 import { MenuItem } from './types'
+import { useDialogStore } from '@/os/kernel/useDialogStore'
 
 export function useDesktopMenuItems(
     visible: boolean,
@@ -21,6 +22,7 @@ export function useDesktopMenuItems(
     const { createItem, getChildren } = useFileSystemStore()
     const { organizeIcons, iconPositions, updateIconPosition } = useDesktopStore()
     const { openWindow } = useWindowStore()
+    const { openPrompt } = useDialogStore()
 
     return useMemo(() => {
         if (!visible || !isVisibleType) return []
@@ -31,6 +33,40 @@ export function useDesktopMenuItems(
                 openWindow(app.id, t('start.settings'), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true, initialCategory: categoryId })
             }
             hideMenu()
+        }
+
+        const handleAddWebApp = async () => {
+            hideMenu()
+            
+            const url = await openPrompt(t('menu.webapp.url.title'), 'https://', t('menu.webapp.url.placeholder'))
+            if (!url) return
+
+            const defaultName = url.replace(/^https?:\/\//, '').split('/')[0]
+            const name = await openPrompt(t('menu.webapp.name.title'), defaultName, t('menu.webapp.name.placeholder'))
+            if (!name) return
+
+            const fileName = `${name}.web`
+            const fileContent = JSON.stringify({ url, name })
+
+            const id = createItem('desktop', fileName, 'file', fileContent)
+            
+            const scaleFactor = displayScale / 100
+            const currentGridSize = GRID_SIZE * scaleFactor
+            const currentGridPadding = GRID_PADDING * scaleFactor
+
+            const startX = position?.x || currentGridPadding
+            const startY = position?.y || currentGridPadding
+
+            const pos = findFreePosition(
+                startX,
+                startY,
+                id,
+                iconPositions,
+                currentGridSize,
+                currentGridPadding
+            )
+
+            updateIconPosition(id, pos)
         }
 
         return [
@@ -44,28 +80,33 @@ export function useDesktopMenuItems(
                 label: t('menu.newfolder'),
                 icon: FolderPlus,
                 action: () => {
-                    createItem('desktop', 'New Folder', 'folder').then((id) => {
-                        const scaleFactor = displayScale / 100
-                        const currentGridSize = GRID_SIZE * scaleFactor
-                        const currentGridPadding = GRID_PADDING * scaleFactor
+                    const id = createItem('desktop', 'New Folder', 'folder')
+                    
+                    const scaleFactor = displayScale / 100
+                    const currentGridSize = GRID_SIZE * scaleFactor
+                    const currentGridPadding = GRID_PADDING * scaleFactor
 
-                        const startX = position?.x || currentGridPadding
-                        const startY = position?.y || currentGridPadding
+                    const startX = position?.x || currentGridPadding
+                    const startY = position?.y || currentGridPadding
 
-                        const pos = findFreePosition(
-                            startX,
-                            startY,
-                            id,
-                            iconPositions,
-                            currentGridSize,
-                            currentGridPadding
-                        )
+                    const pos = findFreePosition(
+                        startX,
+                        startY,
+                        id,
+                        iconPositions,
+                        currentGridSize,
+                        currentGridPadding
+                    )
 
-                        updateIconPosition(id, pos)
-                    }).catch(console.error)
+                    updateIconPosition(id, pos)
 
                     hideMenu()
                 }
+            },
+            {
+                label: t('menu.webapp.add'),
+                icon: Globe,
+                action: handleAddWebApp
             },
             {
                 label: t('menu.openterminal'),

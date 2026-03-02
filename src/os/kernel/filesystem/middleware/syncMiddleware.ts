@@ -142,7 +142,7 @@ export function createSyncMiddleware(
       }
 
       inFlightOps.delete(operation.id)
-      console.log(`[SyncMiddleware] Operation ${operation.type} succeeded for ${operation.id}`)
+      // console.log(`[SyncMiddleware] Operation ${operation.type} succeeded for ${operation.id}`)
 
     } catch (error) {
       console.error(`[SyncMiddleware] Operation ${operation.type} failed:`, error)

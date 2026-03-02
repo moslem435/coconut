@@ -42,7 +42,23 @@ async function* streamGemini(
     const modeInstructions: Record<string, string> = {
         chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
         control: "You are a system control assistant for a web OS. Respond in the user's language. Answer questions directly. Only describe what actions you would take (no tool execution in cloud mode).",
-        builder: `You are an expert app builder assistant. Respond in the user's language.\n\nWhen asked to create an app/game:\n1. Reply briefly confirming what you will build.\n2. Output a SINGLE, complete, self-contained HTML file in a markdown code block tagged as \`\`\`html\n3. The HTML must include ALL CSS and JavaScript inline. Make it visually polished and fully functional.\n4. After the code block, add a short usage tip.\n\nDo NOT skip steps. Always produce complete, working code.`
+        builder: `You are an expert app builder assistant. Respond in the user's language.
+
+When asked to create an app/game:
+1. Explain briefly what you will build.
+2. State clearly that you are creating the files automatically.
+3. Output the JSON block containing the file operations immediately.
+4. DO NOT output the full source code in Markdown text blocks. ONLY include the code inside the JSON 'content' fields.
+5. The JSON must follow this format:
+\`\`\`json
+{
+  "actions": [
+    { "type": "create_directory", "path": "/Desktop/FolderName" },
+    { "type": "create_file", "path": "/Desktop/FolderName/index.html", "content": "..." }
+  ]
+}
+\`\`\`
+Ensure the content is properly escaped in JSON. Do not output the JSON block if you are just answering a question.`
     };
 
     const sysInstruction = modeInstructions[mode] || modeInstructions.chat;
@@ -110,7 +126,23 @@ async function* streamOpenAI(
     const modeInstructions: Record<string, string> = {
         chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
         control: "You are a system control assistant for a web OS. Respond in the user's language. Answer questions directly.",
-        builder: `You are an expert app builder assistant. Respond in the user's language.\n\nWhen asked to create an app/game:\n1. Reply briefly confirming what you will build.\n2. Output a SINGLE, complete, self-contained HTML file in a markdown code block tagged as \`\`\`html\n3. The HTML must include ALL CSS and JavaScript inline. Make it visually polished and fully functional.\n4. After the code block, add a short usage tip.`
+        builder: `You are an expert app builder assistant. Respond in the user's language.
+
+When asked to create an app/game:
+1. Explain briefly what you will build.
+2. State clearly that you are creating the files automatically.
+3. Output the JSON block containing the file operations immediately.
+4. DO NOT output the full source code in Markdown text blocks. ONLY include the code inside the JSON 'content' fields.
+5. The JSON must follow this format:
+\`\`\`json
+{
+  "actions": [
+    { "type": "create_directory", "path": "/Desktop/FolderName" },
+    { "type": "create_file", "path": "/Desktop/FolderName/index.html", "content": "..." }
+  ]
+}
+\`\`\`
+Ensure the content is properly escaped in JSON. Do not output the JSON block if you are just answering a question.`
     };
 
     const sysContent = modeInstructions[mode] || modeInstructions.chat;
@@ -223,19 +255,180 @@ export async function testCloudConnection(config: CloudConfig): Promise<{ ok: bo
             return { ok: true, message: 'Gemini 连接成功 ✓' };
         } else {
             const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com/v1';
-            const res = await fetch(`${baseUrl}/chat/completions`, {
+            // Determine if the base URL likely needs a path appended
+            // Some users might paste the full chat/completions URL
+            const finalUrl = baseUrl.endsWith('/chat/completions') 
+                ? baseUrl 
+                : `${baseUrl}/chat/completions`;
+
+            const res = await fetch(finalUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
                 body: JSON.stringify({ model: config.modelId, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 })
             });
+            
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-                throw new Error(err?.error?.message || res.statusText);
+                const errText = await res.text();
+                let errMsg = res.statusText;
+                try {
+                    const errJson = JSON.parse(errText);
+                    errMsg = errJson?.error?.message || errJson?.message || errText;
+                } catch {
+                    errMsg = errText || res.statusText;
+                }
+                throw new Error(`(${res.status}) ${errMsg}`);
             }
             return { ok: true, message: 'API 连接成功 ✓' };
         }
     } catch (e: any) {
-        return { ok: false, message: `连接失败: ${e.message}` };
+        let msg = e.message || '未知错误';
+        if (msg === 'Failed to fetch') {
+            msg = '网络错误或跨域限制 (CORS)。请检查 Base URL 是否正确，或尝试使用代理。';
+        }
+        return { ok: false, message: `连接失败: ${msg}` };
+    }
+}
+
+// ─── Builder Action Processor ──────────────────────────────────────────────────
+
+function tryParseJSON(str: string): any {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        try {
+            // Common LLM JSON fixes:
+            // 1. Remove markdown code block markers if they wrap the content
+            let cleaned = str.replace(/```json/g, '').replace(/```/g, '');
+            
+            // 2. Remove trailing commas in arrays/objects: ,] -> ] and ,} -> }
+            cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+            
+            // 3. Remove comments (//...) if they are on their own line or end of line
+            // This is tricky inside strings, so let's be careful. Maybe skip for now to avoid breaking URLs.
+            // cleaned = cleaned.replace(/\/\/.*/g, '');
+
+            // 4. Robust fix for unescaped control characters inside strings (newlines, tabs)
+            // We use a state machine to track if we are inside a string.
+            let inString = false;
+            let escaped = false;
+            let result = '';
+            
+            for (let i = 0; i < cleaned.length; i++) {
+                const char = cleaned[i];
+                
+                if (char === '"' && !escaped) {
+                    inString = !inString;
+                    result += char;
+                } else if (inString) {
+                    // Inside string: escape control characters
+                    if (char === '\n') {
+                        result += '\\n';
+                    } else if (char === '\r') {
+                        // skip CR
+                    } else if (char === '\t') {
+                        result += '\\t';
+                    } else {
+                        result += char;
+                    }
+                } else {
+                    // Outside string: keep as is (structural)
+                    result += char;
+                }
+                
+                // Track escape state (backslash)
+                if (char === '\\' && !escaped) {
+                    escaped = true;
+                } else {
+                    escaped = false;
+                }
+            }
+            
+            return JSON.parse(result);
+        } catch (e2) {
+             console.warn("[CloudLLM] JSON parse error:", e2, "in string:", str.substring(0, 100) + "...");
+             return null;
+        }
+    }
+}
+
+async function processBuilderActions(content: string, onNewMessage: (msg: any) => void) {
+    // Extract JSON block using multiple strategies
+    // 1. Standard markdown code block: ```json ... ```
+    // 2. Generic code block: ``` ... ```
+    // 3. Raw JSON object that looks like it contains "actions"
+    
+    let jsonString = null;
+    
+    // Strategy 1 & 2: Code blocks
+    // Be more lenient with whitespace around the block
+    const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g;
+    
+    // Iterate all code blocks to find one that parses to { actions: [] }
+    let match;
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+        const potentialJson = match[1];
+        const data = tryParseJSON(potentialJson);
+        if (data && Array.isArray(data.actions)) {
+            jsonString = potentialJson;
+            break;
+        }
+    }
+    
+    if (!jsonString) {
+        // Strategy 3: Find the last valid JSON object structure
+        // Look for { "actions": [ ... ] } pattern
+        // We use a simpler regex that just looks for the key structure
+        const jsonPattern = /\{\s*"actions"\s*:\s*\[[\s\S]*\]\s*\}/;
+        const match2 = content.match(jsonPattern);
+        if (match2) {
+            jsonString = match2[0];
+        }
+    }
+    
+    if (jsonString) {
+        // Log the raw JSON string for debugging
+        // console.log("[CloudLLM] Raw Builder JSON:", jsonString);
+        const data = tryParseJSON(jsonString);
+            
+        if (data && Array.isArray(data.actions)) {
+            for (const action of data.actions) {
+                if (systemToolsImplementation[action.type]) {
+                    // Execute tool
+                        let result = '';
+                        try {
+                            if (action.type === 'create_directory') {
+                                result = await systemToolsImplementation['create_directory']({ path: action.path });
+                            } else if (action.type === 'create_file') {
+                                if (!action.content || action.content.trim() === '') {
+                                    console.warn(`[Builder] Empty content for file: ${action.path}`);
+                                    result = `Warning: Content for '${action.path}' was empty. File created but might be incomplete.`;
+                                    await systemToolsImplementation['create_file']({ path: action.path, content: '' });
+                                } else {
+                                    result = await systemToolsImplementation['create_file']({ path: action.path, content: action.content });
+                                }
+                            } else {
+                                continue;
+                            }
+                        
+                        // Report result to UI (as a tool message)
+                        onNewMessage({
+                            role: 'tool',
+                            content: `[Builder] ${result}`,
+                            mode: 'builder'
+                        });
+                    } catch (e: any) {
+                        onNewMessage({
+                            role: 'tool',
+                            content: `[Builder] Error: ${e.message}`,
+                            mode: 'builder',
+                            error: true
+                        });
+                    }
+                }
+            }
+        } else {
+             console.warn("Failed to parse builder actions or invalid structure:", jsonString);
+        }
     }
 }
 
@@ -278,6 +471,15 @@ export function useCloudLLM() {
                     onUpdate({ content: chunk });
                     accumulated = chunk;
                 }
+            }
+            
+            // Post-process builder actions
+            if (mode === 'builder') {
+                await processBuilderActions(accumulated, (msg) => {
+                    // We need to inject tool messages into the chat state
+                    // The onNewMessage prop might just append to UI, let's use it
+                    onNewMessage(msg);
+                });
             }
 
             onFinish();

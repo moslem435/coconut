@@ -60,12 +60,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件
-    eventBus.emit('fs:file:created', {
-      id: path.split('/').pop() || '',
-      path,
-      type
-    })
+    // 发布事件 - DISABLED to prevent loop (ActionSlice emits this already)
+    // eventBus.emit('fs:file:created', {
+    //   id: path.split('/').pop() || '',
+    //   path,
+    //   type
+    // })
   }
 
   /**
@@ -101,12 +101,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件
-    eventBus.emit('fs:file:updated', {
-      id: path.split('/').pop() || '',
-      path,
-      content
-    })
+    // 发布事件 - DISABLED
+    // eventBus.emit('fs:file:updated', {
+    //   id: path.split('/').pop() || '',
+    //   path,
+    //   content
+    // })
   }
 
   /**
@@ -143,11 +143,11 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件
-    eventBus.emit('fs:file:deleted', {
-      id: path.split('/').pop() || '',
-      path
-    })
+    // 发布事件 - DISABLED
+    // eventBus.emit('fs:file:deleted', {
+    //   id: path.split('/').pop() || '',
+    //   path
+    // })
   }
 
   /**
@@ -188,12 +188,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件
-    eventBus.emit('fs:file:renamed', {
-      id: newPath.split('/').pop() || '',
-      oldPath,
-      newPath
-    })
+    // 发布事件 - DISABLED
+    // eventBus.emit('fs:file:renamed', {
+    //   id: newPath.split('/').pop() || '',
+    //   oldPath,
+    //   newPath
+    // })
   }
 
   /**

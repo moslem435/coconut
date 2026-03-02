@@ -5,7 +5,7 @@ export interface FileNode {
     parentId: string | null
     name: string
     type: FileType
-    // content?: string // REMOVED: Content is now only in OPFS
+    content?: string // Restored for optimistic writes and small files
     appId?: string // For shortcuts
     createdAt: number
     updatedAt: number

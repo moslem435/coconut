@@ -85,6 +85,7 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   // View / Styles (Orange/Pink/Cyan)
   'html': { icon: Globe, color: COLORS.orange },
   'htm': { icon: Globe, color: COLORS.orange },
+  'web': { icon: Link, color: COLORS.cyan },
   'css': { icon: Palette, color: COLORS.sky },
   'scss': { icon: Palette, color: COLORS.pink },
   'sass': { icon: Palette, color: COLORS.pink },

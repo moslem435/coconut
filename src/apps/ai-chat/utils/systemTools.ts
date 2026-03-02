@@ -64,12 +64,40 @@ export const systemToolsImplementation: Record<string, Function> = {
     },
 
     // --- File System ---
+    create_directory: async (args: { path: string }) => {
+        try {
+            await System.fs.createDirectory(args.path);
+            return `Directory created at '${args.path}'`;
+        } catch (e: any) {
+            // If error is "Path exists but is not a directory", it's an error.
+            // If it already exists as a folder, System.fs.createDirectory returns the id, so no error thrown usually?
+            // Let's check System.fs implementation: it throws "Path exists but is not a directory".
+            // If it is a folder, it returns node.id.
+            // So we are good.
+            return `Error creating directory: ${e.message || e}`;
+        }
+    },
+
     create_file: async (args: { path: string, content: string }) => {
         try {
+            // console.log(`[SystemTools] create_file: writing to '${args.path}', length: ${args.content?.length}`);
+            if (!args.content) {
+                console.warn(`[SystemTools] create_file: Warning - content is empty for '${args.path}'`);
+            }
             await System.fs.writeFile(args.path, args.content);
+            
+            // Verify write
+            // const readBack = await System.fs.readFile(args.path);
+            // if (readBack !== args.content) {
+            //     console.error(`[SystemTools] create_file: Verification failed for '${args.path}'. Expected len ${args.content.length}, got ${readBack.length}`);
+            // } else {
+            //     console.log(`[SystemTools] create_file: Verification success for '${args.path}'`);
+            // }
+            
             return `File created at '${args.path}'`;
-        } catch (e) {
-            return `Error creating file: ${e}`;
+        } catch (e: any) {
+            console.error(`[SystemTools] create_file error:`, e);
+            return `Error creating file: ${e.message || e}`;
         }
     },
 
@@ -178,6 +206,20 @@ export const systemToolsDefinitions: ToolDefinition[] = [
     {
         type: 'function',
         function: {
+            name: 'create_directory',
+            description: 'Create a new directory (folder) in the file system',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The directory path (e.g. "/Desktop/MyApp")' }
+                },
+                required: ['path']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'create_file',
             description: 'Create a file in the file system',
             parameters: {
@@ -218,6 +260,7 @@ export const TOOL_CATEGORIES = {
         'get_running_apps'
     ],
     builder: [
+        'create_directory',
         'create_file',
         'list_directory',
         'launch_app'

@@ -378,14 +378,15 @@ export function useWebLLM() {
                 chat: "", // Default behavior
                 control: "You are a system control assistant for a web OS. Respond in the same language the user speaks (Chinese users → reply in Chinese). RULES: 1) If the user asks a QUESTION (e.g. 'what can you do?', '你有什么功能?'), answer it directly in text — do NOT call any tools. 2) Only call a tool when the user EXPLICITLY requests an action (e.g. '切换暗色主题', 'set volume to 50'). 3) When calling a tool, call EXACTLY ONE tool that matches the request. 4) NEVER call unrelated tools.",
                 builder: `You are an expert app builder assistant. Respond in the same language as the user (Chinese users → reply in Chinese).
-
-When a user asks you to CREATE an app, game, website, or tool:
-1. Reply briefly confirming what you will build.
-2. Output a SINGLE, complete, self-contained HTML file in a markdown code block tagged as \`\`\`html
-3. The HTML must include ALL CSS and JavaScript inline. Use canvas, DOM APIs, or CDN libraries (e.g. p5.js via CDN). Make it visually polished and fully functional.
-4. After the code block, add a short usage tip.
-
-Do NOT use any tools. Just output the code directly in your response.`
+    
+    When a user asks you to CREATE an app, game, website, or tool:
+    1. Reply briefly confirming what you will build.
+    2. Use the 'create_directory' tool to create a folder for the project (e.g., "/Desktop/SnakeGame").
+    3. Use the 'create_file' tool to create the necessary files (index.html, style.css, script.js) inside that folder.
+    4. Ensure the HTML file links to the CSS and JS files correctly.
+    5. After creating all files, tell the user the app is ready and where to find it.
+    
+    Do NOT output raw code blocks unless specifically asked to explain. Prefer creating files directly.`
             };
 
             const effectiveSystemPrompt = mode !== 'chat' ? modeSystemPrompts[mode] : systemPrompt;
@@ -465,6 +466,7 @@ Do NOT use any tools. Just output the code directly in your response.`
                     // Filter tools based on mode
                     let allowedToolNames: string[] = [];
                     if (mode === 'control') allowedToolNames = TOOL_CATEGORIES.control;
+                    if (mode === 'builder') allowedToolNames = TOOL_CATEGORIES.builder;
                     // builder mode intentionally gets NO tools - pure text code generation
 
                     const filteredTools = systemToolsDefinitions.filter(t =>
