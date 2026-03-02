@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useState } from 'react'
-import { FileNode } from '@/os/kernel/useFileSystemStore'
+import { FileNode, useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { AppManifest } from '@/os/registry/types'
@@ -56,6 +56,41 @@ export function useDesktopInteraction() {
 
     // 文件夹
     if (item.type === 'folder') {
+      // 检查是否为 App Bundle (.app)
+      if (item.name.endsWith('.app')) {
+        try {
+          // 尝试读取入口文件 (index.html)
+          // 注意：readFileContent 需要 ID，而不是路径。我们需要先找到子节点。
+          const children = useFileSystemStore.getState().getChildren(item.id)
+          const indexNode = children.find(c => c.name === 'index.html')
+          
+          if (!indexNode) {
+             throw new Error('index.html not found in app bundle')
+          }
+
+          const indexContent = await readFileContent(indexNode.id)
+          
+          // 启动 Code Runner
+          launchApp(
+            'app-run-' + item.id,
+            item.name.replace(/\.app$/, ''), // 去除后缀作为标题
+            'code-runner',
+            undefined, // 使用默认图标或应用特定图标
+            { 
+              code: indexContent, 
+              language: 'html', 
+              mode: 'html',
+              isAppBundle: true 
+            }
+          )
+          return
+        } catch (e) {
+          console.warn('App bundle missing index.html or error loading', e)
+          // 如果没有 index.html，降级为普通文件夹打开，或者提示错误
+          // 这里选择降级打开，方便用户调试
+        }
+      }
+
       const fileExplorer = APPS_REGISTRY['file-explorer']
       if (fileExplorer) {
         launchApp(

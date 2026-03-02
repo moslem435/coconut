@@ -49,12 +49,13 @@ When asked to create an app/game:
 2. State clearly that you are creating the files automatically.
 3. Output the JSON block containing the file operations immediately.
 4. DO NOT output the full source code in Markdown text blocks. ONLY include the code inside the JSON 'content' fields.
-5. The JSON must follow this format:
+5. IMPORTANT: You MUST create a folder with the '.app' extension (e.g. "/Desktop/MyGame.app") and place an 'index.html' file inside it.
+6. The JSON must follow this format:
 \`\`\`json
 {
   "actions": [
-    { "type": "create_directory", "path": "/Desktop/FolderName" },
-    { "type": "create_file", "path": "/Desktop/FolderName/index.html", "content": "..." }
+    { "type": "create_directory", "path": "/Desktop/GameName.app" },
+    { "type": "create_file", "path": "/Desktop/GameName.app/index.html", "content": "<html>...</html>" }
   ]
 }
 \`\`\`
@@ -133,12 +134,13 @@ When asked to create an app/game:
 2. State clearly that you are creating the files automatically.
 3. Output the JSON block containing the file operations immediately.
 4. DO NOT output the full source code in Markdown text blocks. ONLY include the code inside the JSON 'content' fields.
-5. The JSON must follow this format:
+5. IMPORTANT: You MUST create a folder with the '.app' extension (e.g. "/Desktop/MyGame.app") and place an 'index.html' file inside it.
+6. The JSON must follow this format:
 \`\`\`json
 {
   "actions": [
-    { "type": "create_directory", "path": "/Desktop/FolderName" },
-    { "type": "create_file", "path": "/Desktop/FolderName/index.html", "content": "..." }
+    { "type": "create_directory", "path": "/Desktop/GameName.app" },
+    { "type": "create_file", "path": "/Desktop/GameName.app/index.html", "content": "<html>...</html>" }
   ]
 }
 \`\`\`
@@ -301,8 +303,9 @@ function tryParseJSON(str: string): any {
             let cleaned = str.replace(/```json/g, '').replace(/```/g, '');
             
             // 2. Remove trailing commas in arrays/objects: ,] -> ] and ,} -> }
-            cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
-            
+            // Improved regex to handle trailing commas more robustly across lines
+            cleaned = cleaned.replace(/,(\s*[\]}])/g, '$1');
+
             // 3. Remove comments (//...) if they are on their own line or end of line
             // This is tricky inside strings, so let's be careful. Maybe skip for now to avoid breaking URLs.
             // cleaned = cleaned.replace(/\/\/.*/g, '');
@@ -345,7 +348,23 @@ function tryParseJSON(str: string): any {
             
             return JSON.parse(result);
         } catch (e2) {
-             console.warn("[CloudLLM] JSON parse error:", e2, "in string:", str.substring(0, 100) + "...");
+             // console.warn("[CloudLLM] JSON parse error:", e2, "in string:", str.substring(0, 100) + "...");
+             
+             // Repair strategies
+             // 1. Missing commas between objects in array: } { -> }, {
+             let fixed = str.replace(/}\s*{/g, '}, {');
+             try { return JSON.parse(fixed); } catch (e) {}
+    
+             // 2. Missing commas between properties: "val" "key": -> "val", "key":
+             // Aggressive regex on raw string might be risky but worth a shot as fallback.
+             fixed = str.replace(/("[\s\r\n]+)(?="[^"]+":)/g, '$1,');
+             try { return JSON.parse(fixed); } catch (e) {}
+    
+             // 3. Combined fixes
+             fixed = str.replace(/}\s*{/g, '}, {').replace(/("[\s\r\n]+)(?="[^"]+":)/g, '$1,');
+             try { return JSON.parse(fixed); } catch (e) {}
+    
+             console.warn("[CloudLLM] JSON parse failed after repairs:", e2);
              return null;
         }
     }
@@ -394,21 +413,23 @@ async function processBuilderActions(content: string, onNewMessage: (msg: any) =
             for (const action of data.actions) {
                 if (systemToolsImplementation[action.type]) {
                     // Execute tool
-                        let result = '';
-                        try {
-                            if (action.type === 'create_directory') {
-                                result = await systemToolsImplementation['create_directory']({ path: action.path });
-                            } else if (action.type === 'create_file') {
-                                if (!action.content || action.content.trim() === '') {
-                                    console.warn(`[Builder] Empty content for file: ${action.path}`);
-                                    result = `Warning: Content for '${action.path}' was empty. File created but might be incomplete.`;
-                                    await systemToolsImplementation['create_file']({ path: action.path, content: '' });
-                                } else {
-                                    result = await systemToolsImplementation['create_file']({ path: action.path, content: action.content });
-                                }
+                    let result = '';
+                    try {
+                        if (action.type === 'create_directory') {
+                            await systemToolsImplementation['create_directory']({ path: action.path });
+                            result = `Directory created: ${action.path}`;
+                        } else if (action.type === 'create_file') {
+                            if (!action.content || action.content.trim() === '') {
+                                console.warn(`[Builder] Empty content for file: ${action.path}`);
+                                result = `Warning: Content for '${action.path}' was empty. File created but might be incomplete.`;
+                                await systemToolsImplementation['create_file']({ path: action.path, content: '' });
                             } else {
-                                continue;
+                                await systemToolsImplementation['create_file']({ path: action.path, content: action.content });
+                                result = `File created: ${action.path}`;
                             }
+                        } else {
+                            continue;
+                        }
                         
                         // Report result to UI (as a tool message)
                         onNewMessage({

@@ -5,6 +5,7 @@ import { useWebContainerStore } from '@/os/kernel/useWebContainerStore';
 import { Runner } from 'react-runner';
 import * as Lucide from 'lucide-react';
 import * as FramerMotion from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 // --- Types ---
 type RunMode = 'react' | 'html' | 'node';
@@ -14,6 +15,7 @@ interface CodeRunnerProps {
     code?: string;
     language?: string; // Passed from AI Chat run button
     mode?: RunMode;    // Explicit mode override
+    isAppBundle?: boolean; // If true, hide toolbar for app-like experience
 }
 
 // --- React Scope ---
@@ -106,8 +108,8 @@ function detectMode(language?: string, filePath?: string, code?: string): RunMod
 }
 
 // --- Main Component ---
-export default function CodeRunner({ filePath, code: initialCode, language, mode: initialMode }: CodeRunnerProps) {
-    const [code, setCode] = useState<string>(initialCode || '');
+export default function CodeRunner({ filePath, code: initialCode, language, mode: initialMode, isAppBundle }: CodeRunnerProps) {
+    const [code, setCode] = useState<string | null>(initialCode ?? null);
     const [error, setError] = useState<string | null>(null);
     const { readFileContent } = useFileSystemStore();
     const [mode, setMode] = useState<RunMode>(
@@ -125,11 +127,12 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
                     }
                 } catch (e: any) {
                     setError(`Failed to read file: ${e.message}`);
+                    setCode(''); // Stop loading on error
                 }
             }
         };
 
-        if (filePath && !initialCode) loadCode();
+        if (filePath && initialCode === undefined) loadCode();
     }, [filePath, initialCode, readFileContent, initialMode, language]);
 
     if (error) {
@@ -144,7 +147,7 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
         );
     }
 
-    if (!code && mode !== 'node') {
+    if (code === null && mode !== 'node') {
         return (
             <div className="h-full w-full flex items-center justify-center text-zinc-500">
                 <div className="text-center">
@@ -155,9 +158,25 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
         );
     }
 
+    // Ensure code is string for runners
+    const safeCode = code || '';
+
+    // Define scope for React Runner
+    const scope = {
+        import: {
+            react: React,
+            'lucide-react': Lucide,
+            'framer-motion': FramerMotion,
+        },
+    };
+
     return (
-        <div className="h-full w-full bg-white dark:bg-zinc-900 overflow-auto flex flex-col pt-10">
+        <div className={cn(
+            "h-full w-full bg-white dark:bg-zinc-900 overflow-auto flex flex-col",
+            !isAppBundle && "pt-10"
+        )}>
             {/* Toolbar */}
+            {!isAppBundle && (
             <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 gap-4 bg-zinc-50 dark:bg-zinc-900 shrink-0">
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-zinc-500 uppercase">Mode:</span>
@@ -172,23 +191,23 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
                     </select>
                 </div>
             </div>
+            )}
 
             {/* Runner Area */}
             <div className="flex-1 relative overflow-hidden">
-                {mode === 'html' ? (
-                    <HtmlRunner code={code} />
-                ) : mode === 'react' ? (
-                    <div className="p-4 h-full">
-                        <Runner
-                            code={code}
-                            scope={scope}
-                            onRendered={(error) => {
-                                if (error) setError(error.toString());
-                            }}
-                        />
-                    </div>
-                ) : (
-                    <WasmRunner code={code} filePath={filePath} />
+                {/* HTML Runner */}
+                {mode === 'html' && (
+                    <HtmlRunner code={safeCode} />
+                )}
+
+                {/* React Runner */}
+                {mode === 'react' && (
+                    <Runner code={safeCode} scope={scope} />
+                )}
+
+                {/* Node/Wasm Runner */}
+                {mode === 'node' && (
+                    <WasmRunner code={safeCode} />
                 )}
             </div>
         </div>

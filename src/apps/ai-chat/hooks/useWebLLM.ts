@@ -381,10 +381,10 @@ export function useWebLLM() {
     
     When a user asks you to CREATE an app, game, website, or tool:
     1. Reply briefly confirming what you will build.
-    2. Use the 'create_directory' tool to create a folder for the project (e.g., "/Desktop/SnakeGame").
-    3. Use the 'create_file' tool to create the necessary files (index.html, style.css, script.js) inside that folder.
-    4. Ensure the HTML file links to the CSS and JS files correctly.
-    5. After creating all files, tell the user the app is ready and where to find it.
+    2. Use the 'create_directory' tool to create a folder for the project with the '.app' extension (e.g., "/Desktop/SnakeGame.app").
+    3. Use the 'create_file' tool to create the 'index.html' file inside that folder.
+    4. Ensure the HTML file links to the CSS and JS files correctly (if you create them separately).
+    5. After creating all files, tell the user the app is ready and they can double-click the .app folder to run it.
     
     Do NOT output raw code blocks unless specifically asked to explain. Prefer creating files directly.`
             };

@@ -4,6 +4,7 @@ import { AppIcon } from '@/os/ui/AppIcon'
 import { RenameInput } from '@/os/ui/RenameInput'
 import { useFileDisplay } from '@/os/hooks/useFileDisplay'
 import { cn } from '@/lib/utils'
+import { AppWindow, Package } from 'lucide-react'
 
 export interface FileGridItemProps extends React.HTMLAttributes<HTMLDivElement> {
   item: FileNode
@@ -31,6 +32,11 @@ export function FileGridItem({
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
   const { Icon, backgroundColor, useAppIcon, manifest } = iconTheme
   const IconComponent = Icon as any
+  
+  // App Bundle Logic
+  const isAppBundle = item.type === 'folder' && item.name.endsWith('.app')
+  const appBundleName = isAppBundle ? item.name.replace(/\.app$/, '') : displayName
+  const AppBundleIcon = AppWindow // or Package
 
   return (
     <div
@@ -38,7 +44,22 @@ export function FileGridItem({
       {...props}
     >
       <div className="relative group">
-        {useAppIcon && manifest ? (
+        {isAppBundle ? (
+           <div
+            className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200`, selected && 'scale-105', iconClassName)}
+            style={{
+              width: iconSize,
+              height: iconSize,
+              backgroundColor: '#3b82f6', // Blue for apps
+              color: '#ffffff'
+            }}
+          >
+            <AppBundleIcon
+              size={iconSize * 0.6}
+              strokeWidth={1.5}
+            />
+          </div>
+        ) : useAppIcon && manifest ? (
           <AppIcon
             manifest={manifest}
             size={iconSize}
@@ -89,14 +110,14 @@ export function FileGridItem({
             "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none line-clamp-2 overflow-hidden text-ellipsis",
             textClassName || "text-[var(--os-text-primary)]"
           )}
-          title={displayName}
+          title={isAppBundle ? appBundleName : displayName}
           style={{
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical'
           }}
         >
-          {displayName}
+          {isAppBundle ? appBundleName : displayName}
         </span>
       )}
     </div>
