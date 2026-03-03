@@ -287,15 +287,15 @@ export function Sidebar() {
             <div className="p-4 space-y-4" style={{ minWidth: sidebarWidth }}>
                 {/* Logo / Title Area */}
                 <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2 text-zinc-100">
+                    <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-100">
                         <div className="w-8 h-8 flex items-center justify-center">
-                            <Sparkles size={18} className="text-zinc-100" />
+                            <Sparkles size={18} className="text-zinc-800 dark:text-zinc-100" />
                         </div>
                         <span className="font-medium tracking-wide text-sm">{t('app.ai-chat')}</span>
                     </div>
                     <button
                         onClick={handleToggle}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-zinc-200 transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                         title={t('ai.sidebar.close')}
                     >
                         <PanelLeftClose size={18} />
@@ -303,14 +303,14 @@ export function Sidebar() {
                 </div>
 
                 {/* Mode Switcher */}
-                <div className="flex p-1 bg-white/5 rounded-lg border border-white/5">
+                <div className="flex p-1 bg-black/5 dark:bg-white/5 rounded-lg border border-black/5 dark:border-white/5">
                     <button
                         onClick={() => setSidebarMode('chat')}
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all",
                             sidebarMode === 'chat'
-                                ? "bg-white/10 text-zinc-100 shadow-sm"
-                                : "text-zinc-500 hover:text-zinc-300"
+                                ? "bg-white dark:bg-white/10 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                         )}
                     >
                         <MessageSquare size={14} />
@@ -321,8 +321,8 @@ export function Sidebar() {
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-medium transition-all",
                             sidebarMode === 'settings'
-                                ? "bg-white/10 text-zinc-100 shadow-sm"
-                                : "text-zinc-500 hover:text-zinc-300"
+                                ? "bg-white dark:bg-white/10 text-zinc-900 dark:text-zinc-100 shadow-sm"
+                                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                         )}
                     >
                         <Sliders size={14} />
@@ -335,21 +335,21 @@ export function Sidebar() {
                         {/* New Chat Button */}
                         <button
                             onClick={() => createSession()}
-                            className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-200 rounded-lg transition-all border border-white/5 hover:border-white/10 font-medium text-sm"
+                            className="group w-full flex items-center justify-center gap-2 px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-zinc-800 dark:text-zinc-200 rounded-lg transition-all border border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 font-medium text-sm"
                         >
-                            <Plus size={16} className="text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+                            <Plus size={16} className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors" />
                             <span>{t('ai.sidebar.new_chat')}</span>
                         </button>
 
                         {/* Search */}
                         <div className="relative group">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-600 group-focus-within:text-zinc-800 dark:group-focus-within:text-zinc-400 transition-colors" />
                             <input
                                 type="text"
                                 placeholder={t('ai.sidebar.search')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-transparent border-b border-white/10 focus:border-white/20 py-2 pl-9 pr-3 text-sm text-zinc-200 placeholder:text-zinc-700 outline-none transition-all"
+                                className="w-full bg-transparent border-b border-black/10 dark:border-white/10 focus:border-black/20 dark:focus:border-white/20 py-2 pl-9 pr-3 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-500 dark:placeholder:text-zinc-700 outline-none transition-all"
                             />
                         </div>
                     </>
@@ -368,7 +368,7 @@ export function Sidebar() {
                         <div className="space-y-6">
                             {groupedSessions.map((group) => (
                                 <div key={group.title} className="space-y-1">
-                                    <h3 className="px-3 text-[10px] font-medium text-zinc-500 uppercase tracking-widest mb-2 sticky top-0 py-1 z-10">
+                                    <h3 className="px-3 text-[10px] font-medium text-zinc-500 dark:text-zinc-500 uppercase tracking-widest mb-2 sticky top-0 py-1 z-10">
                                         {t(group.title as any)}
                                     </h3>
                                     {group.items.map(session => (
@@ -380,16 +380,16 @@ export function Sidebar() {
                                             className={cn(
                                                 "group/item relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all text-sm",
                                                 currentSessionId === session.id
-                                                    ? "bg-white/10 text-zinc-100 font-medium"
-                                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                                                    ? "bg-black/10 dark:bg-white/10 text-zinc-900 dark:text-zinc-100 font-medium"
+                                                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5"
                                             )}
                                         >
                                             {currentSessionId === session.id && (
-                                                <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-zinc-100 rounded-full" />
+                                                <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-zinc-900 dark:bg-zinc-100 rounded-full" />
                                             )}
                                             <MessageSquare size={14} className={cn(
                                                 "shrink-0 transition-opacity",
-                                                currentSessionId === session.id ? "opacity-100 text-zinc-100" : "opacity-50"
+                                                currentSessionId === session.id ? "opacity-100 text-zinc-900 dark:text-zinc-100" : "opacity-50"
                                             )} />
 
                                             <div className="flex-1 min-w-0">
@@ -404,7 +404,7 @@ export function Sidebar() {
                                                             e.stopPropagation();
                                                             deleteSession(session.id);
                                                         }}
-                                                        className="p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/item:opacity-100"
+                                                        className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover/item:opacity-100"
                                                         title={t('ai.sidebar.delete')}
                                                     >
                                                         <Trash2 size={13} />
@@ -421,12 +421,12 @@ export function Sidebar() {
                     /* ── Settings / Model Panel ── */
                     <div className="space-y-6 pb-10">
                         {/* Tabs */}
-                        <div className="flex border-b border-white/5 pb-1">
+                        <div className="flex border-b border-black/5 dark:border-white/5 pb-1">
                             <button
                                 onClick={() => { setModelTab('all'); setAiProvider('local'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
-                                    modelTab === 'all' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                                    modelTab === 'all' ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
                                 )}
                             >
                                 {t('ai.model.tab.all')}
@@ -438,7 +438,7 @@ export function Sidebar() {
                                 onClick={() => { setModelTab('downloaded'); setAiProvider('local'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
-                                    modelTab === 'downloaded' ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                                    modelTab === 'downloaded' ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
                                 )}
                             >
                                 {t('ai.model.tab.downloaded')}
@@ -450,7 +450,7 @@ export function Sidebar() {
                                 onClick={() => { setModelTab('cloud'); setAiProvider('cloud'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
-                                    modelTab === 'cloud' ? "text-amber-300" : "text-zinc-500 hover:text-zinc-300"
+                                    modelTab === 'cloud' ? "text-amber-600 dark:text-amber-300" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
                                 )}
                             >
                                 Cloud
@@ -465,7 +465,7 @@ export function Sidebar() {
                             <div className="space-y-4">
                                 {/* Provider selector */}
                                 <div className="space-y-2">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.service')}</label>
+                                    <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.service')}</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {(['gemini', 'openai'] as const).map(p => (
                                             <button
@@ -474,8 +474,8 @@ export function Sidebar() {
                                                 className={cn(
                                                     "py-2 rounded-lg text-xs font-medium border transition-all text-center",
                                                     cloudConfig.provider === p
-                                                        ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30"
+                                                        : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                 )}
                                             >
                                                 {p === 'gemini' ? t('ai.cloud.gemini') : t('ai.cloud.openai')}
@@ -486,7 +486,7 @@ export function Sidebar() {
 
                                 {/* Model selector */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.model_preset')}</label>
+                                    <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.model_preset')}</label>
                                     <div className="space-y-1">
                                         {CLOUD_MODELS[cloudConfig.provider].map(m => (
                                             <button
@@ -495,8 +495,8 @@ export function Sidebar() {
                                                 className={cn(
                                                     "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
                                                     cloudConfig.modelId === m.id
-                                                        ? "bg-amber-500/10 text-amber-200 border-amber-500/20"
-                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-200 border-amber-500/20"
+                                                        : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                 )}
                                             >
                                                 <span className="font-medium truncate">{m.name}</span>
@@ -510,8 +510,8 @@ export function Sidebar() {
                                     <>
                                         {/* Saved Custom Models */}
                                         {customModels.filter(m => m.provider === 'openai').length > 0 && (
-                                            <div className="space-y-1.5 pt-2 border-t border-white/5">
-                                                <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.saved_models')}</label>
+                                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                                                <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.saved_models')}</label>
                                                 <div className="space-y-1">
                                                     {customModels.filter(m => m.provider === 'openai').map(m => (
                                                         <div key={m.id} className="flex items-center gap-2 group/model">
@@ -524,8 +524,8 @@ export function Sidebar() {
                                                                 className={cn(
                                                                     "flex-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
                                                                     cloudConfig.modelId === m.modelId && (cloudConfig.baseUrl || 'https://api.openai.com/v1') === (m.baseUrl || 'https://api.openai.com/v1')
-                                                                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                                        : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                                 )}
                                                             >
                                                                 <span className="font-medium truncate">{m.name}</span>
@@ -533,7 +533,7 @@ export function Sidebar() {
                                                             </button>
                                                             <button
                                                                 onClick={() => removeCustomModel(m.id)}
-                                                                className="p-2 rounded-lg bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors border border-white/5 opacity-0 group-hover/model:opacity-100"
+                                                                className="p-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-black/5 dark:border-white/5 opacity-0 group-hover/model:opacity-100"
                                                                 title={t('ai.cloud.delete_preset')}
                                                             >
                                                                 <Trash2 size={12} />
@@ -544,9 +544,9 @@ export function Sidebar() {
                                             </div>
                                         )}
 
-                                        <div className="space-y-1.5 pt-2 border-t border-white/5">
+                                        <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
                                             <div className="flex items-center justify-between">
-                                                <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.custom_config')}</label>
+                                                <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.custom_config')}</label>
                                                 {!isSavingPreset && (
                                                     <button
                                                         onClick={() => {
@@ -554,7 +554,7 @@ export function Sidebar() {
                                                             setIsSavingPreset(true);
                                                         }}
                                                         disabled={!cloudConfig.modelId}
-                                                        className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-50"
+                                                        className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-50"
                                                     >
                                                         <Plus size={10} />
                                                         {t('ai.cloud.save_preset')}
@@ -563,9 +563,9 @@ export function Sidebar() {
                                             </div>
 
                                             {isSavingPreset && (
-                                                <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg border border-white/10 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="flex flex-col gap-2 p-3 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 animate-in fade-in zoom-in-95 duration-200">
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] text-zinc-400">Preset Name</label>
+                                                        <label className="text-[9px] text-zinc-600 dark:text-zinc-400">Preset Name</label>
                                                         <input
                                                             type="text"
                                                             value={presetName}
@@ -576,13 +576,13 @@ export function Sidebar() {
                                                             }}
                                                             placeholder="e.g. My Custom Model"
                                                             autoFocus
-                                                            className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-indigo-500/50 transition-colors"
+                                                            className="w-full bg-white dark:bg-black/40 border border-black/10 dark:border-white/10 rounded px-2 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 outline-none focus:border-indigo-500/50 transition-colors"
                                                         />
                                                     </div>
                                                     <div className="flex justify-end gap-2 mt-1">
                                                         <button
                                                             onClick={() => setIsSavingPreset(false)}
-                                                            className="px-2 py-1 text-[10px] text-zinc-400 hover:text-zinc-300 hover:bg-white/5 rounded transition-colors"
+                                                            className="px-2 py-1 text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors"
                                                         >
                                                             {t('common.cancel')}
                                                         </button>
@@ -604,7 +604,7 @@ export function Sidebar() {
                                                     value={cloudConfig.modelId}
                                                     onChange={e => updateCloudConfig({ modelId: e.target.value })}
                                                     placeholder="e.g. deepseek-chat"
-                                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                                 />
                                             </div>
                                         </div>
@@ -616,27 +616,27 @@ export function Sidebar() {
                                                 value={cloudConfig.baseUrl || ''}
                                                 onChange={e => updateCloudConfig({ baseUrl: e.target.value })}
                                                 placeholder="https://api.openai.com/v1"
-                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                             />
-                                            <p className="text-[9px] text-zinc-600">{t('ai.cloud.base_url_default')}</p>
+                                            <p className="text-[9px] text-zinc-500 dark:text-zinc-600">{t('ai.cloud.base_url_default')}</p>
                                         </div>
                                     </>
                                 )}
 
                                 {/* API Key */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.api_key')}</label>
+                                    <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.api_key')}</label>
                                     <div className="relative">
                                         <input
                                             type={showApiKey ? 'text' : 'password'}
                                             value={cloudConfig.apiKey}
                                             onChange={e => updateCloudConfig({ apiKey: e.target.value })}
                                             placeholder={cloudConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-10 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 pr-10 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                         />
                                         <button
                                             onClick={() => setShowApiKey(v => !v)}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400 transition-colors text-[10px]"
                                         >
                                             {showApiKey ? t('ai.cloud.hide') : t('ai.cloud.show')}
                                         </button>
@@ -652,14 +652,14 @@ export function Sidebar() {
                                             setCloudTestState({ loading: false, message: result.message, ok: result.ok });
                                         }}
                                         disabled={!cloudConfig.apiKey || cloudTestState.loading}
-                                        className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 text-xs font-medium transition-colors disabled:opacity-40"
+                                        className="w-full py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-300 border border-black/10 dark:border-white/10 text-xs font-medium transition-colors disabled:opacity-40"
                                     >
                                         {cloudTestState.loading ? t('ai.cloud.testing') : t('ai.cloud.test_connection')}
                                     </button>
                                     <button
                                         onClick={() => { setAiProvider('cloud'); }}
                                         disabled={!cloudConfig.apiKey}
-                                        className="w-full py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-xs font-medium transition-colors disabled:opacity-40"
+                                        className="w-full py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/20 text-xs font-medium transition-colors disabled:opacity-40"
                                     >
                                         {aiProvider === 'cloud' ? t('ai.cloud.active') : t('ai.cloud.activate')}
                                     </button>

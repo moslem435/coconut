@@ -51,6 +51,7 @@ export function createSyncMiddleware(
 
   // 监听文件系统操作事件
   eventBus.on('fs:file:created', (data: any) => {
+    // console.log('[SyncMiddleware] Received create event:', data)
     const operation: SyncOperation = {
       id: data.id,
       type: 'create',
@@ -58,7 +59,13 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    queueOperation(operation)
+    
+    // Execute immediately in the chain
+    syncChain = syncChain
+      .then(() => executeOperation(operation))
+      .catch(err => {
+        console.error(`[SyncMiddleware] Op ${operation.type}:${operation.id} failed:`, err)
+      })
   })
 
   eventBus.on('fs:file:deleted', (data: any) => {
@@ -114,6 +121,7 @@ export function createSyncMiddleware(
 
       switch (operation.type) {
         case 'create':
+          // console.log('[SyncMiddleware] Executing syncCreate:', operation.payload.path)
           await syncService.syncCreate(
             operation.payload.path,
             operation.payload.type,

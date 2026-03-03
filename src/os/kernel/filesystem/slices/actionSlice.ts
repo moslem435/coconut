@@ -17,14 +17,14 @@ export interface ActionSlice {
     parentId: string,
     name: string,
     type: FileType,
-    content?: string,
+    content?: string | Uint8Array,
     appId?: string
   ) => string
 
-  deleteItem: (id: string) => void
+  deleteItem: (id: string) => Promise<void>
   renameItem: (id: string, newName: string) => void
   moveItem: (id: string, newParentId: string) => void
-  updateFileContent: (id: string, content: string) => void
+  updateFileContent: (id: string, content: string | Uint8Array) => void
   patchNode: (id: string, updates: Partial<FileNode>) => void
 
   // 内容访问
@@ -46,7 +46,7 @@ export const createActionSlice: StateCreator<
       name,
       type,
       appId,
-      content: content || '', // Optimistically store content
+      content: typeof content === 'string' ? content : undefined, // Only store string content in memory
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
@@ -60,13 +60,13 @@ export const createActionSlice: StateCreator<
       id,
       path,
       type,
-      content
+      content // Pass original content (string or Uint8Array) to sync service
     } as any)
 
     return id
   },
 
-  deleteItem: (id) => {
+  deleteItem: async (id) => {
     const path = get().resolvePath(id)
     const itemsToDelete = collectDescendants(id, get().childrenIndex)
 
@@ -128,7 +128,7 @@ export const createActionSlice: StateCreator<
     // 1. 更新元数据和内容
     get()._updateFile(id, { 
         updatedAt: Date.now(),
-        content // Update content in memory
+        content: typeof content === 'string' ? content : undefined // Only store string content in memory
     })
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）

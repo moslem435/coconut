@@ -4,6 +4,7 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
+import { useTrashStore } from '@/os/kernel/useTrashStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 
@@ -27,6 +28,7 @@ export function useFileMenuItems(
     const { getItem, readFileContent, deleteItem } = useFileSystemStore()
     const { setRenamingId } = useUIStore()
     const { openWindow } = useWindowStore()
+    const { trashItems } = useTrashStore()
 
     return useMemo<MenuItem[]>(() => {
         if (!visible || !isVisibleType) return []
@@ -85,12 +87,14 @@ export function useFileMenuItems(
                 icon: Trash2,
                 danger: true,
                 action: () => {
-                    if (data?.id) {
-                        deleteItem(data.id).catch(console.error)
-                    }
                     hideMenu()
+                    const ids = data?.selectedIds || (data?.id ? [data.id] : [])
+                    if (ids.length > 0) {
+                        // 移至回收站而不是直接删除
+                        trashItems(ids)
+                    }
                 }
             }
         ]
-    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu])
+    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu, trashItems])
 }

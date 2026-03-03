@@ -30,6 +30,12 @@ export function AppearancePanel() {
     // Local state for color picker to prevent lag
     const [localColor, setLocalColor] = useState(accentColor)
     const timeoutRef = useRef<NodeJS.Timeout>()
+    
+    // Local state for transparency and blur to prevent lag
+    const [localTransparency, setLocalTransparency] = useState(transparencyLevel)
+    const [localBlur, setLocalBlur] = useState(blurLevel)
+    const transparencyTimeoutRef = useRef<NodeJS.Timeout>()
+    const blurTimeoutRef = useRef<NodeJS.Timeout>()
 
     // Sync local color when external changes happen
     useEffect(() => {
@@ -38,14 +44,46 @@ export function AppearancePanel() {
         }
     }, [accentColor])
 
+    // Sync local transparency when external changes happen
+    useEffect(() => {
+        if (!transparencyTimeoutRef.current) {
+            setLocalTransparency(transparencyLevel)
+        }
+    }, [transparencyLevel])
+
+    // Sync local blur when external changes happen
+    useEffect(() => {
+        if (!blurTimeoutRef.current) {
+            setLocalBlur(blurLevel)
+        }
+    }, [blurLevel])
+
     // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current)
-            }
+            if (timeoutRef.current) clearTimeout(timeoutRef.current)
+            if (transparencyTimeoutRef.current) clearTimeout(transparencyTimeoutRef.current)
+            if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
         }
     }, [])
+
+    const handleTransparencyChange = (value: number) => {
+        setLocalTransparency(value)
+        if (transparencyTimeoutRef.current) clearTimeout(transparencyTimeoutRef.current)
+        transparencyTimeoutRef.current = setTimeout(() => {
+            setTransparencyLevel(value)
+            transparencyTimeoutRef.current = undefined
+        }, 50) // 50ms delay
+    }
+
+    const handleBlurChange = (value: number) => {
+        setLocalBlur(value)
+        if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
+        blurTimeoutRef.current = setTimeout(() => {
+            setBlurLevel(value)
+            blurTimeoutRef.current = undefined
+        }, 50) // 50ms delay
+    }
 
     const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newColor = e.target.value
@@ -208,8 +246,8 @@ export function AppearancePanel() {
                                     min={0.1}
                                     max={1}
                                     step={0.05}
-                                    value={transparencyLevel}
-                                    onChange={setTransparencyLevel}
+                                    value={localTransparency}
+                                    onChange={handleTransparencyChange}
                                     label="Opacity"
                                     formatValue={(v) => `${Math.round(v * 100)}%`}
                                 />
@@ -217,8 +255,8 @@ export function AppearancePanel() {
                                     min={0}
                                     max={60}
                                     step={1}
-                                    value={blurLevel}
-                                    onChange={setBlurLevel}
+                                    value={localBlur}
+                                    onChange={handleBlurChange}
                                     label="Blur"
                                     formatValue={(v) => `${v}px`}
                                 />

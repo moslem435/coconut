@@ -79,14 +79,29 @@ async function callGemini(
     // Mode-aware system instruction
     const modeInstructions: Record<string, string> = {
         chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
-        control: "You are a system control assistant for a web OS. Respond in the user's language. Use the available tools to execute system actions when requested.",
+        control: `You are a system control assistant for a web OS. Respond in the user's language.
+You have tools to control the system. Follow these rules:
+1. THEME: use set_theme with 'light' or 'dark'.
+2. VOLUME: use set_volume with a level from 0 to 100.
+3. WALLPAPER: use set_wallpaper with a real, publicly accessible image URL (e.g. from unsplash.com).
+4. LAUNCH APP: use launch_app with one of these exact appId values:
+   "vscode-lite", "terminal", "file-explorer", "settings", "portfolio-hub",
+   "notepad", "music-player", "photo-gallery", "weather", "task-manager",
+   "ai-chat", "code-runner", "yume", "emulator"
+5. CLOSE APP: First call get_running_apps to retrieve the windowId, then call close_app with that windowId.
+6. STATUS: use get_system_status to read current settings before modifying if needed.
+Never make up windowIds. Always query running apps first before closing.`,
         builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
 When asked to create an app/game/tool:
 1. Briefly explain what you will build.
 2. Use 'create_directory' to create a folder with '.app' extension (e.g. "/Desktop/MyGame.app").
 3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
    CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
-4. After the file is created, confirm the app is ready and the user can double-click the folder to run it.`
+4. After the file is created, confirm the app is ready and the user can double-click the folder to run it.
+When asked to modify or fix an existing app:
+1. Use 'read_file' to read the current file content.
+2. Apply the requested changes.
+3. Use 'update_file' to overwrite the file with the updated content.`
     };
 
     const sysInstruction = modeInstructions[mode] || modeInstructions.chat;
@@ -116,7 +131,7 @@ When asked to create an app/game/tool:
             generationConfig: {
                 temperature: 0.7,
                 topP: 0.9,
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
             }
         };
 
@@ -126,7 +141,13 @@ When asked to create an app/game/tool:
             body.tool_config = { function_calling_config: { mode: 'AUTO' } };
         }
 
-        const response = await fetch(url, {
+        // ── Strategy: use SSE streaming for text-only rounds (better UX),
+        //   non-streaming for tool-call rounds (need complete JSON).
+        //   We don't know in advance, so we first try streaming (SSE).
+        //   If the response contains functionCalls we handle them the same way.
+        const streamUrl = `${baseUrl}/models/${config.modelId}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+
+        const response = await fetch(streamUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -137,20 +158,43 @@ When asked to create an app/game/tool:
             throw new Error(`Gemini API error ${response.status}: ${errText}`);
         }
 
-        const json = await response.json();
-        const candidate = json?.candidates?.[0];
-        const parts: any[] = candidate?.content?.parts || [];
-        const finishReason: string = candidate?.finishReason || '';
+        // Parse SSE stream
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedText = '';
+        const functionCallParts: any[] = [];
+        let finishReason = '';
 
-        // Separate text parts and function call parts
-        const textParts = parts.filter(p => typeof p.text === 'string');
-        const functionCallParts = parts.filter(p => p.functionCall);
+        outer: while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
 
-        // Stream text to UI
-        if (textParts.length > 0) {
-            const combinedText = textParts.map(p => p.text).join('');
-            if (combinedText) {
-                onUpdate({ content: combinedText });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') break outer;
+                try {
+                    const chunk = JSON.parse(data);
+                    const candidate = chunk?.candidates?.[0];
+                    if (candidate?.finishReason) finishReason = candidate.finishReason;
+
+                    const parts: any[] = candidate?.content?.parts || [];
+                    for (const part of parts) {
+                        if (typeof part.text === 'string' && part.text) {
+                            accumulatedText += part.text;
+                            // Stream text to UI incrementally
+                            onUpdate({ content: accumulatedText });
+                        }
+                        if (part.functionCall) {
+                            functionCallParts.push(part);
+                        }
+                    }
+                } catch { /* skip malformed SSE line */ }
             }
         }
 
@@ -205,6 +249,9 @@ When asked to create an app/game/tool:
             parts: functionResponseParts
         });
 
+        // Reset accumulated text for next round
+        accumulatedText = '';
+
         // If model indicated it's done after this, break
         if (finishReason === 'STOP') break;
     }
@@ -225,14 +272,29 @@ async function callOpenAI(
 
     const modeInstructions: Record<string, string> = {
         chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
-        control: "You are a system control assistant for a web OS. Respond in the user's language. Use available tools to execute system actions.",
+        control: `You are a system control assistant for a web OS. Respond in the user's language.
+You have tools to control the system. Follow these rules:
+1. THEME: use set_theme with 'light' or 'dark'.
+2. VOLUME: use set_volume with a level from 0 to 100.
+3. WALLPAPER: use set_wallpaper with a real, publicly accessible image URL (e.g. from unsplash.com).
+4. LAUNCH APP: use launch_app with one of these exact appId values:
+   "vscode-lite", "terminal", "file-explorer", "settings", "portfolio-hub",
+   "notepad", "music-player", "photo-gallery", "weather", "task-manager",
+   "ai-chat", "code-runner", "yume", "emulator"
+5. CLOSE APP: First call get_running_apps to retrieve the windowId, then call close_app with that windowId.
+6. STATUS: use get_system_status to read current settings before modifying if needed.
+Never make up windowIds. Always query running apps first before closing.`,
         builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
 When asked to create an app/game/tool:
 1. Briefly explain what you will build.
 2. Use 'create_directory' to create a folder with '.app' extension (e.g. "/Desktop/MyGame.app").
 3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
    CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
-4. After the file is created, confirm the app is ready.`
+4. After the file is created, confirm the app is ready.
+When asked to modify or fix an existing app:
+1. Use 'read_file' to read the current file content.
+2. Apply the requested changes.
+3. Use 'update_file' to overwrite the file with the updated content.`
     };
 
     const sysContent = modeInstructions[mode] || modeInstructions.chat;
@@ -260,7 +322,7 @@ When asked to create an app/game/tool:
             messages: apiMessages,
             stream: true,
             temperature: 0.7,
-            max_tokens: 8192
+            max_tokens: 16384
         };
 
         if (filteredTools.length > 0) {

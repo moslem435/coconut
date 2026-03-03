@@ -72,8 +72,8 @@ export const createMountSlice: StateCreator<
     const fullPath = state.resolvePath(folderId)
     logger.debug(`[loadFolderContent] Loading content for ${folderId}, path: ${fullPath}`)
 
-    if (!fullPath || !fullPath.startsWith('/mnt/')) {
-      logger.debug(`[loadFolderContent] Skipping non-mount path: ${fullPath}`)
+    if (!fullPath) {
+      logger.debug(`[loadFolderContent] Skipping invalid path: ${fullPath}`)
       return
     }
 

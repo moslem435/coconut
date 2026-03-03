@@ -85,7 +85,7 @@ export const systemToolsImplementation: Record<string, Function> = {
                 console.warn(`[SystemTools] create_file: Warning - content is empty for '${args.path}'`);
             }
             await System.fs.writeFile(args.path, args.content);
-            
+
             // Verify write
             // const readBack = await System.fs.readFile(args.path);
             // if (readBack !== args.content) {
@@ -93,7 +93,7 @@ export const systemToolsImplementation: Record<string, Function> = {
             // } else {
             //     console.log(`[SystemTools] create_file: Verification success for '${args.path}'`);
             // }
-            
+
             return `File created at '${args.path}'`;
         } catch (e: any) {
             console.error(`[SystemTools] create_file error:`, e);
@@ -107,6 +107,24 @@ export const systemToolsImplementation: Record<string, Function> = {
             return JSON.stringify(files.map(f => f.name));
         } catch (e) {
             return `Error listing directory: ${e}`;
+        }
+    },
+
+    read_file: async (args: { path: string }) => {
+        try {
+            const content = await System.fs.readFile(args.path);
+            return content;
+        } catch (e: any) {
+            return `Error reading file: ${e.message || e}`;
+        }
+    },
+
+    update_file: async (args: { path: string; content: string }) => {
+        try {
+            await System.fs.writeFile(args.path, args.content);
+            return `File updated at '${args.path}'`;
+        } catch (e: any) {
+            return `Error updating file: ${e.message || e}`;
         }
     }
 };
@@ -245,6 +263,35 @@ export const systemToolsDefinitions: ToolDefinition[] = [
                 required: ['path']
             }
         }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'read_file',
+            description: 'Read the content of an existing file',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path to read' }
+                },
+                required: ['path']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'update_file',
+            description: 'Overwrite an existing file with new content',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path to update' },
+                    content: { type: 'string', description: 'The new file content' }
+                },
+                required: ['path', 'content']
+            }
+        }
     }
 ];
 
@@ -262,7 +309,7 @@ export const TOOL_CATEGORIES = {
     builder: [
         'create_directory',
         'create_file',
-        'list_directory',
-        'launch_app'
+        'read_file',
+        'update_file'
     ]
 };

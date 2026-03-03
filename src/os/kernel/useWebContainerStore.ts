@@ -7,11 +7,11 @@ interface WebContainerState {
   error: string | null
 
   boot: () => Promise<void>
-  writeFile: (path: string, content: string) => Promise<void>
+  writeFile: (path: string, content: string | Uint8Array) => Promise<void>
   readFile: (path: string) => Promise<string>
 
   // New: Explicit Sync Methods for VFS
-  syncFile: (path: string, content: string) => Promise<void>
+  syncFile: (path: string, content: string | Uint8Array) => Promise<void>
   syncMkdir: (path: string) => Promise<void>
   syncUnlink: (path: string) => Promise<void>
   isSyncingFromWC: boolean
@@ -300,7 +300,7 @@ app.listen(port, () => {
     }
   },
 
-  writeFile: async (path: string, content: string) => {
+  writeFile: async (path, content) => {
     const { instance } = get()
     if (!instance) throw new Error('WebContainer not booted')
     await instance.fs.writeFile(path, content)

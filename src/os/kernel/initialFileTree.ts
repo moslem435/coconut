@@ -18,7 +18,7 @@ export interface FileNode {
 
 export const INITIAL_ROOT_ID = 'root'
 
-export const FILESYSTEM_VERSION = 6; // Increment this to force re-sync
+export const FILESYSTEM_VERSION = 8; // Increment this to force re-sync
 
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {
@@ -61,6 +61,33 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
+    'gallery-abstract-01': {
+        id: 'gallery-abstract-01',
+        parentId: 'pictures',
+        name: 'Abstract_01.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
+    'gallery-cyber-city': {
+        id: 'gallery-cyber-city',
+        parentId: 'pictures',
+        name: 'Cyber_City.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
+    'gallery-workspace': {
+        id: 'gallery-workspace',
+        parentId: 'pictures',
+        name: 'Workspace.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
     'gallery-abstract': {
         id: 'gallery-abstract',
         parentId: 'pictures',
@@ -92,6 +119,15 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         id: 'gallery-cars',
         parentId: 'pictures',
         name: 'cars.jpg',
+        type: 'file',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: 1024 * 500
+    },
+    'gallery-nature': {
+        id: 'gallery-nature',
+        parentId: 'pictures',
+        name: 'nature.jpg',
         type: 'file',
         createdAt: Date.now(),
         updatedAt: Date.now(),

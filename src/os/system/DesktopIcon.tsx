@@ -9,19 +9,19 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 
 interface DesktopIconProps {
-    item: FileNode
-    pos: { x: number, y: number }
-    isSelected: boolean
-    scaleFactor: number
-    currentGridSize: number
-    currentGridPadding: number
-    snapToGrid: boolean
-    textColor: string
-    onSelect: (id: string, multi?: boolean) => void
-    onDragEnd: (id: string, x: number, y: number) => void
-    onDragPreview: (preview: { x: number, y: number } | null) => void
-    onClick: (id: string, e: React.MouseEvent) => void
-    onDoubleClick: (id: string) => void
+  item: FileNode
+  pos: { x: number; y: number }
+  isSelected: boolean
+  scaleFactor: number
+  currentGridSize: number
+  currentGridPadding: number
+  snapToGrid: boolean
+  textColor: string
+  onSelect: (id: string) => void
+  onDragEnd: (id: string, x: number, y: number) => void
+  onDragPreview: (preview: { x: number; y: number } | null) => void
+  onClick: (id: string, e: React.MouseEvent) => void
+  onDoubleClick: (id: string) => void
 }
 
 export function DesktopIcon({
@@ -112,9 +112,10 @@ export function DesktopIcon({
                 onClick={(e) => onClick(item.id, e)}
                 onDoubleClick={() => onDoubleClick(item.id)}
                 onContextMenu={(e) => {
+                    // Prevent default browser context menu
                     e.preventDefault()
-                    e.stopPropagation()
-                    showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
+                    // We do NOT stop propagation here, allowing the parent (DesktopIcons -> Desktop) to catch it
+                    // and show the system context menu
                 }}
                 textClassName={cn(textColor, "drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium")}
                 noTruncate={true}

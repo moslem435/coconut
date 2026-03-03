@@ -23,6 +23,7 @@ interface DesktopIconsProps {
   onDragPreview: (preview: { x: number; y: number } | null) => void
   onClick: (id: string, e: React.MouseEvent) => void
   onDoubleClick: (id: string) => void
+  onContextMenu: (id: string, e: React.MouseEvent) => void
 }
 
 export function DesktopIcons({
@@ -40,36 +41,40 @@ export function DesktopIcons({
   onDragEnd,
   onDragPreview,
   onClick,
-  onDoubleClick
+  onDoubleClick,
+  onContextMenu
 }: DesktopIconsProps) {
   if (!isLayoutReady) return null
 
   return (
     <>
-      {/* 图标 */}
       {items.map((item) => {
         const pos = iconPositions[item.id] || { x: GRID_PADDING, y: GRID_PADDING }
         const isSelected = selectedIds.includes(item.id)
 
         return (
-          <DesktopIcon
+          <div
             key={item.id}
-            item={item}
-            pos={pos}
-            isSelected={isSelected}
-            scaleFactor={scaleFactor}
-            currentGridSize={currentGridSize}
-            currentGridPadding={currentGridPadding}
-            snapToGrid={snapToGrid}
-            textColor={textColor}
-            onSelect={(id) => {
-              if (!isSelected) onSelect(id)
-            }}
-            onDragEnd={onDragEnd}
-            onDragPreview={onDragPreview}
-            onClick={onClick}
-            onDoubleClick={onDoubleClick}
-          />
+            onContextMenu={(e) => onContextMenu(item.id, e)}
+          >
+            <DesktopIcon
+              item={item}
+              pos={pos}
+              isSelected={isSelected}
+              scaleFactor={scaleFactor}
+              currentGridSize={currentGridSize}
+              currentGridPadding={currentGridPadding}
+              snapToGrid={snapToGrid}
+              textColor={textColor}
+              onSelect={(id) => {
+                if (!isSelected) onSelect(id)
+              }}
+              onDragEnd={onDragEnd}
+              onDragPreview={onDragPreview}
+              onClick={onClick}
+              onDoubleClick={onDoubleClick}
+            />
+          </div>
         )
       })}
 

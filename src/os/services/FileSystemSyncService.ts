@@ -22,7 +22,7 @@ class FileSystemSyncService {
   async syncCreate(
     path: string,
     type: 'file' | 'folder',
-    content?: string,
+    content?: string | Uint8Array,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
     const tasks: Array<() => Promise<void>> = []
@@ -73,7 +73,7 @@ class FileSystemSyncService {
    */
   async syncUpdate(
     path: string,
-    content: string,
+    content: string | Uint8Array,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
     const tasks: Array<() => Promise<void>> = []

@@ -11,6 +11,7 @@ import { useWindowSnapshot } from '@/os/hooks/useWindowSnapshot'
 import { useWindowDrag } from '@/os/hooks/useWindowDrag'
 import { WindowContext } from '@/os/kernel/WindowContext'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { useSystemSettingsStore } from '@/os/kernel/useSystemSettingsStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { useMemo, useCallback, useState, useEffect } from 'react'
@@ -36,7 +37,15 @@ export default function Window({ id }: WindowProps) {
 
   const windowState = storeWindowState || cachedWindowState
 
-  const { useAnimations, theme, useTransparency, transparencyLevel, blurLevel } = useSystemSettings()
+  const { useAnimations, theme, useTransparency, transparencyLevel, blurLevel } = useSystemSettingsStore(
+    useShallow(state => ({
+      useAnimations: state.useAnimations,
+      theme: state.theme,
+      useTransparency: state.useTransparency,
+      transparencyLevel: state.transparencyLevel,
+      blurLevel: state.blurLevel
+    }))
+  )
   const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
   const peekWindowId = useWindowStore(state => state.peekWindowId)

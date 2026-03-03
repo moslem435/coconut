@@ -57,12 +57,23 @@ export const syncService = {
                     if (node.name === 'Welcome.txt') initialContent = 'Welcome to Portfolio OS!...'
 
                     // Gallery Images
-                    if (node.parentId === 'pictures') {
+                    if (node.parentId === 'pictures' || (node.parentId === 'desktop' && node.name.endsWith('.jpg'))) {
                         try {
-                            const response = await fetch(`/gallery/${node.name}`)
+                            // Check if file name matches expected gallery files
+                            // The gallery folder in public contains: abstract.jpg, colorful.jpg, gradient.jpg, cars.jpg
+                            let fetchPath = `/gallery/${node.name}`
+                            
+                            // Map virtual files to existing assets
+                            if (node.name === 'Abstract_01.jpg') fetchPath = '/gallery/abstract.jpg'
+                            if (node.name === 'Cyber_City.jpg') fetchPath = '/wallpapers/city.jpg' // Use city wallpaper as cyber city
+                            if (node.name === 'Workspace.jpg') fetchPath = '/wallpapers/default.jpg' // Use default wallpaper as workspace
+                            
+                            const response = await fetch(fetchPath)
                             if (response.ok) {
                                 const blob = await response.blob()
                                 initialContent = new Uint8Array(await blob.arrayBuffer())
+                            } else {
+                                console.warn(`Failed to fetch gallery image ${node.name} from ${fetchPath}: ${response.status} ${response.statusText}`)
                             }
                         } catch (e) {
                             console.warn(`Failed to fetch gallery image ${node.name}`, e)

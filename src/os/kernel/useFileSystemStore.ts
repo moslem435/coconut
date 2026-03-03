@@ -34,7 +34,11 @@ export const useFileSystemStore = create<FileSystemStore>()(
     }),
     {
       name: 'filesystem-storage',
-      skipHydration: true
+      skipHydration: true,
+      partialize: (state) => ({
+        files: state.files,
+        rootId: state.rootId
+      })
     }
   )
 )

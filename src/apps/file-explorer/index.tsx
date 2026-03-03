@@ -475,13 +475,10 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         />
 
         {/* 主内容区域 */}
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent relative">
-          {/* 文件上传拖放区域 */}
-          <FileUploadZone
-            targetFolderId={currentPathId}
-            onUploadComplete={handleUploadComplete}
-          />
-
+        <FileUploadZone
+          targetFolderId={currentPathId}
+          onUploadComplete={handleUploadComplete}
+        >
           {isSystemLoading || isFolderLoading ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--os-border-active)] mb-4" />
@@ -501,7 +498,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
               onDrop={handleFileDrop}
             />
           )}
-        </div>
+        </FileUploadZone>
       </div>
 
       {/* 状态栏 */}

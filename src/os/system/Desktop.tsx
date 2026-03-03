@@ -43,6 +43,8 @@ import { DesktopIcons } from './desktop/DesktopIcons'
 import { DesktopWidgets } from './desktop/DesktopWidgets'
 import { SplashScreenPortal } from './desktop/SplashScreenPortal'
 
+import { DesktopSelectionBox } from './desktop/DesktopSelectionBox'
+
 /**
  * 桌面主组件
  * 
@@ -113,13 +115,21 @@ export default function Desktop() {
     const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
 
     // 文件系统
-    const { isLoading, files, readFileContent } = useFileSystemStore(
+    const { isLoading, files, readFileContent, loadFolderContent } = useFileSystemStore(
         useShallow(state => ({
             isLoading: state.isLoading,
             files: state.files,
-            readFileContent: state.readFileContent
+            readFileContent: state.readFileContent,
+            loadFolderContent: state.loadFolderContent
         }))
     )
+
+    // 自动加载桌面内容
+    useEffect(() => {
+        // 'desktop' 是系统的虚拟根路径之一，通常对应文件系统的某个位置
+        // 这里我们主动触发加载，确保持久化的文件能同步到内存
+        loadFolderContent('desktop')
+    }, [loadFolderContent])
 
     /**
      * 桌面项目列表
@@ -216,13 +226,121 @@ export default function Desktop() {
         }
     }, [])
 
+    // 桌面选择框状态
+    const [selectionBox, setSelectionBox] = useState<{ startX: number, startY: number, currentX: number, currentY: number } | null>(null)
+    const selectionStartRef = useRef<{ x: number, y: number } | null>(null)
+
+    /**
+     * 处理桌面鼠标按下事件 - 开始框选
+     */
+    const handleDesktopMouseDown = useCallback((e: React.MouseEvent) => {
+        // 如果点击的是图标、任务栏或右键，不触发框选
+        if (e.button !== 0 || (e.target as HTMLElement).closest('.desktop-icon') || (e.target as HTMLElement).closest('.os-taskbar')) {
+            return
+        }
+
+        // 清除当前选择
+        if (!e.ctrlKey && !e.shiftKey) {
+            clearSelection()
+        }
+
+        const rect = desktopRef.current?.getBoundingClientRect()
+        if (!rect) return
+
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+
+        selectionStartRef.current = { x, y }
+        setSelectionBox({ startX: x, startY: y, currentX: x, currentY: y })
+    }, [clearSelection])
+
+    /**
+     * 处理桌面鼠标移动事件 - 更新框选范围
+     */
+    const handleDesktopMouseMove = useCallback((e: MouseEvent) => {
+        if (!selectionStartRef.current || !selectionBox) return
+
+        const rect = desktopRef.current?.getBoundingClientRect()
+        if (!rect) return
+
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+
+        setSelectionBox(prev => prev ? ({ ...prev, currentX: x, currentY: y }) : null)
+
+        // 计算框选区域
+        const startX = Math.min(selectionStartRef.current.x, x)
+        const startY = Math.min(selectionStartRef.current.y, y)
+        const endX = Math.max(selectionStartRef.current.x, x)
+        const endY = Math.max(selectionStartRef.current.y, y)
+
+        // 查找在区域内的图标
+        const newSelectedIds: string[] = []
+        
+        desktopItems.forEach(item => {
+            const pos = iconPositions[item.id]
+            if (!pos) return
+
+            // 简单的碰撞检测：图标中心点在框选区域内
+            // 假设图标大小约为 64x64 (加上 padding 可能更大，这里用 grid 尺寸估算)
+            const iconSize = currentGridSize
+            const iconCenterX = pos.x * scaleFactor + (iconSize * scaleFactor) / 2
+            const iconCenterY = pos.y * scaleFactor + (iconSize * scaleFactor) / 2
+
+            if (
+                iconCenterX >= startX &&
+                iconCenterX <= endX &&
+                iconCenterY >= startY &&
+                iconCenterY <= endY
+            ) {
+                newSelectedIds.push(item.id)
+            }
+        })
+
+        // 更新选中项
+        // 注意：这里简单的实现是直接替换选中项。如果要支持 Ctrl+框选（追加），逻辑会更复杂
+        if (newSelectedIds.length > 0 || (newSelectedIds.length === 0 && selectedIcons.length > 0)) {
+             // 只有当选中项发生变化时才更新，避免频繁渲染
+             // 这里为了简化，直接设置。优化方案是可以比较数组是否相同。
+             const isSame = newSelectedIds.length === selectedIcons.length && 
+                            newSelectedIds.every(id => selectedIcons.includes(id))
+             
+             if (!isSame) {
+                 setSelectedIcons(newSelectedIds)
+             }
+        }
+        
+    }, [selectionBox, desktopItems, iconPositions, currentGridSize, scaleFactor, selectedIcons, setSelectedIcons])
+
+    /**
+     * 处理桌面鼠标松开事件 - 结束框选
+     */
+    const handleDesktopMouseUp = useCallback(() => {
+        if (selectionStartRef.current) {
+            selectionStartRef.current = null
+            setSelectionBox(null)
+        }
+    }, [])
+
+    // 绑定全局鼠标事件用于拖拽框选
+    useEffect(() => {
+        if (selectionBox) {
+            window.addEventListener('mousemove', handleDesktopMouseMove)
+            window.addEventListener('mouseup', handleDesktopMouseUp)
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleDesktopMouseMove)
+            window.removeEventListener('mouseup', handleDesktopMouseUp)
+        }
+    }, [selectionBox, handleDesktopMouseMove, handleDesktopMouseUp])
+
     return (
         <>
             <div
                 ref={desktopRef}
                 className="fixed inset-0 font-sans overflow-hidden select-none cursor-default z-0"
                 style={{ backgroundColor: 'var(--os-bg-base)', color: 'var(--os-text-primary)' }}
-                onClick={clearSelection}
+                onMouseDown={handleDesktopMouseDown}
                 onContextMenu={(e) => {
                     e.preventDefault()
                     showMenu(e.clientX, e.clientY, 'desktop')
@@ -245,6 +363,19 @@ export default function Desktop() {
                     dragConstraintsRef={desktopRef}
                 />
 
+                {/* Selection Box */}
+                {selectionBox && (
+                    <div
+                        className="absolute bg-blue-500/20 border border-blue-500/50 z-10 pointer-events-none"
+                        style={{
+                            left: Math.min(selectionBox.startX, selectionBox.currentX),
+                            top: Math.min(selectionBox.startY, selectionBox.currentY),
+                            width: Math.abs(selectionBox.currentX - selectionBox.startX),
+                            height: Math.abs(selectionBox.currentY - selectionBox.startY)
+                        }}
+                    />
+                )}
+
                 {/* Icons */}
                 <div className="absolute inset-0 top-6 bottom-24">
                     {!isLoading && (
@@ -264,6 +395,15 @@ export default function Desktop() {
                             onDragPreview={setDragPreview}
                             onClick={handleIconClick}
                             onDoubleClick={handleDoubleClick}
+                            onContextMenu={(id, e) => {
+                                e.stopPropagation()
+                                // 如果右键点击的图标不在已选列表中，则只选中该图标
+                                // 否则保持当前选中状态（支持批量操作）
+                                if (!selectedIcons.includes(id)) {
+                                    setSelectedIcons([id])
+                                }
+                                showMenu(e.clientX, e.clientY, 'desktop-item', { id, selectedIds: selectedIcons.includes(id) ? selectedIcons : [id] })
+                            }}
                         />
                     )}
                 </div>
