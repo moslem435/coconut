@@ -107,6 +107,9 @@ export function useWebLLM() {
     const currentSpeedRef = useRef<number>(0);
     const abortRef = useRef(false);
 
+    const isInitializingRef = useRef(false);
+    const activeGenerationAbortControllerRef = useRef<AbortController | null>(null);
+
     // Check WebGPU support
     const checkWebGPUSupport = useCallback(async () => {
         if (typeof navigator === 'undefined' || !navigator.gpu) {
@@ -147,17 +150,35 @@ export function useWebLLM() {
         }
     }, []);
 
-    // Auto-detect GPU on mount
+    // Auto-detect GPU on mount and cleanup on unmount
     useEffect(() => {
         checkWebGPUSupport().then(({ supported, info }) => {
             if (supported && info) {
                 setState(prev => ({ ...prev, gpuInfo: info }));
             }
         });
+
+        return () => {
+            if (activeGenerationAbortControllerRef.current) {
+                activeGenerationAbortControllerRef.current.abort();
+            }
+            if (workerRef.current) {
+                workerRef.current.terminate();
+                workerRef.current = null;
+            }
+            engineRef.current = null;
+        };
     }, [checkWebGPUSupport]);
 
     // Initialize the engine
     const initEngine = useCallback(async (modelId: string) => {
+        if (isInitializingRef.current) return;
+        isInitializingRef.current = true;
+
+        if (activeGenerationAbortControllerRef.current) {
+            activeGenerationAbortControllerRef.current.abort();
+        }
+
         try {
             abortRef.current = false;
 
@@ -294,6 +315,8 @@ export function useWebLLM() {
                 isLoading: false,
                 error: errorMessage
             }));
+        } finally {
+            isInitializingRef.current = false;
         }
     }, []);
 
@@ -338,6 +361,13 @@ export function useWebLLM() {
         _cloudConfig?: any  // ignored in local mode, for interface compatibility
     ) => {
         if (!engineRef.current || !state.isModelLoaded) return;
+
+        // Create a new abort controller for this generation
+        if (activeGenerationAbortControllerRef.current) {
+            activeGenerationAbortControllerRef.current.abort();
+        }
+        activeGenerationAbortControllerRef.current = new AbortController();
+        const signal = activeGenerationAbortControllerRef.current.signal;
 
         setState(prev => ({ ...prev, isLoading: true }));
 
@@ -460,6 +490,7 @@ export function useWebLLM() {
                 const completionParams: any = {
                     messages: chatMessages,
                     stream: true,
+                    signal,
                 };
 
                 if (supportsTools) {
@@ -510,6 +541,7 @@ export function useWebLLM() {
                 const currentToolCall: any = null;
 
                 for await (const chunk of reply) {
+                    if (signal.aborted) break;
                     const delta = chunk.choices[0]?.delta;
 
                     // Handle content
@@ -739,6 +771,11 @@ export function useWebLLM() {
             onFinish();
             setState(prev => ({ ...prev, isLoading: false }));
         } catch (err: any) {
+            if (err.name === 'AbortError') {
+                console.log("Generation aborted by user or system");
+                setState(prev => ({ ...prev, isLoading: false }));
+                return;
+            }
             console.error("Chat error:", err);
             setState(prev => ({
                 ...prev,

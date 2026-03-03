@@ -60,6 +60,8 @@ const zh: Record<string, string> = {
     "ai.model.tab.all": "所有模型",
     "ai.model.tab.downloaded": "已下载",
     "ai.cloud.service": "服务",
+    "ai.cloud.gemini": "Gemini",
+    "ai.cloud.openai": "OpenAI",
     "ai.cloud.model_preset": "模型预设",
     "ai.cloud.saved_models": "已保存模型",
     "ai.cloud.delete_preset": "删除预设",

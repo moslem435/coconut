@@ -14,6 +14,8 @@ export interface SystemSettings {
     theme: ThemeMode
     accentColor: string
     useTransparency: boolean
+    transparencyLevel: number
+    blurLevel: number
     useAnimations: boolean
     useTaskbarPreviews: boolean
     skipBootSequence: boolean
@@ -33,6 +35,8 @@ interface SystemSettingsActions {
     setTheme: (theme: ThemeMode) => void
     setAccentColor: (color: string) => void
     setUseTransparency: (enable: boolean) => void
+    setTransparencyLevel: (level: number) => void
+    setBlurLevel: (level: number) => void
     setUseAnimations: (enable: boolean) => void
     setUseTaskbarPreviews: (enable: boolean) => void
     setSkipBootSequence: (enable: boolean) => void
@@ -57,6 +61,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
     theme: 'dark',
     accentColor: '#06b6d4',
     useTransparency: true,
+    transparencyLevel: 0.65,
+    blurLevel: 40,
     useAnimations: true,
     useTaskbarPreviews: true,
     skipBootSequence: false,
@@ -85,6 +91,8 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 setTheme: (theme) => set({ theme }),
                 setAccentColor: (color) => set({ accentColor: color }),
                 setUseTransparency: (enable) => set({ useTransparency: enable }),
+                setTransparencyLevel: (level) => set({ transparencyLevel: level }),
+                setBlurLevel: (level) => set({ blurLevel: level }),
                 setUseAnimations: (enable) => set({ useAnimations: enable }),
                 setUseTaskbarPreviews: (enable) => set({ useTaskbarPreviews: enable }),
                 setSkipBootSequence: (enable) => set({ skipBootSequence: enable }),
@@ -111,7 +119,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 partialize: (state) => {
                     // Exclude actions and isSettingsLoaded from persistence
                     const { isSettingsLoaded, setTheme, setAccentColor, setUseTransparency,
-                        setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
+                        setTransparencyLevel, setBlurLevel, setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
                         setIconTheme, setDisplayScale, setVolume, setBrightness, setMuted, toggleMute,
                         setSnapToGrid, setShowWeatherWidget, pinApp, unpinApp, setWallpaper, setDevMode,
                         ...settings } = state

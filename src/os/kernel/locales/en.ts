@@ -60,6 +60,8 @@ const en: Record<string, string> = {
     "ai.model.tab.all": "All Models",
     "ai.model.tab.downloaded": "Downloaded",
     "ai.cloud.service": "Service",
+    "ai.cloud.gemini": "Gemini",
+    "ai.cloud.openai": "OpenAI",
     "ai.cloud.model_preset": "Model Preset",
     "ai.cloud.saved_models": "Saved Models",
     "ai.cloud.delete_preset": "Delete preset",

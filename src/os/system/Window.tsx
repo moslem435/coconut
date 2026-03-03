@@ -36,7 +36,7 @@ export default function Window({ id }: WindowProps) {
 
   const windowState = storeWindowState || cachedWindowState
 
-  const { useAnimations, theme, useTransparency } = useSystemSettings()
+  const { useAnimations, theme, useTransparency, transparencyLevel, blurLevel } = useSystemSettings()
   const { t } = useLanguage()
   const isActive = useWindowStore(state => state.activeWindowId === id)
   const peekWindowId = useWindowStore(state => state.peekWindowId)
@@ -244,13 +244,13 @@ export default function Window({ id }: WindowProps) {
           className="fixed top-0 right-0 h-full z-[5000] border-l border-[var(--os-border)] shadow-2xl overflow-hidden flex flex-col"
           style={{
             backgroundColor: useTransparency 
-              ? 'rgba(var(--os-bg-window-rgb), 0.65)' 
+              ? `rgba(var(--os-bg-window-rgb), ${transparencyLevel})` 
               : 'var(--os-bg-window)',
             backdropFilter: useTransparency
-              ? 'blur(40px) saturate(150%)'
+              ? `blur(${blurLevel}px) saturate(150%)`
               : 'none',
             WebkitBackdropFilter: useTransparency
-              ? 'blur(40px) saturate(150%)'
+              ? `blur(${blurLevel}px) saturate(150%)`
               : 'none',
           }}
           onPointerDown={() => focusWindow(id)}
@@ -416,13 +416,13 @@ export default function Window({ id }: WindowProps) {
           top: 0,
           left: 0,
           backgroundColor: useTransparency 
-            ? 'rgba(var(--os-bg-window-rgb), 0.65)' 
+            ? `rgba(var(--os-bg-window-rgb), ${transparencyLevel})` 
             : 'var(--os-bg-window)',
           backdropFilter: useTransparency
-            ? (isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)')
+            ? (isActive ? `blur(${blurLevel}px) saturate(150%)` : `blur(${blurLevel * 0.25}px) saturate(100%)`)
             : 'none',
           WebkitBackdropFilter: useTransparency
-            ? (isActive ? 'blur(40px) saturate(150%)' : 'blur(10px) saturate(100%)')
+            ? (isActive ? `blur(${blurLevel}px) saturate(150%)` : `blur(${blurLevel * 0.25}px) saturate(100%)`)
             : 'none',
           boxShadow: isActive
             ? '0 0 0 1px var(--os-border-active), var(--os-shadow-window-active)'

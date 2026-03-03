@@ -45,6 +45,9 @@ interface ChatStore {
 const CLOUD_CONFIG_KEY = 'ai-chat-cloud-config';
 const AI_PROVIDER_KEY = 'ai-chat-provider';
 const CUSTOM_MODELS_KEY = 'ai-chat-custom-models';
+const MODEL_SETTINGS_KEY = 'ai-chat-model-settings';
+
+const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant living in a web-based OS. You can chat with users normally. You also have access to system tools (theme, wallpaper, apps). Only use tools when explicitly requested.";
 
 function loadCloudConfig(): CloudConfig {
     try {
@@ -62,6 +65,25 @@ function loadCustomModels(): CustomModel[] {
     return [];
 }
 
+function loadModelSettings() {
+    try {
+        const raw = localStorage.getItem(MODEL_SETTINGS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return {
+                temperature: parsed.temperature ?? 0.5,
+                top_p: parsed.top_p ?? 0.9,
+                systemPrompt: parsed.systemPrompt ?? DEFAULT_SYSTEM_PROMPT
+            };
+        }
+    } catch { }
+    return {
+        temperature: 0.5,
+        top_p: 0.9,
+        systemPrompt: DEFAULT_SYSTEM_PROMPT
+    };
+}
+
 export const useChatStore = create<ChatStore>((set, get) => ({
     sessions: [],
     currentSessionId: null,
@@ -69,11 +91,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     aiProvider: (localStorage.getItem(AI_PROVIDER_KEY) as 'local' | 'cloud') || 'local',
     cloudConfig: loadCloudConfig(),
     customModels: loadCustomModels(),
-    modelSettings: {
-        temperature: 0.5,
-        top_p: 0.9,
-        systemPrompt: "You are a helpful assistant living in a web-based OS. You can chat with users normally. You also have access to system tools (theme, wallpaper, apps). Only use tools when explicitly requested."
-    },
+    modelSettings: loadModelSettings(),
     currentLocalModelId: null,
 
     setCurrentLocalModelId: (id) => set({ currentLocalModelId: id }),
@@ -185,6 +203,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 return { ...s, messages, updatedAt: Date.now() };
             });
 
+            storage.saveSessions(sessions);
             return { sessions };
         });
     },
@@ -195,9 +214,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     updateModelSettings: (settings) => {
-        set(state => ({
-            modelSettings: { ...state.modelSettings, ...settings }
-        }));
+        set(state => {
+            const newSettings = { ...state.modelSettings, ...settings };
+            localStorage.setItem(MODEL_SETTINGS_KEY, JSON.stringify(newSettings));
+            return { modelSettings: newSettings };
+        });
     },
 
     setAiProvider: (provider) => {

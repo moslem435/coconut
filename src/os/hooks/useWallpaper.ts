@@ -12,6 +12,7 @@ export interface WallpaperConfig {
 
 export interface WallpaperState {
   activeWallpaper: string | null
+  activeType: WallpaperConfig['type'] | null
   loadedWallpaper: string | null
   isLoading: boolean
   transitionType: 'fade' | 'zoom-in' | 'zoom-out' | 'blur'
@@ -19,6 +20,7 @@ export interface WallpaperState {
 
 export function useWallpaper(wallpaper: WallpaperConfig | null) {
   const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null)
+  const [activeType, setActiveType] = useState<WallpaperConfig['type'] | null>(null)
   const [loadedWallpaper, setLoadedWallpaper] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [transitionType, setTransitionType] = useState<WallpaperState['transitionType']>('fade')
@@ -146,6 +148,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
         if (isFirstImageLoad.current) {
           isFirstImageLoad.current = false
           setActiveWallpaper(targetValue)
+          setActiveType(wallpaper.type)
           setLoadedWallpaper(null)
           setIsLoading(false)
           return
@@ -181,6 +184,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
           transitionTimeoutRef.current = setTimeout(() => {
             if (!isCancelled) {
               setActiveWallpaper(targetValue)
+              setActiveType(wallpaper.type)
             }
           }, 1000)
         }
@@ -196,6 +200,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
         if (isCancelled) return
         setLoadedWallpaper(null)
         setActiveWallpaper(targetValue)
+        setActiveType(wallpaper.type)
         setIsLoading(false)
       }
     }
@@ -238,6 +243,7 @@ export function useWallpaper(wallpaper: WallpaperConfig | null) {
 
   return {
     activeWallpaper,
+    activeType,
     loadedWallpaper,
     isLoading,
     transitionType,

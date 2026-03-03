@@ -6,6 +6,7 @@ import { Tooltip } from '@/os/ui/Tooltip'
 import { SettingSection } from '../components/SettingSection'
 import { ThemeOption } from '../components/ThemeOption'
 import { ToggleSwitch } from '../components/ToggleSwitch'
+import { Slider } from '@/os/components/ui/Slider'
 import { getAccentColors, getWallpaperOptions } from '../constants'
 
 export function AppearancePanel() {
@@ -17,6 +18,8 @@ export function AppearancePanel() {
         iconTheme, setIconTheme,
         wallpaper, setWallpaper,
         useTransparency, setUseTransparency,
+        transparencyLevel, setTransparencyLevel,
+        blurLevel, setBlurLevel,
         useAnimations, setUseAnimations,
         useTaskbarPreviews, setUseTaskbarPreviews
     } = useSystem()
@@ -193,11 +196,35 @@ export function AppearancePanel() {
 
             <SettingSection title={t('settings.appearance.effects')}>
                 <div className="space-y-4">
-                    <ToggleSwitch
-                        checked={useTransparency}
-                        onChange={setUseTransparency}
-                        label={t('settings.appearance.transparency')}
-                    />
+                    <div>
+                        <ToggleSwitch
+                            checked={useTransparency}
+                            onChange={setUseTransparency}
+                            label={t('settings.appearance.transparency')}
+                        />
+                        {useTransparency && (
+                            <div className="pl-4 pt-2 space-y-4 border-l-2 border-[var(--os-border)] ml-1 mt-2">
+                                <Slider
+                                    min={0.1}
+                                    max={1}
+                                    step={0.05}
+                                    value={transparencyLevel}
+                                    onChange={setTransparencyLevel}
+                                    label="Opacity"
+                                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                                />
+                                <Slider
+                                    min={0}
+                                    max={60}
+                                    step={1}
+                                    value={blurLevel}
+                                    onChange={setBlurLevel}
+                                    label="Blur"
+                                    formatValue={(v) => `${v}px`}
+                                />
+                            </div>
+                        )}
+                    </div>
                     <ToggleSwitch
                         checked={useAnimations}
                         onChange={setUseAnimations}

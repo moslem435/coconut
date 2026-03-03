@@ -59,6 +59,7 @@ export default function Desktop() {
     // 壁纸管理
     const {
         activeWallpaper,        // 当前激活的壁纸 URL
+        activeType,             // 当前激活的壁纸类型
         loadedWallpaper,        // 已加载的壁纸 URL
         isLoading: isWallpaperLoading,  // 壁纸加载状态
         getTransitionStyle      // 获取过渡动画样式
@@ -81,7 +82,10 @@ export default function Desktop() {
                 let brightness = 128
                 
                 // For images, we need to load and analyze
-                if (['image', 'daily', 'dynamic-time'].includes(wallpaper?.type || '')) {
+                // Use activeType to ensure we treat the current wallpaper correctly
+                // Fallback to wallpaper.type if activeType is not ready (though activeWallpaper check above handles most cases)
+                const type = activeType || wallpaper?.type || ''
+                if (['image', 'daily', 'dynamic-time'].includes(type)) {
                     brightness = await getImageBrightness(activeWallpaper)
                 } 
                 // For CSS values (solid, gradient, preset)
@@ -103,7 +107,7 @@ export default function Desktop() {
         }
 
         checkBrightness()
-    }, [activeWallpaper, wallpaper?.type])
+    }, [activeWallpaper, activeType, wallpaper?.type])
 
     // 右键菜单
     const showMenu = useContextMenuStore(useShallow(state => state.showMenu))
@@ -229,6 +233,7 @@ export default function Desktop() {
                     wallpaper={wallpaper} 
                     isVisible={isDesktopVisible}
                     activeWallpaper={activeWallpaper}
+                    activeType={activeType}
                     loadedWallpaper={loadedWallpaper}
                     isLoading={isWallpaperLoading}
                     getTransitionStyle={getTransitionStyle}
