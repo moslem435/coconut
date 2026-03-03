@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
       // 方案 1: geojs.io (无限制，免费)
       try {
         const res = await fetch('https://get.geojs.io/v1/ip/geo.json', {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
         })
         if (res.ok) {
           const data = await res.json()
@@ -44,7 +46,9 @@ export async function GET(request: NextRequest) {
       if (!locationData) {
         try {
           const res = await fetch('http://ip-api.com/json/', {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
           })
           if (res.ok) {
             const data = await res.json()
@@ -84,7 +88,9 @@ export async function GET(request: NextRequest) {
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,apparent_temperature,surface_pressure,visibility,is_day&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`
       
       const res = await fetch(weatherUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
       })
 
       if (!res.ok) {

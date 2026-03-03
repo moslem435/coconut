@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Globe, ShieldAlert, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Globe, ShieldAlert, RefreshCw, Lock } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { SettingSection } from '../components/SettingSection'
-import { CSP_COOKIE_NAME } from '@/os/config/csp'
+import { DEFAULT_CSP_CONFIG, CSP_COOKIE_NAME } from '@/os/config/csp'
 
 export const NetworkPanel = () => {
-    const { t } = useLanguage()
+    const { t, language } = useLanguage()
     const [domains, setDomains] = useState<string[]>([])
     const [newDomain, setNewDomain] = useState('')
     const [hasChanges, setHasChanges] = useState(false)
+
+    // Extract default allowed domains (filtering out 'self', 'blob:', etc.)
+    const defaultDomains = DEFAULT_CSP_CONFIG['frame-src'].filter(d => d.startsWith('http'))
 
     // Load domains from cookie on mount
     useEffect(() => {
@@ -112,32 +115,58 @@ export const NetworkPanel = () => {
                 </div>
 
                 <div className="space-y-2">
-                    {domains.length === 0 ? (
+                    {/* System Default Domains */}
+                    {defaultDomains.map((domain) => (
+                        <div 
+                            key={`default-${domain}`}
+                            className="flex items-center justify-between px-3 py-2 rounded-lg group transition-colors opacity-70 hover:opacity-100"
+                            style={{
+                                backgroundColor: 'var(--os-bg-base)',
+                                border: '1px dashed var(--os-border)'
+                            }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Globe size={16} style={{ color: 'var(--os-text-muted)' }} />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium" style={{ color: 'var(--os-text-primary)' }}>{domain}</span>
+                                    <span className="text-[10px] uppercase tracking-wider opacity-60" style={{ color: 'var(--os-text-muted)' }}>
+                                        {language === 'zh' ? '系统默认' : 'System Default'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-2" title={language === 'zh' ? '系统默认配置，无法删除' : 'System default configuration, cannot be removed'}>
+                                <Lock size={14} className="opacity-40" />
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* User Custom Domains */}
+                    {domains.map((domain) => (
+                        <div 
+                            key={domain} 
+                            className="flex items-center justify-between px-3 py-2 rounded-lg group transition-colors"
+                            style={{
+                                backgroundColor: 'var(--os-bg-base)',
+                            }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Globe size={16} style={{ color: 'var(--os-text-muted)' }} />
+                                <span className="text-sm" style={{ color: 'var(--os-text-primary)' }}>{domain}</span>
+                            </div>
+                            <button
+                                onClick={() => handleRemove(domain)}
+                                className="opacity-0 group-hover:opacity-100 transition-all p-1 hover:text-red-400"
+                                style={{ color: 'var(--os-text-muted)' }}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
+
+                    {domains.length === 0 && defaultDomains.length === 0 && (
                         <div className="text-center py-8 text-sm" style={{ color: 'var(--os-text-muted)' }}>
                             {t('settings.network.empty')}
                         </div>
-                    ) : (
-                        domains.map((domain) => (
-                            <div 
-                                key={domain} 
-                                className="flex items-center justify-between px-3 py-2 rounded-lg group transition-colors"
-                                style={{
-                                    backgroundColor: 'var(--os-bg-base)',
-                                }}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Globe size={16} style={{ color: 'var(--os-text-muted)' }} />
-                                    <span className="text-sm" style={{ color: 'var(--os-text-primary)' }}>{domain}</span>
-                                </div>
-                                <button
-                                    onClick={() => handleRemove(domain)}
-                                    className="opacity-0 group-hover:opacity-100 transition-all p-1 hover:text-red-400"
-                                    style={{ color: 'var(--os-text-muted)' }}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        ))
                     )}
                 </div>
             </SettingSection>
