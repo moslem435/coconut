@@ -122,7 +122,8 @@ export function useWindowDrag() {
         setRestorePreview(null)
 
         if (windowState.isMaximized) {
-            if (info.offset.y > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
+            const deltaY = info.point.y - dragStartY.current
+            if (deltaY > SYSTEM_CONSTANTS.RESTORE_DRAG_THRESHOLD) {
                 const restoredWidth = windowState.preMaximizeState?.size.width ?? 800
                 const newX = Math.max(0, info.point.x - restoredWidth / 2)
                 const newY = Math.max(0, info.point.y - 20)

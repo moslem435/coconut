@@ -117,6 +117,7 @@ export function DesktopIcon({
                     showMenu(e.clientX, e.clientY, 'desktop-item', { id: item.id, appId: item.appId })
                 }}
                 textClassName={cn(textColor, "drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium")}
+                noTruncate={true}
             />
         </motion.div>
     )

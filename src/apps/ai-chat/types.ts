@@ -27,6 +27,15 @@ export interface CloudConfig {
     baseUrl?: string; // for OpenAI-compatible endpoints
 }
 
+export interface CustomModel {
+    id: string;
+    name: string;
+    provider: CloudProvider;
+    modelId: string;
+    baseUrl?: string;
+    apiKey?: string;
+}
+
 export interface ModelConfig {
     id: string;
     name: string;

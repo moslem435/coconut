@@ -56,17 +56,11 @@ export function WindowTitleBar({
 }: WindowTitleBarProps) {
     const { t } = useLanguage()
 
-    // Determine colors based on colorMode
-    // colorMode = 'dark' means dark text (for light backgrounds)
-    // colorMode = 'light' or undefined means light text (for dark backgrounds - default)
-    const isDarkText = colorMode === 'dark'
+    // Dynamic contrast colors
+    // We use white color with mix-blend-mode: difference to achieve dynamic contrast against any background
+    const dynamicTextColor = '#ffffff'
+    const dynamicIconColor = '#ffffff'
     
-    const activeTextColor = isDarkText ? 'rgba(0,0,0,0.9)' : 'var(--os-text-primary)'
-    const inactiveTextColor = isDarkText ? 'rgba(0,0,0,0.5)' : 'var(--os-text-muted)'
-    const iconColor = isActive ? (isDarkText ? 'rgba(0,0,0,0.9)' : 'var(--os-accent)') : inactiveTextColor
-    const buttonColor = isDarkText ? 'rgba(0,0,0,0.7)' : 'var(--os-text-secondary)'
-    const buttonHoverBg = isDarkText ? 'rgba(0,0,0,0.1)' : 'var(--os-hover-bg)'
-
     const manifest = appId ? APPS_REGISTRY[appId] : undefined
     
     const displayTitle = isDefaultTitle && appId ? t(`app.${appId}`) : title
@@ -82,22 +76,27 @@ export function WindowTitleBar({
                 e.preventDefault()
                 if (isResizable) onMaximize()
             }}
-            className="h-10 flex items-center justify-between px-3 select-none shrink-0 cursor-grab active:cursor-grabbing"
+            className="h-10 flex items-center justify-between px-3 select-none shrink-0 cursor-grab active:cursor-grabbing group/titlebar"
             style={{
                 backgroundColor: 'transparent',
             }}
         >
             {/* Left: Icon + Title */}
             <div className="flex items-center gap-2.5">
-                <AppIcon 
-                    manifest={manifest}
-                    icon={Icon}
-                    size={20}
-                    className="drop-shadow-sm"
-                />
+                <div className="relative z-10">
+                    <AppIcon 
+                        manifest={manifest}
+                        icon={Icon}
+                        size={20}
+                        className="drop-shadow-sm"
+                    />
+                </div>
                 <span
-                    className="text-sm font-medium tracking-wide transition-colors"
-                    style={{ color: isActive ? activeTextColor : inactiveTextColor }}
+                    className="text-sm font-medium tracking-wide transition-colors mix-blend-difference"
+                    style={{ 
+                        color: dynamicTextColor,
+                        opacity: isActive ? 1 : 0.6
+                    }}
                 >
                     {displayTitle}
                 </span>
@@ -110,13 +109,13 @@ export function WindowTitleBar({
                     <button
                         onClick={onMinimize}
                         aria-label={labels.minimize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 active:scale-90 hover:bg-[var(--hover-bg)]"
-                        style={{ 
-                            color: buttonColor,
-                            '--hover-bg': buttonHoverBg
-                        } as React.CSSProperties}
+                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-[var(--os-hover-bg)]"
                     >
-                        <Minus size={16} />
+                        <Minus 
+                            size={16} 
+                            className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
+                            style={{ color: dynamicIconColor }} 
+                        />
                     </button>
                 </Tooltip>
 
@@ -126,16 +125,20 @@ export function WindowTitleBar({
                     <button
                         onClick={onMaximize}
                         aria-label={isMaximized ? labels.restore : labels.maximize}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 active:scale-90 hover:bg-[var(--hover-bg)]"
-                        style={{ 
-                            color: buttonColor,
-                            '--hover-bg': buttonHoverBg
-                        } as React.CSSProperties}
+                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-[var(--os-hover-bg)]"
                     >
                         {isMaximized ? (
-                            <Minimize2 size={16} />
+                            <Minimize2 
+                                size={16} 
+                                className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
+                                style={{ color: dynamicIconColor }}
+                            />
                         ) : (
-                            <Maximize2 size={16} />
+                            <Maximize2 
+                                size={16} 
+                                className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
+                                style={{ color: dynamicIconColor }}
+                            />
                         )}
                     </button>
                 </Tooltip>
@@ -146,10 +149,13 @@ export function WindowTitleBar({
                     <button
                         onClick={onClose}
                         aria-label={labels.close}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 hover:bg-red-500 hover:text-white active:scale-90"
-                        style={{ color: buttonColor }}
+                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 hover:bg-red-500 active:scale-90"
                     >
-                        <X size={16} />
+                        <X 
+                            size={16} 
+                            className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-white"
+                            style={{ color: dynamicIconColor }}
+                        />
                     </button>
                 </Tooltip>
             </div>

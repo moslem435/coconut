@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { ChatSession, Message, CloudConfig } from '../types';
+import { ChatSession, Message, CloudConfig, CustomModel } from '../types';
 import { storage } from '../utils/storage';
 
 interface ChatStore {
@@ -9,6 +9,7 @@ interface ChatStore {
     isSidebarOpen: boolean;
     aiProvider: 'local' | 'cloud';
     cloudConfig: CloudConfig;
+    customModels: CustomModel[];
     modelSettings: {
         temperature: number;
         top_p: number;
@@ -35,12 +36,15 @@ interface ChatStore {
     updateModelSettings: (settings: Partial<ChatStore['modelSettings']>) => void;
     setAiProvider: (provider: 'local' | 'cloud') => void;
     updateCloudConfig: (config: Partial<CloudConfig>) => void;
+    addCustomModel: (model: CustomModel) => void;
+    removeCustomModel: (id: string) => void;
     loadSessions: () => Promise<void>;
     clearHistory: () => Promise<void>;
 }
 
 const CLOUD_CONFIG_KEY = 'ai-chat-cloud-config';
 const AI_PROVIDER_KEY = 'ai-chat-provider';
+const CUSTOM_MODELS_KEY = 'ai-chat-custom-models';
 
 function loadCloudConfig(): CloudConfig {
     try {
@@ -50,12 +54,21 @@ function loadCloudConfig(): CloudConfig {
     return { provider: 'gemini', apiKey: '', modelId: 'gemini-2.0-flash' };
 }
 
+function loadCustomModels(): CustomModel[] {
+    try {
+        const raw = localStorage.getItem(CUSTOM_MODELS_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch { }
+    return [];
+}
+
 export const useChatStore = create<ChatStore>((set, get) => ({
     sessions: [],
     currentSessionId: null,
     isSidebarOpen: true,
     aiProvider: (localStorage.getItem(AI_PROVIDER_KEY) as 'local' | 'cloud') || 'local',
     cloudConfig: loadCloudConfig(),
+    customModels: loadCustomModels(),
     modelSettings: {
         temperature: 0.5,
         top_p: 0.9,
@@ -153,9 +166,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 if (s.id !== sessionId) return s;
 
                 const messages = [...s.messages];
-                if (messages.length > 0) {
-                    messages[messages.length - 1] = {
-                        ...messages[messages.length - 1],
+                // Find the LAST assistant message (not just last message,
+                // since tool result messages may have been appended after it)
+                let lastAssistantIdx = -1;
+                for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i]!.role === 'assistant') {
+                        lastAssistantIdx = i;
+                        break;
+                    }
+                }
+                if (lastAssistantIdx !== -1) {
+                    messages[lastAssistantIdx] = {
+                        ...messages[lastAssistantIdx],
                         ...updates
                     } as Message;
                 }
@@ -163,11 +185,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 return { ...s, messages, updatedAt: Date.now() };
             });
 
-            // Don't save to storage on every character update to avoid perf issues
-            // Storage sync could be debounced or done on specific events
             return { sessions };
         });
     },
+
 
     toggleSidebar: () => {
         set(state => ({ isSidebarOpen: !state.isSidebarOpen }));
@@ -189,6 +210,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             const newConfig = { ...state.cloudConfig, ...config };
             localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(newConfig));
             return { cloudConfig: newConfig };
+        });
+    },
+
+    addCustomModel: (model) => {
+        set(state => {
+            const customModels = [...state.customModels, model];
+            localStorage.setItem(CUSTOM_MODELS_KEY, JSON.stringify(customModels));
+            return { customModels };
+        });
+    },
+
+    removeCustomModel: (id) => {
+        set(state => {
+            const customModels = state.customModels.filter(m => m.id !== id);
+            localStorage.setItem(CUSTOM_MODELS_KEY, JSON.stringify(customModels));
+            return { customModels };
         });
     },
 

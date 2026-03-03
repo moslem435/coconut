@@ -15,6 +15,7 @@ export interface FileGridItemProps extends React.HTMLAttributes<HTMLDivElement> 
   iconSize?: number
   iconClassName?: string
   textClassName?: string
+  noTruncate?: boolean
 }
 
 export function FileGridItem({
@@ -27,6 +28,7 @@ export function FileGridItem({
   iconSize = 48,
   iconClassName,
   textClassName,
+  noTruncate,
   ...props
 }: FileGridItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
@@ -107,15 +109,16 @@ export function FileGridItem({
       ) : (
         <span 
           className={cn(
-            "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none line-clamp-2 overflow-hidden text-ellipsis",
+            "text-xs text-center drop-shadow-sm break-words w-full px-1 select-none",
+            !noTruncate && "line-clamp-2 overflow-hidden text-ellipsis",
             textClassName || "text-[var(--os-text-primary)]"
           )}
           title={isAppBundle ? appBundleName : displayName}
-          style={{
+          style={!noTruncate ? {
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical'
-          }}
+          } : undefined}
         >
           {isAppBundle ? appBundleName : displayName}
         </span>

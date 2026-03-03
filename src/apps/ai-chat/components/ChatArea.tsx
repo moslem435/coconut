@@ -54,6 +54,7 @@ function cn(...inputs: ClassValue[]) {
 // Tool Call Card Component
 function ToolCallCard({ toolName, args, result }: { toolName: string, args: any, result?: string }) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const { t } = useTranslation();
 
     return (
         <div className="my-2 rounded-lg border border-white/10 bg-black/20 overflow-hidden">
@@ -66,21 +67,21 @@ function ToolCallCard({ toolName, args, result }: { toolName: string, args: any,
                     {toolName}
                 </span>
                 <span className="text-[10px] text-zinc-500 font-mono">
-                    {isExpanded ? 'Hide' : 'Show'}
+                    {isExpanded ? t('ai.cloud.hide') : t('ai.cloud.show')}
                 </span>
             </div>
 
             {isExpanded && (
                 <div className="p-3 border-t border-white/5 space-y-2">
                     <div>
-                        <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Arguments</div>
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('ai.tool.arguments')}</div>
                         <pre className="text-[10px] font-mono text-zinc-300 bg-black/30 p-2 rounded overflow-x-auto">
                             {JSON.stringify(args, null, 2)}
                         </pre>
                     </div>
                     {result && (
                         <div>
-                            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Result</div>
+                            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('ai.tool.result')}</div>
                             <pre className="text-[10px] font-mono text-zinc-300 bg-black/30 p-2 rounded overflow-x-auto max-h-32">
                                 {result}
                             </pre>
@@ -415,7 +416,7 @@ export function ChatArea() {
                 <p className="text-sm font-medium">{t('ai.msg.select_to_begin')}</p>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => createSession(currentModelId || undefined)}
+                        onClick={() => createSession((aiProvider === 'cloud' ? cloudConfig.modelId : currentModelId) || undefined)}
                         className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-indigo-500/20"
                     >
                         <MessageSquare size={16} />
@@ -427,7 +428,7 @@ export function ChatArea() {
                             className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-white/5"
                         >
                             <PanelLeft size={16} />
-                            Open Sidebar
+                            {t('ai.sidebar.open')}
                         </button>
                     )}
                 </div>
@@ -435,7 +436,17 @@ export function ChatArea() {
         );
     }
 
-    const currentModelName = AVAILABLE_MODELS.find(m => m.id === currentModelId)?.name || t('ai.header.no_model_loaded');
+    const currentModelName = (() => {
+        if (aiProvider === 'cloud') {
+            const id = cloudConfig.modelId;
+            for (const provider of Object.values(CLOUD_MODELS)) {
+                const model = provider.find(m => m.id === id);
+                if (model) return model.name;
+            }
+            return id || 'Cloud Model';
+        }
+        return AVAILABLE_MODELS.find(m => m.id === currentModelId)?.name || t('ai.header.no_model_loaded');
+    })();
 
     // Filter models based on tab
     // Removed local filtering logic as it's now in Sidebar
@@ -452,10 +463,10 @@ export function ChatArea() {
                     }
                 }}
                 className={cn(
-                "h-16 flex items-center justify-between px-6 z-10 shrink-0 select-none",
-                isSidebar && "pt-0",
-                !isSidebar && "pt-0"
-            )}>
+                    "h-16 flex items-center justify-between px-6 z-10 shrink-0 select-none",
+                    isSidebar && "pt-0",
+                    !isSidebar && "pt-0"
+                )}>
                 <div className="flex items-center gap-3 min-w-0 px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
                     {/* Show sidebar toggle button if sidebar is closed */}
                     {!isSidebarOpen && (
@@ -498,6 +509,7 @@ export function ChatArea() {
                         )}
                     >
                         {!isModelLoaded && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                        {aiProvider === 'cloud' && <Cloud size={12} className="text-indigo-400" />}
                         {currentModelName}
                     </div>
                 </div>
@@ -518,21 +530,21 @@ export function ChatArea() {
                             <button
                                 className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors"
                                 onClick={() => minimize('ai-chat')}
-                                title="Minimize"
+                                title={t('menu.minimize')}
                             >
                                 <Minus size={14} />
                             </button>
                             <button
                                 className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors"
                                 onClick={() => maximize('ai-chat')}
-                                title={isMaximized ? "Restore" : "Maximize"}
+                                title={isMaximized ? t('menu.restore') : t('menu.maximize')}
                             >
                                 {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                             </button>
                             <button
                                 className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg text-zinc-400 transition-colors"
                                 onClick={() => close('ai-chat')}
-                                title="Close"
+                                title={t('menu.close')}
                             >
                                 <X size={14} />
                             </button>
@@ -701,172 +713,202 @@ export function ChatArea() {
                         )
                         : msgs;
 
-                    return displayMessages.map((msg) => (
-                        <div
-                            key={msg.id}
-                            className={cn(
-                                "flex gap-4 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
-                                msg.role === 'user' ? "justify-end" : "justify-start"
-                            )}
-                        >
-                            {msg.role === 'assistant' && (
-                                <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1">
-                                    <Sparkles size={18} className="text-zinc-400" />
+                    return displayMessages.map((msg, index) => {
+                        // ── Tool operation card (Builder / Control results) ──
+                        if (msg.role === 'tool') {
+                            const isError = msg.content?.includes('Error');
+                            // Strip [Builder] / [Control] prefix for display
+                            const displayText = msg.content?.replace(/^\[(?:Builder|Control)\]\s*/, '') || '';
+                            return (
+                                <div key={msg.id} className="max-w-4xl mx-auto w-full pl-12 animate-in fade-in duration-200">
+                                    <div className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono",
+                                        isError
+                                            ? "text-red-400 bg-red-500/5 border border-red-500/10"
+                                            : "text-emerald-400 bg-emerald-500/5 border border-emerald-500/10"
+                                    )}>
+                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isError ? "bg-red-400" : "bg-emerald-400")} />
+                                        <span className="truncate">{displayText}</span>
+                                    </div>
                                 </div>
-                            )}
+                            );
+                        }
 
-                            <div className={cn(
-                                "flex-1 min-w-0 px-5 py-3 max-w-[85%] group/msg relative",
-                                msg.role === 'user'
-                                    ? "bg-white/10 text-zinc-100 rounded-2xl rounded-tr-sm border border-white/5"
-                                    : "text-zinc-300 pl-0 rounded-2xl rounded-tl-sm border bg-transparent border-transparent"
-                            )}>
-                                <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
-                                    {msg.role === 'assistant' && msg.content && (
-                                        (() => {
-                                            // Check for thinking tags
-                                            const thinkMatch = msg.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-                                            const thinkContent = thinkMatch ? thinkMatch[1] : null;
-                                            const mainContent = thinkMatch
-                                                ? msg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim()
-                                                : msg.content;
-
-                                            // Filter out empty JSON arrays or null content
-                                            if (mainContent === '[]' || mainContent === '[""]' || !mainContent) {
-                                                if (msg.tool_calls && msg.tool_calls.length > 0) {
-                                                    // Only show tool calls if main content is empty
-                                                } else {
-                                                    return isLoading ? '...' : null;
-                                                }
-                                            }
-
-                                            return (
-                                                <>
-                                                    {thinkContent && <ThinkingProcess content={thinkContent} />}
-
-                                                    {/* Tool Calls Visualization */}
-                                                    {msg.tool_calls && msg.tool_calls.map((toolCall: any, index: number) => {
-                                                        // Find corresponding tool result if available (usually in next messages)
-                                                        // For simplicity in this view, we might not link them perfectly yet
-                                                        // But we can show the call itself
-                                                        return (
-                                                            <ToolCallCard
-                                                                key={toolCall.id || index}
-                                                                toolName={toolCall.function.name}
-                                                                args={JSON.parse(toolCall.function.arguments || '{}')}
-                                                            />
-                                                        );
-                                                    })}
-
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[remarkGfm]}
-                                                        rehypePlugins={[rehypeHighlight]}
-                                                        components={{
-                                                            code({ node, inline, className, children, ...props }: any) {
-                                                                const match = /language-(\w+)/.exec(className || '')
-                                                                // Recursively extract plain text from React node tree
-                                                                // (needed because rehype-highlight converts code to styled spans)
-                                                                const extractText = (node: any): string => {
-                                                                    if (typeof node === 'string') return node;
-                                                                    if (Array.isArray(node)) return node.map(extractText).join('');
-                                                                    if (node?.props?.children) return extractText(node.props.children);
-                                                                    return '';
-                                                                };
-                                                                const codeContent = extractText(children).replace(/\n$/, '');
-                                                                // Check if it's runnable code (React/JS/TS)
-                                                                const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts', 'html'].includes(match[1]));
-
-                                                                return !inline && match ? (
-                                                                    <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                                                                        <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
-                                                                            <span className="text-[10px] text-zinc-500 font-mono uppercase">{match[1]}</span>
-                                                                            {isRunable && (
-                                                                                <button
-                                                                                    onClick={() => handleRunApp(codeContent, match[1] || '')}
-                                                                                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium transition-colors border border-emerald-500/20"
-                                                                                    title="Run this code as an app"
-                                                                                >
-                                                                                    <Play size={10} className="fill-current" />
-                                                                                    {t('ai.msg.run_app')}
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="p-4 overflow-x-auto">
-                                                                            <code className={className} {...props}>
-                                                                                {children}
-                                                                            </code>
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
-                                                                        {children}
-                                                                    </code>
-                                                                )
-                                                            }
-                                                        }}
-                                                    >
-                                                        {mainContent || (isLoading ? '...' : '')}
-                                                    </ReactMarkdown>
-                                                </>
-                                            );
-                                        })()
-                                    )}
-                                    {msg.role !== 'assistant' && (
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            rehypePlugins={[rehypeHighlight]}
-                                            components={{
-                                                code({ node, inline, className, children, ...props }: any) {
-                                                    const match = /language-(\w+)/.exec(className || '')
-                                                    return !inline && match ? (
-                                                        <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                                                            <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
-                                                                <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
-                                                            </div>
-                                                            <div className="p-4 overflow-x-auto">
-                                                                <code className={className} {...props}>
-                                                                    {children}
-                                                                </code>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
-                                                            {children}
-                                                        </code>
-                                                    )
-                                                }
-                                            }}
-                                        >
-                                            {msg.content}
-                                        </ReactMarkdown>
-                                    )}
-                                </div>
-
-                                {/* Copy Button for AI Messages */}
-                                {msg.role === 'assistant' && !isLoading && (
-                                    <div className="absolute -bottom-6 left-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleCopyMessage(msg.content, msg.id)}
-                                            className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1.5"
-                                            title={t('ai.msg.copy')}
-                                        >
-                                            {copiedMessageId === msg.id ? (
-                                                <>
-                                                    <Check size={14} className="text-emerald-500" />
-                                                    <span className="text-[10px] text-emerald-500">{t('ai.msg.copied')}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy size={14} />
-                                                    <span className="text-[10px]">{t('ai.msg.copy')}</span>
-                                                </>
-                                            )}
-                                        </button>
+                        return (
+                            <div
+                                key={msg.id}
+                                className={cn(
+                                    "flex gap-4 max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
+                                    msg.role === 'user' ? "justify-end" : "justify-start"
+                                )}
+                            >
+                                {msg.role === 'assistant' && (
+                                    <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1">
+                                        <Sparkles size={18} className="text-zinc-400" />
                                     </div>
                                 )}
+
+                                <div className={cn(
+                                    "flex-1 min-w-0 px-5 py-3 max-w-[85%] group/msg relative",
+                                    msg.role === 'user'
+                                        ? "bg-white/10 text-zinc-100 rounded-2xl rounded-tr-sm border border-white/5"
+                                        : "text-zinc-300 pl-0 rounded-2xl rounded-tl-sm border bg-transparent border-transparent"
+                                )}>
+                                    <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
+                                        {msg.role === 'assistant' && msg.content && (
+                                            (() => {
+                                                // Check for thinking tags
+                                                const thinkMatch = msg.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+                                                const thinkContent = thinkMatch ? thinkMatch[1] : null;
+                                                const rawContent = thinkMatch
+                                                    ? msg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim()
+                                                    : msg.content;
+
+                                                // Determine if we should show cursor
+                                                const isGenerating = isLoading && index === displayMessages.length - 1;
+
+                                                // Filter out empty JSON arrays or null content
+                                                if (rawContent === '[]' || rawContent === '[""]' || !rawContent) {
+                                                    if (msg.tool_calls && msg.tool_calls.length > 0) {
+                                                        // Only show tool calls if main content is empty
+                                                    } else {
+                                                        return isGenerating ? (
+                                                            <span className="inline-block w-2 h-4 bg-zinc-400 animate-pulse align-middle" />
+                                                        ) : (isLoading ? '...' : null);
+                                                    }
+                                                }
+
+                                                // Append cursor to content for typing effect
+                                                const contentWithCursor = isGenerating ? rawContent + ' ▍' : rawContent;
+
+                                                return (
+                                                    <>
+                                                        {thinkContent && <ThinkingProcess content={thinkContent} />}
+
+                                                        {/* Tool Calls Visualization */}
+                                                        {msg.tool_calls && msg.tool_calls.map((toolCall: any, toolIndex: number) => {
+                                                            // Find corresponding tool result if available (usually in next messages)
+                                                            // For simplicity in this view, we might not link them perfectly yet
+                                                            // But we can show the call itself
+                                                            return (
+                                                                <ToolCallCard
+                                                                    key={toolCall.id || toolIndex}
+                                                                    toolName={toolCall.function.name}
+                                                                    args={(() => { try { return JSON.parse(toolCall.function.arguments || '{}'); } catch { return {}; } })()}
+                                                                />
+                                                            );
+                                                        })}
+
+                                                        <ReactMarkdown
+                                                            remarkPlugins={[remarkGfm]}
+                                                            rehypePlugins={[rehypeHighlight]}
+                                                            components={{
+                                                                code({ node, inline, className, children, ...props }: any) {
+                                                                    const match = /language-(\w+)/.exec(className || '')
+                                                                    // Recursively extract plain text from React node tree
+                                                                    // (needed because rehype-highlight converts code to styled spans)
+                                                                    const extractText = (node: any): string => {
+                                                                        if (typeof node === 'string') return node;
+                                                                        if (Array.isArray(node)) return node.map(extractText).join('');
+                                                                        if (node?.props?.children) return extractText(node.props.children);
+                                                                        return '';
+                                                                    };
+                                                                    const codeContent = extractText(children).replace(/\n$/, '');
+                                                                    // Check if it's runnable code (React/JS/TS)
+                                                                    const isRunable = match && match[1] && (['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts', 'html'].includes(match[1]));
+
+                                                                    return !inline && match ? (
+                                                                        <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                                            <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                                                <span className="text-[10px] text-zinc-500 font-mono uppercase">{match[1]}</span>
+                                                                                {isRunable && (
+                                                    <button
+                                                        onClick={() => handleRunApp(codeContent, match[1] || '')}
+                                                        className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium transition-colors border border-emerald-500/20"
+                                                        title={t('ai.tool.run_app_desc')}
+                                                    >
+                                                        <Play size={10} className="fill-current" />
+                                                        {t('ai.msg.run_app')}
+                                                    </button>
+                                                )}
+                                                                            </div>
+                                                                            <div className="p-4 overflow-x-auto">
+                                                                                <code className={className} {...props}>
+                                                                                    {children}
+                                                                                </code>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                                            {children}
+                                                                        </code>
+                                                                    )
+                                                                }
+                                                            }}
+                                                        >
+                                                            {contentWithCursor || (isLoading ? '...' : '')}
+                                                        </ReactMarkdown>
+                                                    </>
+                                                );
+                                            })()
+                                        )}
+                                        {msg.role === 'user' && (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                rehypePlugins={[rehypeHighlight]}
+                                                components={{
+                                                    code({ node, inline, className, children, ...props }: any) {
+                                                        const match = /language-(\w+)/.exec(className || '')
+                                                        return !inline && match ? (
+                                                            <div className="relative group my-4 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                                                                <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/5">
+                                                                    <span className="text-[10px] text-zinc-500 font-mono">{match[1]}</span>
+                                                                </div>
+                                                                <div className="p-4 overflow-x-auto">
+                                                                    <code className={className} {...props}>
+                                                                        {children}
+                                                                    </code>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <code className={cn(className, "bg-white/10 px-1.5 py-0.5 rounded text-inherit font-normal border border-white/5")} {...props}>
+                                                                {children}
+                                                            </code>
+                                                        )
+                                                    }
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        )}
+                                    </div>
+
+                                    {/* Copy Button for AI Messages */}
+                                    {msg.role === 'assistant' && !isLoading && (
+                                        <div className="absolute -bottom-6 left-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleCopyMessage(msg.content, msg.id)}
+                                                className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1.5"
+                                                title={t('ai.msg.copy')}
+                                            >
+                                                {copiedMessageId === msg.id ? (
+                                                    <>
+                                                        <Check size={14} className="text-emerald-500" />
+                                                        <span className="text-[10px] text-emerald-500">{t('ai.msg.copied')}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy size={14} />
+                                                        <span className="text-[10px]">{t('ai.msg.copy')}</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ));
+                        );
+                    });
                 })()}
 
                 {/* Loading Indicator / Progress - REMOVED, now in center */}

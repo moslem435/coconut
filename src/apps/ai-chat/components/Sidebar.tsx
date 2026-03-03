@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '../store/useChatStore';
 import { useTranslation, useWindow } from '@/os/sdk';
 import { useWindowStore } from '@/os/kernel/useWindowStore';
@@ -38,6 +39,9 @@ export function Sidebar() {
         setAiProvider,
         cloudConfig,
         updateCloudConfig,
+        customModels,
+        addCustomModel,
+        removeCustomModel,
         currentLocalModelId
     } = useChatStore();
 
@@ -65,6 +69,25 @@ export function Sidebar() {
     const [cachedModels, setCachedModels] = useState<Set<string>>(new Set());
     const [cloudTestState, setCloudTestState] = useState<{ loading: boolean; message: string; ok: boolean | null }>({ loading: false, message: '', ok: null });
     const [showApiKey, setShowApiKey] = useState(false);
+    
+    // Preset saving state
+    const [isSavingPreset, setIsSavingPreset] = useState(false);
+    const [presetName, setPresetName] = useState('');
+
+    const handleSavePreset = () => {
+        if (presetName.trim()) {
+            addCustomModel({
+                id: uuidv4(),
+                name: presetName.trim(),
+                provider: 'openai',
+                modelId: cloudConfig.modelId,
+                baseUrl: cloudConfig.baseUrl,
+                apiKey: cloudConfig.apiKey
+            });
+            setIsSavingPreset(false);
+            setPresetName('');
+        }
+    };
 
     // Check for cached models on mount and when menu opens
     useEffect(() => {
@@ -442,7 +465,7 @@ export function Sidebar() {
                             <div className="space-y-4">
                                 {/* Provider selector */}
                                 <div className="space-y-2">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Service</label>
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.service')}</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {(['gemini', 'openai'] as const).map(p => (
                                             <button
@@ -455,7 +478,7 @@ export function Sidebar() {
                                                         : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
                                                 )}
                                             >
-                                                {p === 'gemini' ? 'Gemini' : 'OpenAI'}
+                                                {p === 'gemini' ? t('ai.cloud.gemini') : t('ai.cloud.openai')}
                                             </button>
                                         ))}
                                     </div>
@@ -463,7 +486,7 @@ export function Sidebar() {
 
                                 {/* Model selector */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Model Preset</label>
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.model_preset')}</label>
                                     <div className="space-y-1">
                                         {CLOUD_MODELS[cloudConfig.provider].map(m => (
                                             <button
@@ -485,19 +508,109 @@ export function Sidebar() {
                                 {/* Custom Model & Base URL (OpenAI only) */}
                                 {cloudConfig.provider === 'openai' && (
                                     <>
+                                        {/* Saved Custom Models */}
+                                        {customModels.filter(m => m.provider === 'openai').length > 0 && (
+                                            <div className="space-y-1.5 pt-2 border-t border-white/5">
+                                                <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.saved_models')}</label>
+                                                <div className="space-y-1">
+                                                    {customModels.filter(m => m.provider === 'openai').map(m => (
+                                                        <div key={m.id} className="flex items-center gap-2 group/model">
+                                                            <button
+                                                                onClick={() => updateCloudConfig({
+                                                                    modelId: m.modelId,
+                                                                    baseUrl: m.baseUrl || 'https://api.openai.com/v1',
+                                                                    apiKey: m.apiKey || cloudConfig.apiKey
+                                                                })}
+                                                                className={cn(
+                                                                    "flex-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
+                                                                    cloudConfig.modelId === m.modelId && (cloudConfig.baseUrl || 'https://api.openai.com/v1') === (m.baseUrl || 'https://api.openai.com/v1')
+                                                                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                                                        : "bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10"
+                                                                )}
+                                                            >
+                                                                <span className="font-medium truncate">{m.name}</span>
+                                                                <span className="text-[9px] opacity-50 ml-2 font-mono">{m.modelId}</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => removeCustomModel(m.id)}
+                                                                className="p-2 rounded-lg bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors border border-white/5 opacity-0 group-hover/model:opacity-100"
+                                                                title={t('ai.cloud.delete_preset')}
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-1.5 pt-2 border-t border-white/5">
-                                            <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Custom Model ID</label>
-                                            <input
-                                                type="text"
-                                                value={cloudConfig.modelId}
-                                                onChange={e => updateCloudConfig({ modelId: e.target.value })}
-                                                placeholder="e.g. deepseek-chat"
-                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
-                                            />
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.custom_config')}</label>
+                                                {!isSavingPreset && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPresetName(cloudConfig.modelId);
+                                                            setIsSavingPreset(true);
+                                                        }}
+                                                        disabled={!cloudConfig.modelId}
+                                                        className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-50"
+                                                    >
+                                                        <Plus size={10} />
+                                                        {t('ai.cloud.save_preset')}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {isSavingPreset && (
+                                                <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg border border-white/10 animate-in fade-in zoom-in-95 duration-200">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] text-zinc-400">Preset Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={presetName}
+                                                            onChange={(e) => setPresetName(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleSavePreset();
+                                                                if (e.key === 'Escape') setIsSavingPreset(false);
+                                                            }}
+                                                            placeholder="e.g. My Custom Model"
+                                                            autoFocus
+                                                            className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-indigo-500/50 transition-colors"
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-end gap-2 mt-1">
+                                                        <button
+                                                            onClick={() => setIsSavingPreset(false)}
+                                                            className="px-2 py-1 text-[10px] text-zinc-400 hover:text-zinc-300 hover:bg-white/5 rounded transition-colors"
+                                                        >
+                                                            {t('common.cancel')}
+                                                        </button>
+                                                        <button
+                                                            onClick={handleSavePreset}
+                                                            disabled={!presetName.trim()}
+                                                            className="px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {t('common.confirm')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] text-zinc-600">{t('ai.cloud.model_id')}</label>
+                                                <input
+                                                    type="text"
+                                                    value={cloudConfig.modelId}
+                                                    onChange={e => updateCloudConfig({ modelId: e.target.value })}
+                                                    placeholder="e.g. deepseek-chat"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
+                                                />
+                                            </div>
                                         </div>
 
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Base URL</label>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] text-zinc-600">{t('ai.cloud.base_url')}</label>
                                             <input
                                                 type="text"
                                                 value={cloudConfig.baseUrl || ''}
@@ -505,14 +618,14 @@ export function Sidebar() {
                                                 placeholder="https://api.openai.com/v1"
                                                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                             />
-                                            <p className="text-[9px] text-zinc-600">Default: https://api.openai.com/v1</p>
+                                            <p className="text-[9px] text-zinc-600">{t('ai.cloud.base_url_default')}</p>
                                         </div>
                                     </>
                                 )}
 
                                 {/* API Key */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">API Key</label>
+                                    <label className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('ai.cloud.api_key')}</label>
                                     <div className="relative">
                                         <input
                                             type={showApiKey ? 'text' : 'password'}
@@ -525,7 +638,7 @@ export function Sidebar() {
                                             onClick={() => setShowApiKey(v => !v)}
                                             className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]"
                                         >
-                                            {showApiKey ? 'Hide' : 'Show'}
+                                            {showApiKey ? t('ai.cloud.hide') : t('ai.cloud.show')}
                                         </button>
                                     </div>
                                 </div>
@@ -534,21 +647,21 @@ export function Sidebar() {
                                 <div className="flex flex-col gap-2 pt-2">
                                     <button
                                         onClick={async () => {
-                                            setCloudTestState({ loading: true, message: 'Testing...', ok: null });
-                                            const result = await testCloudConnection(cloudConfig);
+                                            setCloudTestState({ loading: true, message: t('ai.cloud.testing'), ok: null });
+                                            const result = await testCloudConnection(cloudConfig, t);
                                             setCloudTestState({ loading: false, message: result.message, ok: result.ok });
                                         }}
                                         disabled={!cloudConfig.apiKey || cloudTestState.loading}
                                         className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 text-xs font-medium transition-colors disabled:opacity-40"
                                     >
-                                        {cloudTestState.loading ? 'Testing...' : 'Test Connection'}
+                                        {cloudTestState.loading ? t('ai.cloud.testing') : t('ai.cloud.test_connection')}
                                     </button>
                                     <button
                                         onClick={() => { setAiProvider('cloud'); }}
                                         disabled={!cloudConfig.apiKey}
                                         className="w-full py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-xs font-medium transition-colors disabled:opacity-40"
                                     >
-                                        {aiProvider === 'cloud' ? '✓ Active' : 'Activate Cloud'}
+                                        {aiProvider === 'cloud' ? t('ai.cloud.active') : t('ai.cloud.activate')}
                                     </button>
                                 </div>
 
