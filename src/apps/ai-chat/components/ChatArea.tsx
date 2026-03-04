@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
 import { useTranslation, useWindow } from '@/os/sdk';
 import { useWindowStore } from '@/os/kernel/useWindowStore';
@@ -126,6 +126,7 @@ export function ChatArea() {
         createSession,
         addMessage,
         updateLastMessage,
+        updateMessageById,
         updateSessionTitle,
         modelSettings,
         isSidebarOpen,
@@ -350,8 +351,8 @@ export function ChatArea() {
         // 1. Add user message
         addMessage(currentSessionId, 'user', userContent, chatMode);
 
-        // 2. Add placeholder assistant message
-        addMessage(currentSessionId, 'assistant', '');
+        // 2. Add placeholder assistant message — record its ID for precise update later
+        const assistantMsgId = addMessage(currentSessionId, 'assistant', '');
 
         // 3. Generate
         const history = currentSession ? currentSession.messages : [];
@@ -374,11 +375,11 @@ export function ChatArea() {
             },
             // onNewMessage: tool results and intermediate assistant turns go to store
             (msg) => addMessage(currentSessionId, msg.role, msg.content, chatMode, msg.tool_calls, msg.tool_call_id),
-            // onFinish: write final content to store ONCE, then clear local state
+            // onFinish: write final content to store with precise ID, then clear local state
             () => {
                 const finalMessage = streamingMessageRef.current;
-                if (finalMessage) {
-                    updateLastMessage(currentSessionId, finalMessage);
+                if (finalMessage && assistantMsgId) {
+                    updateMessageById(currentSessionId, assistantMsgId, finalMessage);
                 }
                 streamingMessageRef.current = null;
                 setStreamingMessage(null);
@@ -387,11 +388,16 @@ export function ChatArea() {
             (err) => {
                 streamingMessageRef.current = null;
                 setStreamingMessage(null);
-                updateLastMessage(currentSessionId, { content: `Error: ${err.message || 'Unknown error'}` });
+                if (assistantMsgId) {
+                    updateMessageById(currentSessionId, assistantMsgId, { content: `Error: ${err.message || 'Unknown error'}` });
+                } else {
+                    updateLastMessage(currentSessionId, { content: `Error: ${err.message || 'Unknown error'}` });
+                }
             },
             modelSettings.systemPrompt,
             chatMode,
-            aiProvider === 'cloud' ? cloudConfig : undefined
+            aiProvider === 'cloud' ? cloudConfig : undefined,
+            { temperature: modelSettings.temperature, top_p: modelSettings.top_p }
         );
     };
 
@@ -617,7 +623,7 @@ export function ChatArea() {
                                 </div>
 
                                 <button
-                                    onClick={cancelLoading}
+                                    onClick={() => { const llm = activeLLM as any; if (typeof llm.cancelGeneration === 'function') { llm.cancelGeneration(); } else { cancelLoading(); } }}
                                     className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors px-4 py-2 hover:bg-red-500/10 rounded-lg"
                                 >
                                     {t('ai.loading.cancel')}
@@ -1017,9 +1023,9 @@ export function ChatArea() {
                         />
 
                         <div className="absolute right-2 bottom-2">
-                            {isLoading && !isModelLoaded ? (
+                            {isLoading ? (
                                 <button
-                                    onClick={cancelLoading}
+                                    onClick={() => { const llm = activeLLM as any; if (typeof llm.cancelGeneration === 'function') { llm.cancelGeneration(); } else { cancelLoading(); } }}
                                     className="p-2 rounded-lg text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
                                     title={t('ai.loading.cancel')}
                                 >
@@ -1052,3 +1058,4 @@ export function ChatArea() {
         </div>
     );
 }
+

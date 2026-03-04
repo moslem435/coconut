@@ -30,7 +30,8 @@ interface ChatStore {
         mode?: 'chat' | 'control' | 'builder',
         tool_calls?: any[],
         tool_call_id?: string
-    ) => void;
+    ) => string; // returns the new message ID
+    updateMessageById: (sessionId: string, messageId: string, updates: Partial<Omit<Message, 'id' | 'timestamp'>>) => void;
     updateLastMessage: (sessionId: string, updates: Partial<Omit<Message, 'id' | 'timestamp'>>) => void;
     toggleSidebar: () => void;
     updateModelSettings: (settings: Partial<ChatStore['modelSettings']>) => void;
@@ -145,12 +146,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     addMessage: (sessionId, role, content, mode, tool_calls, tool_call_id) => {
+        const newId = uuidv4();
         set(state => {
             const sessions = state.sessions.map(s => {
                 if (s.id !== sessionId) return s;
 
                 const newMessage: Message = {
-                    id: uuidv4(),
+                    id: newId,
                     role,
                     content,
                     timestamp: Date.now(),
@@ -173,6 +175,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 };
             });
 
+            storage.saveSessions(sessions);
+            return { sessions };
+        });
+        return newId;
+    },
+
+    updateMessageById: (sessionId, messageId, updates) => {
+        set(state => {
+            const sessions = state.sessions.map(s => {
+                if (s.id !== sessionId) return s;
+                const messages = s.messages.map(m =>
+                    m.id === messageId ? { ...m, ...updates } as Message : m
+                );
+                return { ...s, messages, updatedAt: Date.now() };
+            });
             storage.saveSessions(sessions);
             return { sessions };
         });

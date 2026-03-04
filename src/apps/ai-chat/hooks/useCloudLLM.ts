@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useTranslation } from '@/os/sdk';
 import { Message, CloudConfig } from '../types';
 import { systemToolsDefinitions, systemToolsImplementation, TOOL_CATEGORIES } from '../utils/systemTools';
@@ -28,8 +28,6 @@ export const CLOUD_MODELS = {
 };
 
 // ─── Gemini Tool Format Converter ──────────────────────────────────────────────
-// Gemini requires type values in UPPERCASE (OBJECT, STRING, NUMBER, ARRAY, BOOLEAN)
-// and uses 'functionDeclarations' instead of OpenAI's 'tools' array format.
 
 function toGeminiType(t: string): string {
     return t.toUpperCase();
@@ -64,22 +62,106 @@ function formatGeminiTools(toolNames: string[]) {
     return functionDeclarations;
 }
 
-// ─── Gemini API — Multi-turn Agentic Call ──────────────────────────────────────
+// ─── Build Gemini History (preserving tool call context) ───────────────────────
+//
+// Gemini message format:
+//   user text      → { role: 'user',  parts: [{ text }] }
+//   assistant text → { role: 'model', parts: [{ text }] }
+//   assistant tool → { role: 'model', parts: [{ functionCall: { name, args } }] }
+//   tool result    → { role: 'user',  parts: [{ functionResponse: { name, response: { result } } }] }
+//
+// We build an id→name map from assistant tool_calls so tool results can
+// reference the correct function name (Message.role==='tool' has no name field).
 
-async function callGemini(
-    messages: Message[],
-    config: CloudConfig,
-    systemPrompt: string,
-    mode: string,
-    onUpdate: (update: Partial<any>) => void,
-    onNewMessage: (msg: any) => void
-): Promise<void> {
-    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-    const url = `${baseUrl}/models/${config.modelId}:generateContent?key=${config.apiKey}`;
+function buildGeminiHistory(messages: Message[]): any[] {
+    // Build a map: tool_call_id → function name
+    const toolCallIdToName: Record<string, string> = {};
+    for (const m of messages) {
+        if (m.role === 'assistant' && m.tool_calls?.length) {
+            for (const tc of m.tool_calls) {
+                if (tc.id && tc.function?.name) {
+                    toolCallIdToName[tc.id] = tc.function.name;
+                }
+            }
+        }
+    }
 
-    // Mode-aware system instruction
-    const modeInstructions: Record<string, string> = {
-        chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
+    const contents: any[] = [];
+
+    for (const m of messages) {
+        if (m.role === 'system') continue; // Gemini uses systemInstruction instead
+
+        if (m.role === 'user') {
+            contents.push({ role: 'user', parts: [{ text: m.content || '' }] });
+        } else if (m.role === 'assistant') {
+            if (m.tool_calls?.length) {
+                // Assistant turn with function calls
+                const fcParts = m.tool_calls.map((tc: any) => ({
+                    functionCall: {
+                        name: tc.function?.name || '',
+                        args: (() => {
+                            try { return JSON.parse(tc.function?.arguments || '{}'); } catch { return {}; }
+                        })()
+                    }
+                }));
+                // If there is also text content, emit it as a separate preceding turn
+                if (m.content) {
+                    contents.push({ role: 'model', parts: [{ text: m.content }] });
+                }
+                contents.push({ role: 'model', parts: fcParts });
+            } else {
+                contents.push({ role: 'model', parts: [{ text: m.content || '' }] });
+            }
+        } else if (m.role === 'tool') {
+            // Tool result — Gemini expects this as a user turn with functionResponse parts
+            const fnName = m.tool_call_id ? (toolCallIdToName[m.tool_call_id] || 'unknown') : 'unknown';
+            contents.push({
+                role: 'user',
+                parts: [{
+                    functionResponse: {
+                        name: fnName,
+                        response: { result: m.content || '' }
+                    }
+                }]
+            });
+        }
+    }
+
+    return contents;
+}
+
+// ─── Build OpenAI History (preserving tool call context) ───────────────────────
+
+function buildOpenAIHistory(messages: Message[], systemContent: string): any[] {
+    const apiMessages: any[] = [{ role: 'system', content: systemContent }];
+
+    for (const m of messages) {
+        if (m.role === 'system') continue;
+
+        if (m.role === 'user') {
+            apiMessages.push({ role: 'user', content: m.content || '' });
+        } else if (m.role === 'assistant') {
+            const msg: any = { role: 'assistant', content: m.content || null };
+            if (m.tool_calls?.length) {
+                msg.tool_calls = m.tool_calls;
+            }
+            apiMessages.push(msg);
+        } else if (m.role === 'tool') {
+            apiMessages.push({
+                role: 'tool',
+                tool_call_id: m.tool_call_id || '',
+                content: m.content || ''
+            });
+        }
+    }
+
+    return apiMessages;
+}
+
+// ─── Build mode-aware system instruction ────────────────────────────────────────
+
+function buildSystemInstruction(mode: string, systemPrompt: string): string {
+    const hardcoded: Record<string, string> = {
         control: `You are a system control assistant for a web OS. Respond in the user's language.
 You have tools to control the system. Follow these rules:
 1. THEME: use set_theme with 'light' or 'dark'.
@@ -105,15 +187,32 @@ When asked to modify or fix an existing app:
 3. Use 'update_file' to overwrite the file with the updated content.`
     };
 
-    const sysInstruction = modeInstructions[mode] || modeInstructions.chat;
+    if (mode === 'chat') {
+        return systemPrompt || 'You are a helpful assistant in a web-based OS.';
+    }
 
-    // Build initial contents from message history
-    const geminiContents: any[] = messages
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content || '' }]
-        }));
+    const base = hardcoded[mode] || 'You are a helpful assistant.';
+    // Append user custom prompt as additional context if provided
+    return systemPrompt ? `${base}\n\n[User custom instructions]: ${systemPrompt}` : base;
+}
+
+// ─── Gemini API — Multi-turn Agentic Call ──────────────────────────────────────
+
+async function callGemini(
+    messages: Message[],
+    config: CloudConfig,
+    systemPrompt: string,
+    mode: string,
+    modelSettings: { temperature: number; top_p: number },
+    onUpdate: (update: Partial<any>) => void,
+    onNewMessage: (msg: any) => void,
+    signal: AbortSignal
+): Promise<void> {
+    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    const sysInstruction = buildSystemInstruction(mode, systemPrompt);
+
+    // Build history, preserving tool call rounds
+    const geminiContents = buildGeminiHistory(messages);
 
     // Get tools for this mode
     const toolNames: string[] = mode === 'control'
@@ -124,34 +223,34 @@ When asked to modify or fix an existing app:
 
     const functionDeclarations = toolNames.length > 0 ? formatGeminiTools(toolNames) : [];
 
+    const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
+
     // Multi-turn agentic loop (max 6 rounds)
     for (let round = 0; round < 6; round++) {
+        if (signal.aborted) break;
+
         const body: any = {
             systemInstruction: { parts: [{ text: sysInstruction }] },
             contents: geminiContents,
             generationConfig: {
-                temperature: 0.7,
-                topP: 0.9,
+                temperature: modelSettings.temperature,
+                topP: modelSettings.top_p,
                 maxOutputTokens: 16384,
             }
         };
 
-        // Attach tools in builder/control modes
         if (functionDeclarations.length > 0) {
             body.tools = [{ functionDeclarations }];
             body.tool_config = { function_calling_config: { mode: 'AUTO' } };
         }
 
-        // ── Strategy: use SSE streaming for text-only rounds (better UX),
-        //   non-streaming for tool-call rounds (need complete JSON).
-        //   We don't know in advance, so we first try streaming (SSE).
-        //   If the response contains functionCalls we handle them the same way.
         const streamUrl = `${baseUrl}/models/${config.modelId}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
 
         const response = await fetch(streamUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
 
         if (!response.ok) {
@@ -168,6 +267,7 @@ When asked to modify or fix an existing app:
         let finishReason = '';
 
         outer: while (true) {
+            if (signal.aborted) break outer;
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
@@ -188,7 +288,6 @@ When asked to modify or fix an existing app:
                     for (const part of parts) {
                         if (typeof part.text === 'string' && part.text) {
                             accumulatedText += part.text;
-                            // Stream text to UI incrementally
                             onUpdate({ content: accumulatedText });
                         }
                         if (part.functionCall) {
@@ -200,11 +299,9 @@ When asked to modify or fix an existing app:
         }
 
         // If no function calls, we're done
-        if (functionCallParts.length === 0) {
-            break;
-        }
+        if (functionCallParts.length === 0) break;
 
-        // Add model turn (with function calls) to history
+        // Add model turn (with function calls) to in-flight history
         geminiContents.push({
             role: 'model',
             parts: functionCallParts.map(p => ({ functionCall: p.functionCall }))
@@ -214,6 +311,7 @@ When asked to modify or fix an existing app:
         const functionResponseParts: any[] = [];
 
         for (const part of functionCallParts) {
+            if (signal.aborted) break;
             const { name, args } = part.functionCall;
             console.log(`[CloudLLM] Gemini tool call: ${name}`, args);
 
@@ -229,10 +327,9 @@ When asked to modify or fix an existing app:
                 resultText = `Error executing ${name}: ${e.message}`;
             }
 
-            // Report execution to UI
             onNewMessage({
                 role: 'tool',
-                content: `[Builder] ${resultText}`,
+                content: `${toolPrefix} ${resultText}`,
                 mode
             });
 
@@ -244,16 +341,12 @@ When asked to modify or fix an existing app:
             });
         }
 
-        // Add function responses to history for next round
-        geminiContents.push({
-            role: 'user',
-            parts: functionResponseParts
-        });
+        // Add function responses to in-flight history for next round
+        geminiContents.push({ role: 'user', parts: functionResponseParts });
 
         // Reset accumulated text for next round
         accumulatedText = '';
 
-        // If model indicated it's done after this, break
         if (finishReason === 'STOP') break;
     }
 }
@@ -265,42 +358,15 @@ async function callOpenAI(
     config: CloudConfig,
     systemPrompt: string,
     mode: string,
+    modelSettings: { temperature: number; top_p: number },
     onUpdate: (update: Partial<any>) => void,
     onNewMessage: (msg: any) => void,
-    t: (key: string, options?: any) => string
+    t: (key: string, options?: any) => string,
+    signal: AbortSignal
 ): Promise<void> {
     const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com/v1';
+    const sysContent = buildSystemInstruction(mode, systemPrompt);
 
-    const modeInstructions: Record<string, string> = {
-        chat: systemPrompt || 'You are a helpful assistant in a web-based OS.',
-        control: `You are a system control assistant for a web OS. Respond in the user's language.
-You have tools to control the system. Follow these rules:
-1. THEME: use set_theme with 'light' or 'dark'.
-2. VOLUME: use set_volume with a level from 0 to 100.
-3. WALLPAPER: use set_wallpaper with a real, publicly accessible image URL (e.g. from unsplash.com).
-4. LAUNCH APP: use launch_app with one of these exact appId values:
-   "vscode-lite", "terminal", "file-explorer", "settings", "portfolio-hub",
-   "notepad", "music-player", "photo-gallery", "weather", "task-manager",
-   "ai-chat", "code-runner", "yume", "emulator"
-5. CLOSE APP: First call get_running_apps to retrieve the windowId, then call close_app with that windowId.
-6. STATUS: use get_system_status to read current settings before modifying if needed.
-Never make up windowIds. Always query running apps first before closing.`,
-        builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
-When asked to create an app/game/tool:
-1. Briefly explain what you will build.
-2. Use 'create_directory' to create a folder with '.app' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.app").
-3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
-   CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
-4. After the file is created, confirm the app is ready.
-When asked to modify or fix an existing app:
-1. Use 'read_file' to read the current file content.
-2. Apply the requested changes.
-3. Use 'update_file' to overwrite the file with the updated content.`
-    };
-
-    const sysContent = modeInstructions[mode] || modeInstructions.chat;
-
-    // Get tools for this mode
     const toolNames: string[] = mode === 'control'
         ? TOOL_CATEGORIES.control
         : mode === 'builder'
@@ -308,21 +374,21 @@ When asked to modify or fix an existing app:
             : [];
     const filteredTools = systemToolsDefinitions.filter(t => toolNames.includes(t.function.name));
 
-    // Build message history
-    const apiMessages: any[] = [
-        { role: 'system', content: sysContent },
-        ...messages
-            .filter(m => m.role === 'user' || m.role === 'assistant')
-            .map(m => ({ role: m.role, content: m.content || '' }))
-    ];
+    // Build message history preserving tool rounds
+    const apiMessages = buildOpenAIHistory(messages, sysContent);
+
+    const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
 
     // Multi-turn agentic loop (max 6 rounds)
     for (let round = 0; round < 6; round++) {
+        if (signal.aborted) break;
+
         const requestBody: any = {
             model: config.modelId,
             messages: apiMessages,
             stream: true,
-            temperature: 0.7,
+            temperature: modelSettings.temperature,
+            top_p: modelSettings.top_p,
             max_tokens: 16384
         };
 
@@ -337,7 +403,8 @@ When asked to modify or fix an existing app:
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${config.apiKey}`
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal
         });
 
         if (!response.ok) {
@@ -366,6 +433,7 @@ When asked to modify or fix an existing app:
         const toolCalls: any[] = [];
 
         while (true) {
+            if (signal.aborted) break;
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
@@ -425,7 +493,7 @@ When asked to modify or fix an existing app:
         // If no tool calls, we're done
         if (toolCalls.length === 0) break;
 
-        // Add assistant turn with tool calls to history
+        // Add assistant turn with tool calls to in-flight history
         apiMessages.push({
             role: 'assistant',
             content: fullContent || null,
@@ -434,6 +502,7 @@ When asked to modify or fix an existing app:
 
         // Execute each tool call
         for (const toolCall of toolCalls) {
+            if (signal.aborted) break;
             const name = toolCall.function.name;
             let args: any = {};
             try { args = JSON.parse(toolCall.function.arguments); } catch { /* use empty */ }
@@ -452,14 +521,12 @@ When asked to modify or fix an existing app:
                 resultText = `Error executing ${name}: ${e.message}`;
             }
 
-            // Report execution to UI
             onNewMessage({
                 role: 'tool',
-                content: `[Builder] ${resultText}`,
+                content: `${toolPrefix} ${resultText}`,
                 mode
             });
 
-            // Add tool result to message history
             apiMessages.push({
                 role: 'tool',
                 tool_call_id: toolCall.id,
@@ -524,6 +591,15 @@ export async function testCloudConnection(config: CloudConfig, t: (key: string, 
 export function useCloudLLM() {
     const [state, setState] = useState<CloudLLMState>({ isLoading: false, error: null });
     const { t } = useTranslation();
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    const cancelGeneration = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setState(prev => ({ ...prev, isLoading: false }));
+    }, []);
 
     const generateResponse = useCallback(async (
         messages: Message[],
@@ -533,32 +609,57 @@ export function useCloudLLM() {
         onError: (err: any) => void,
         systemPrompt?: string,
         mode: 'chat' | 'control' | 'builder' = 'chat',
-        cloudConfig?: CloudConfig
+        cloudConfig?: CloudConfig,
+        modelSettings?: { temperature: number; top_p: number }
     ) => {
         if (!cloudConfig?.apiKey) {
             onError(new Error(t('ai.cloud.error_api_key_missing')));
             return;
         }
 
+        // Cancel any ongoing generation first
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setState({ isLoading: true, error: null });
 
-        // Normalize onUpdate to always work with Partial<any>
+        const effectiveSettings = modelSettings ?? { temperature: 0.7, top_p: 0.9 };
+
         const handleUpdate = (update: Partial<any>) => {
             onUpdate(update);
         };
 
         try {
             if (cloudConfig.provider === 'gemini') {
-                await callGemini(messages, cloudConfig, systemPrompt || '', mode, handleUpdate, onNewMessage);
+                await callGemini(
+                    messages, cloudConfig, systemPrompt || '', mode,
+                    effectiveSettings, handleUpdate, onNewMessage, controller.signal
+                );
             } else {
-                await callOpenAI(messages, cloudConfig, systemPrompt || '', mode, handleUpdate, onNewMessage, t);
+                await callOpenAI(
+                    messages, cloudConfig, systemPrompt || '', mode,
+                    effectiveSettings, handleUpdate, onNewMessage, t, controller.signal
+                );
             }
-            onFinish();
+
+            if (!controller.signal.aborted) {
+                onFinish();
+            }
         } catch (err: any) {
+            if (err.name === 'AbortError') {
+                console.log('[CloudLLM] Generation aborted');
+                return;
+            }
             console.error('[CloudLLM] Error:', err);
             setState(prev => ({ ...prev, error: err.message }));
             onError(err);
         } finally {
+            if (abortControllerRef.current === controller) {
+                abortControllerRef.current = null;
+            }
             setState(prev => ({ ...prev, isLoading: false }));
         }
     }, [t]);
@@ -572,9 +673,10 @@ export function useCloudLLM() {
         downloadStats: null,
         gpuInfo: null,
         generateResponse,
+        cancelGeneration,
         // Stubs for interface compatibility
         initEngine: async () => { },
-        cancelLoading: () => { },
+        cancelLoading: cancelGeneration,  // alias for compatibility
         unloadModel: async () => { },
         deleteModel: async () => false,
     };

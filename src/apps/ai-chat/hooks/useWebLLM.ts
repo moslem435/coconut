@@ -359,7 +359,8 @@ export function useWebLLM() {
         onError: (err: any) => void,
         systemPrompt?: string,
         mode: 'chat' | 'control' | 'builder' = 'chat',
-        _cloudConfig?: any  // ignored in local mode, for interface compatibility
+        _cloudConfig?: any,    // ignored in local mode
+        _modelSettings?: any   // ignored in local mode, for interface compatibility
     ) => {
         if (!engineRef.current || !state.isModelLoaded) return;
 
