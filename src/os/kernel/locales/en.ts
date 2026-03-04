@@ -447,7 +447,7 @@ const en: Record<string, string> = {
     // Photo Gallery
     "gallery.library": "Library",
     "gallery.items": "items",
-    "gallery.empty": "No photos found in /Pictures",
+    "gallery.empty": "No photos found",
 
     // Browser
     "browser.newtab": "New Tab",
@@ -487,6 +487,7 @@ const en: Record<string, string> = {
 
     // File Explorer
     "explorer.this_system": "THIS SYSTEM",
+    "explorer.libraries": "LIBRARIES",
     "explorer.mounted_drives": "MOUNTED DRIVES",
     "explorer.cloud": "CLOUD",
     "explorer.delete_confirm": "Are you sure you want to delete these items?",

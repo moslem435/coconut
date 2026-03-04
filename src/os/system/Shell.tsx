@@ -42,6 +42,7 @@ import Desktop from './Desktop'
 import Window from './Window'
 import GlobalShortcuts from './GlobalShortcuts'
 import GlobalDialogs from './GlobalDialogs'
+import { ToastContainer } from '@/os/components/Toast'
 
 /**
  * Shell 组件属性
@@ -127,7 +128,10 @@ export default function Shell({ onShutdown }: ShellProps) {
       {/* 5. 全局对话框（z-99999） */}
       <GlobalDialogs />
       
-      {/* 6. 全局快捷键 */}
+      {/* 6. Toast 通知（z-10000） */}
+      <ToastContainer />
+      
+      {/* 7. 全局快捷键 */}
       <GlobalShortcuts />
     </>
   )

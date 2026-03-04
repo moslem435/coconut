@@ -23,6 +23,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
+import { SYSTEM_PATHS, SYSTEM_CONFIG } from '@/os/config/paths'
 import { logger } from '@/os/utils/logger'
 import '@xterm/xterm/css/xterm.css'
 
@@ -219,7 +220,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
           env: {
             TERM: 'xterm-256color',
           },
-          cwd: '/home/guest/project'
+          cwd: SYSTEM_PATHS.PROJECT
         })
 
         processRef.current = shellProcess
@@ -229,7 +230,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
           new WritableStream({
             write(data) {
               let cleanData = data
-              cleanData = cleanData.replace(/~\/[a-z0-9-]{10,}/g, 'guest@portfoliio:~/project')
+              cleanData = cleanData.replace(/~\/[a-z0-9-]{10,}/g, `${SYSTEM_CONFIG.USER_NAME}@${SYSTEM_CONFIG.HOST_NAME}:~/project`)
               cleanData = cleanData.replace(/\r\n(\x1b\[[0-9;]*m)*❯/g, '$1 $')
               term.write(cleanData)
             },

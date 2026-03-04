@@ -142,6 +142,12 @@ export function createSyncMiddleware(
           break
 
         case 'update':
+          // Skip update if content is undefined (e.g. from bulk write operations)
+          // unless we want to clear the file, but usually undefined means "payload too large/not provided"
+          if (operation.payload.content === undefined) {
+             // console.log('[SyncMiddleware] Skipping update with undefined content:', operation.payload.path);
+             break;
+          }
           await syncService.syncUpdate(
             operation.payload.path,
             operation.payload.content

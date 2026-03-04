@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { SYSTEM_PATHS, FILE_IDS } from '@/os/config/paths'
 import { cn } from '@/lib/utils'
 
 import { useStorageInfo } from '../hooks/useStorageInfo'
@@ -31,19 +32,22 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
 
   // Group 1: This System
   const systemItems = [
-    { id: 'root', icon: Disc, label: 'explorer.root' }, // Moved Root here
-    { id: 'desktop', icon: Monitor, label: 'explorer.desktop' },
-    { id: 'documents', icon: FileText, label: 'explorer.documents' },
-    { id: 'downloads', icon: Download, label: 'explorer.downloads' },
-    { id: 'pictures', icon: Image, label: 'explorer.pictures' },
+    { id: FILE_IDS.ROOT, icon: Disc, label: 'explorer.root', path: SYSTEM_PATHS.ROOT },
+    { id: FILE_IDS.DESKTOP, icon: Monitor, label: 'explorer.desktop', path: SYSTEM_PATHS.DESKTOP },
+    { id: FILE_IDS.DOCUMENTS, icon: FileText, label: 'explorer.documents', path: SYSTEM_PATHS.DOCUMENTS },
+    { id: FILE_IDS.DOWNLOADS, icon: Download, label: 'explorer.downloads', path: SYSTEM_PATHS.DOWNLOADS },
+    { id: FILE_IDS.PICTURES, icon: Image, label: 'explorer.pictures', path: SYSTEM_PATHS.PICTURES },
   ]
 
-  // Group 2: Mounted Drives
-  const mounts = Object.values(files).filter(node => node.isMount)
+  // Group 2: Libraries (Virtual/System Mounts)
+  const libraries = Object.values(files).filter(node => node.isMount && node.isSystem)
+
+  // Group 3: User Mounts (External Drives)
+  const userMounts = Object.values(files).filter(node => node.isMount && !node.isSystem)
 
   const SidebarItem = ({ id, icon: Icon, label, isActive, onClick, node }: any) => (
     <button
-      onClick={onClick}
+      onClick={() => onClick(id)}
       className={cn(
         "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group relative select-none",
         isActive
@@ -79,13 +83,35 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
                 key={item.id}
                 id={item.id}
                 icon={item.icon}
-                label={t(item.label)}
+                label={t(item.label)} // Use t() if available or fallback label
                 isActive={currentPathId === item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={onNavigate}
               />
             ))}
           </div>
         </div>
+
+        {/* Libraries Section */}
+        {libraries.length > 0 && (
+          <div>
+            <h3 className="px-3 text-xs font-semibold text-[var(--os-text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Star size={10} />
+              {t('explorer.libraries') || 'Libraries'}
+            </h3>
+            <div className="space-y-0.5">
+              {libraries.map(node => (
+                <SidebarItem
+                  key={node.id}
+                  id={node.id}
+                  icon={node.icon === 'images' ? Image : node.icon === 'disc' ? Disc : HardDrive}
+                  label={node.name}
+                  isActive={currentPathId === node.id}
+                  onClick={onNavigate}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Mounted Drives Section */}
         <div>
@@ -103,8 +129,8 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
             </button>
           </div>
           <div className="space-y-0.5">
-            {mounts.length > 0 ? (
-              mounts.map(node => (
+            {userMounts.length > 0 ? (
+              userMounts.map(node => (
                 <SidebarItem
                   key={node.id}
                   id={node.id}
@@ -114,7 +140,7 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
                   // Pass node to component to check permission
                   // @ts-ignore
                   node={node}
-                  onClick={() => onNavigate(node.id)}
+                  onClick={onNavigate}
                 />
               ))
             ) : (

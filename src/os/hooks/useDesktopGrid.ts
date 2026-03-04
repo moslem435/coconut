@@ -29,9 +29,14 @@ export function useDesktopGrid({ desktopItems, selectedIcons }: UseDesktopGridPr
     const [mounted, setMounted] = useState(false)
     const [isLayoutReady, setIsLayoutReady] = useState(false)
 
-    // Initialize icon positions if empty
+    // Mount effect
     useEffect(() => {
         setMounted(true)
+    }, [])
+
+    // Initialize icon positions if empty
+    useEffect(() => {
+        if (!mounted) return
 
         // Calculate max rows based on viewport
         const maxRows = typeof window !== 'undefined'
@@ -43,33 +48,47 @@ export function useDesktopGrid({ desktopItems, selectedIcons }: UseDesktopGridPr
         const missingPositionIds = itemIds.filter(id => !iconPositions[id])
 
         // 1. If NO positions exist at all (first run), organize everything
-        if (Object.keys(iconPositions).length === 0) {
+        if (Object.keys(iconPositions).length === 0 && itemIds.length > 0) {
             organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
         }
         // 2. If SOME items are missing positions (newly added files), assign them free spots
         else if (missingPositionIds.length > 0) {
             const newPositions = { ...iconPositions }
+            let hasChanges = false
 
             missingPositionIds.forEach(id => {
                 // Find a free spot for this new item
+                // Use a default position (0,0) if finding fails, but findFreePosition handles it
                 const pos = findFreePosition(GRID_PADDING, GRID_PADDING, id, newPositions, currentGridSize, currentGridPadding)
-                newPositions[id] = pos
+                if (pos) {
+                    newPositions[id] = pos
+                    hasChanges = true
+                }
             })
 
-            setIconPositions(newPositions)
+            if (hasChanges) {
+                setIconPositions(newPositions)
+            }
         }
 
         setIsLayoutReady(true)
-    }, [desktopItems, iconPositions, currentGridSize, currentGridPadding, organizeIcons, setIconPositions])
+    }, [desktopItems, mounted, currentGridSize, currentGridPadding, organizeIcons, setIconPositions]) // Removed iconPositions from deps to avoid loop
+
 
     // Handle Scale Changes
     useEffect(() => {
-        if (!mounted) return
+        if (!mounted || !isLayoutReady) return
         // Re-organize when scale changes to ensure everything fits
         const maxRows = Math.floor((window.innerHeight - 150) / currentGridSize)
         const itemIds = desktopItems.map(i => i.id)
-        organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
-    }, [displayScale, currentGridSize, currentGridPadding, desktopItems, organizeIcons, mounted])
+        
+        // Use timeout to debounce
+        const timer = setTimeout(() => {
+            organizeIcons(itemIds, maxRows, currentGridSize, currentGridPadding)
+        }, 100)
+        
+        return () => clearTimeout(timer)
+    }, [displayScale, currentGridSize, currentGridPadding, desktopItems, organizeIcons, mounted, isLayoutReady])
 
     const handleDragEnd = useCallback((id: string, x: number, y: number) => {
         const currentPositions = useDesktopStore.getState().iconPositions

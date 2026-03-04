@@ -4,6 +4,7 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useShortcuts } from '@/os/kernel/useShortcuts'
 import { Save, FilePlus, FolderOpen, Search, ZoomIn, ZoomOut, Type, X } from 'lucide-react'
 import { FilePickerDialog } from '@/os/ui/dialogs/FilePickerDialog'
+import { FILE_IDS } from '@/os/config/paths'
 
 interface NotepadProps {
   fileId?: string
@@ -218,7 +219,7 @@ const Notepad: React.FC<NotepadProps> = ({ fileId: initialFileId }) => {
         mode={pickerMode}
         onConfirm={handleFilePickerConfirm}
         onCancel={() => setPickerOpen(false)}
-        initialPath="desktop"
+        initialPath={FILE_IDS.DESKTOP}
       />
     </div>
   )

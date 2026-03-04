@@ -34,7 +34,8 @@ class FileSystemSyncService {
           if (type === 'folder') {
             await ioService.mkdir(path)
           } else {
-            await ioService.writeFile(path, content || '')
+            const fileContent = content !== undefined ? content : '';
+            await ioService.writeFile(path, fileContent)
           }
         } catch (error) {
           console.error('[SyncService] OPFS create failed:', error)
@@ -50,7 +51,8 @@ class FileSystemSyncService {
           if (type === 'folder') {
             useWebContainerStore.getState().syncMkdir(path)
           } else {
-            useWebContainerStore.getState().syncFile(path, content || '')
+            const fileContent = content !== undefined ? content : '';
+            useWebContainerStore.getState().syncFile(path, fileContent)
           }
         } catch (error) {
           console.error('[SyncService] WebContainer create failed:', error)
@@ -60,12 +62,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件 - DISABLED to prevent loop (ActionSlice emits this already)
-    // eventBus.emit('fs:file:created', {
-    //   id: path.split('/').pop() || '',
-    //   path,
-    //   type
-    // })
+    // Publish event
+    eventBus.emit('fs:file:created', {
+      id: path.split('/').pop() || '',
+      path,
+      type
+    })
   }
 
   /**
@@ -101,12 +103,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件 - DISABLED
-    // eventBus.emit('fs:file:updated', {
-    //   id: path.split('/').pop() || '',
-    //   path,
-    //   content
-    // })
+    // Publish event (content might be Uint8Array, convert to string for event)
+    eventBus.emit('fs:file:updated', {
+      id: path.split('/').pop() || '',
+      path,
+      content: typeof content === 'string' ? content : undefined
+    })
   }
 
   /**
@@ -143,11 +145,11 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件 - DISABLED
-    // eventBus.emit('fs:file:deleted', {
-    //   id: path.split('/').pop() || '',
-    //   path
-    // })
+    // Publish event
+    eventBus.emit('fs:file:deleted', {
+      id: path.split('/').pop() || '',
+      path
+    })
   }
 
   /**
@@ -177,8 +179,8 @@ class FileSystemSyncService {
           const { instance, isSyncingFromWC } = useWebContainerStore.getState()
           if (!instance || isSyncingFromWC) return
 
-          const wcOld = `/home/guest${oldPath}`
-          const wcNew = `/home/guest${newPath}`
+          const wcOld = oldPath
+          const wcNew = newPath
           await instance.fs.rename(wcOld, wcNew)
         } catch (error) {
           console.error('[SyncService] WebContainer rename failed:', error)
@@ -188,12 +190,12 @@ class FileSystemSyncService {
 
     await this.executeTasks(tasks)
     
-    // 发布事件 - DISABLED
-    // eventBus.emit('fs:file:renamed', {
-    //   id: newPath.split('/').pop() || '',
-    //   oldPath,
-    //   newPath
-    // })
+    // Publish event
+    eventBus.emit('fs:file:renamed', {
+      id: newPath.split('/').pop() || '',
+      oldPath,
+      newPath
+    })
   }
 
   /**

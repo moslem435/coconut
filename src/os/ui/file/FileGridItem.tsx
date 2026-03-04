@@ -4,7 +4,7 @@ import { AppIcon } from '@/os/ui/AppIcon'
 import { RenameInput } from '@/os/ui/RenameInput'
 import { useFileDisplay } from '@/os/hooks/useFileDisplay'
 import { cn } from '@/lib/utils'
-import { AppWindow, Package } from 'lucide-react'
+import { AppWindow, Package, Lock, Shield } from 'lucide-react'
 
 export interface FileGridItemProps extends React.HTMLAttributes<HTMLDivElement> {
   item: FileNode
@@ -95,6 +95,20 @@ export function FileGridItem({
               strokeWidth={2}
               fill={item.type === 'folder' ? 'currentColor' : 'none'}
             />
+          </div>
+        )}
+        
+        {/* System/ReadOnly Badge */}
+        {(item.isSystem || item.isReadOnly) && (
+          <div 
+            className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 shadow-md"
+            title={item.isSystem ? 'System Folder' : 'Read-Only'}
+          >
+            {item.isSystem ? (
+              <Shield size={12} className="text-white" />
+            ) : (
+              <Lock size={12} className="text-white" />
+            )}
           </div>
         )}
       </div>

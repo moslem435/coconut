@@ -6,6 +6,9 @@
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { FilePath } from '@/types/branded'
 import { PathValidator } from '@/os/security/PathValidator'
+import { LRUCache, BlobCache } from '@/os/utils/LRUCache'
+import { eventBus } from '@/os/kernel/EventBus'
+import { FileStat } from '@/os/kernel/filesystem/IFileSystemProvider'
 
 export interface ReadStreamOptions {
   chunkSize?: number
@@ -18,16 +21,64 @@ export interface WriteStreamOptions {
   signal?: AbortSignal
 }
 
-export interface FileStats {
-  size: number
-  isDirectory: boolean
-  ctime: number
-  mtime: number
-}
+// Re-export FileStat for compatibility
+export type FileStats = FileStat
 
 class FileSystemIOService {
   private readonly CHUNK_SIZE = 1024 * 1024 // 1MB chunks
   private readonly LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 // 10MB
+
+  // Caches
+  private contentCache = new LRUCache<string, string>(20 * 1024 * 1024, 5 * 60 * 1000) // 20MB, 5min
+  private blobCache = new BlobCache(30 * 1024 * 1024, 5 * 60 * 1000) // 30MB, 5min
+
+  constructor() {
+    // Listen for file changes and invalidate cache
+    if (typeof window !== 'undefined') {
+      eventBus.on('fs:file:updated', ({ path }) => {
+        this.invalidateCache(path)
+      })
+      eventBus.on('fs:file:deleted', ({ path }) => {
+        this.invalidateCache(path)
+      })
+      eventBus.on('fs:file:renamed', ({ oldPath, newPath }) => {
+        this.invalidateCache(oldPath)
+        this.invalidateCache(newPath)
+      })
+
+      // Periodic cleanup
+      setInterval(() => {
+        this.contentCache.cleanup()
+        this.blobCache.cleanup()
+      }, 60 * 1000) // Every minute
+    }
+  }
+
+  /**
+   * Invalidate cache for a path
+   */
+  private invalidateCache(path: string): void {
+    this.contentCache.delete(path)
+    this.blobCache.delete(path)
+  }
+
+  /**
+   * Get cache statistics (for debugging)
+   */
+  getCacheStats() {
+    return {
+      content: this.contentCache.getStats(),
+      blob: this.blobCache.getStats()
+    }
+  }
+
+  /**
+   * Clear all caches
+   */
+  clearCache(): void {
+    this.contentCache.clear()
+    this.blobCache.clear()
+  }
 
   /**
    * 读取文件内容（自动选择流式或一次性读取）
@@ -35,18 +86,30 @@ class FileSystemIOService {
   async readFile(path: string): Promise<string> {
     PathValidator.validate(path)
     
+    // Check cache first
+    const cached = this.contentCache.get(path)
+    if (cached !== undefined) {
+      return cached
+    }
+
     try {
       // 检查文件大小
       const stats = await this.stat(path)
       
+      let content: string
       if (stats.size > this.LARGE_FILE_THRESHOLD) {
         // 大文件使用流式读取
-        return await this.readFileStream(path)
+        content = await this.readFileStream(path)
       } else {
         // 小文件一次性读取
         const buffer = await fs.readFile(path)
-        return new TextDecoder().decode(buffer)
+        content = new TextDecoder().decode(buffer)
       }
+
+      // Cache the result
+      this.contentCache.set(path, content, stats.size)
+
+      return content
     } catch (error: any) {
       if (error.message?.includes('File not found')) {
         // Expected error for missing files, just warn or ignore
@@ -123,8 +186,21 @@ class FileSystemIOService {
   async getFileBlob(path: string): Promise<Blob> {
     PathValidator.validate(path)
     
+    // Check cache first (returns object URL)
+    const cachedUrl = this.blobCache.get(path)
+    if (cachedUrl !== undefined) {
+      // Fetch blob from cached URL
+      const response = await fetch(cachedUrl)
+      return await response.blob()
+    }
+
     try {
-      return await fs.getFileBlob(path)
+      const blob = await fs.getFileBlob(path)
+      
+      // Cache the blob (creates object URL)
+      this.blobCache.setBlob(path, blob)
+
+      return blob
     } catch (error: any) {
       // Suppress "not found" errors which are expected during sync or polling
       if (error.message?.includes('could not be found') || error.name === 'NotFoundError') {
@@ -142,7 +218,14 @@ class FileSystemIOService {
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {
     PathValidator.validate(path)
     
+    // Invalidate cache
+    this.invalidateCache(path)
+
     try {
+      if (content === undefined || content === null) {
+          throw new Error('Content cannot be null or undefined');
+      }
+
       const data = typeof content === 'string' 
         ? new TextEncoder().encode(content)
         : content
@@ -253,13 +336,7 @@ class FileSystemIOService {
     PathValidator.validate(path)
     
     try {
-      const stats = await fs.stat(path)
-      return {
-        size: stats.size,
-        isDirectory: stats.isDirectory,
-        ctime: stats.ctime,
-        mtime: stats.mtime
-      }
+      return await fs.stat(path)
     } catch (error: any) {
       if (error.message?.includes('File not found')) {
         // Expected error, ignore log

@@ -472,7 +472,7 @@ const zh: Record<string, string> = {
     // Photo Gallery
     "gallery.library": "图库",
     "gallery.items": "项",
-    "gallery.empty": "在 /Pictures 中未找到照片",
+    "gallery.empty": "相册为空",
 
     // Browser
     "browser.newtab": "新标签页",
@@ -512,6 +512,7 @@ const zh: Record<string, string> = {
 
     // File Explorer
     "explorer.this_system": "此系统",
+    "explorer.libraries": "库",
     "explorer.mounted_drives": "挂载盘",
     "explorer.cloud": "云盘",
     "explorer.delete_confirm": "确定要删除这些项目吗？",

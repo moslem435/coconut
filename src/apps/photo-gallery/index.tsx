@@ -6,12 +6,44 @@ import { Grid, Maximize2, X, ChevronLeft, ChevronRight, Image as ImageIcon } fro
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { eventBus } from '@/os/kernel/EventBus'
 import { GalleryItem } from './components/GalleryItem'
+import { FILE_IDS } from '@/os/config/paths'
 
 export default function PhotoGallery() {
-  const { files, getChildren } = useFileSystemStore()
+  const { files, getChildren, loadFolderContent } = useFileSystemStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { t } = useLanguage()
+
+  // Load virtual "All Pictures" folder on mount
+  useEffect(() => {
+      const virtualPicturesNode = files[FILE_IDS.VIRTUAL_ALL_PICTURES]
+      if (virtualPicturesNode) {
+          loadFolderContent(FILE_IDS.VIRTUAL_ALL_PICTURES)
+      }
+  }, [files, loadFolderContent])
+
+  // Listen for file system changes and refresh
+  useEffect(() => {
+    const handleFileChange = () => {
+      // Refresh virtual pictures folder when files change
+      const virtualPicturesNode = files[FILE_IDS.VIRTUAL_ALL_PICTURES]
+      if (virtualPicturesNode) {
+        loadFolderContent(FILE_IDS.VIRTUAL_ALL_PICTURES)
+      }
+    }
+
+    // Subscribe to file system events
+    const unsubscribeCreated = eventBus.on('fs:file:created', handleFileChange)
+    const unsubscribeDeleted = eventBus.on('fs:file:deleted', handleFileChange)
+    const unsubscribeUpdated = eventBus.on('fs:file:updated', handleFileChange)
+
+    return () => {
+      unsubscribeCreated.unsubscribe()
+      unsubscribeDeleted.unsubscribe()
+      unsubscribeUpdated.unsubscribe()
+    }
+  }, [files, loadFolderContent])
 
   const getDisplayName = (file: any) => {
     const key = `gallery.image.${file.id}`
@@ -19,14 +51,15 @@ export default function PhotoGallery() {
     return translated === key ? file.name : translated
   }
 
-  // Get images from Pictures folder
-  // In a real scenario, we'd filter by mime type, but here we assume everything in Pictures is an image
-  // or we check if content is a URL
-  const picturesFolderId = 'pictures'
+  // Get images from virtual "All Pictures" folder
   const images = useMemo(() => {
-    const children = getChildren(picturesFolderId)
-    // Filter for files only
-    return children.filter(c => c.type === 'file')
+    const virtualPicturesNode = files[FILE_IDS.VIRTUAL_ALL_PICTURES]
+    if (virtualPicturesNode) {
+        return getChildren(FILE_IDS.VIRTUAL_ALL_PICTURES).filter(c => c.type === 'file')
+    }
+    
+    // Fallback: Get from Pictures folder only
+    return getChildren(FILE_IDS.PICTURES).filter(c => c.type === 'file')
   }, [files, getChildren])
 
   const selectedIndex = useMemo(() => {

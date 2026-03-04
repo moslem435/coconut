@@ -10,6 +10,7 @@ import type { FileNode, FileType } from '../../initialFileTree'
 import { eventBus } from '../../EventBus'
 import { collectDescendants } from '../utils/indexManager'
 import { syncService } from '@/os/services/FileSystemSyncService'
+import { toast } from '@/os/components/Toast'
 
 export interface ActionSlice {
   // 文件操作
@@ -67,8 +68,44 @@ export const createActionSlice: StateCreator<
   },
 
   deleteItem: async (id) => {
+    const node = get().files[id]
+    if (!node) return
+
+    // Protection: Check if system folder/file
+    if (node.isSystem) {
+      console.warn(`Cannot delete system item: ${node.name}`)
+      toast.error(
+        'Cannot Delete System Folder',
+        `"${node.name}" is a system folder and cannot be deleted.`
+      )
+      eventBus.emit('sys:error', {
+        source: 'filesystem',
+        message: `Cannot delete system folder "${node.name}"`,
+        severity: 'warning'
+      })
+      return
+    }
+
     const path = get().resolvePath(id)
     const itemsToDelete = collectDescendants(id, get().childrenIndex)
+
+    // Check if any descendant is a system item
+    for (const descendantId of itemsToDelete) {
+      const descendant = get().files[descendantId]
+      if (descendant?.isSystem) {
+        console.warn(`Cannot delete: contains system item ${descendant.name}`)
+        toast.error(
+          'Cannot Delete',
+          `Folder contains system item "${descendant.name}".`
+        )
+        eventBus.emit('sys:error', {
+          source: 'filesystem',
+          message: `Cannot delete: folder contains system item "${descendant.name}"`,
+          severity: 'warning'
+        })
+        return
+      }
+    }
 
     // 1. 乐观删除
     get()._deleteFiles(Array.from(itemsToDelete))
@@ -82,9 +119,40 @@ export const createActionSlice: StateCreator<
   },
 
   renameItem: (id, newName) => {
-    const oldPath = get().resolvePath(id)
     const node = get().files[id]
     if (!node) return
+
+    // Protection: Check if system folder/file
+    if (node.isSystem) {
+      console.warn(`Cannot rename system item: ${node.name}`)
+      toast.warning(
+        'Cannot Rename',
+        `"${node.name}" is a system folder and cannot be renamed.`
+      )
+      eventBus.emit('sys:error', {
+        source: 'filesystem',
+        message: `Cannot rename system folder "${node.name}"`,
+        severity: 'warning'
+      })
+      return
+    }
+
+    // Protection: Check if read-only
+    if (node.isReadOnly) {
+      console.warn(`Cannot rename read-only item: ${node.name}`)
+      toast.warning(
+        'Read-Only',
+        `"${node.name}" is read-only and cannot be renamed.`
+      )
+      eventBus.emit('sys:error', {
+        source: 'filesystem',
+        message: `Cannot rename read-only item "${node.name}"`,
+        severity: 'warning'
+      })
+      return
+    }
+
+    const oldPath = get().resolvePath(id)
 
     // 1. 乐观更新
     get()._updateFile(id, { name: newName })
@@ -101,9 +169,25 @@ export const createActionSlice: StateCreator<
   },
 
   moveItem: (id, newParentId) => {
-    const oldPath = get().resolvePath(id)
     const node = get().files[id]
     if (!node) return
+
+    // Protection: Check if system folder/file
+    if (node.isSystem) {
+      console.warn(`Cannot move system item: ${node.name}`)
+      toast.warning(
+        'Cannot Move',
+        `"${node.name}" is a system folder and cannot be moved.`
+      )
+      eventBus.emit('sys:error', {
+        source: 'filesystem',
+        message: `Cannot move system folder "${node.name}"`,
+        severity: 'warning'
+      })
+      return
+    }
+
+    const oldPath = get().resolvePath(id)
 
     // 1. 乐观更新
     const newFiles = { ...get().files }
@@ -124,6 +208,21 @@ export const createActionSlice: StateCreator<
   updateFileContent: (id, content) => {
     const node = get().files[id]
     if (!node) return
+
+    // Protection: Check if read-only
+    if (node.isReadOnly) {
+      console.warn(`Cannot modify read-only file: ${node.name}`)
+      toast.warning(
+        'Read-Only File',
+        `"${node.name}" is read-only and cannot be modified.`
+      )
+      eventBus.emit('sys:error', {
+        source: 'filesystem',
+        message: `Cannot modify read-only file "${node.name}"`,
+        severity: 'warning'
+      })
+      return
+    }
 
     // 1. 更新元数据和内容
     get()._updateFile(id, { 

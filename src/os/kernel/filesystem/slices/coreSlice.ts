@@ -8,6 +8,7 @@ import type { FileNode, FileType } from '../../initialFileTree'
 import { INITIAL_FILES, INITIAL_ROOT_ID } from '../../initialFileTree'
 import * as indexManager from '../utils/indexManager'
 import type { ChildrenIndex } from '../utils/indexManager'
+import { SYSTEM_PATHS, FILE_IDS } from '@/os/config/paths'
 
 export interface CoreSlice {
   // 状态
@@ -116,35 +117,89 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
     return path
   },
 
-  resolvePath: (id) => {
+  resolvePath: (id: string) => {
     const state = get()
     const node = state.files[id]
     if (!node) return ''
-    if (id === state.rootId) return '/'
-
-    const pathNodes = state.getPath(id)
-
-    // Check if path contains a mount point
+    if (id === state.rootId) return SYSTEM_PATHS.ROOT
+    
+    // Build path from parent chain
+    const pathNodes: FileNode[] = []
+    let current: FileNode | undefined = node
+    
+    while (current) {
+        pathNodes.unshift(current)
+        if (!current.parentId || current.id === state.rootId) break
+        current = state.files[current.parentId]
+    }
+    
+    // If the path starts with a mount point (e.g. rom, virtual folders, or user mounts)
+    // We need to handle them specially because they are not physical paths in OPFS
+    // But wait, the previous logic was a bit confused.
+    // Let's simplify:
+    // 1. If it's a mount point root (isMount=true), we return its mount path
+    // 2. If it's inside a mount point, we append the relative path
+    
+    // Find the mount point in the chain
     const mountIndex = pathNodes.findIndex(n => n.isMount)
+    
     if (mountIndex !== -1) {
-      const mountNode = pathNodes[mountIndex]
-      if (mountNode) {
+        const mountNode = pathNodes[mountIndex]
         const relativePath = pathNodes.slice(mountIndex + 1).map(n => n.name).join('/')
-        return `/mnt/${mountNode.id}${relativePath ? '/' + relativePath : ''}` as string
-      }
+        
+        if (mountNode.id === FILE_IDS.ROM) {
+            return `${SYSTEM_PATHS.ROM}${relativePath ? '/' + relativePath : ''}`
+        } else if (mountNode.id === FILE_IDS.VIRTUAL_ALL_PICTURES) {
+            return `${SYSTEM_PATHS.VIRTUAL_ALL_PICTURES}${relativePath ? '/' + relativePath : ''}`
+        } else {
+            // User mounts or other virtual folders
+            // Assuming user mounts are at /mnt/{id} (though currently we mount at root in UI?)
+            // Wait, mountSlice mounts them at root in the file tree (parentId: 'root')
+            // But physically they are handles.
+            // If we want to represent them as paths, we can use /mnt/{id} or /{name}
+            // In mountSlice: mountPath = fs.mount(handle) -> returns "/mnt/{uuid}"
+            // So physically they are at /mnt/{uuid}.
+            // But in VFS they are at /MountName.
+            // resolvePath should return the PHYSICAL path for IO operations?
+            // Yes, resolvePath is used by syncService/IO to talk to underlying FS.
+            
+            // If it is a user mount (isMount=true but not system/rom/virtual),
+            // The ID IS the mount ID (uuid) from fs.mount() usually?
+            // In mountSlice.mountLocalFolder: mountId = mountPath.split('/').pop()! (which is uuid)
+            // So constructing /mnt/{id} is correct for physical access.
+            return `/mnt/${mountNode.id}${relativePath ? '/' + relativePath : ''}`
+        }
     }
 
+    // Standard OPFS path (VFS mirrors OPFS structure for non-mounts)
+    // pathNodes[0] is Root.
+    // pathNodes[1...] are the segments.
     return '/' + pathNodes.slice(1).map(n => n.name).join('/')
   },
 
-  getNodeByPath: (path) => {
+  getNodeByPath: (path: string) => {
     const state = get()
-    if (!path || path === '/') return state.files[state.rootId]
+    if (!path || path === SYSTEM_PATHS.ROOT) return state.files[state.rootId]
 
-    // Remove leading slash and split
-    const parts = path.replace(/^\/+/, '').split('/')
+    // Normalize path
+    const normalizedPath = path.replace(/^\/+/, '')
+    if (!normalizedPath) return state.files[state.rootId]
+
+    const parts = normalizedPath.split('/')
     let currentId = state.rootId
 
+    // Handle absolute paths that might start with system roots (like /rom, /mnt)
+    // But here we are traversing VFS tree which matches path structure mostly.
+    // Exception: /mnt/{uuid} in physical FS corresponds to a node in VFS with id={uuid} and name={HandleName}
+    // But VFS tree structure is: Root -> [MountNode(id=uuid, name=HandleName)]
+    // So if we ask for /mnt/uuid/file, we might not find it by name "mnt".
+    // We need to map path prefixes to VFS roots if they diverge.
+    
+    // However, getNodeByPath is usually used for VFS navigation (cd, ls).
+    // If the user types "cd /rom", we look for "rom" under root.
+    // If the user types "cd /home/user", we look for "home" then "user".
+    // This seems correct for the standard tree.
+    
     for (const part of parts) {
       const children = state.getChildren(currentId)
       const found = children.find(c => c.name === part)

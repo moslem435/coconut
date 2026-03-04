@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from '@/os/sdk';
 import { Message, CloudConfig } from '../types';
 import { systemToolsDefinitions, systemToolsImplementation, TOOL_CATEGORIES } from '../utils/systemTools';
+import { SYSTEM_PATHS } from '@/os/config/paths';
 
 export interface CloudLLMState {
     isLoading: boolean;
@@ -94,7 +95,7 @@ Never make up windowIds. Always query running apps first before closing.`,
         builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
 When asked to create an app/game/tool:
 1. Briefly explain what you will build.
-2. Use 'create_directory' to create a folder with '.app' extension (e.g. "/Desktop/MyGame.app").
+2. Use 'create_directory' to create a folder with '.app' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.app").
 3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
    CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
 4. After the file is created, confirm the app is ready and the user can double-click the folder to run it.
@@ -287,7 +288,7 @@ Never make up windowIds. Always query running apps first before closing.`,
         builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
 When asked to create an app/game/tool:
 1. Briefly explain what you will build.
-2. Use 'create_directory' to create a folder with '.app' extension (e.g. "/Desktop/MyGame.app").
+2. Use 'create_directory' to create a folder with '.app' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.app").
 3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
    CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
 4. After the file is created, confirm the app is ready.

@@ -57,6 +57,52 @@ class EventBus {
   private listeners = new Map<keyof SystemEvents, Set<EventCallback>>()
   private onceListeners = new Map<keyof SystemEvents, Set<EventCallback>>()
   private globalListeners = new Set<(event: keyof SystemEvents, data: any) => void>()
+  
+  // Event deduplication
+  private recentEvents = new Map<string, number>()
+  private deduplicationWindow = 100 // ms
+
+  /**
+   * Generate event fingerprint for deduplication
+   */
+  private getEventFingerprint<K extends keyof SystemEvents>(
+    event: K,
+    data: SystemEvents[K]
+  ): string {
+    // Create a simple fingerprint based on event type and key data
+    const keyData = JSON.stringify(data)
+    return `${event}:${keyData}`
+  }
+
+  /**
+   * Check if event should be deduplicated
+   */
+  private shouldDeduplicate<K extends keyof SystemEvents>(
+    event: K,
+    data: SystemEvents[K]
+  ): boolean {
+    const fingerprint = this.getEventFingerprint(event, data)
+    const lastEmit = this.recentEvents.get(fingerprint)
+    const now = Date.now()
+
+    if (lastEmit && now - lastEmit < this.deduplicationWindow) {
+      return true // Duplicate, skip
+    }
+
+    this.recentEvents.set(fingerprint, now)
+    
+    // Clean up old entries
+    if (this.recentEvents.size > 1000) {
+      const cutoff = now - this.deduplicationWindow * 2
+      for (const [key, timestamp] of this.recentEvents.entries()) {
+        if (timestamp < cutoff) {
+          this.recentEvents.delete(key)
+        }
+      }
+    }
+
+    return false
+  }
 
   /**
    * 订阅所有事件（用于调试/日志）
@@ -121,12 +167,18 @@ class EventBus {
   }
 
   /**
-   * 发布事件
+   * 发布事件（带去重）
    */
   emit<K extends keyof SystemEvents>(
     event: K,
     data: SystemEvents[K]
   ): void {
+    // Check for duplicates
+    if (this.shouldDeduplicate(event, data)) {
+      // console.debug(`[EventBus] Deduplicated event: ${event}`)
+      return
+    }
+
     // 执行全局监听器
     this.globalListeners.forEach(callback => {
       try {

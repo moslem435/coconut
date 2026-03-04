@@ -200,23 +200,28 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
             }
 
             case 'rename': {
-                if (!root || !oldPath || !newPath) throw new Error('Invalid arguments');
+                // Ensure arguments
+                const actualOldPath = oldPath || path; // Handle inconsistent API (path vs oldPath)
+                const actualNewPath = newPath;
+
+                if (!root || !actualOldPath || !actualNewPath) throw new Error('Invalid arguments for rename');
+                
                 // Fallback: Copy + Delete Strategy
                 let sourceHandle: FileSystemHandle | undefined;
                 let isFile = true;
 
                 try {
-                    sourceHandle = await getFileHandle(root, oldPath);
+                    sourceHandle = await getFileHandle(root, actualOldPath);
                 } catch {
                     try {
-                        sourceHandle = await getDirHandle(root, oldPath);
+                        sourceHandle = await getDirHandle(root, actualOldPath);
                         isFile = false;
                     } catch {
-                        throw new Error(`Source path not found: ${oldPath}`);
+                        throw new Error(`Source path not found: ${actualOldPath}`);
                     }
                 }
 
-                if (!sourceHandle) throw new Error(`Source handle not found: ${oldPath}`);
+                if (!sourceHandle) throw new Error(`Source handle not found: ${actualOldPath}`);
 
                 if (isFile) {
                     const oldFileHandle = sourceHandle as FileSystemFileHandle;
@@ -224,7 +229,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     const fileContent = await file.arrayBuffer();
 
                     // Create new file
-                    const parts = newPath.split('/').filter(p => p.length > 0);
+                    const parts = actualNewPath.split('/').filter(p => p.length > 0);
                     const fileName = parts.pop();
                     if (!fileName) throw new Error('Invalid new file path');
                     
@@ -244,12 +249,10 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     }
                     
                     // Remove old file
-                    await removePath(root, oldPath);
+                    await removePath(root, actualOldPath);
                 } else {
-                    // Rename directory (create new, remove old)
-                    // Note: Recursive copy not fully implemented for directories
-                    await getDirHandle(root, newPath, true);
-                    await removePath(root, oldPath, true);
+                    // Rename directory (Recursive Move)
+                    await moveDirectory(root, actualOldPath, actualNewPath);
                 }
                 break;
             }
@@ -268,6 +271,9 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
 
                 // 1. Remove (in current but not in fs)
                 for (const [name, file] of currentMap) {
+                    // Skip system/mount points which are not physical files in OPFS
+                    if (file.isMount || file.isSystem) continue;
+
                     if (!fsMap.has(name)) {
                         patch.toRemove.push(file.id);
                     }
@@ -330,9 +336,59 @@ async function getDirHandle(root: FileSystemDirectoryHandle, path: string, creat
     const parts = path.split('/').filter(p => p.length > 0);
     let current = root;
     for (const part of parts) {
-        current = await current.getDirectoryHandle(part, { create });
+        try {
+            current = await current.getDirectoryHandle(part, { create });
+        } catch (e: any) {
+            // Enhance error message for debugging
+            if (e.name === 'NotFoundError') {
+                throw new Error(`Directory not found: ${part} in path ${path}`);
+            }
+            throw e;
+        }
     }
     return current;
+}
+
+async function moveDirectory(root: FileSystemDirectoryHandle, oldPath: string, newPath: string) {
+    // 1. Create new directory
+    await getDirHandle(root, newPath, true);
+
+    // 2. Get old directory handle
+    const oldDir = await getDirHandle(root, oldPath);
+
+    // 3. Iterate and move children
+    // @ts-ignore
+    for await (const [name, handle] of oldDir.entries()) {
+        const childOldPath = `${oldPath}/${name}`;
+        const childNewPath = `${newPath}/${name}`;
+
+        if (handle.kind === 'file') {
+            // Move file (Copy + Delete)
+            const file = await handle.getFile();
+            const buffer = await file.arrayBuffer();
+            
+            // Write to new location
+            const parts = childNewPath.split('/').filter(p => p.length > 0);
+            const fileName = parts.pop()!;
+            let current = root;
+            for (const part of parts) {
+                current = await current.getDirectoryHandle(part, { create: true });
+            }
+            const newFileHandle = await current.getFileHandle(fileName, { create: true });
+            const writable = await newFileHandle.createWritable();
+            await writable.write(buffer);
+            await writable.close();
+
+            // Delete old file
+            await removePath(root, childOldPath);
+        } else {
+            // Recursive move directory
+            await moveDirectory(root, childOldPath, childNewPath);
+        }
+    }
+
+    // 4. Remove old empty directory
+    await removePath(root, oldPath);
 }
 
 async function removePath(root: FileSystemDirectoryHandle, path: string, recursive = false) {

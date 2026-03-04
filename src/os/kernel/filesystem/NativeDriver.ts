@@ -10,10 +10,12 @@
  * - CRUD operations mapped to FSA API
  */
 
-import { IFileSystem, FileStat } from './IFileSystem'
+import { IFileSystemProvider, FileStat } from './IFileSystemProvider'
 import { get, set, del, entries } from 'idb-keyval'
 
-export class NativeDriver implements IFileSystem {
+export class NativeDriver implements IFileSystemProvider {
+    name = 'native-driver'
+    readonly = false
     private rootHandle: FileSystemDirectoryHandle
 
     constructor(rootHandle: FileSystemDirectoryHandle) {

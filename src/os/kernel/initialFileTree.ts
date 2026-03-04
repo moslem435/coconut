@@ -1,3 +1,5 @@
+import { FILE_IDS } from '../config/paths'
+
 export type FileType = 'file' | 'folder'
 
 export interface FileNode {
@@ -14,11 +16,15 @@ export interface FileNode {
     isMount?: boolean
     needsPermission?: boolean
     size?: number
+    isSystem?: boolean // System folder/file, cannot be deleted or moved
+    isReadOnly?: boolean // Read-only folder/file, cannot be modified
 }
 
-export const INITIAL_ROOT_ID = 'root'
+export const INITIAL_ROOT_ID = FILE_IDS.ROOT
+export const INITIAL_HOME_ID = FILE_IDS.HOME
+export const INITIAL_USER_ID = FILE_IDS.USER
 
-export const FILESYSTEM_VERSION = 8; // Increment this to force re-sync
+export const FILESYSTEM_VERSION = 11; // Increment this to force re-sync
 
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {
@@ -27,115 +33,64 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Root',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
-    'trash': {
-        id: 'trash',
+    [INITIAL_HOME_ID]: {
+        id: INITIAL_HOME_ID,
+        parentId: INITIAL_ROOT_ID,
+        name: 'home',
+        type: 'folder',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isSystem: true
+    },
+    [INITIAL_USER_ID]: {
+        id: INITIAL_USER_ID,
+        parentId: INITIAL_HOME_ID,
+        name: 'user', // Default user
+        type: 'folder',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isSystem: true
+    },
+    [FILE_IDS.TRASH]: {
+        id: FILE_IDS.TRASH,
         parentId: INITIAL_ROOT_ID,
         name: 'Trash',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
-    'desktop': {
-        id: 'desktop',
-        parentId: INITIAL_ROOT_ID,
+    [FILE_IDS.DESKTOP]: {
+        id: FILE_IDS.DESKTOP,
+        parentId: INITIAL_USER_ID,
         name: 'Desktop',
         type: 'folder',
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'documents': {
-        id: 'documents',
-        parentId: INITIAL_ROOT_ID,
+    [FILE_IDS.DOCUMENTS]: {
+        id: FILE_IDS.DOCUMENTS,
+        parentId: INITIAL_USER_ID,
         name: 'Documents',
         type: 'folder',
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'pictures': {
-        id: 'pictures',
-        parentId: INITIAL_ROOT_ID,
+    [FILE_IDS.PICTURES]: {
+        id: FILE_IDS.PICTURES,
+        parentId: INITIAL_USER_ID,
         name: 'Pictures',
         type: 'folder',
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'gallery-abstract-01': {
-        id: 'gallery-abstract-01',
-        parentId: 'pictures',
-        name: 'Abstract_01.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-cyber-city': {
-        id: 'gallery-cyber-city',
-        parentId: 'pictures',
-        name: 'Cyber_City.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-workspace': {
-        id: 'gallery-workspace',
-        parentId: 'pictures',
-        name: 'Workspace.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-abstract': {
-        id: 'gallery-abstract',
-        parentId: 'pictures',
-        name: 'abstract.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-colorful': {
-        id: 'gallery-colorful',
-        parentId: 'pictures',
-        name: 'colorful.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-gradient': {
-        id: 'gallery-gradient',
-        parentId: 'pictures',
-        name: 'gradient.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-cars': {
-        id: 'gallery-cars',
-        parentId: 'pictures',
-        name: 'cars.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'gallery-nature': {
-        id: 'gallery-nature',
-        parentId: 'pictures',
-        name: 'nature.jpg',
-        type: 'file',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        size: 1024 * 500
-    },
-    'downloads': {
-        id: 'downloads',
-        parentId: INITIAL_ROOT_ID,
+    // Removed gallery-* files as they are now mounted via StaticHttpProvider at /rom
+    [FILE_IDS.DOWNLOADS]: {
+        id: FILE_IDS.DOWNLOADS,
+        parentId: INITIAL_USER_ID,
         name: 'Downloads',
         type: 'folder',
         createdAt: Date.now(),
@@ -144,7 +99,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     // Shortcuts
     'shortcut-portfolio': {
         id: 'shortcut-portfolio',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Portfolio Hub',
         type: 'file',
         appId: 'portfolio-hub',
@@ -153,7 +108,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-settings': {
         id: 'shortcut-settings',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Settings',
         type: 'file',
         appId: 'settings',
@@ -162,7 +117,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-emulator': {
         id: 'shortcut-emulator',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Retro PC',
         type: 'file',
         appId: 'emulator',
@@ -171,7 +126,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-files': {
         id: 'shortcut-files',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'File Explorer',
         type: 'file',
         appId: 'file-explorer',
@@ -180,7 +135,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-terminal': {
         id: 'shortcut-terminal',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Terminal',
         type: 'file',
         appId: 'terminal',
@@ -189,7 +144,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-notepad': {
         id: 'shortcut-notepad',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Notepad',
         type: 'file',
         appId: 'notepad',
@@ -198,7 +153,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-recycle-bin': {
         id: 'shortcut-recycle-bin',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Recycle Bin',
         type: 'file',
         appId: 'recycle-bin',
@@ -207,7 +162,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-gallery': {
         id: 'shortcut-gallery',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Gallery',
         type: 'file',
         appId: 'photo-gallery',
@@ -216,7 +171,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-music': {
         id: 'shortcut-music',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Music Player',
         type: 'file',
         appId: 'music-player',
@@ -225,7 +180,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-vscode': {
         id: 'shortcut-vscode',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'VS Code',
         type: 'file',
         appId: 'vscode-lite',
@@ -234,7 +189,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-taskmanager': {
         id: 'shortcut-taskmanager',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Task Manager',
         type: 'file',
         appId: 'task-manager',
@@ -243,7 +198,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-weather': {
         id: 'shortcut-weather',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Weather',
         type: 'file',
         appId: 'weather',
@@ -252,7 +207,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-sandbox-test': {
         id: 'shortcut-sandbox-test',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Sandbox Test',
         type: 'file',
         appId: 'sandbox-test',
@@ -261,7 +216,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-ai-chat': {
         id: 'shortcut-ai-chat',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'AI Assistant',
         type: 'file',
         appId: 'ai-chat',
@@ -270,7 +225,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'shortcut-yume': {
         id: 'shortcut-yume',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Yume',
         type: 'file',
         appId: 'yume',
@@ -278,17 +233,17 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         updatedAt: Date.now()
     },
     // Sample Folders
-    'music': {
-        id: 'music',
-        parentId: INITIAL_ROOT_ID,
+    [FILE_IDS.MUSIC]: {
+        id: FILE_IDS.MUSIC,
+        parentId: INITIAL_USER_ID,
         name: 'Music',
         type: 'folder',
         createdAt: Date.now(),
         updatedAt: Date.now()
     },
-    'code': {
-        id: 'code',
-        parentId: INITIAL_ROOT_ID,
+    [FILE_IDS.CODE]: {
+        id: FILE_IDS.CODE,
+        parentId: INITIAL_USER_ID,
         name: 'Code',
         type: 'folder',
         createdAt: Date.now(),
@@ -297,7 +252,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     // Sample Code Files
     'code-1': {
         id: 'code-1',
-        parentId: 'code',
+        parentId: FILE_IDS.CODE,
         name: 'hello_world.ts',
         type: 'file',
         // content removed
@@ -306,7 +261,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'code-2': {
         id: 'code-2',
-        parentId: 'code',
+        parentId: FILE_IDS.CODE,
         name: 'component.tsx',
         type: 'file',
         // content removed
@@ -316,7 +271,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     // Sample Files
     'welcome-txt': {
         id: 'welcome-txt',
-        parentId: 'desktop',
+        parentId: FILE_IDS.DESKTOP,
         name: 'Welcome.txt',
         type: 'file',
         // content removed
@@ -325,7 +280,7 @@ export const INITIAL_FILES: Record<string, FileNode> = {
     },
     'about-md': {
         id: 'about-md',
-        parentId: 'documents',
+        parentId: FILE_IDS.DOCUMENTS,
         name: 'About.md',
         type: 'file',
         // content removed

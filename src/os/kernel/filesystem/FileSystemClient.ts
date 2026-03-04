@@ -1,5 +1,7 @@
-import { IFileSystem, FileStat } from './IFileSystem';
+import { IFileSystemProvider, FileStat } from './IFileSystemProvider';
 import { NativeDriver } from './NativeDriver';
+import { eventBus } from '@/os/kernel/EventBus';
+import { FileSystemError, FileSystemErrorType } from './errors/FileSystemError';
 
 /**
  * FileSystemClient.ts
@@ -7,13 +9,16 @@ import { NativeDriver } from './NativeDriver';
  * The main thread client that routes requests to either:
  * 1. The OPFS Worker (for internal system files)
  * 2. The NativeDriver (for mounted local folders)
+ * 3. Registered FileSystemProviders (e.g. static assets)
  */
-export class FileSystemClient implements IFileSystem {
+export class FileSystemClient implements IFileSystemProvider {
+    name = 'fs-client';
+    readonly = false;
     private worker: Worker | null = null;
     private pendingRequests: Map<string, { resolve: (val: any) => void, reject: (err: any) => void }>;
 
-    // Map of mountId -> NativeDriver instance
-    private mounts: Map<string, NativeDriver> = new Map();
+    // Map of mountPath -> IFileSystemProvider
+    private mounts: Map<string, IFileSystemProvider> = new Map();
 
     constructor() {
         this.pendingRequests = new Map();
@@ -44,7 +49,7 @@ export class FileSystemClient implements IFileSystem {
     mount(handle: FileSystemDirectoryHandle, forcedId?: string): string {
         const id = forcedId || crypto.randomUUID();
         const driver = new NativeDriver(handle);
-        this.mounts.set(id, driver);
+        this.mounts.set(`/mnt/${id}`, driver);
         return `/mnt/${id}`;
     }
 
@@ -54,8 +59,46 @@ export class FileSystemClient implements IFileSystem {
     unmount(path: string): void {
         const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)/);
         if (match && match[1]) {
-            this.mounts.delete(match[1]);
+            this.mounts.delete(`/mnt/${match[1]}`);
         }
+    }
+
+    /**
+     * Register a custom file system provider (e.g. static http)
+     */
+    registerProvider(mountPath: string, provider: IFileSystemProvider) {
+        // Normalize mountPath to ensure it starts with / and no trailing /
+        let normalized = mountPath.startsWith('/') ? mountPath : '/' + mountPath;
+        if (normalized.length > 1 && normalized.endsWith('/')) {
+            normalized = normalized.slice(0, -1);
+        }
+        this.mounts.set(normalized, provider);
+        console.log(`[FileSystem] Registered provider '${provider.name}' at '${normalized}'`);
+    }
+
+    /**
+     * Resolve the correct provider and relative path for a given absolute path.
+     */
+    private resolveProvider(path: string): { provider: IFileSystemProvider | null, relativePath: string } {
+        // Find the longest matching mount point
+        let bestMatch = '';
+        let bestProvider: IFileSystemProvider | null = null;
+
+        for (const [mountPath, provider] of this.mounts) {
+            if (path === mountPath || path.startsWith(mountPath + '/')) {
+                if (mountPath.length > bestMatch.length) {
+                    bestMatch = mountPath;
+                    bestProvider = provider;
+                }
+            }
+        }
+
+        if (bestProvider) {
+            const relativePath = path.slice(bestMatch.length) || '/';
+            return { provider: bestProvider, relativePath };
+        }
+
+        return { provider: null, relativePath: path };
     }
 
     /**
@@ -63,27 +106,47 @@ export class FileSystemClient implements IFileSystem {
      */
     private async route<T>(
         path: string,
-        opfsAction: string,
-        nativeAction: (driver: NativeDriver, relativePath: string) => Promise<T>,
+        action: keyof IFileSystemProvider,
         payload: any = {}
     ): Promise<T> {
-        // Check if path implies a mount
-        const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
+        const { provider, relativePath } = this.resolveProvider(path);
 
-        if (match && match[1]) {
-            const mountId = match[1];
-            const relativePath = match[2] || '/'; // e.g. /docs/file.txt
-            const driver = this.mounts.get(mountId);
-
-            if (!driver) {
-                throw new Error(`Mount point not found: ${path}`);
+        const result = await (async () => {
+            if (provider) {
+                try {
+                    // @ts-ignore
+                    return provider[action](relativePath, payload.content || payload.recursive || payload.newPath);
+                } catch (e: any) {
+                    // Pass through FileSystemErrors
+                    if (e instanceof FileSystemError) {
+                        throw e;
+                    }
+                    throw new Error(`Provider error [${provider.name}]: ${e.message}`);
+                }
             }
 
-            return nativeAction(driver, relativePath);
+            // Default to OPFS Worker
+            // Map IFileSystemProvider method names to worker message types if necessary
+            // Assuming worker types match interface method names
+            return this.sendWorker<T>(action, { path, ...payload });
+        })();
+
+        // Emit events for write operations
+        if (action === 'writeFile') {
+            eventBus.emit('fs:file:updated', { id: path.split('/').pop() || '', path, content: typeof payload.content === 'string' ? payload.content : undefined });
+        } else if (action === 'unlink') {
+            eventBus.emit('fs:file:deleted', { id: path.split('/').pop() || '', path });
+        } else if (action === 'mkdir') {
+            eventBus.emit('fs:file:created', { id: path.split('/').pop() || '', path, type: 'folder' });
+        } else if (action === 'rename') {
+            const oldPath = path;
+            const newPath = payload.newPath; // Ensure payload has newPath for rename
+            if (newPath) {
+                eventBus.emit('fs:file:renamed', { id: newPath.split('/').pop() || '', oldPath, newPath });
+            }
         }
 
-        // Default to OPFS Worker
-        return this.sendWorker<T>(opfsAction, { path, ...payload });
+        return result;
     }
 
     private sendWorker<T>(type: string, payload: any = {}): Promise<T> {
@@ -99,102 +162,94 @@ export class FileSystemClient implements IFileSystem {
         });
     }
 
-    // --- IFileSystem Implementation ---
+    // --- IFileSystemProvider Implementation ---
 
     async readFile(path: string): Promise<Uint8Array> {
-        return this.route<Uint8Array>(
-            path,
-            'readFile',
-            (d, p) => d.readFile(p)
-        );
+        return this.route<Uint8Array>(path, 'readFile');
     }
 
     async getFileBlob(path: string): Promise<Blob> {
-        return this.route<Blob>(
-            path,
-            'getFileBlob',
-            (d, p) => d.getFileBlob(p)
-        );
+        const { provider, relativePath } = this.resolveProvider(path);
+        
+        if (provider) {
+             if (provider.getFileBlob) {
+                 return provider.getFileBlob(relativePath);
+             }
+             // Fallback
+             const content = await provider.readFile(relativePath);
+             return new Blob([content]);
+        }
+        
+        return this.sendWorker<Blob>('getFileBlob', { path });
     }
 
     async writeFile(path: string, content: Uint8Array | string): Promise<void> {
-        return this.route<void>(
-            path,
-            'writeFile',
-            (d, p) => d.writeFile(p, content),
-            { content }
-        );
+        return this.route<void>(path, 'writeFile', { content });
     }
 
     async unlink(path: string, recursive = false): Promise<void> {
-        return this.route<void>(
-            path,
-            'unlink',
-            (d, p) => d.unlink(p, recursive),
-            { recursive }
-        );
+        return this.route<void>(path, 'unlink', { recursive });
     }
 
     async readdir(path: string): Promise<string[]> {
-        return this.route<string[]>(
-            path,
-            'readdir',
-            (d, p) => d.readdir(p)
-        );
+        // If path is root, merge mount points with OPFS root content
+        if (path === '/' || path === '') {
+            let opfsFiles: string[] = [];
+            try {
+                 opfsFiles = await this.route<string[]>('/', 'readdir');
+            } catch (e) {
+                console.warn('Failed to read OPFS root:', e);
+            }
+            
+            const mountPoints = Array.from(this.mounts.keys())
+                .filter(p => p.split('/').length === 2) // Top level mounts e.g. /rom, /mnt
+                .map(p => p.slice(1)); // Remove leading /
+            
+            // Deduplicate
+            return Array.from(new Set([...opfsFiles, ...mountPoints]));
+        }
+
+        return this.route<string[]>(path, 'readdir');
     }
 
     async mkdir(path: string, recursive = true): Promise<void> {
-        return this.route<void>(
-            path,
-            'mkdir',
-            (d, p) => d.mkdir(p, recursive),
-            { recursive }
-        );
+        return this.route<void>(path, 'mkdir', { recursive });
     }
 
     async stat(path: string): Promise<FileStat> {
-        return this.route<FileStat>(
-            path,
-            'stat',
-            (d, p) => d.stat(p)
-        );
+        return this.route<FileStat>(path, 'stat');
     }
 
     async exists(path: string): Promise<boolean> {
-        return this.route<boolean>(
-            path,
-            'exists',
-            (d, p) => d.exists(p)
-        );
+        return this.route<boolean>(path, 'exists');
     }
 
     async rename(oldPath: string, newPath: string): Promise<void> {
-        const isOldMount = oldPath.startsWith('/mnt/');
-        const isNewMount = newPath.startsWith('/mnt/');
+        const { provider: oldProvider, relativePath: oldRel } = this.resolveProvider(oldPath);
+        const { provider: newProvider, relativePath: newRel } = this.resolveProvider(newPath);
 
-        // Same driver - use optimized native move
-        if (isOldMount === isNewMount) {
-            return this.route<void>(
-                oldPath,
-                'rename',
-                (d, p) => {
-                    // We need to resolve newPath relative to the driver ROOT too
-                    const matchNew = newPath.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-                    const relativeNew = matchNew ? (matchNew[2] || '/') : newPath;
-                    return d.rename(p, relativeNew);
-                },
-                { oldPath, newPath }
-            );
+        // Same provider - use optimized move
+        if (oldProvider === newProvider) {
+            // Note: We need to pass newPath in payload for event emission in route()
+            // But route() takes a single path.
+            // For rename, route() handles dispatch but event emission needs newPath.
+            // We can call route() with oldPath and payload { newPath }
+            return this.route<void>(oldPath, 'rename', { newPath });
         }
 
-        // Cross-driver move: Copy + Delete
-        console.log(`[FileSystem] Cross-driver move detected: ${oldPath} -> ${newPath}`);
+        // Cross-provider move: Copy + Delete
+        console.log(`[FileSystem] Cross-provider move detected: ${oldPath} -> ${newPath}`);
         try {
             await this.copy(oldPath, newPath);
             await this.unlink(oldPath, true);
-        } catch (error) {
-            console.error('[FileSystem] Cross-driver move failed:', error);
-            throw new Error(`Failed to move file across filesystems: ${error}`);
+            eventBus.emit('fs:file:moved', { id: newPath.split('/').pop() || '', oldPath, newPath });
+        } catch (error: any) {
+            console.error('[FileSystem] Cross-provider move failed:', error);
+            throw new FileSystemError(
+                FileSystemErrorType.Unknown,
+                `Failed to move file across filesystems: ${error.message}`,
+                error
+            );
         }
     }
 
@@ -220,31 +275,56 @@ export class FileSystemClient implements IFileSystem {
     }
 
     /**
+     * Check if an operation is allowed on a path
+     */
+    async checkPermission(path: string, operation: 'read' | 'write' | 'delete'): Promise<{allowed: boolean, reason?: string}> {
+        const { provider } = this.resolveProvider(path);
+
+        if (provider) {
+            if (provider.readonly && ['write', 'delete'].includes(operation)) {
+                return { 
+                    allowed: false, 
+                    reason: `Read-only file system: ${provider.name}` 
+                };
+            }
+            
+            // Native driver permission check
+            if (provider instanceof NativeDriver) {
+                 const mode = operation === 'read' ? 'read' : 'readwrite';
+                 const hasPermission = await provider.verifyPermission(mode);
+                 if (!hasPermission) {
+                    return { 
+                        allowed: false, 
+                        reason: `Permission required for ${operation} operation` 
+                    };
+                }
+            }
+            
+            return { allowed: true };
+        }
+
+        // OPFS - always allowed
+        return { allowed: true };
+    }
+
+    /**
      * Check if a path requires permission (NativeDriver) and if we have it.
      */
     async verifyPermission(path: string, mode: 'read' | 'readwrite' = 'readwrite'): Promise<boolean> {
-        const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-        if (match && match[1]) {
-            const mountId = match[1];
-            const driver = this.mounts.get(mountId);
-            if (driver) {
-                return driver.verifyPermission(mode);
-            }
+        const { provider } = this.resolveProvider(path);
+        if (provider instanceof NativeDriver) {
+            return provider.verifyPermission(mode);
         }
-        return true; // Non-native paths don't need explicit permission prompt
+        return true;
     }
 
     /**
      * Request permission for a path (NativeDriver)
      */
     async requestPermission(path: string, mode: 'read' | 'readwrite' = 'readwrite'): Promise<boolean> {
-        const match = path.match(/^\/mnt\/([a-zA-Z0-9-]+)(.*)/);
-        if (match && match[1]) {
-            const mountId = match[1];
-            const driver = this.mounts.get(mountId);
-            if (driver) {
-                return driver.requestPermission(mode);
-            }
+        const { provider } = this.resolveProvider(path);
+        if (provider instanceof NativeDriver) {
+            return provider.requestPermission(mode);
         }
         return true;
     }

@@ -1,5 +1,6 @@
 
 import { System, ThemeMode } from '@/os/sdk';
+import { SYSTEM_PATHS } from '@/os/config/paths';
 
 // Define the tool structure expected by OpenAI/WebLLM
 export interface ToolDefinition {
@@ -229,7 +230,7 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The directory path (e.g. "/Desktop/MyApp")' }
+                    path: { type: 'string', description: `The directory path (e.g. "${SYSTEM_PATHS.DESKTOP}/MyApp")` }
                 },
                 required: ['path']
             }

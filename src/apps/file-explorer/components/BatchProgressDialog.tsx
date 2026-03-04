@@ -14,6 +14,8 @@ interface BatchProgressDialogProps {
   operations: BatchOperation[]
   onCancel: () => void
   onClose: () => void
+  completed?: number
+  failed?: number
 }
 
 export default function BatchProgressDialog({
@@ -21,13 +23,17 @@ export default function BatchProgressDialog({
   title,
   operations,
   onCancel,
-  onClose
+  onClose,
+  completed: completedProp,
+  failed: failedProp
 }: BatchProgressDialogProps) {
   if (!isOpen) return null
 
-  const completed = operations.filter(op => op.status === 'success' || op.status === 'error').length
+  const completed = completedProp ?? operations.filter(op => op.status === 'success' || op.status === 'error').length
+  const failed = failedProp ?? operations.filter(op => op.status === 'error').length
+  const succeeded = completed - failed
   const total = operations.length
-  const hasErrors = operations.some(op => op.status === 'error')
+  const hasErrors = failed > 0
   const isComplete = completed === total
 
   return (
@@ -47,7 +53,15 @@ export default function BatchProgressDialog({
         {/* Progress Bar */}
         <div className="px-4 py-3 border-b border-white/10">
           <div className="flex items-center justify-between text-sm text-white/70 mb-2">
-            <span>{completed} / {total} items</span>
+            <div className="flex items-center gap-4">
+              <span>{completed} / {total} items</span>
+              {succeeded > 0 && (
+                <span className="text-green-400">{succeeded} succeeded</span>
+              )}
+              {failed > 0 && (
+                <span className="text-red-400">{failed} failed</span>
+              )}
+            </div>
             <span>{Math.round((completed / total) * 100)}%</span>
           </div>
           <div className="h-2 bg-white/10 rounded-full overflow-hidden">

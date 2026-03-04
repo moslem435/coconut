@@ -128,8 +128,11 @@ export default function Desktop() {
     useEffect(() => {
         // 'desktop' 是系统的虚拟根路径之一，通常对应文件系统的某个位置
         // 这里我们主动触发加载，确保持久化的文件能同步到内存
-        loadFolderContent('desktop')
-    }, [loadFolderContent])
+        // Wait for FS initialization to avoid race condition with migration
+        if (!isLoading) {
+            loadFolderContent('desktop')
+        }
+    }, [loadFolderContent, isLoading])
 
     /**
      * 桌面项目列表

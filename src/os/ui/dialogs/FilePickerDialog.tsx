@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Folder, File, ChevronRight, Search, Upload, ArrowUp } from 'lucide-react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { FILE_IDS } from '@/os/config/paths'
 
 interface FilePickerDialogProps {
     isOpen: boolean
@@ -18,7 +19,7 @@ export function FilePickerDialog({
     isOpen,
     mode,
     title,
-    initialPath = 'desktop',
+    initialPath = FILE_IDS.DESKTOP,
     defaultFileName = '',
     allowedExtensions,
     onConfirm,

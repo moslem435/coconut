@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { CreateWebWorkerMLCEngine, MLCEngineInterface, InitProgressCallback } from "@mlc-ai/web-llm";
 import { Message, ModelConfig } from '../types';
 import { systemToolsDefinitions, systemToolsImplementation, TOOL_CATEGORIES } from '../utils/systemTools';
+import { SYSTEM_PATHS } from '@/os/config/paths';
 
 export interface WebLLMState {
     isLoading: boolean;
@@ -411,7 +412,7 @@ export function useWebLLM() {
     
     When a user asks you to CREATE an app, game, website, or tool:
     1. Reply briefly confirming what you will build.
-    2. Use the 'create_directory' tool to create a folder for the project with the '.app' extension (e.g., "/Desktop/SnakeGame.app").
+    2. Use the 'create_directory' tool to create a folder for the project with the '.app' extension (e.g., "${SYSTEM_PATHS.DESKTOP}/SnakeGame.app").
     3. Use the 'create_file' tool to create the 'index.html' file inside that folder.
     4. Ensure the HTML file links to the CSS and JS files correctly (if you create them separately).
     5. After creating all files, tell the user the app is ready and they can double-click the .app folder to run it.

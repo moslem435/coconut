@@ -512,6 +512,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         isOpen={batchProgress.isOpen}
         title={batchProgress.title}
         operations={batchProgress.operations}
+        completed={batchProgress.completed}
+        failed={batchProgress.failed}
         onCancel={cancelBatch}
         onClose={closeBatch}
       />

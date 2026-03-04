@@ -1,0 +1,58 @@
+[
+  {
+    "path": "/gallery/abstract.jpg",
+    "name": "abstract.jpg",
+    "size": 94306,
+    "mtime": 1771897745049,
+    "type": "file"
+  },
+  {
+    "path": "/gallery/cars.jpg",
+    "name": "cars.jpg",
+    "size": 34107,
+    "mtime": 1771897745049,
+    "type": "file"
+  },
+  {
+    "path": "/gallery/colorful.jpg",
+    "name": "colorful.jpg",
+    "size": 19080,
+    "mtime": 1771897745050,
+    "type": "file"
+  },
+  {
+    "path": "/gallery/gradient.jpg",
+    "name": "gradient.jpg",
+    "size": 12771,
+    "mtime": 1771897745050,
+    "type": "file"
+  },
+  {
+    "path": "/wallpapers/city.jpg",
+    "name": "city.jpg",
+    "size": 788849,
+    "mtime": 1771897745067,
+    "type": "file"
+  },
+  {
+    "path": "/wallpapers/default.jpg",
+    "name": "default.jpg",
+    "size": 22916,
+    "mtime": 1771897745067,
+    "type": "file"
+  },
+  {
+    "path": "/wallpapers/desert.jpg",
+    "name": "desert.jpg",
+    "size": 840920,
+    "mtime": 1771897745073,
+    "type": "file"
+  },
+  {
+    "path": "/wallpapers/snow.jpg",
+    "name": "snow.jpg",
+    "size": 620516,
+    "mtime": 1771897745075,
+    "type": "file"
+  }
+]

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { WebContainer } from '@webcontainer/api'
+import { SYSTEM_PATHS } from '@/os/config/paths'
 
 interface WebContainerState {
   instance: WebContainer | null
@@ -38,7 +39,8 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       return
     }
 
-    const wcPath = `/home/guest${path}`
+    // Direct mapping: VFS path -> WC path (assuming path is absolute)
+    const wcPath = path
     try {
       // console.log('[VFS->WC] writeFile:', wcPath)
       await instance.fs.writeFile(wcPath, content)
@@ -56,7 +58,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
        return
     }
 
-    const wcPath = `/home/guest${path}`
+    const wcPath = path
     try {
       // console.log('[VFS->WC] mkdir:', wcPath)
       await instance.fs.mkdir(wcPath, { recursive: true })
@@ -69,12 +71,9 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     const { instance, isSyncingFromWC } = get()
     if (!instance || isSyncingFromWC) return
 
-    const wcPath = `/home/guest${path}`
+    const wcPath = path
     try {
       console.log('[VFS->WC] unlink:', wcPath)
-      // Try to determine if file or folder, but rm -r works for both mostly if we use custom logic
-      // WebContainer rm is strictly file or directory?
-      // rm(path, { recursive: true }) handles both
       await instance.fs.rm(wcPath, { recursive: true, force: true })
     } catch (e) {
       console.warn('[VFS->WC] unlink failed:', e)
@@ -113,53 +112,8 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       const webcontainer = await bootPromise
 
       // Mount a basic starter project
-      // 1. Basic System Files & Project Structure
+      // 1. Basic System Files
       const mountTree: any = {
-        'home': {
-          directory: {
-            'guest': {
-              directory: {
-                // Project folder for Node.js stuff
-                'project': {
-                  directory: {
-                    'package.json': {
-                      file: {
-                        contents: JSON.stringify({
-                          name: 'web-os-terminal',
-                          type: 'module',
-                          dependencies: {
-                            'express': 'latest',
-                            'nodemon': 'latest'
-                          },
-                          scripts: {
-                            'start': 'nodemon index.js'
-                          }
-                        }, null, 2)
-                      }
-                    },
-                    'index.js': {
-                      file: {
-                        contents: `import express from 'express';
-const app = express();
-const port = 3000;
-
-app.get('/', (req, res) => {
-  res.send('Hello from WebContainer OS!');
-});
-
-app.listen(port, () => {
-  console.log(\`App running at http://localhost:\${port}\`);
-});`
-                      }
-                    }
-                  }
-                },
-                // VFS Content will be mounted here dynamically
-                // We reserve keys for VFS content to be merged here
-              }
-            }
-          }
-        },
         // System wide config (optional)
         'etc': {
           directory: {
@@ -206,34 +160,71 @@ app.listen(port, () => {
         return tree
       }
 
-      // Build the tree starting from root and mount it under '/home/guest'
-      // Merge VFS tree into the guest directory
+      // Build the tree starting from root and mount it under '/'
       const vfsTree = await buildTree(rootId)
-      Object.assign(mountTree['home'].directory['guest'].directory, vfsTree)
+      
+      // Merge trees (simple merge since top levels don't overlap much, or vfsTree takes precedence)
+      const finalTree = { ...mountTree, ...vfsTree }
 
-      await webcontainer.mount(mountTree)
+      await webcontainer.mount(finalTree)
+
+      // Ensure /home/user/project exists with default files
+      try {
+        await webcontainer.fs.mkdir(SYSTEM_PATHS.PROJECT, { recursive: true });
+        
+        // Write default project files if they don't exist
+        // Note: We use writeFile directly which might trigger watcher, but usually initial write is fine
+        // We can check if file exists but overwrite is safer for ensuring a working environment
+        
+        await webcontainer.fs.writeFile(`${SYSTEM_PATHS.PROJECT}/package.json`, JSON.stringify({
+          name: 'web-os-terminal',
+          type: 'module',
+          dependencies: {
+            'express': 'latest',
+            'nodemon': 'latest'
+          },
+          scripts: {
+            'start': 'nodemon index.js'
+          }
+        }, null, 2));
+
+        await webcontainer.fs.writeFile(`${SYSTEM_PATHS.PROJECT}/index.js`, `import express from 'express';
+const app = express();
+const port = 3000;
+
+app.get('/', (req, res) => {
+  res.send('Hello from WebContainer OS!');
+});
+
+app.listen(port, () => {
+  console.log(\`App running at http://localhost:\${port}\`);
+});`);
+
+      } catch (e) {
+        console.warn('Failed to setup default project:', e)
+      }
 
       // --- Bi-directional Sync Implementation ---
 
       // 3. WebContainer -> VFS (fs.watch)
-      webcontainer.fs.watch('/home/guest', { recursive: true }, async (event, filename) => {
+      // Watch root to capture all changes
+      webcontainer.fs.watch('/', { recursive: true }, async (event, filename) => {
         // Explicitly check if filename is string. fs.watch type definition might be loose.
         if (typeof filename !== 'string' || !filename) return
 
         // Ignore node_modules and hidden files/directories
         if (filename.includes('node_modules') || filename.includes('/.') || filename.startsWith('.')) return
 
-        // Previously we ignored project/, now we allow it for source code sync
-        // if (filename.startsWith('project/')) return
-
         set({ isSyncingFromWC: true })
 
         try {
-          const vfsPath = filename
+          // filename is relative to watched path ('/'), so "home/user/foo.txt"
+          // We prepend '/' to make it absolute
+          const vfsPath = '/' + filename
 
           // Check existence and type using readdir on parent to avoid 'stat' error
-          const parentWcPath = `/home/guest/${vfsPath.split('/').slice(0, -1).join('/')}`
-          const name = vfsPath.split('/').pop()!
+          const parentWcPath = `/${filename.split('/').slice(0, -1).join('/')}`
+          const name = filename.split('/').pop()!
 
           let entry: { isDirectory: () => boolean; name: string } | undefined
           try {
@@ -267,7 +258,7 @@ app.listen(port, () => {
                 await createItem(parentId, name, 'folder')
               }
             } else {
-              const fullWcPath = `/home/guest/${filename}`
+              const fullWcPath = vfsPath
               const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8') as string
 
               if (!existingNode) {
