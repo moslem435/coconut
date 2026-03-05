@@ -1,4 +1,4 @@
-
+﻿
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
 import { useWindowContext } from '@/os/kernel/WindowContext';
@@ -34,7 +34,7 @@ export function ChatArea() {
     const [sendError, setSendError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    const { launch, minimize, maximize, close } = useWindow();
+    const { launch, minimize, maximize, close, update } = useWindow();
     const windowContext = useWindowContext();
     const windowId = windowContext?.windowId || '';
     const dragControls = windowContext?.dragControls;
@@ -173,9 +173,13 @@ export function ChatArea() {
                 isModelLoaded={llm.isModelLoaded}
                 currentModelName={currentModelName}
                 aiProvider={aiProvider}
-                isSidebar={false}
+                isSidebar={windowState?.isSidebar || false}
                 isMaximized={windowState?.isMaximized || false}
-                onDetach={() => { }}
+                onDetach={() => {
+                    if (windowId) {
+                        update(windowId, { isSidebar: false });
+                    }
+                }}
                 onMinimize={() => windowId && minimize(windowId)}
                 onMaximize={() => windowId && maximize(windowId)}
                 onClose={() => windowId && close(windowId)}
