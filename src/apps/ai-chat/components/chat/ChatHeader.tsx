@@ -1,5 +1,5 @@
 
-import { PanelLeft, Pencil, ArrowUpRightFromSquare, Minus, Maximize2, Minimize2, X, Cloud } from 'lucide-react';
+import { PanelLeft, Pencil, ArrowUpRightFromSquare, Minus, Maximize2, Minimize2, X, Cloud, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/os/sdk';
 import { useChatStore } from '../../store/useChatStore';
@@ -48,6 +48,7 @@ export function ChatHeader({
     onDragStart
 }: ChatHeaderProps) {
     const { t } = useTranslation();
+    const createSession = useChatStore(state => state.createSession);
 
     return (
         <header
@@ -67,6 +68,13 @@ export function ChatHeader({
                         <PanelLeft size={16} />
                     </button>
                 )}
+                <button
+                    onClick={() => createSession()}
+                    className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                    title={t('ai.sidebar.new_chat')}
+                >
+                    <Plus size={16} />
+                </button>
                 {isEditingTitle ? (
                     <div className="flex items-center gap-2 min-w-[200px]">
                         <input

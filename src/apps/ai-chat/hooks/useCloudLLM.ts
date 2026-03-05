@@ -262,17 +262,60 @@ You have tools to control the system. Follow these rules:
 5. CLOSE APP: First call get_running_apps to retrieve the windowId, then call close_app with that windowId.
 6. STATUS: use get_system_status to read current settings before modifying if needed.
 Never make up windowIds. Always query running apps first before closing.`,
-        builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
-When asked to create an app/game/tool:
-1. Briefly explain what you will build.
-2. Use 'create_directory' to create a folder with '.coco' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.coco").
-3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
-   CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
-4. After the file is created, confirm the app is ready and the user can double-click the folder to run it.
-When asked to modify or fix an existing app:
-1. Use 'read_file' to read the current file content.
-2. Apply the requested changes.
-3. Use 'update_file' to overwrite the file with the updated content.`
+        builder: `You are an expert full-stack developer and system architect. Respond in the same language as the user (Chinese users → reply in Chinese).
+
+CORE PRINCIPLES:
+1. **App-as-a-Folder**: Every app must be a self-contained folder in the file system.
+2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
+3. **Decoupling**: The app should not depend on system-wide configuration changes.
+
+CAPABILITIES:
+- You have a full Node.js environment (WebContainer).
+- You can run shell commands like 'npm install', 'npm run dev', 'node server.js'.
+- You can create multi-file projects (React, Vue, Express, etc.).
+
+WHEN CREATING AN APP:
+1. Plan the folder structure. All apps go into "${SYSTEM_PATHS.USER}/apps/[app-name]".
+2. Use 'create_directory' to create the root folder.
+3. Initialize the project:
+   
+   FOR REACT APPS - DO NOT use 'npm create vite' (it's interactive). Instead:
+   a) Create package.json manually with 'create_file'
+   b) Install dependencies: 'npm install react react-dom vite @vitejs/plugin-react'
+   c) Create vite.config.js and index.html manually
+   
+   FOR EXPRESS BACKEND:
+   - Use 'npm init -y' (non-interactive)
+   - Then install: 'npm install express cors sqlite3 body-parser'
+   
+4. Write all necessary code files using 'create_file' or 'update_file'.
+5. For full-stack apps, ensure both frontend and backend can run.
+
+CRITICAL EXECUTION RULES:
+- NEVER use interactive commands: "npm create vite", "npm init" (use "npm init -y"), "create-react-app"
+- For React projects: Manually create package.json, vite.config.js, index.html, and install dependencies
+- After completing a major milestone (e.g., project initialized, dependencies installed), provide a brief progress update
+- When all setup is complete, STOP using tools and provide a final summary with next steps
+- Don't create unnecessary files or run redundant commands
+- Maximum 12-15 tool calls per task - plan efficiently
+
+REACT + VITE PROJECT TEMPLATE (use this instead of npm create vite):
+1. Create package.json with: {"name":"app","type":"module","scripts":{"dev":"vite","build":"vite build"},"dependencies":{"react":"^18","react-dom":"^18"},"devDependencies":{"vite":"^5","@vitejs/plugin-react":"^4"}}
+2. Create vite.config.js with: import react from '@vitejs/plugin-react'; export default { plugins: [react()] }
+3. Create index.html with basic HTML structure and <div id="root"></div>
+4. Create src/main.jsx with React.render code
+5. Run: npm install
+
+DEBUGGING:
+- If a command fails, read the output, fix the code/config, and try again.
+- Use 'get_file_tree' to understand the current structure.
+
+COMPLETION CRITERIA:
+You should STOP and provide a summary when:
+- All requested files and directories are created
+- All dependencies are installed
+- The project structure is complete and ready to use
+- You've provided clear instructions on how to run/use the app`
     };
 
     if (mode === 'chat') {
@@ -313,8 +356,12 @@ async function callGemini(
 
     const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
 
-    // Multi-turn agentic loop (max 6 rounds)
-    for (let round = 0; round < 6; round++) {
+    // Multi-turn agentic loop
+    // Control mode: 6 rounds (simple system operations)
+    // Builder mode: 12 rounds (complex build tasks)
+    const maxRounds = mode === 'builder' ? 50 : 6;
+    
+    for (let round = 0; round < maxRounds; round++) {
         if (signal.aborted) break;
 
         if (round > 0) {
@@ -490,8 +537,13 @@ async function callOpenAI(
 
     const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
 
-    // Multi-turn agentic loop (max 6 rounds)
-    for (let round = 0; round < 6; round++) {
+    // Multi-turn agentic loop
+    // Control mode: 6 rounds (simple system operations)
+    // Builder mode: 12 rounds (complex build tasks)
+    const maxRounds = mode === 'builder' ? 12 : 6;
+    
+    for (let round = 0; round < maxRounds; round++) {
+        console.log(`[CloudLLM/OpenAI] Starting round ${round}/${maxRounds - 1}, messages count: ${apiMessages.length}`);
         if (signal.aborted) break;
 
         if (round > 0) {
@@ -524,6 +576,8 @@ async function callOpenAI(
             body: JSON.stringify(requestBody),
             signal
         });
+
+        console.log(`[CloudLLM/OpenAI] Round ${round}: Received response, status: ${response.status}`);
 
         if (!response.ok) {
             const errText = await response.text();
@@ -620,8 +674,17 @@ async function callOpenAI(
             }
         }
 
-        // If no tool calls, we're done
-        if (toolCalls.length === 0) break;
+        console.log(`[CloudLLM/OpenAI] Round ${round}: Stream completed. fullContent length: ${fullContent.length}, toolCalls: ${toolCalls.length}`);
+
+        // If no tool calls, we're done with this agentic loop
+        // The assistant has provided a final text response
+        if (toolCalls.length === 0) {
+            console.log(`[CloudLLM] Round ${round}: No tool calls, ending loop`);
+            // This is a text-only response, which is the final answer
+            break;
+        }
+
+        console.log(`[CloudLLM] Round ${round}: Found ${toolCalls.length} tool calls, executing...`);
 
         // Ensure final state is correctly updated to UI store before starting tool execution
         const finalContent = thinkingContent
@@ -668,7 +731,7 @@ async function callOpenAI(
 
             onNewMessage({
                 role: 'tool',
-                content: `${toolPrefix} ${resultText || "Success"}`,
+                content: resultText || "Success",
                 mode,
                 tool_call_id: toolCall.id
             });
@@ -679,7 +742,12 @@ async function callOpenAI(
                 content: resultText || "Success"
             });
         }
+        
+        console.log(`[CloudLLM/OpenAI] Round ${round}: Completed ${toolCalls.length} tool executions, continuing to next round...`);
     }
+    
+    // If we exit the loop due to max rounds, log a warning
+    console.warn(`[CloudLLM/OpenAI] Reached maximum rounds (${maxRounds}). Task may be incomplete.`);
 }
 
 // ─── Test API connection ───────────────────────────────────────────────────────

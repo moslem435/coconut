@@ -1,6 +1,7 @@
 
 import { System, ThemeMode } from '@/os/sdk';
 import { SYSTEM_PATHS } from '@/os/config/paths';
+import { useWebContainerStore } from '@/os/kernel/useWebContainerStore';
 
 // Define the tool structure expected by OpenAI/WebLLM
 export interface ToolDefinition {
@@ -87,14 +88,6 @@ export const systemToolsImplementation: Record<string, Function> = {
             }
             await System.fs.writeFile(args.path, args.content);
 
-            // Verify write
-            // const readBack = await System.fs.readFile(args.path);
-            // if (readBack !== args.content) {
-            //     console.error(`[SystemTools] create_file: Verification failed for '${args.path}'. Expected len ${args.content.length}, got ${readBack.length}`);
-            // } else {
-            //     console.log(`[SystemTools] create_file: Verification success for '${args.path}'`);
-            // }
-
             return `File created at '${args.path}'`;
         } catch (e: any) {
             console.error(`[SystemTools] create_file error:`, e);
@@ -126,6 +119,91 @@ export const systemToolsImplementation: Record<string, Function> = {
             return `File updated at '${args.path}'`;
         } catch (e: any) {
             return `Error updating file: ${e.message || e}`;
+        }
+    },
+
+    // --- Execution ---
+    run_command: async (args: { cmd: string, args?: string[], cwd?: string }) => {
+        let output = '';
+        
+        try {
+            // Ensure WebContainer is ready
+            const store = useWebContainerStore.getState();
+            if (!store.instance) {
+                try {
+                    await store.boot();
+                    // Double check after boot
+                    if (!store.instance && !useWebContainerStore.getState().instance) {
+                        return `Failed to initialize WebContainer. Please refresh the page and try again.`;
+                    }
+                } catch (bootError: any) {
+                    // Check if it's a session conflict
+                    if (bootError.message && bootError.message.includes('session conflict')) {
+                        return `WebContainer initialization conflict detected. Please refresh the page to reset the environment, then try again.`;
+                    }
+                    return `Failed to initialize WebContainer: ${bootError.message || bootError}`;
+                }
+            }
+            
+            // Dispatch a custom event to notify UI about the output stream
+            // This is a temporary solution until we have a proper streaming tool response architecture
+            const dispatchOutput = (data: string) => {
+                // Strip ANSI escape codes (colors, cursor movements, etc.)
+                // eslint-disable-next-line no-control-regex
+                const cleanData = data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+                
+                output += cleanData;
+                window.dispatchEvent(new CustomEvent('ai-builder:command-output', { 
+                    detail: { cmd: args.cmd, output: cleanData } 
+                }));
+            };
+
+            // Create a timeout promise (60 seconds for most commands)
+            const timeoutMs = 60000;
+            const timeoutPromise = new Promise<number>((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error(`Command timed out after ${timeoutMs / 1000} seconds. The command may be waiting for user input or taking too long.`));
+                }, timeoutMs);
+            });
+
+            // Race between command execution and timeout
+            const exitCode = await Promise.race([
+                store.runCommand(
+                    args.cmd, 
+                    args.args || [], 
+                    args.cwd || '/',
+                    dispatchOutput
+                ),
+                timeoutPromise
+            ]);
+            
+            if (exitCode === 0) {
+                return `Command executed successfully.\nOutput:\n${output.slice(0, 1000)}${output.length > 1000 ? '...(truncated)' : ''}`;
+            } else {
+                return `Command failed with exit code ${exitCode}.\nOutput:\n${output.slice(0, 1000)}`;
+            }
+        } catch (e: any) {
+            // Include output in error message if available
+            // This is crucial for commands that fail but output useful stderr info
+            const outputInfo = (output && output.length > 0) ? `\nOutput before failure:\n${output.slice(0, 1000)}` : '';
+            
+            // Check if it's a timeout error
+            if (e.message && e.message.includes('timed out')) {
+                return `Error: ${e.message}${outputInfo}\n\nTip: Avoid interactive commands. Use non-interactive alternatives (e.g., 'npm init -y' instead of 'npm init', or add '-y' flag to skip prompts).`;
+            }
+            
+            return `Error running command: ${e.message || e}${outputInfo}`;
+        }
+    },
+    
+    get_file_tree: (args: { path: string, depth?: number }) => {
+        try {
+             // Basic recursive listing (simplified for now)
+             // In real implementation we might want a tree structure
+             const files = System.fs.readDir(args.path);
+             return JSON.stringify(files.map(f => f.name));
+        } catch(e) {
+             return `Error getting file tree: ${e}`;
         }
     }
 };
@@ -293,6 +371,36 @@ export const systemToolsDefinitions: ToolDefinition[] = [
                 required: ['path', 'content']
             }
         }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'run_command',
+            description: 'Run a shell command in the WebContainer environment. CRITICAL: Commands MUST be non-interactive and complete within 60 seconds. NEVER use: "npm create vite" (interactive), "npm init" (use "npm init -y"), or any command that waits for user input. Safe commands: "npm install", "npm init -y", "ls", "cat", etc.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    cmd: { type: 'string', description: 'The command to run (e.g., "npm")' },
+                    args: { type: 'array', items: { type: 'string' }, description: 'Arguments for the command (e.g., ["install", "react"])' },
+                    cwd: { type: 'string', description: 'Current working directory for the command (e.g. "/home/user/apps/myapp")' }
+                },
+                required: ['cmd']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_file_tree',
+            description: 'Get a list of files in a directory (shallow)',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The directory path' }
+                },
+                required: ['path']
+            }
+        }
     }
 ];
 
@@ -307,10 +415,20 @@ export const TOOL_CATEGORIES = {
         'close_app',
         'get_running_apps'
     ],
+    filesystem: [
+        'create_directory',
+        'create_file',
+        'read_file',
+        'update_file',
+        'run_command',
+        'get_file_tree'
+    ],
     builder: [
         'create_directory',
         'create_file',
         'read_file',
-        'update_file'
+        'update_file',
+        'run_command',
+        'get_file_tree'
     ]
 };

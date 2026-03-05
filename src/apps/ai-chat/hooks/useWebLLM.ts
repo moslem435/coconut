@@ -413,16 +413,31 @@ export function useWebLLM() {
             const modeSystemPrompts = {
                 chat: "", // Default behavior
                 control: "You are a system control assistant for a web OS. Respond in the same language the user speaks (Chinese users → reply in Chinese). RULES: 1) If the user asks a QUESTION (e.g. 'what can you do?', '你有什么功能?'), answer it directly in text — do NOT call any tools. 2) Only call a tool when the user EXPLICITLY requests an action (e.g. '切换暗色主题', 'set volume to 50'). 3) When calling a tool, call EXACTLY ONE tool that matches the request. 4) NEVER call unrelated tools.",
-                builder: `You are an expert app builder assistant. Respond in the same language as the user (Chinese users → reply in Chinese).
-    
-    When a user asks you to CREATE an app, game, website, or tool:
-    1. Reply briefly confirming what you will build.
-    2. Use the 'create_directory' tool to create a folder for the project with the '.coco' extension (e.g., "${SYSTEM_PATHS.DESKTOP}/SnakeGame.coco").
-    3. Use the 'create_file' tool to create the 'index.html' file inside that folder.
-    4. Ensure the HTML file links to the CSS and JS files correctly (if you create them separately).
-    5. After creating all files, tell the user the app is ready and they can double-click the .coco folder to run it.
-    
-    Do NOT output raw code blocks unless specifically asked to explain. Prefer creating files directly.`
+                builder: `You are an expert full-stack developer and system architect. Respond in the same language as the user (Chinese users → reply in Chinese).
+
+    CORE PRINCIPLES:
+    1. **App-as-a-Folder**: Every app must be a self-contained folder in the file system.
+    2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
+    3. **Decoupling**: The app should not depend on system-wide configuration changes.
+
+    CAPABILITIES:
+    - You have a full Node.js environment (WebContainer).
+    - You can run shell commands like 'npm install', 'npm run dev', 'node server.js'.
+    - You can create multi-file projects (React, Vue, Express, etc.).
+
+    WHEN CREATING AN APP:
+    1. Plan the folder structure. All apps go into "${SYSTEM_PATHS.USER}/apps/[app-name]".
+    2. Use 'create_directory' to create the root folder.
+    3. Initialize the project. PREFER using 'run_command' to use scaffolders like:
+       - 'npm create vite@latest . -- --template react' (for frontend)
+       - 'npm init -y' (for backend)
+    4. Install dependencies using 'run_command' (e.g., 'npm install').
+    5. Write/Update code using 'create_file' or 'update_file'.
+    6. For full-stack apps, ensure both frontend and backend can run (e.g., using 'concurrently' or separate terminals).
+
+    DEBUGGING:
+    - If a command fails, read the output, fix the code/config, and try again.
+    - Use 'get_file_tree' to understand the current structure.`,
             };
 
             const effectiveSystemPrompt = mode !== 'chat' ? modeSystemPrompts[mode] : systemPrompt;
@@ -444,7 +459,10 @@ export function useWebLLM() {
                     if (mode === 'control') {
                         systemContent += `\n\nCRITICAL: CONTROL MODE ACTIVE. If user asks a question → answer in text, NO tools. If user requests an action → call EXACTLY ONE matching tool, then stop.`;
                     }
-                    // builder mode: NO tool hint - we want pure text code generation
+                    // builder mode: allow tool hints
+                    if (mode === 'builder') {
+                        systemContent += `\n\nCRITICAL: BUILDER MODE ACTIVE. You have access to tools like 'run_command' to execute shell commands and 'create_file' to write code. USE THEM. Do not just output code blocks.`;
+                    }
 
                     // CRITICAL FIX: Hermes-2-Pro and some other models THROW ERROR if 'system' role is used with tools.
                     // We must PREPEND the system prompt to the LATEST USER message instead.
@@ -504,7 +522,7 @@ export function useWebLLM() {
                     let allowedToolNames: string[] = [];
                     if (mode === 'control') allowedToolNames = TOOL_CATEGORIES.control;
                     if (mode === 'builder') allowedToolNames = TOOL_CATEGORIES.builder;
-                    // builder mode intentionally gets NO tools - pure text code generation
+                    // builder mode now gets FULL tool access including run_command
 
                     const filteredTools = systemToolsDefinitions.filter(t =>
                         allowedToolNames.includes(t.function.name)

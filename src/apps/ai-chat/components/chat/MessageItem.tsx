@@ -104,19 +104,30 @@ export function MessageItem({
                     if (msg.tool_calls && msg.tool_calls.length > 0) {
                         msg.tool_calls.forEach((tc: any) => {
                             // Check for duplicates (just in case)
-                            if (!timelineEvents.find(e => e.type === 'tool' && e.toolCall.id === tc.id)) {
-                                timelineEvents.push({ type: 'tool', toolCall: tc, result: null });
+                            if (!timelineEvents.find(e => e.type === 'tool' && e.toolCall?.id === tc.id)) {
+                                timelineEvents.push({ 
+                                    type: 'tool', 
+                                    toolCall: tc, 
+                                    result: null,
+                                    status: 'loading'
+                                });
                             }
                         });
                     }
                 } else if (msg.role === 'tool') {
                     // 3. Match Tool Results to Tool Calls
-                    const event = timelineEvents.find(e => e.type === 'tool' && e.toolCall.id === msg.tool_call_id);
+                    const event = timelineEvents.find(e => e.type === 'tool' && e.toolCall?.id === msg.tool_call_id);
                     if (event) {
                         event.result = msg.content;
-                        event.isError = msg.content?.includes('Error');
+                        // Check if the result indicates an error
+                        // Only mark as error if it starts with "Error" or "Failed" or contains "Error:" pattern
+                        const contentTrimmed = (msg.content || '').trim();
+                        const startsWithError = contentTrimmed.startsWith('Error') || contentTrimmed.startsWith('Failed');
+                        const containsErrorPattern = /Error:/i.test(contentTrimmed) || /Failed:/i.test(contentTrimmed);
+                        const hasError = startsWithError || containsErrorPattern;
+                        event.isError = hasError;
                         // Update status based on result
-                        event.status = event.isError ? 'error' : 'success';
+                        event.status = hasError ? 'error' : 'success';
                     }
                 }
             }
