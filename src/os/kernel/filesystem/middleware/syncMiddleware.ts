@@ -51,7 +51,11 @@ export function createSyncMiddleware(
 
   // 监听文件系统操作事件
   eventBus.on('fs:file:created', (data: any) => {
-    // console.log('[SyncMiddleware] Received create event:', data)
+    const hasContent = data.content !== undefined && data.content !== null;
+    const contentLen = hasContent ? (typeof data.content === 'string' ? data.content.length : data.content.byteLength) : 0;
+
+    console.log(`[SyncMiddleware] Received create event: ${data.path}, type: ${data.type}, content presence: ${hasContent}, length: ${contentLen}`);
+
     const operation: SyncOperation = {
       id: data.id,
       type: 'create',
@@ -59,10 +63,13 @@ export function createSyncMiddleware(
       timestamp: Date.now(),
       retries: 0
     }
-    
+
     // Execute immediately in the chain
     syncChain = syncChain
-      .then(() => executeOperation(operation))
+      .then(() => {
+        console.log(`[SyncMiddleware] Starting syncCreate execution for ${data.path}, length in payload: ${contentLen}`);
+        return executeOperation(operation);
+      })
       .catch(err => {
         console.error(`[SyncMiddleware] Op ${operation.type}:${operation.id} failed:`, err)
       })
@@ -120,14 +127,22 @@ export function createSyncMiddleware(
       inFlightOps.set(operation.id, operation)
 
       switch (operation.type) {
-        case 'create':
-          // console.log('[SyncMiddleware] Executing syncCreate:', operation.payload.path)
-          await syncService.syncCreate(
-            operation.payload.path,
-            operation.payload.type,
-            operation.payload.content
-          )
+        case 'create': {
+          const { path, type, content } = operation.payload;
+          const isFolder = type === 'folder';
+
+          // WRITE GUARD: Prevent overwriting disk with empty content if it's supposed to have data
+          if (!isFolder && content === undefined) {
+            console.warn(`[SyncMiddleware] Write Guard: Skipping syncCreate for ${path} because content is undefined. Preventing disk corruption.`);
+            break;
+          }
+
+          const byteLen = content ? (typeof content === 'string' ? content.length : content.byteLength) : 0;
+          console.log(`[SyncMiddleware] Executing syncCreate: ${path}, type: ${type}, body size: ${byteLen} bytes`);
+
+          await syncService.syncCreate(path, type, content)
           break
+        }
 
         case 'delete':
           await syncService.syncDelete(operation.payload.path)
@@ -141,18 +156,22 @@ export function createSyncMiddleware(
           )
           break
 
-        case 'update':
-          // Skip update if content is undefined (e.g. from bulk write operations)
-          // unless we want to clear the file, but usually undefined means "payload too large/not provided"
-          if (operation.payload.content === undefined) {
-             // console.log('[SyncMiddleware] Skipping update with undefined content:', operation.payload.path);
-             break;
+        case 'update': {
+          const { path, content } = operation.payload;
+
+          // WRITE GUARD: Skip update if content is undefined to prevent wiping file on disk
+          // This happens if the event payload lost the content during rapid state changes
+          if (content === undefined) {
+            console.warn(`[SyncMiddleware] Write Guard: Skipping syncUpdate for ${path} due to undefined content payload.`);
+            break;
           }
-          await syncService.syncUpdate(
-            operation.payload.path,
-            operation.payload.content
-          )
+
+          const byteLen = typeof content === 'string' ? content.length : (content as any).byteLength;
+          console.log(`[SyncMiddleware] Executing syncUpdate: ${path}, body size: ${byteLen} bytes`);
+
+          await syncService.syncUpdate(path, content)
           break
+        }
       }
 
       inFlightOps.delete(operation.id)
@@ -184,29 +203,27 @@ export function createSyncMiddleware(
    * 回滚操作
    */
   function rollbackOperation(operation: SyncOperation) {
-    const store = storeGetter()
+    // const store = storeGetter()
 
     switch (operation.type) {
       case 'create':
-        // 删除创建的文件
-        store._deleteFiles([operation.payload.id])
-        console.log(`[SyncMiddleware] Rolled back create: deleted ${operation.payload.id}`)
+        // PREVIOUSLY: store._deleteFiles([operation.payload.id])
+        // NOW: Do NOT delete memory node to prevent data loss. 
+        // Keep the node so the user can see it, even if sync failed.
+        console.warn(`[SyncMiddleware] Sync failed for create: ${operation.payload.path}. Memory node KEPT to prevent data loss. User should be notified of sync state.`);
         break
 
       case 'delete':
-        // 删除操作失败，文件可能已经不存在，无需回滚
         console.log(`[SyncMiddleware] Delete operation failed, no rollback needed`)
         break
 
       case 'rename':
       case 'move':
-        // 恢复操作已在 ActionSlice 中处理
         console.log(`[SyncMiddleware] Rename/move rollback handled by ActionSlice`)
         break
 
       case 'update':
-        // 更新失败，元数据已更新但内容未同步
-        console.log(`[SyncMiddleware] Update operation failed, metadata may be inconsistent`)
+        console.log(`[SyncMiddleware] Update operation failed, content in memory is ahead of disk`)
         break
     }
   }

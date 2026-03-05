@@ -27,7 +27,7 @@ export class PathNormalizationWrapper implements IFileSystemProvider {
         if (!path) return '/';
         
         // Ensure start with /
-        let normalized = path.startsWith('/') ? path : '/' + path;
+        const normalized = path.startsWith('/') ? path : '/' + path;
         
         // Split and process segments
         const parts = normalized.split('/').filter(p => p.length > 0 && p !== '.');

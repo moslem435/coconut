@@ -61,26 +61,31 @@ export function useDesktopInteraction() {
         try {
           // 尝试读取入口文件 (index.html)
           // 注意：readFileContent 需要 ID，而不是路径。我们需要先找到子节点。
-          const children = useFileSystemStore.getState().getChildren(item.id)
-          const indexNode = children.find(c => c.name === 'index.html')
-          
-          if (!indexNode) {
-             throw new Error('index.html not found in app bundle')
+          let children = useFileSystemStore.getState().getChildren(item.id)
+
+          // 如果目录没被打开过（比如网页刚刷新），自动扫描一次
+          if (children.length === 0) {
+            await useFileSystemStore.getState().loadFolderContent(item.id)
+            children = useFileSystemStore.getState().getChildren(item.id)
           }
 
-          const indexContent = await readFileContent(indexNode.id)
-          
+          const indexNode = children.find(c => c.name === 'index.html')
+
+          if (!indexNode) {
+            throw new Error('index.html not found in app bundle')
+          }
+
           // 启动 Code Runner
           launchApp(
             'app-run-' + item.id,
             item.name.replace(/\.coco$/, ''), // 去除后缀作为标题
             'code-runner',
             undefined, // 使用默认图标或应用特定图标
-            { 
-              code: indexContent, 
-              language: 'html', 
+            {
+              filePath: indexNode.id,
+              language: 'html',
               mode: 'html',
-              isAppBundle: true 
+              isAppBundle: true
             }
           )
           return

@@ -5,7 +5,6 @@ import { useTranslation } from '@/os/sdk';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ThinkingProcess } from './ThinkingProcess';
 import { BuilderTimeline } from './BuilderTimeline';
-import { TimelineNode } from './TimelineNode';
 
 interface MessageItemProps {
     message: any;
@@ -53,20 +52,29 @@ export function MessageItem({
     const mode = (message.mode as keyof typeof MODE_CONFIG) ?? 'chat';
     const modeCfg = MODE_CONFIG[mode] ?? MODE_CONFIG.chat;
 
-    // ── Tool Result (orphaned) ──
+    // ── Tool Result (orphaned / standalone) ──
     if (isTool) {
-        // ... (Existing tool logic) ...
         const isError = message.content?.includes('Error');
         const displayTx = message.content?.replace(/^\[(?:Builder|Control)\]\s*/, '') || '';
         return (
-            <div className="max-w-4xl mx-auto w-full pl-12 animate-in fade-in duration-200 mb-4">
-                <TimelineNode
-                    title={isError ? 'Operation Failed' : 'Operation Completed'}
-                    description={displayTx}
-                    status={isError ? 'error' : 'success'}
-                    isLast
-                    error={isError ? displayTx : undefined}
-                />
+            <div className="max-w-4xl mx-auto w-full pl-4 animate-in fade-in duration-200 mb-3">
+                <div className="flex items-start gap-2">
+                    <div className={cn(
+                        "mt-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0",
+                        isError ? "bg-red-500" : "bg-emerald-500"
+                    )}>
+                        {isError
+                            ? <span className="text-white text-[8px] font-bold leading-none">✕</span>
+                            : <span className="text-white text-[8px] font-bold leading-none">✓</span>
+                        }
+                    </div>
+                    <p className={cn(
+                        "text-[12px] font-mono leading-relaxed",
+                        isError ? "text-red-400" : "text-zinc-400 dark:text-zinc-500"
+                    )}>
+                        {displayTx}
+                    </p>
+                </div>
             </div>
         );
     }
@@ -76,10 +84,10 @@ export function MessageItem({
         const isGenerating = isLoading && isLast;
         const thinkMatch = message.content?.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
         const thinkContent = thinkMatch ? thinkMatch[1] : null;
-        
+
         // Reconstruct events from rawMessages if available (preferred method for grouped messages)
         let timelineEvents: any[] = [];
-        
+
         if (rawMessages && rawMessages.length > 0) {
             // Process the raw message group to build a chronological timeline
             for (const msg of rawMessages) {
@@ -91,14 +99,14 @@ export function MessageItem({
                             timelineEvents.push({ type: 'text', content: cleanContent });
                         }
                     }
-                    
+
                     // 2. Add Tool Calls
                     if (msg.tool_calls && msg.tool_calls.length > 0) {
                         msg.tool_calls.forEach((tc: any) => {
-                             // Check for duplicates (just in case)
-                             if (!timelineEvents.find(e => e.type === 'tool' && e.toolCall.id === tc.id)) {
-                                 timelineEvents.push({ type: 'tool', toolCall: tc, result: null });
-                             }
+                            // Check for duplicates (just in case)
+                            if (!timelineEvents.find(e => e.type === 'tool' && e.toolCall.id === tc.id)) {
+                                timelineEvents.push({ type: 'tool', toolCall: tc, result: null });
+                            }
                         });
                     }
                 } else if (msg.role === 'tool') {
@@ -115,15 +123,15 @@ export function MessageItem({
         } else if (flowEvents) {
             // Fallback to legacy flowEvents prop
             timelineEvents = flowEvents.map((e: any) => {
-                 if (e.type === 'text' && e.content) {
-                     return { ...e, content: e.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim() };
-                 }
-                 return e;
+                if (e.type === 'text' && e.content) {
+                    return { ...e, content: e.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim() };
+                }
+                return e;
             });
         }
 
         const hasTools = timelineEvents.some((e: any) => e.type === 'tool');
-        
+
         // Regular text content for fallback or simple chat
         const rawContent = message.content
             ? (thinkMatch ? message.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim() : message.content)
@@ -225,11 +233,11 @@ export function MessageItem({
 
     // ── User Message ──
     const userMode = MODE_CONFIG[(message.mode as keyof typeof MODE_CONFIG) ?? 'chat'] ?? MODE_CONFIG.chat;
-    const userBubbleCls = {
+    const userBubbleCls = ({
         chat: 'bg-indigo-500/10 dark:bg-indigo-500/10 border-indigo-500/20 text-indigo-950 dark:text-indigo-100',
         control: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-950 dark:text-emerald-100',
         builder: 'bg-amber-500/10  border-amber-500/20  text-amber-950  dark:text-amber-100',
-    }[message.mode ?? 'chat'] ?? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-950 dark:text-indigo-100';
+    } as Record<string, string>)[message.mode ?? 'chat'] ?? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-950 dark:text-indigo-100';
 
     return (
         <div className="flex flex-col items-end max-w-4xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-300 mb-6">

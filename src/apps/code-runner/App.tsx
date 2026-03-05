@@ -135,6 +135,8 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
         if (filePath && initialCode === undefined) loadCode();
     }, [filePath, initialCode, readFileContent, initialMode, language]);
 
+    console.log('[CodeRunner] Render state:', { filePath, mode, codeLength: code?.length, error })
+
     if (error) {
         return (
             <div className="h-full w-full flex items-center justify-center bg-red-900/20 text-red-400 p-4">
@@ -170,6 +172,24 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
         },
     };
 
+    if (safeCode.trim() === '') {
+        return (
+            <div className="h-full w-full flex items-center justify-center bg-zinc-900 text-yellow-400 p-4 font-mono text-sm">
+                <div className="text-center max-w-md">
+                    <Lucide.FileWarning className="w-12 h-12 mx-auto mb-2 text-yellow-500" />
+                    <h3 className="text-lg font-bold">Code is Empty</h3>
+                    <p className="mt-2 text-zinc-400">
+                        The file was loaded, but the content is empty. This could mean the file was never written to disk, or the read path failed resolving.
+                    </p>
+                    <div className="mt-4 p-2 bg-black/50 rounded text-left break-all text-xs text-zinc-500">
+                        Target File ID: {filePath || 'N/A'}<br />
+                        Mode: {mode}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={cn(
             "h-full w-full bg-white dark:bg-zinc-900 overflow-auto flex flex-col",
@@ -177,20 +197,20 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
         )}>
             {/* Toolbar */}
             {!isAppBundle && (
-            <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 gap-4 bg-zinc-50 dark:bg-zinc-900 shrink-0">
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-500 uppercase">Mode:</span>
-                    <select
-                        value={mode}
-                        onChange={(e) => setMode(e.target.value as RunMode)}
-                        className="bg-transparent dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
-                    >
-                        <option value="html">HTML Preview</option>
-                        <option value="react">React Preview</option>
-                        <option value="node">Node.js / WASM (WebContainer)</option>
-                    </select>
+                <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 gap-4 bg-zinc-50 dark:bg-zinc-900 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-zinc-500 uppercase">Mode:</span>
+                        <select
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value as RunMode)}
+                            className="bg-transparent dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
+                        >
+                            <option value="html">HTML Preview</option>
+                            <option value="react">React Preview</option>
+                            <option value="node">Node.js / WASM (WebContainer)</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
             )}
 
             {/* Runner Area */}

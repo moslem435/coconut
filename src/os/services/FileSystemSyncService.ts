@@ -28,25 +28,22 @@ class FileSystemSyncService {
   ): Promise<void> {
     const tasks: Array<() => Promise<void>> = []
 
-    // OPFS 同步
+    // OPFS 同步 (Critical, await)
     if (options.syncToOPFS) {
-      tasks.push(async () => {
-        try {
-          if (type === 'folder') {
-            await ioService.mkdir(path)
-          } else {
-            const fileContent = content !== undefined ? content : '';
-            await ioService.writeFile(path, fileContent)
-          }
-        } catch (error) {
-          console.error('[SyncService] OPFS create failed:', error)
+      const opfsTask = async () => {
+        if (type === 'folder') {
+          await ioService.mkdir(path)
+        } else {
+          const fileContent = content !== undefined ? content : '';
+          await ioService.writeFile(path, fileContent)
         }
-      })
+      };
+      await this.executeTasks([opfsTask]);
     }
 
-    // WebContainer 同步
+    // WebContainer 同步 (Non-critical, background)
     if (options.syncToWebContainer) {
-      tasks.push(async () => {
+      (async () => {
         try {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
           if (type === 'folder') {
@@ -56,12 +53,10 @@ class FileSystemSyncService {
             useWebContainerStore.getState().syncFile(path, fileContent)
           }
         } catch (error) {
-          console.error('[SyncService] WebContainer create failed:', error)
+          console.warn('[SyncService] Background WebContainer creation failed (non-fatal):', error)
         }
-      })
+      })();
     }
-
-    await this.executeTasks(tasks)
 
     // Publish event
     eventBus.emit('fs:file:created', {
@@ -79,32 +74,25 @@ class FileSystemSyncService {
     content: string | Uint8Array,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    const tasks: Array<() => Promise<void>> = []
-
     if (options.syncToOPFS) {
-      tasks.push(async () => {
-        try {
-          await ioService.writeFile(path, content)
-        } catch (error) {
-          console.error('[SyncService] OPFS update failed:', error)
-        }
-      })
+      const opfsTask = async () => {
+        await ioService.writeFile(path, content)
+      };
+      await this.executeTasks([opfsTask]);
     }
 
     if (options.syncToWebContainer) {
-      tasks.push(async () => {
+      (async () => {
         try {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
           useWebContainerStore.getState().syncFile(path, content)
         } catch (error) {
-          console.error('[SyncService] WebContainer update failed:', error)
+          console.warn('[SyncService] Background WebContainer update failed:', error)
         }
-      })
+      })();
     }
 
-    await this.executeTasks(tasks)
-
-    // Publish event (content might be Uint8Array, convert to string for event)
+    // Publish event
     eventBus.emit('fs:file:updated', {
       id: path.split('/').pop() || '',
       path,
@@ -119,37 +107,28 @@ class FileSystemSyncService {
     path: string,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    const tasks: Array<() => Promise<void>> = []
-
     if (options.syncToOPFS) {
-      tasks.push(async () => {
-        try {
-          if (path && path !== '/') {
-            // Use fs.exists() to silently check OPFS presence before attempting delete.
-            // ioService.unlink on a missing path causes Worker to post an error message.
-            const exists = await fs.exists(path)
-            if (exists) {
-              await ioService.unlink(path, true)
-            }
+      const opfsTask = async () => {
+        if (path && path !== '/') {
+          const exists = await fs.exists(path)
+          if (exists) {
+            await ioService.unlink(path, true)
           }
-        } catch (error) {
-          console.error('[SyncService] OPFS delete failed:', error)
         }
-      })
+      };
+      await this.executeTasks([opfsTask]);
     }
 
     if (options.syncToWebContainer) {
-      tasks.push(async () => {
+      (async () => {
         try {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
           useWebContainerStore.getState().syncUnlink(path)
         } catch (error) {
-          console.error('[SyncService] WebContainer delete failed:', error)
+          console.warn('[SyncService] Background WebContainer deletion failed:', error)
         }
-      })
+      })();
     }
-
-    await this.executeTasks(tasks)
 
     // Publish event
     eventBus.emit('fs:file:deleted', {
@@ -166,43 +145,30 @@ class FileSystemSyncService {
     newPath: string,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    const tasks: Array<() => Promise<void>> = []
-
     if (options.syncToOPFS) {
-      tasks.push(async () => {
-        try {
-          // Use fs.exists() directly — it sends an 'exists' message to the Worker,
-          // which returns true/false without ever throwing or posting an error message.
-          // ioService.exists() routes through stat(), which DOES post an error on missing files.
-          const sourceExists = await fs.exists(oldPath)
-          if (!sourceExists) {
-            console.warn(`[SyncService] syncRename: source not in OPFS, skipping: ${oldPath}`)
-            return
-          }
-          await ioService.rename(oldPath, newPath)
-        } catch (error) {
-          console.error('[SyncService] OPFS rename failed:', error)
+      const opfsTask = async () => {
+        const sourceExists = await fs.exists(oldPath)
+        if (!sourceExists) {
+          console.warn(`[SyncService] syncRename: source not in OPFS, skipping: ${oldPath}`)
+          return
         }
-      })
+        await ioService.rename(oldPath, newPath)
+      };
+      await this.executeTasks([opfsTask]);
     }
 
     if (options.syncToWebContainer) {
-      tasks.push(async () => {
+      (async () => {
         try {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
           const { instance, isSyncingFromWC } = useWebContainerStore.getState()
           if (!instance || isSyncingFromWC) return
-
-          const wcOld = oldPath
-          const wcNew = newPath
-          await instance.fs.rename(wcOld, wcNew)
+          await instance.fs.rename(oldPath, newPath)
         } catch (error) {
-          console.error('[SyncService] WebContainer rename failed:', error)
+          console.warn('[SyncService] Background WebContainer rename failed:', error)
         }
-      })
+      })();
     }
-
-    await this.executeTasks(tasks)
 
     // Publish event
     eventBus.emit('fs:file:renamed', {
@@ -264,8 +230,10 @@ class FileSystemSyncService {
    * 批量执行同步任务
    */
   private async executeTasks(tasks: Array<() => Promise<void>>): Promise<void> {
-    // 并行执行所有任务
-    await Promise.allSettled(tasks.map(task => task()))
+    // Execute all tasks sequentially to prevent race conditions in OPFS handles
+    for (const task of tasks) {
+      await task();
+    }
   }
 
   /**

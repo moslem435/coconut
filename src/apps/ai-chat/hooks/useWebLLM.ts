@@ -389,14 +389,18 @@ export function useWebLLM() {
 
             // Prepend system prompt if exists
             const chatMessages: any[] = messages.map(m => {
-                const msg: any = {
-                    role: m.role,
-                    content: m.content
-                };
-                // @ts-ignore
-                if (m.tool_calls) msg.tool_calls = m.tool_calls;
-                // @ts-ignore
-                if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+                const msg: any = { role: m.role };
+
+                if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+                    msg.content = m.content ? m.content : null; // Strict OpenAI: null if empty text + tool_calls
+                    msg.tool_calls = m.tool_calls;
+                } else if (m.role === 'tool') {
+                    msg.content = String(m.content || "");
+                    msg.tool_call_id = m.tool_call_id;
+                } else {
+                    msg.content = m.content || "";
+                }
+
                 return msg;
             });
 
@@ -486,7 +490,7 @@ export function useWebLLM() {
             for (let i = 0; i < 5; i++) {
                 // If this is a follow-up turn (after tool execution), we need a new assistant message placeholder in the UI
                 if (i > 0) {
-                    onNewMessage({ role: 'assistant', content: '', mode });
+                    onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });
                 }
 
                 const completionParams: any = {
@@ -515,7 +519,7 @@ export function useWebLLM() {
 
                 if (mode === 'control') {
                     const fallbackInjection = (msg: string) => {
-                        let allowedToolNames = TOOL_CATEGORIES.control;
+                        const allowedToolNames = TOOL_CATEGORIES.control;
                         const filteredTools = systemToolsDefinitions.filter(t =>
                             allowedToolNames.includes(t.function.name)
                         );
@@ -523,25 +527,22 @@ export function useWebLLM() {
                         return `${msg}\n\n[System Control Mode]\nAVAILABLE TOOLS:\n${toolsJson}\n\nINSTRUCTION: You MUST output a JSON object to use a tool. Format: {"tool": "tool_name", "args": {...}}`;
                     };
 
-                    // Inject prompt if:
-                    // 1. Not using native tools
-                    // 2. OR using native tools but we are in a follow-up loop (which might mean previous attempt failed or we are chaining)
-                    // Actually, for simplicity, let's inject it ALWAYS for non-native, and ONLY on retry for native.
-
                     if (!supportsTools) {
-                        const lastMsg = chatMessages[chatMessages.length - 1];
-                        if (lastMsg.role === 'user' && !lastMsg.content.includes('[System Control Mode]')) {
-                            lastMsg.content = fallbackInjection(lastMsg.content);
+                        const lastUserMsg = chatMessages.filter(m => m.role === 'user').pop();
+                        if (lastUserMsg && !lastUserMsg.content.includes('[System Control Mode]')) {
+                            lastUserMsg.content = fallbackInjection(lastUserMsg.content);
                         }
                     }
                 }
 
+                console.log("[AI-Chat] completionParams going to WebLLM:", JSON.stringify(completionParams, null, 2));
                 const reply = await engineRef.current.chat.completions.create(completionParams);
 
                 let fullContent = '';
                 const toolCalls: any[] = [];
 
-                for await (const chunk of reply) {
+
+                for await (const chunk of (reply as any)) {
                     if (signal.aborted) break;
                     const delta = chunk.choices[0]?.delta;
 
@@ -635,7 +636,7 @@ export function useWebLLM() {
 
                                 // Inject manual prompt into the last user message
                                 const fallbackInjection = (msg: string) => {
-                                    let allowedToolNames = TOOL_CATEGORIES.control;
+                                    const allowedToolNames = TOOL_CATEGORIES.control;
                                     const filteredTools = systemToolsDefinitions.filter(t =>
                                         allowedToolNames.includes(t.function.name)
                                     );
@@ -662,7 +663,7 @@ export function useWebLLM() {
                                     try {
                                         const retryReply = await engineRef.current.chat.completions.create(completionParams);
                                         let retryContent = '';
-                                        for await (const chunk of retryReply) {
+                                        for await (const chunk of (retryReply as any)) {
                                             retryContent += chunk.choices[0]?.delta?.content || '';
                                         }
 

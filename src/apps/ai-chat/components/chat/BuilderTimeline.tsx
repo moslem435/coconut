@@ -1,15 +1,13 @@
-
+import React from 'react';
 import { useTranslation } from '@/os/sdk';
-import { Loader2, Terminal, CheckCircle2, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { Loader2, Check, X, FolderPlus, FilePlus, FileEdit, FileSearch, Trash2, Move, Copy, List, Play, Settings, Info, Terminal, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { TimelineNode, TimelineStatus } from './TimelineNode';
+import { TimelineStatus } from './TimelineNode';
 
 export interface TimelineEvent {
     type: 'text' | 'tool';
-    // Text props
     content?: string;
-    // Tool props
     toolCall?: any;
     result?: string;
     isError?: boolean;
@@ -21,168 +19,184 @@ interface BuilderTimelineProps {
     isLoading?: boolean;
 }
 
-// Format tool title
-function formatTitle(toolName: string, args: any): string {
+// ── Tool name → icon + display label ──────────────────────────────────────────
+function getToolMeta(toolName: string, args: any): { label: string; Icon: React.ElementType } {
     const s = args || {};
-    const fn = (p: string) => p?.split('/').pop() || p;
-    switch (toolName) {
-        case 'create_directory': return `Create Directory ${fn(s.path) || ''}`;
-        case 'create_file': return `Create File ${fn(s.path) || ''}`;
-        case 'update_file': return `Update File ${fn(s.path) || ''}`;
-        case 'read_file': return `Read File ${fn(s.path) || ''}`;
-        case 'rename_file': return `Rename ${fn(s.new_path || s.path) || ''}`;
-        case 'delete_file': return `Delete File ${fn(s.path) || ''}`;
-        case 'move_file': return `Move File ${fn(s.path) || ''}`;
-        case 'copy_file': return `Copy File ${fn(s.path) || ''}`;
-        case 'list_directory': return `List ${s.path || '/'}`;
-        case 'launch_app': return `Launch ${s.appId || ''}`;
-        case 'close_app': return `Close ${s.appId || ''}`;
-        case 'set_theme': return `Set Theme → ${s.mode || ''}`;
-        case 'set_volume': return `Set Volume → ${s.level ?? ''}`;
-        case 'set_wallpaper': return `Set Wallpaper`;
-        case 'execute_command': return `Execute Command`;
-        case 'get_system_info': return `Get System Info`;
-        case 'open_settings': return `Open Settings`;
-        default: return toolName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    }
+    const fileName = (p: string) => p?.split('/').pop() || p;
+
+    const map: Record<string, { label: string; Icon: React.ElementType }> = {
+        create_directory: { label: `新建文件夹  ${fileName(s.path) || ''}`, Icon: FolderPlus },
+        create_file: { label: `创建文件  ${fileName(s.path) || ''}`, Icon: FilePlus },
+        update_file: { label: `更新文件  ${fileName(s.path) || ''}`, Icon: FileEdit },
+        read_file: { label: `读取文件  ${fileName(s.path) || ''}`, Icon: FileSearch },
+        delete_file: { label: `删除文件  ${fileName(s.path) || ''}`, Icon: Trash2 },
+        move_file: { label: `移动文件  ${fileName(s.path) || ''}`, Icon: Move },
+        copy_file: { label: `复制文件  ${fileName(s.path) || ''}`, Icon: Copy },
+        list_directory: { label: `列出目录  ${s.path || '/'}`, Icon: List },
+        launch_app: { label: `启动应用  ${s.appId || ''}`, Icon: Play },
+        close_app: { label: `关闭应用  ${s.appId || ''}`, Icon: X },
+        set_theme: { label: `切换主题  ${s.mode || ''}`, Icon: Settings },
+        set_volume: { label: `设置音量  ${s.level ?? ''}`, Icon: Settings },
+        set_wallpaper: { label: `更换壁纸`, Icon: Settings },
+        execute_command: { label: `执行命令`, Icon: Terminal },
+        get_system_info: { label: `获取系统信息`, Icon: Info },
+        open_settings: { label: `打开设置`, Icon: Settings },
+    };
+
+    if (map[toolName]) return map[toolName];
+    return {
+        label: toolName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        Icon: Zap,
+    };
 }
 
 // ── Text Step ─────────────────────────────────────────────────────────────────
-function TextStep({ content, isLast }: { content: string; isLast: boolean }) {
+function TextStep({ content }: { content: string }) {
     return (
-        <div className="relative pl-9 pb-4 last:pb-0">
-            {/* Connecting line */}
-            {!isLast && (
-                <div className="absolute left-[13px] top-5 bottom-0 w-px bg-gradient-to-b from-zinc-300/60 to-zinc-200/30 dark:from-zinc-700/60 dark:to-zinc-800/30" />
-            )}
-
-            {/* Icon dot */}
-            <div className="absolute left-0.5 top-0.5 w-6 h-6 rounded-full flex items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 shadow-sm z-10">
-                <MessageSquare size={11} className="text-blue-400 dark:text-blue-500" />
-            </div>
-
-            {/* Content */}
-            <div className="ml-1 pl-3 border-l-2 border-blue-400/30 dark:border-blue-500/25 py-0.5">
-                <div className="text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-300">
-                    <MarkdownRenderer content={content} />
-                </div>
+        <div className="relative pl-4 py-0.5 border-l border-blue-400/25 dark:border-blue-500/20">
+            <div className="text-[13px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                <MarkdownRenderer content={content} />
             </div>
         </div>
     );
 }
 
 // ── Tool Step ─────────────────────────────────────────────────────────────────
-function ToolStep({ event, isLast, index }: { event: TimelineEvent; isLast: boolean; index: number }) {
+function ToolStep({ event }: { event: TimelineEvent }) {
     const { toolCall, result, isError, status } = event;
-    const args = (() => { try { return JSON.parse(toolCall.function.arguments || '{}'); } catch { return {}; } })();
-    const title = formatTitle(toolCall.function.name, args);
+    const args = (() => { try { return JSON.parse(toolCall?.function?.arguments || '{}'); } catch { return {}; } })();
+    const toolMeta = getToolMeta(toolCall?.function?.name || '', args);
     const currentStatus: TimelineStatus = status || (isError ? 'error' : result ? 'success' : 'loading');
 
-    const resultPreview = result && result.length < 120
-        ? result
-        : result ? result.substring(0, 120) + '…' : null;
+    // Compact result line — strip prefix tags like "[Builder] "
+    const cleanResult = result?.replace(/^\[.*?\]\s*/, '');
+    const resultLine = cleanResult && cleanResult.length < 80
+        ? cleanResult
+        : cleanResult ? cleanResult.slice(0, 80) + '…' : null;
 
     return (
-        <TimelineNode
-            title={title}
-            status={currentStatus}
-            isLast={isLast}
-            index={index}
-            details={result || args}
-            error={isError ? result : undefined}
-            description={!isError && resultPreview ? resultPreview : undefined}
-        />
+        <div className="flex items-start gap-2.5 py-0.5">
+            {/* Status indicator */}
+            <div className="mt-0.5 shrink-0 w-4 h-4 flex items-center justify-center">
+                {currentStatus === 'loading' && (
+                    <Loader2 size={13} className="animate-spin text-indigo-400" />
+                )}
+                {currentStatus === 'success' && (
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-500/30">
+                        <Check size={9} strokeWidth={3} className="text-white" />
+                    </div>
+                )}
+                {currentStatus === 'error' && (
+                    <div className="w-3.5 h-3.5 rounded-full bg-red-500 flex items-center justify-center shadow-sm shadow-red-500/30">
+                        <X size={9} strokeWidth={3} className="text-white" />
+                    </div>
+                )}
+                {currentStatus === 'pending' && (
+                    <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                )}
+            </div>
+
+            {/* Label + result */}
+            <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5">
+                    {React.createElement(toolMeta.Icon as any, {
+                        size: 11,
+                        className: cn(
+                            "shrink-0",
+                            currentStatus === 'loading' ? "text-indigo-400" :
+                                currentStatus === 'success' ? "text-emerald-500" :
+                                    currentStatus === 'error' ? "text-red-400" :
+                                        "text-zinc-400"
+                        )
+                    })}
+                    <span className={cn(
+                        "text-[13px] font-medium truncate",
+                        currentStatus === 'loading' ? "text-indigo-600 dark:text-indigo-400" :
+                            currentStatus === 'error' ? "text-red-600 dark:text-red-400" :
+                                "text-zinc-700 dark:text-zinc-200"
+                    )}>
+                        {toolMeta.label}
+                    </span>
+                </div>
+                {resultLine && !isError && (
+                    <span className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500 truncate mt-0.5 pl-0.5">
+                        {resultLine}
+                    </span>
+                )}
+                {isError && result && (
+                    <span className="text-[11px] font-mono text-red-400 dark:text-red-500 mt-0.5 pl-0.5 line-clamp-2">
+                        {cleanResult}
+                    </span>
+                )}
+            </div>
+        </div>
     );
 }
 
-// ── Summary badge  ────────────────────────────────────────────────────────────
-function SummaryBadge({ events, isLoading }: { events: TimelineEvent[]; isLoading?: boolean }) {
-    const done = events.filter(e => e.type === 'tool' && e.result).length;
-    const total = events.filter(e => e.type === 'tool').length;
-    const errors = events.filter(e => e.type === 'tool' && e.isError).length;
-
-    if (isLoading) return (
-        <span className="flex items-center gap-1 text-[10px] font-mono text-indigo-400 dark:text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-md border border-indigo-500/20">
-            <Loader2 size={9} className="animate-spin" />
-            {done}/{total || '?'}
-        </span>
+// ── Loading pulse ─────────────────────────────────────────────────────────────
+function LoadingPulse() {
+    return (
+        <div className="flex items-center gap-1.5 pl-0.5 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70 animate-pulse" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/40 animate-pulse" style={{ animationDelay: '300ms' }} />
+        </div>
     );
-    if (errors > 0) return (
-        <span className="flex items-center gap-1 text-[10px] font-mono text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-md border border-red-500/20">
-            <XCircle size={9} />
-            {errors} error{errors > 1 ? 's' : ''}
-        </span>
-    );
-    if (total > 0) return (
-        <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
-            <CheckCircle2 size={9} />
-            {done} done
-        </span>
-    );
-    return null;
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
     const { t } = useTranslation();
 
-    const validEvents = events.filter(e => {
-        if (e.type === 'tool') return true;
-        return e.content && e.content.trim().length > 0;
-    });
+    const validEvents = events.filter(e =>
+        e.type === 'tool' ? true : (e.content?.trim().length ?? 0) > 0
+    );
 
     if (validEvents.length === 0) return null;
+
+    const toolEvents = validEvents.filter(e => e.type === 'tool');
+    const doneCount = toolEvents.filter(e => e.result).length;
+    const totalTools = toolEvents.length;
+    const hasError = toolEvents.some(e => e.isError);
 
     const lastEvent = validEvents[validEvents.length - 1];
     const lastIsExecuting = lastEvent?.type === 'tool' && !lastEvent?.result;
 
     return (
-        <div className="rounded-xl border border-black/8 dark:border-white/8 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-sm my-2">
-            {/* ── Header ──────────────────────────────────────────────── */}
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/6 dark:border-white/6 bg-zinc-50/80 dark:bg-white/[0.025]">
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <Terminal size={12} className="text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                        {t('ai.timeline.build_process') || '构建过程'}
-                    </span>
+        <div className="my-2 rounded-lg border border-black/6 dark:border-white/6 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50/60 dark:bg-white/[0.025] border-b border-black/5 dark:border-white/5">
+                <Terminal size={11} className="text-zinc-400" />
+                <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 tracking-wide">
+                    {t('ai.timeline.build_process') || '构建过程'}
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                    {isLoading ? (
+                        <span className="text-[10px] font-mono text-indigo-400">
+                            {doneCount}/{totalTools || '?'}
+                        </span>
+                    ) : hasError ? (
+                        <span className="text-[10px] font-mono text-red-400">error</span>
+                    ) : (
+                        <span className="text-[10px] font-mono text-zinc-400">{totalTools}</span>
+                    )}
                 </div>
-                <SummaryBadge events={validEvents} isLoading={isLoading} />
             </div>
 
-            {/* ── Timeline Body ─────────────────────────────────────── */}
-            <div className="px-4 py-4 flex flex-col gap-0">
+            {/* Steps */}
+            <div className="px-3 py-2.5 flex flex-col gap-2.5">
                 {validEvents.map((event, i) => {
-                    const isLast = i === validEvents.length - 1 && !isLoading;
-
                     if (event.type === 'text' && event.content) {
-                        return <TextStep key={i} content={event.content} isLast={isLast} />;
+                        return <TextStep key={i} content={event.content} />;
                     }
                     if (event.type === 'tool' && event.toolCall) {
-                        return (
-                            <ToolStep
-                                key={event.toolCall.id || i}
-                                event={event}
-                                isLast={isLast}
-                                index={i}
-                            />
-                        );
+                        return <ToolStep key={event.toolCall?.id || i} event={event} />;
                     }
                     return null;
                 })}
 
-                {/* Skeleton: only shown when waiting for a NEW step (last step already done) */}
-                {isLoading && !lastIsExecuting && (
-                    <div className="relative pl-9 pt-3 animate-pulse">
-                        <div className="absolute left-[13px] -top-1 h-5 w-px bg-gradient-to-b from-zinc-300/60 to-zinc-200/20 dark:from-zinc-700/60 dark:to-zinc-800/20" />
-                        <div className="absolute left-0.5 top-2.5 w-6 h-6 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 z-10">
-                            <Loader2 size={11} className="animate-spin text-indigo-500" />
-                        </div>
-                        <div className="flex flex-col gap-1.5 py-1">
-                            <div className="h-2.5 w-28 bg-zinc-200 dark:bg-zinc-700/60 rounded-full" />
-                            <div className="h-2 w-20 bg-zinc-100 dark:bg-zinc-800/60 rounded-full" />
-                        </div>
-                    </div>
-                )}
+                {/* Loading indicator: only when waiting for next step */}
+                {isLoading && !lastIsExecuting && <LoadingPulse />}
             </div>
         </div>
     );

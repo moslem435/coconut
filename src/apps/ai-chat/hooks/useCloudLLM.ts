@@ -139,27 +139,111 @@ function buildGeminiHistory(messages: Message[]): any[] {
 function buildOpenAIHistory(messages: Message[], systemContent: string): any[] {
     const apiMessages: any[] = [{ role: 'system', content: systemContent }];
 
+    let fallbackToolCallIds: string[] = [];
+
     for (const m of messages) {
         if (m.role === 'system') continue;
 
         if (m.role === 'user') {
             apiMessages.push({ role: 'user', content: m.content || '' });
         } else if (m.role === 'assistant') {
-            const msg: any = { role: 'assistant', content: m.content || null };
+            const msg: any = { role: 'assistant', content: m.content || "" };
+
             if (m.tool_calls?.length) {
-                msg.tool_calls = m.tool_calls;
+                fallbackToolCallIds = []; // clear for new turn
+                msg.tool_calls = m.tool_calls.map((tc: any, idx: number) => {
+                    const resolvedId = tc.id || `call_${Date.now()}_${idx}`;
+                    fallbackToolCallIds.push(resolvedId);
+                    return {
+                        id: resolvedId,
+                        type: tc.type || 'function',
+                        function: {
+                            name: tc.function.name,
+                            arguments: typeof tc.function.arguments === 'string'
+                                ? tc.function.arguments
+                                : JSON.stringify(tc.function.arguments)
+                        }
+                    };
+                });
             }
             apiMessages.push(msg);
         } else if (m.role === 'tool') {
+            let cleanContent = String(m.content || '');
+            if (cleanContent.startsWith('[Control] ')) cleanContent = cleanContent.replace('[Control] ', '');
+            if (cleanContent.startsWith('[Builder] ')) cleanContent = cleanContent.replace('[Builder] ', '');
+
+            const defaultFallbackId = fallbackToolCallIds.shift() || `call_orphan_${Date.now()}`;
+
             apiMessages.push({
                 role: 'tool',
-                tool_call_id: m.tool_call_id || '',
-                content: m.content || ''
+                tool_call_id: m.tool_call_id || defaultFallbackId,
+                content: cleanContent || "Success"
             });
         }
     }
 
-    return apiMessages;
+    // --- Strict Sanitization for DeepSeek / strict OpenAPI ---
+    let sanitized: any[] = [];
+    for (const msg of apiMessages) {
+        if (msg.role === 'system') {
+            sanitized.push(msg);
+            continue;
+        }
+
+        const last = sanitized[sanitized.length - 1];
+
+        // Merge consecutive user messages
+        if (msg.role === 'user') {
+            // Error prevention: If previous message was a tool, but no assistant followed it 
+            if (last && last.role === 'tool') {
+                sanitized.push({ role: 'assistant', content: "Action completed." });
+            }
+            const newLast = sanitized[sanitized.length - 1];
+            if (newLast && newLast.role === 'user') {
+                newLast.content += `\n\n${msg.content}`;
+            } else {
+                sanitized.push(msg);
+            }
+        }
+        // Assistant messages
+        else if (msg.role === 'assistant') {
+            if (last && last.role === 'assistant' && !last.tool_calls?.length && !msg.tool_calls?.length) {
+                last.content += `\n\n${msg.content}`;
+            } else {
+                // Ensure assistant message always has content or tool_calls
+                if (!msg.content && !msg.tool_calls?.length) {
+                    msg.content = "Proceeding...";
+                }
+                sanitized.push(msg);
+            }
+        }
+        // Tool messages
+        else if (msg.role === 'tool') {
+            // A tool MUST be preceded by an assistant with tool_calls (or another tool)
+            if (last && (last.role === 'assistant' || last.role === 'tool')) {
+                // If the previous assistant doesn't actually have this tool_call_id, we MUST inject a dummy assistant call or it breaks
+                if (last.role === 'assistant' && !last.tool_calls?.find((t: any) => t.id === msg.tool_call_id)) {
+                    // It's orphaned, drop it
+                    continue;
+                }
+                sanitized.push(msg);
+            }
+        }
+    }
+
+    // Final sanity check: ensuring history ends with a user message when a new query starts.
+    // If we're midway through a tool loop, it drops the ending user message.
+    // However, DeepSeek requires alternating structures. 
+    // We clean up trailing tool/assistant messages if they are malformed without a user prompt.
+    if (sanitized.length > 0) {
+        // Find the first non-system message, if it's not a user message, we prepend a generic one
+        const firstNonSystemIdx = sanitized.findIndex(m => m.role !== 'system');
+        if (firstNonSystemIdx >= 0 && sanitized[firstNonSystemIdx].role !== 'user') {
+            sanitized.splice(firstNonSystemIdx, 0, { role: 'user', content: 'Begin task' });
+        }
+    }
+
+    return sanitized;
 }
 
 // ─── Build mode-aware system instruction ────────────────────────────────────────
@@ -232,6 +316,11 @@ async function callGemini(
     // Multi-turn agentic loop (max 6 rounds)
     for (let round = 0; round < 6; round++) {
         if (signal.aborted) break;
+
+        if (round > 0) {
+            // Need a new assistant placeholder for follow-up turns
+            onNewMessage({ role: 'assistant', content: '', mode });
+        }
 
         const body: any = {
             systemInstruction: { parts: [{ text: sysInstruction }] },
@@ -320,32 +409,6 @@ async function callGemini(
         // If no function calls, we're done
         if (functionCallParts.length === 0) break;
 
-        // Save the assistant message with text content (if any) before tool calls
-        if (accumulatedText.trim()) {
-            onNewMessage({
-                role: 'assistant',
-                content: accumulatedText,
-                mode
-            });
-        }
-
-        // Save the assistant message with tool calls
-        const toolCalls = functionCallParts.map((p, i) => ({
-            id: `call_${p.functionCall.name}_${round}_${i}`, // Add index for uniqueness
-            function: {
-                name: p.functionCall.name,
-                arguments: JSON.stringify(p.functionCall.args)
-            },
-            type: 'function'
-        }));
-
-        onNewMessage({
-            role: 'assistant',
-            content: '',
-            tool_calls: toolCalls,
-            mode
-        });
-
         // Add model turn (with function calls) to in-flight history
         geminiContents.push({
             role: 'model',
@@ -431,6 +494,11 @@ async function callOpenAI(
     for (let round = 0; round < 6; round++) {
         if (signal.aborted) break;
 
+        if (round > 0) {
+            // Need a new assistant placeholder for follow-up turns
+            onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });
+        }
+
         const requestBody: any = {
             model: config.modelId,
             messages: apiMessages,
@@ -442,8 +510,10 @@ async function callOpenAI(
 
         if (filteredTools.length > 0) {
             requestBody.tools = filteredTools;
-            requestBody.tool_choice = 'auto';
+            requestBody.tool_choice = 'auto'; // DeepSeek might have an issue with auto? Let's check the messages first
         }
+
+        console.log("[CloudLLM] Sending request to OpenAI API format. Request Body:", JSON.stringify(requestBody, null, 2));
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
             method: 'POST',
@@ -457,6 +527,9 @@ async function callOpenAI(
 
         if (!response.ok) {
             const errText = await response.text();
+            console.error(`[CloudLLM] API Error Details (${response.status}):`, errText);
+            console.error(`[CloudLLM] Faulty Request Body:`, JSON.stringify(requestBody, null, 2));
+
             let friendlyMsg = errText;
             try {
                 const errJson = JSON.parse(errText);
@@ -519,7 +592,7 @@ async function callOpenAI(
                             if (tc.index !== undefined) {
                                 if (!toolCalls[tc.index]) {
                                     toolCalls[tc.index] = {
-                                        id: tc.id || '',
+                                        id: tc.id || `call_${Date.now()}_${tc.index}`,
                                         function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' },
                                         type: 'function'
                                     };
@@ -550,33 +623,27 @@ async function callOpenAI(
         // If no tool calls, we're done
         if (toolCalls.length === 0) break;
 
-        // Save the assistant message with text content (if any) before tool calls
+        // Ensure final state is correctly updated to UI store before starting tool execution
         const finalContent = thinkingContent
             ? (fullContent ? `<think>${thinkingContent}</think>${fullContent}` : `<think>${thinkingContent}</think>`)
             : fullContent;
 
-        if (finalContent.trim()) {
-            onNewMessage({
-                role: 'assistant',
+        if (finalContent.trim() || toolCalls.length > 0) {
+            onUpdate({
                 content: finalContent,
-                mode
+                tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined
             });
         }
 
-        // Save the assistant message with tool calls
-        onNewMessage({
-            role: 'assistant',
-            content: '',
-            tool_calls: toolCalls,
-            mode
-        });
-
         // Add assistant turn with tool calls to in-flight history
-        apiMessages.push({
+        const assistantMsg: any = {
             role: 'assistant',
-            content: fullContent || null,
-            tool_calls: toolCalls
-        });
+            content: fullContent || ""
+        };
+        if (toolCalls.length > 0) {
+            assistantMsg.tool_calls = toolCalls;
+        }
+        apiMessages.push(assistantMsg);
 
         // Execute each tool call
         for (const toolCall of toolCalls) {
@@ -601,7 +668,7 @@ async function callOpenAI(
 
             onNewMessage({
                 role: 'tool',
-                content: `${toolPrefix} ${resultText}`,
+                content: `${toolPrefix} ${resultText || "Success"}`,
                 mode,
                 tool_call_id: toolCall.id
             });
@@ -609,7 +676,7 @@ async function callOpenAI(
             apiMessages.push({
                 role: 'tool',
                 tool_call_id: toolCall.id,
-                content: resultText
+                content: resultText || "Success"
             });
         }
     }

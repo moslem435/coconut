@@ -46,6 +46,7 @@ export function DesktopIcon({
 
     return (
         <motion.div
+            className="desktop-icon"
             drag={renamingId !== item.id}
             dragMomentum={false}
             dragElastic={0}

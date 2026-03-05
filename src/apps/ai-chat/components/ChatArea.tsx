@@ -1,6 +1,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useTranslation, useWindow } from '@/os/sdk';
+import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
+import { useWindowContext } from '@/os/kernel/WindowContext';
 import { useChatStore } from '../store/useChatStore';
 import { ChatHeader } from './chat/ChatHeader';
 import { MessageList } from './chat/MessageList';
@@ -33,7 +34,11 @@ export function ChatArea() {
     const [sendError, setSendError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    const { launch } = useWindow();
+    const { launch, minimize, maximize, close } = useWindow();
+    const windowContext = useWindowContext();
+    const windowId = windowContext?.windowId || '';
+    const dragControls = windowContext?.dragControls;
+    const windowState = useWindowState(windowId);
 
     // ── LLM hooks (both always called, interface is identical) ──
     const webLLM = useWebLLM();
@@ -60,7 +65,7 @@ export function ChatArea() {
     const onNewMessage = useCallback((msg: any) => {
         if (!currentSessionId) return;
 
-        if (msg.role === 'assistant' && !msg.tool_calls?.length) {
+        if (msg.role === 'assistant' && !msg.tool_calls?.length && !msg.isPlaceholder) {
             // This is the "finalized text content" snapshot the cloud hook saves before
             // executing tool calls. It's already been streamed into our placeholder via
             // onUpdate — just sync the final content to avoid adding a duplicate.
@@ -169,12 +174,12 @@ export function ChatArea() {
                 currentModelName={currentModelName}
                 aiProvider={aiProvider}
                 isSidebar={false}
-                isMaximized={false}
+                isMaximized={windowState?.isMaximized || false}
                 onDetach={() => { }}
-                onMinimize={() => { }}
-                onMaximize={() => { }}
-                onClose={() => { }}
-                onDragStart={() => { }}
+                onMinimize={() => windowId && minimize(windowId)}
+                onMaximize={() => windowId && maximize(windowId)}
+                onClose={() => windowId && close(windowId)}
+                onDragStart={(e) => dragControls?.start(e)}
             />
 
             {/* Send Error Banner */}

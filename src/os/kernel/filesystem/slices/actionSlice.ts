@@ -57,11 +57,11 @@ export const createActionSlice: StateCreator<
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
-    
+
     // Use a Promise to track the sync operation if needed, but here we just emit
     // However, to satisfy the interface change to Promise, we wrap it.
     // In a real implementation, we might wait for syncService acknowledgment
-    
+
     eventBus.emit('fs:file:created', {
       id,
       path,
@@ -228,8 +228,7 @@ export const createActionSlice: StateCreator<
       )
       eventBus.emit('sys:error', {
         source: 'filesystem',
-        message: `Cannot modify read-only file "${node.name}"`,
-        severity: 'warning'
+        message: `Cannot modify read-only file "${node.name}"`
       })
       return
     }
@@ -265,7 +264,15 @@ export const createActionSlice: StateCreator<
     if (!path) return ''
 
     try {
-      return await syncService.readContent(path)
+      const content = await syncService.readContent(path)
+
+      // OPTIMIZATION & Fix: Cache the content back into memory for immediate subsequent reads
+      // only if it's not a huge binary
+      if (typeof content === 'string' && content.length > 0) {
+        get()._updateFile(id, { content: content })
+      }
+
+      return content
     } catch (e) {
       console.warn(`Failed to read content for ${id}`, e)
       return ''
