@@ -212,6 +212,10 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         logger.debug('[XTerm] Spawning jsh shell...')
 
         // Spawn jsh (JavaScript Shell)
+        // Fix: Map VFS path (/home/user/project) to WC internal path (/project)
+        // Since we mount /home/user content to WC root, the project folder is at /project
+        const wcCwd = SYSTEM_PATHS.PROJECT.replace(SYSTEM_PATHS.USER, '') || '/'
+        
         const shellProcess = await instance.spawn('jsh', {
           terminal: {
             cols: term.cols,
@@ -219,23 +223,39 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
           },
           env: {
             TERM: 'xterm-256color',
+            HOME: '/', // WC root is mapped to /home/user
           },
-          cwd: SYSTEM_PATHS.PROJECT
+          cwd: wcCwd
         })
 
         processRef.current = shellProcess
 
         // Pipe process output to XTerm with prompt cleanup
+        // We do NOT await this promise because it resolves when the process exits
         shellProcess.output.pipeTo(
           new WritableStream({
             write(data) {
-              let cleanData = data
-              cleanData = cleanData.replace(/~\/[a-z0-9-]{10,}/g, `${SYSTEM_CONFIG.USER_NAME}@${SYSTEM_CONFIG.HOST_NAME}:~/project`)
-              cleanData = cleanData.replace(/\r\n(\x1b\[[0-9;]*m)*❯/g, '$1 $')
+              // Ensure data is string to prevent crashes
+              let cleanData = typeof data === 'string' ? data : String(data)
+              
+              // 1. Remove WebContainer internal hash path prefix (e.g. /home/xyz123...)
+              // This fixes 'pwd' output to show clean paths like /home/user/project
+              cleanData = cleanData.replace(/\/home\/[a-z0-9-]{10,}/g, '/home/user')
+              
+              // 2. Prepend user@host to paths starting with ~ or /home/user in the prompt
+              // This makes "~/project" look like "user@portfoliio:~/project"
+              // We match the start of line or newline, followed by optional ANSI colors, then ~ or /home/user
+              cleanData = cleanData.replace(/(^|\r\n)(\x1b\[[0-9;]*m)*(~|\/home\/user)/g, `$1$2${SYSTEM_CONFIG.USER_NAME}@${SYSTEM_CONFIG.HOST_NAME}:$3`)
+
+              // 3. Custom prompt styling (replace jsh arrow '❯' with standard '$')
+              cleanData = cleanData.replace(/❯/g, '$')
+              
               term.write(cleanData)
             },
           })
-        )
+        ).catch((err: any) => {
+            logger.error('[XTerm] Shell output pipe error:', err)
+        })
 
         // Pipe XTerm input to process
         const inputWriter = shellProcess.input.getWriter()
@@ -354,7 +374,7 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
   if (error) {
     return (
       <div className="p-4 text-red-500">
-        Error booting WebContainer: {error}
+        Error booting WebContainer: {typeof error === 'object' ? JSON.stringify(error) : error}
         <br />
         Make sure your browser supports SharedArrayBuffer (COOP/COEP headers required).
       </div>

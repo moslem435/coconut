@@ -62,7 +62,7 @@ const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) =>
         const run = async () => {
             if (!instance) return;
             setIsRunning(true);
-            setOutput(['Initializing WebContainer for WASM/Node execution...']);
+            setOutput(['Initializing System Runtime for WASM/Node execution...']);
 
             try {
                 const scriptPath = 'runner-script.js';
@@ -86,7 +86,7 @@ const WasmRunner = ({ code, filePath }: { code?: string, filePath?: string }) =>
     }, [code, instance]);
 
     if (!instance) {
-        return <div className="p-4 text-amber-400">WebContainer not initialized. Please open Terminal first.</div>;
+        return <div className="p-4 text-amber-400">System Runtime not active. Launch Terminal to initialize.</div>;
     }
 
     return (
@@ -207,7 +207,7 @@ export default function CodeRunner({ filePath, code: initialCode, language, mode
                         >
                             <option value="html">HTML Preview</option>
                             <option value="react">React Preview</option>
-                            <option value="node">Node.js / WASM (WebContainer)</option>
+                            <option value="node">Node.js / WASM (System Runtime)</option>
                         </select>
                     </div>
                 </div>

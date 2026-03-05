@@ -200,7 +200,7 @@ const zh: Record<string, string> = {
     "settings.about.pillar.web.title": "原生 Web",
     "settings.about.pillar.web.desc": "浏览器原生，无需安装",
     "settings.about.pillar.dev.title": "开发就绪",
-    "settings.about.pillar.dev.desc": "浏览器内完整 Node.js 运行时",
+    "settings.about.pillar.dev.desc": "内置完整 Node.js 运行时",
     "settings.about.pillar.local.title": "本地优先",
     "settings.about.pillar.local.desc": "无云端，100% 隐私",
     "settings.about.powered_title": "构建于现代 Web 技术",
