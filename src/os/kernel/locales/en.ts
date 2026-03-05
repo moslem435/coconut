@@ -131,6 +131,9 @@ const en: Record<string, string> = {
     "ai.mode.control": "Control",
     "ai.mode.builder": "Builder",
     "ai.error.webgpu_init_failed": "Failed to initialize WebGPU. Check your GPU drivers or browser settings.",
+    "ai.timeline.build_process": "Build Process",
+    "ai.timeline.steps": "steps",
+    "ai.timeline.processing": "Processing...",
     "ai.error.generic": "An unknown error occurred",
     "emulator.download": "Download Image",
     "emulator.status.ready": "Ready (Local Cache)",
@@ -344,6 +347,9 @@ const en: Record<string, string> = {
     "menu.properties": "Properties",
     "menu.delete": "Delete",
     "menu.download": "Download",
+    "menu.copy": "Copy",
+    "menu.cut": "Cut",
+    "menu.paste": "Paste",
 
     // Messages / Notifications
     "msg.pinned": "Pinned to Taskbar",

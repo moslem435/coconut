@@ -6,7 +6,8 @@ import {
   Archive, Database, Braces, Settings, Package, Palette,
   Box, Hash, Monitor, Smartphone, Layout, Component,
   Terminal, Shield, Globe, Coffee, Link, FileSymlink,
-  FileQuestion, Command, Cpu, GitGraph
+  FileQuestion, Command, Cpu, GitGraph, Download as DownloadIcon, Monitor as DesktopIcon,
+  Book as BookIcon
 } from 'lucide-react'
 import React from 'react'
 
@@ -18,6 +19,7 @@ export interface FileIconTheme {
   useAppIcon: boolean
   manifest?: any
   isShortcut?: boolean
+  fill?: boolean
 }
 
 // Color Palette
@@ -141,9 +143,21 @@ const EXTENSION_MATCHES: Record<string, { icon: React.ElementType, color: string
   'msi': { icon: Package, color: COLORS.zinc },
   'dmg': { icon: Package, color: COLORS.zinc },
   'iso': { icon: Disc, color: COLORS.zinc },
+  'coco': { icon: Package, color: COLORS.green }, // Coconut OS App Bundle
 }
 
-import { Disc } from 'lucide-react'
+// System Folder Mappings
+const SYSTEM_FOLDERS: Record<string, { icon: React.ElementType, color: string }> = {
+  'Desktop': { icon: DesktopIcon, color: COLORS.blue },
+  'Documents': { icon: BookIcon, color: COLORS.orange },
+  'Downloads': { icon: DownloadIcon, color: COLORS.green },
+  'Pictures': { icon: ImageIcon, color: COLORS.purple },
+  'Music': { icon: Music, color: COLORS.pink },
+  'Code': { icon: Code, color: COLORS.slate },
+  'Trash': { icon: Trash2, color: COLORS.red },
+}
+
+import { Disc, Trash2 } from 'lucide-react'
 
 export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
   // 1. App Shortcut (Highest Priority)
@@ -162,12 +176,24 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
 
   // 2. Folder
   if (node.type === 'folder') {
-    // Check for special folders based on name (optional enhancement)
+    // Check for special system folders
+    if (SYSTEM_FOLDERS[node.name]) {
+      const match = SYSTEM_FOLDERS[node.name]
+      return {
+        Icon: match.icon,
+        backgroundColor: match.color,
+        useAppIcon: false,
+        color: '#ffffff',
+        fill: false
+      }
+    }
+
     return {
       Icon: Folder,
-      backgroundColor: COLORS.yellow,
+      backgroundColor: 'transparent',
+      color: COLORS.yellow,
       useAppIcon: false,
-      color: '#ffffff'
+      fill: true
     }
   }
 

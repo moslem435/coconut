@@ -20,7 +20,7 @@ export interface ActionSlice {
     type: FileType,
     content?: string | Uint8Array,
     appId?: string
-  ) => string
+  ) => Promise<string>
 
   deleteItem: (id: string) => Promise<void>
   renameItem: (id: string, newName: string) => void
@@ -39,7 +39,7 @@ export const createActionSlice: StateCreator<
   [],
   ActionSlice
 > = (set, get) => ({
-  createItem: (parentId, name, type, content, appId) => {
+  createItem: async (parentId, name, type, content, appId) => {
     const id = uuidv4()
     const newItem: FileNode = {
       id,
@@ -57,6 +57,11 @@ export const createActionSlice: StateCreator<
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
+    
+    // Use a Promise to track the sync operation if needed, but here we just emit
+    // However, to satisfy the interface change to Promise, we wrap it.
+    // In a real implementation, we might wait for syncService acknowledgment
+    
     eventBus.emit('fs:file:created', {
       id,
       path,
@@ -110,7 +115,12 @@ export const createActionSlice: StateCreator<
     // 1. 乐观删除
     get()._deleteFiles(Array.from(itemsToDelete))
 
-    // 2. 发出事件（SyncMiddleware 监听并执行 IO）
+    // 2. 登记墓碑（防止物理删除延迟导致的扫描回吞）
+    if (path) {
+      get()._addTombstone(path)
+    }
+
+    // 3. 发出事件（SyncMiddleware 监听并执行 IO）
     eventBus.emit('fs:file:deleted', {
       id,
       path,
@@ -225,9 +235,9 @@ export const createActionSlice: StateCreator<
     }
 
     // 1. 更新元数据和内容
-    get()._updateFile(id, { 
-        updatedAt: Date.now(),
-        content: typeof content === 'string' ? content : undefined // Only store string content in memory
+    get()._updateFile(id, {
+      updatedAt: Date.now(),
+      content: typeof content === 'string' ? content : undefined // Only store string content in memory
     })
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）

@@ -230,7 +230,7 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: `The directory path (e.g. "${SYSTEM_PATHS.DESKTOP}/MyApp")` }
+                    path: { type: 'string', description: `The directory path (e.g. "${SYSTEM_PATHS.DESKTOP}/MyApp.coco")` }
                 },
                 required: ['path']
             }

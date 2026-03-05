@@ -79,17 +79,17 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
 
             case 'writeFile': {
                 if (!root || !path) throw new Error('Invalid arguments');
-                
+
                 // Ensure parent directories exist
                 const parts = path.split('/').filter(p => p.length > 0);
                 const fileName = parts.pop();
                 if (!fileName) throw new Error('Invalid file path');
-                
+
                 let current = root;
                 for (const part of parts) {
                     current = await current.getDirectoryHandle(part, { create: true });
                 }
-                
+
                 const handle = await current.getFileHandle(fileName, { create: true });
 
                 try {
@@ -205,7 +205,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                 const actualNewPath = newPath;
 
                 if (!root || !actualOldPath || !actualNewPath) throw new Error('Invalid arguments for rename');
-                
+
                 // Fallback: Copy + Delete Strategy
                 let sourceHandle: FileSystemHandle | undefined;
                 let isFile = true;
@@ -232,7 +232,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     const parts = actualNewPath.split('/').filter(p => p.length > 0);
                     const fileName = parts.pop();
                     if (!fileName) throw new Error('Invalid new file path');
-                    
+
                     let current = root;
                     for (const part of parts) {
                         current = await current.getDirectoryHandle(part, { create: true });
@@ -247,7 +247,7 @@ self.onmessage = async (e: MessageEvent<FileSystemRequest>) => {
                     } finally {
                         accessHandle.close();
                     }
-                    
+
                     // Remove old file
                     await removePath(root, actualOldPath);
                 } else {
@@ -364,9 +364,9 @@ async function moveDirectory(root: FileSystemDirectoryHandle, oldPath: string, n
 
         if (handle.kind === 'file') {
             // Move file (Copy + Delete)
-            const file = await handle.getFile();
+            const file = await (handle as FileSystemFileHandle).getFile();
             const buffer = await file.arrayBuffer();
-            
+
             // Write to new location
             const parts = childNewPath.split('/').filter(p => p.length > 0);
             const fileName = parts.pop()!;
@@ -398,21 +398,36 @@ async function removePath(root: FileSystemDirectoryHandle, path: string, recursi
 
     let current = root;
     for (const part of parts) {
-        current = await current.getDirectoryHandle(part);
+        try {
+            current = await current.getDirectoryHandle(part);
+        } catch {
+            // Parent directory not found in OPFS — nothing to delete physically
+            return;
+        }
     }
-    
-    // Attempt to remove as file first, then as directory if that fails
+
     try {
         await current.removeEntry(name, { recursive });
     } catch (e: any) {
-        // If it's a file, removeEntry with recursive option might fail in some implementations
-        // Or if it's a directory and recursive was false, it might fail if not empty
-        
+        // NotFoundError: already gone — treat as success
+        if (e.name === 'NotFoundError') return;
+
+        // NotAllowedError / NoModificationAllowedError: 
+        // File is locked by an active SyncAccessHandle, is read-only, or browsing context restriction.
+        // Memory state is already updated. Warn and skip rather than throwing to avoid UI crash.
+        const errorNames = ['NotAllowedError', 'NoModificationAllowedError', 'InvalidModificationError'];
+        if (errorNames.includes(e.name)) {
+            console.warn(`[OPFS] removePath: cannot remove "${path}" (${e.name}), skipping physical delete. It may persist after refresh.`);
+            return;
+        }
+
+        // For other errors, try once more without recursive flag (simple entry fallback)
         try {
-             // Try without options (works for files and empty directories)
-             await current.removeEntry(name);
-        } catch (retryError) {
-             throw e; // Throw original error
+            await current.removeEntry(name);
+        } catch (retryError: any) {
+            const retryErrorNames = ['NotFoundError', 'NotAllowedError', 'NoModificationAllowedError'];
+            if (retryErrorNames.includes(retryError.name)) return;
+            throw e; // Re-throw original unexpected error
         }
     }
 }

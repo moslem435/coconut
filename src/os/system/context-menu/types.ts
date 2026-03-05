@@ -8,4 +8,6 @@ export interface MenuItem {
     disabled?: boolean
     checked?: boolean
     type?: string // Allow 'separator' or other values
+    shortcut?: string
+    submenu?: MenuItem[]
 }

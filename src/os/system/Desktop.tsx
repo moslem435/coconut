@@ -69,6 +69,7 @@ export default function Desktop() {
 
     // 背景亮度状态（用于自适应文字颜色）
     const [isDarkBackground, setIsDarkBackground] = useState(true)
+    const [isDesktopLoaded, setIsDesktopLoaded] = useState(false)
 
     /**
      * 计算背景亮度
@@ -130,7 +131,7 @@ export default function Desktop() {
         // 这里我们主动触发加载，确保持久化的文件能同步到内存
         // Wait for FS initialization to avoid race condition with migration
         if (!isLoading) {
-            loadFolderContent('desktop')
+            loadFolderContent('desktop').then(() => setIsDesktopLoaded(true))
         }
     }, [loadFolderContent, isLoading])
 
@@ -381,7 +382,7 @@ export default function Desktop() {
 
                 {/* Icons */}
                 <div className="absolute inset-0 top-6 bottom-24">
-                    {!isLoading && (
+                    {!isLoading && isDesktopLoaded && (
                         <DesktopIcons
                             items={desktopItems}
                             textColor={isDarkBackground ? 'text-white' : 'text-black'}

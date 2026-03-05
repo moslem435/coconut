@@ -94,21 +94,25 @@ function buildGeminiHistory(messages: Message[]): any[] {
         if (m.role === 'user') {
             contents.push({ role: 'user', parts: [{ text: m.content || '' }] });
         } else if (m.role === 'assistant') {
+            // Skip empty placeholder messages (no content, no tool_calls)
+            if (!m.tool_calls?.length && !m.content) continue;
             if (m.tool_calls?.length) {
-                // Assistant turn with function calls
-                const fcParts = m.tool_calls.map((tc: any) => ({
-                    functionCall: {
-                        name: tc.function?.name || '',
-                        args: (() => {
-                            try { return JSON.parse(tc.function?.arguments || '{}'); } catch { return {}; }
-                        })()
-                    }
-                }));
-                // If there is also text content, emit it as a separate preceding turn
-                if (m.content) {
-                    contents.push({ role: 'model', parts: [{ text: m.content }] });
+                // Merge text + functionCall into ONE model turn.
+                // Gemini requires user/model turns to strictly alternate;
+                // two consecutive model turns cause a 400 error.
+                const parts: any[] = [];
+                if (m.content) parts.push({ text: m.content });
+                for (const tc of m.tool_calls) {
+                    parts.push({
+                        functionCall: {
+                            name: tc.function?.name || '',
+                            args: (() => {
+                                try { return JSON.parse(tc.function?.arguments || '{}'); } catch { return {}; }
+                            })()
+                        }
+                    });
                 }
-                contents.push({ role: 'model', parts: fcParts });
+                contents.push({ role: 'model', parts });
             } else {
                 contents.push({ role: 'model', parts: [{ text: m.content || '' }] });
             }
@@ -177,7 +181,7 @@ Never make up windowIds. Always query running apps first before closing.`,
         builder: `You are an expert app builder for a web-based OS. Respond in the user's language.
 When asked to create an app/game/tool:
 1. Briefly explain what you will build.
-2. Use 'create_directory' to create a folder with '.app' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.app").
+2. Use 'create_directory' to create a folder with '.coco' extension (e.g. "${SYSTEM_PATHS.DESKTOP}/MyGame.coco").
 3. Use 'create_file' to write a SINGLE self-contained 'index.html' inside that folder.
    CRITICAL: The index.html MUST be fully self-contained — embed ALL CSS inside <style> tags and ALL JavaScript inside <script> tags. Do NOT create separate .css or .js files, as they cannot be loaded in this environment.
 4. After the file is created, confirm the app is ready and the user can double-click the folder to run it.
@@ -286,12 +290,27 @@ async function callGemini(
 
                     const parts: any[] = candidate?.content?.parts || [];
                     for (const part of parts) {
+                        let hasNewData = false;
                         if (typeof part.text === 'string' && part.text) {
                             accumulatedText += part.text;
-                            onUpdate({ content: accumulatedText });
+                            hasNewData = true;
                         }
                         if (part.functionCall) {
                             functionCallParts.push(part);
+                            hasNewData = true;
+                        }
+                        if (hasNewData) {
+                            onUpdate({
+                                content: accumulatedText,
+                                tool_calls: functionCallParts.length > 0 ? functionCallParts.map((p, i) => ({
+                                    id: `call_${p.functionCall.name}_${round}_${i}`, // Add index for uniqueness
+                                    function: {
+                                        name: p.functionCall.name,
+                                        arguments: JSON.stringify(p.functionCall.args)
+                                    },
+                                    type: 'function'
+                                })) : undefined
+                            });
                         }
                     }
                 } catch { /* skip malformed SSE line */ }
@@ -300,6 +319,32 @@ async function callGemini(
 
         // If no function calls, we're done
         if (functionCallParts.length === 0) break;
+
+        // Save the assistant message with text content (if any) before tool calls
+        if (accumulatedText.trim()) {
+            onNewMessage({
+                role: 'assistant',
+                content: accumulatedText,
+                mode
+            });
+        }
+
+        // Save the assistant message with tool calls
+        const toolCalls = functionCallParts.map((p, i) => ({
+            id: `call_${p.functionCall.name}_${round}_${i}`, // Add index for uniqueness
+            function: {
+                name: p.functionCall.name,
+                arguments: JSON.stringify(p.functionCall.args)
+            },
+            type: 'function'
+        }));
+
+        onNewMessage({
+            role: 'assistant',
+            content: '',
+            tool_calls: toolCalls,
+            mode
+        });
 
         // Add model turn (with function calls) to in-flight history
         geminiContents.push({
@@ -310,9 +355,11 @@ async function callGemini(
         // Execute each function call and collect results
         const functionResponseParts: any[] = [];
 
-        for (const part of functionCallParts) {
+        for (let i = 0; i < functionCallParts.length; i++) {
+            const part = functionCallParts[i];
             if (signal.aborted) break;
             const { name, args } = part.functionCall;
+            const toolCallId = `call_${name}_${round}_${i}`; // Add index for uniqueness
             console.log(`[CloudLLM] Gemini tool call: ${name}`, args);
 
             let resultText = '';
@@ -330,7 +377,8 @@ async function callGemini(
             onNewMessage({
                 role: 'tool',
                 content: `${toolPrefix} ${resultText}`,
-                mode
+                mode,
+                tool_call_id: toolCallId
             });
 
             functionResponseParts.push({
@@ -454,17 +502,15 @@ async function callOpenAI(
                     const reasoning = delta.reasoning_content ?? delta.reasoning ?? '';
                     const content = delta.content ?? '';
 
-                    if (reasoning) thinkingContent += reasoning;
-                    if (content) fullContent += content;
-
                     // Stream text to UI
-                    if (thinkingContent) {
-                        const thinkTag = fullContent
-                            ? `<think>${thinkingContent}</think>`
-                            : `<think>${thinkingContent}`;
-                        onUpdate({ content: thinkTag + fullContent });
-                    } else if (fullContent) {
-                        onUpdate({ content: fullContent });
+                    let hasNewData = false;
+                    if (reasoning) {
+                        thinkingContent += reasoning;
+                        hasNewData = true;
+                    }
+                    if (content) {
+                        fullContent += content;
+                        hasNewData = true;
                     }
 
                     // Accumulate tool calls (streamed incrementally by index)
@@ -484,7 +530,18 @@ async function callOpenAI(
                                 }
                             }
                         }
-                        onUpdate({ tool_calls: toolCalls });
+                        hasNewData = true;
+                    }
+
+                    if (hasNewData) {
+                        const displayContent = thinkingContent
+                            ? (fullContent ? `<think>${thinkingContent}</think>${fullContent}` : `<think>${thinkingContent}`)
+                            : fullContent;
+
+                        onUpdate({
+                            content: displayContent,
+                            tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined
+                        });
                     }
                 } catch { /* ignore malformed chunks */ }
             }
@@ -492,6 +549,27 @@ async function callOpenAI(
 
         // If no tool calls, we're done
         if (toolCalls.length === 0) break;
+
+        // Save the assistant message with text content (if any) before tool calls
+        const finalContent = thinkingContent
+            ? (fullContent ? `<think>${thinkingContent}</think>${fullContent}` : `<think>${thinkingContent}</think>`)
+            : fullContent;
+
+        if (finalContent.trim()) {
+            onNewMessage({
+                role: 'assistant',
+                content: finalContent,
+                mode
+            });
+        }
+
+        // Save the assistant message with tool calls
+        onNewMessage({
+            role: 'assistant',
+            content: '',
+            tool_calls: toolCalls,
+            mode
+        });
 
         // Add assistant turn with tool calls to in-flight history
         apiMessages.push({
@@ -524,7 +602,8 @@ async function callOpenAI(
             onNewMessage({
                 role: 'tool',
                 content: `${toolPrefix} ${resultText}`,
-                mode
+                mode,
+                tool_call_id: toolCall.id
             });
 
             apiMessages.push({

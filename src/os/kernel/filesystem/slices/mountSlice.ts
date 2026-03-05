@@ -26,6 +26,7 @@ const WORKER_THRESHOLD = 100
 export interface MountSlice {
   // 挂载操作
   mountLocalFolder: () => Promise<void>
+  unmountLocalFolder: (mountId: string) => Promise<void>
   loadFolderContent: (folderId: string) => Promise<void>
   checkMountPermissions: () => Promise<void>
   initialize: () => Promise<void>
@@ -40,52 +41,52 @@ export const createMountSlice: StateCreator<
   MountSlice
 > = (set, get) => ({
   mountStaticProvider: async () => {
-      try {
-        const provider = new StaticHttpProvider('/fs-manifest.json');
-        await provider.init();
-        
-        // Wrap with ReadOnlyWrapper then PathNormalizationWrapper
-        const wrappedProvider = new PathNormalizationWrapper(
-            new ReadOnlyWrapper(provider)
-        );
+    try {
+      const provider = new StaticHttpProvider('/fs-manifest.json');
+      await provider.init();
 
-        // Register with FS Client
-        fs.registerProvider(SYSTEM_PATHS.ROM, wrappedProvider);
-        logger.info(`StaticHttpProvider mounted at ${SYSTEM_PATHS.ROM}`);
-        
-        // Add ROM node to Root if not exists (marked as system and mount)
-        const romId = FILE_IDS.ROM;
-        const existing = get().files[romId];
-        if (!existing) {
-             const romNode: FileNode = {
-                 id: romId,
-                 parentId: FILE_IDS.ROOT,
-                 name: 'rom',
-                 type: 'folder',
-                 createdAt: Date.now(),
-                 updatedAt: Date.now(),
-                 isMount: true,
-                 isSystem: true,
-                 isReadOnly: true,
-                 icon: 'disc'
-             };
-             get()._addFile(romNode);
-        } else if (!existing.isSystem || !existing.isReadOnly) {
-            // Update existing ROM node to ensure it has system flags
-            get()._updateFile(romId, { 
-                isMount: true, 
-                isSystem: true, 
-                isReadOnly: true,
-                icon: 'disc'
-            });
-        }
-        
-        // Trigger load
-        await get().loadFolderContent(romId);
-        
-      } catch (e) {
-          logger.error('Failed to mount StaticHttpProvider', e);
+      // Wrap with ReadOnlyWrapper then PathNormalizationWrapper
+      const wrappedProvider = new PathNormalizationWrapper(
+        new ReadOnlyWrapper(provider)
+      );
+
+      // Register with FS Client
+      fs.registerProvider(SYSTEM_PATHS.ROM, wrappedProvider);
+      logger.info(`StaticHttpProvider mounted at ${SYSTEM_PATHS.ROM}`);
+
+      // Add ROM node to Root if not exists (marked as system and mount)
+      const romId = FILE_IDS.ROM;
+      const existing = get().files[romId];
+      if (!existing) {
+        const romNode: FileNode = {
+          id: romId,
+          parentId: FILE_IDS.ROOT,
+          name: 'rom',
+          type: 'folder',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isMount: true,
+          isSystem: true,
+          isReadOnly: true,
+          icon: 'disc'
+        };
+        get()._addFile(romNode);
+      } else if (!existing.isSystem || !existing.isReadOnly) {
+        // Update existing ROM node to ensure it has system flags
+        get()._updateFile(romId, {
+          isMount: true,
+          isSystem: true,
+          isReadOnly: true,
+          icon: 'disc'
+        });
       }
+
+      // Trigger load
+      await get().loadFolderContent(romId);
+
+    } catch (e) {
+      logger.error('Failed to mount StaticHttpProvider', e);
+    }
   },
 
   mountLocalFolder: async () => {
@@ -128,6 +129,36 @@ export const createMountSlice: StateCreator<
       if (error.name !== 'AbortError') {
         logger.error('Failed to mount folder:', error)
       }
+    }
+  },
+
+  unmountLocalFolder: async (mountId: string) => {
+    try {
+      // 1. Unmount in FS Client
+      fs.unmount(`/mnt/${mountId}`)
+
+      // 2. Remove from Persisted Mounts
+      const { NativeDriver } = await import('../NativeDriver')
+      await NativeDriver.removeMount(mountId)
+
+      // 3. Remove from Store State
+      const newFiles = { ...get().files }
+      delete newFiles[mountId]
+
+      // Remove all children of this mount from the store
+      const childIds = Object.keys(newFiles).filter(id => {
+        let currentId = id
+        while (currentId !== INITIAL_ROOT_ID && newFiles[currentId]) {
+          if (currentId === mountId) return true
+          currentId = newFiles[currentId]?.parentId as string
+        }
+        return false
+      })
+      childIds.forEach(id => delete newFiles[id])
+
+      get()._setFiles(newFiles)
+    } catch (error) {
+      logger.error('Failed to unmount folder:', error)
     }
   },
 
@@ -190,56 +221,66 @@ export const createMountSlice: StateCreator<
   },
 
   mountVirtualFolders: async () => {
-      try {
-        // Create "All Pictures" virtual folder
-        const allPicturesProvider = new VirtualFolderProvider([
-          { path: SYSTEM_PATHS.PICTURES, priority: 10 }, // User pictures first
-          { path: SYSTEM_PATHS.ROM_GALLERY, priority: 5 }  // System gallery second
-        ]);
-        
-        // Wrap with ReadOnlyWrapper then PathNormalizationWrapper
-        const wrappedProvider = new PathNormalizationWrapper(
-            new ReadOnlyWrapper(allPicturesProvider)
-        );
+    try {
+      // Create "All Pictures" virtual folder
+      const allPicturesProvider = new VirtualFolderProvider([
+        { path: SYSTEM_PATHS.PICTURES, priority: 10 }, // User pictures first
+        { path: SYSTEM_PATHS.ROM_GALLERY, priority: 5 }  // System gallery second
+      ]);
 
-        fs.registerProvider(SYSTEM_PATHS.VIRTUAL_ALL_PICTURES, wrappedProvider);
-        logger.info(`VirtualFolderProvider mounted at ${SYSTEM_PATHS.VIRTUAL_ALL_PICTURES}`);
-        
-        // Add virtual folder node to Root
-        const allPicturesId = FILE_IDS.VIRTUAL_ALL_PICTURES;
-        const existing = get().files[allPicturesId];
-        if (!existing) {
-          const virtualNode: FileNode = {
-            id: allPicturesId,
-            parentId: FILE_IDS.ROOT,
-            name: 'All Pictures',
-            type: 'folder',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            isMount: true,
-            isSystem: true,
-            isReadOnly: true,
-            icon: 'images'
-          };
-          get()._addFile(virtualNode);
-        }
-        
-        // Load content
-        await get().loadFolderContent(allPicturesId);
-        
-      } catch (e) {
-        logger.error('Failed to mount virtual folders', e);
+      // Wrap with ReadOnlyWrapper then PathNormalizationWrapper
+      const wrappedProvider = new PathNormalizationWrapper(
+        new ReadOnlyWrapper(allPicturesProvider)
+      );
+
+      fs.registerProvider(SYSTEM_PATHS.VIRTUAL_ALL_PICTURES, wrappedProvider);
+      logger.info(`VirtualFolderProvider mounted at ${SYSTEM_PATHS.VIRTUAL_ALL_PICTURES}`);
+
+      // Add virtual folder node to Root
+      const allPicturesId = FILE_IDS.VIRTUAL_ALL_PICTURES;
+      const existing = get().files[allPicturesId];
+      if (!existing) {
+        const virtualNode: FileNode = {
+          id: allPicturesId,
+          parentId: FILE_IDS.ROOT,
+          name: 'All Pictures',
+          type: 'folder',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isMount: true,
+          isSystem: true,
+          isReadOnly: true,
+          icon: 'images'
+        };
+        get()._addFile(virtualNode);
       }
+
+      // Load content
+      await get().loadFolderContent(allPicturesId);
+
+    } catch (e) {
+      logger.error('Failed to mount virtual folders', e);
+    }
   },
 
   initialize: async () => {
     try {
+      // FIX: Wait for persistence hydration BEFORE any physical scan to prevent ghost file "resurrection"
+      // Since skipHydration is true, we must manually ensure we are ready.
+      // @ts-ignore - persist exists on the store
+      const store = get() as any
+      if (store.persist && !store.persist.hasHydrated()) {
+        logger.debug('[mountSlice] Waiting for hydration...');
+        await store.persist.rehydrate();
+        logger.debug('[mountSlice] Hydration complete.');
+      }
+
       // 0. Mount Static ROM
       await get().mountStaticProvider();
-      
+
       // 0.1 Mount Virtual Folders
       await get().mountVirtualFolders();
-      
+
       // Ensure intermediate system directories exist (home, user, trash)
       // This is crucial for migration from old structure
       // Moved BEFORE syncToOPFS to ensure folders exist for sync
@@ -247,16 +288,16 @@ export const createMountSlice: StateCreator<
       const currentFiles = get().files;
       const newFiles = { ...currentFiles };
       let hasChanges = false;
-      
+
       systemDirs.forEach(dirId => {
-          if (!newFiles[dirId] && INITIAL_FILES[dirId]) {
-              newFiles[dirId] = INITIAL_FILES[dirId];
-              hasChanges = true;
-          }
+        if (!newFiles[dirId] && INITIAL_FILES[dirId]) {
+          newFiles[dirId] = INITIAL_FILES[dirId];
+          hasChanges = true;
+        }
       });
-      
+
       if (hasChanges) {
-          get()._setFiles(newFiles);
+        get()._setFiles(newFiles);
       }
 
       // @ts-ignore - syncToOPFS expects full store
@@ -293,41 +334,41 @@ export const createMountSlice: StateCreator<
       // Update parentId for migrated folders if they are still pointing to root
       // This handles the migration from root->desktop to root->home->user->desktop
       const migratedFolders = [
-          FILE_IDS.DESKTOP, 
-          FILE_IDS.DOCUMENTS, 
-          FILE_IDS.DOWNLOADS, 
-          FILE_IDS.MUSIC, 
-          FILE_IDS.PICTURES, 
-          FILE_IDS.CODE
+        FILE_IDS.DESKTOP,
+        FILE_IDS.DOCUMENTS,
+        FILE_IDS.DOWNLOADS,
+        FILE_IDS.MUSIC,
+        FILE_IDS.PICTURES,
+        FILE_IDS.CODE
       ];
       migratedFolders.forEach(folderId => {
-          const folder = updatedFiles[folderId];
-          if (folder && folder.parentId === FILE_IDS.ROOT) {
-              updatedFiles[folderId] = {
-                  ...folder,
-                  parentId: FILE_IDS.USER
-              };
-              hasChanges = true;
-          }
+        const folder = updatedFiles[folderId];
+        if (folder && folder.parentId === FILE_IDS.ROOT) {
+          updatedFiles[folderId] = {
+            ...folder,
+            parentId: FILE_IDS.USER
+          };
+          hasChanges = true;
+        }
       });
-      
+
       // Cleanup: Remove physical legacy folders from root if they exist
       // This prevents them from reappearing as new folders during sync
       const cleanupLegacyFolders = async () => {
-          try {
-              const rootChildren = await fs.readdir('/');
-              for (const name of rootChildren) {
-                  // If we find a folder in root that matches a migrated system folder name
-                  if (migratedFolders.some(id => updatedFiles[id]?.name === name)) {
-                      // Check if it's empty or already migrated
-                      // For safety, we only hide it from store by not doing anything here
-                      // The actual physical cleanup should be done by syncService migration
-                      // But here we need to ensure we don't re-add them to store in loadFolderContent
-                  }
-              }
-          } catch (e) {
-              console.warn('Failed to cleanup legacy folders', e);
+        try {
+          const rootChildren = await fs.readdir('/');
+          for (const name of rootChildren) {
+            // If we find a folder in root that matches a migrated system folder name
+            if (migratedFolders.some(id => updatedFiles[id]?.name === name)) {
+              // Check if it's empty or already migrated
+              // For safety, we only hide it from store by not doing anything here
+              // The actual physical cleanup should be done by syncService migration
+              // But here we need to ensure we don't re-add them to store in loadFolderContent
+            }
           }
+        } catch (e) {
+          console.warn('Failed to cleanup legacy folders', e);
+        }
       };
       // We don't await this to not block initialization
       cleanupLegacyFolders();
@@ -405,6 +446,17 @@ async function loadFolderContentWithWorker(
     if (patch.toAdd.length > 0 || patch.toRemove.length > 0 || patch.toUpdate.length > 0) {
       const newFiles = { ...get().files }
 
+      // Helper to check if a file with the same name exists in Trash
+      const existsInTrash = (name: string) => {
+        return Object.values(newFiles).some((f: any) => (f as FileNode).parentId === FILE_IDS.TRASH && (f as FileNode).name === name)
+      }
+
+      const isRecentlyDeleted = (name: string) => {
+        const path = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+        const expiry = get().tombstoneEntries[path]
+        return expiry && expiry > Date.now()
+      }
+
       // 删除
       patch.toRemove.forEach(id => {
         delete newFiles[id]
@@ -412,6 +464,12 @@ async function loadFolderContentWithWorker(
 
       // 添加（替换临时 ID）
       patch.toAdd.forEach(file => {
+        // FIX: Check if ghost file
+        if (existsInTrash(file.name) || isRecentlyDeleted(file.name)) {
+          logger.debug(`[loadFolderContentWithWorker] Skipping ghost file: ${file.name}`)
+          return
+        }
+
         const realId = uuidv4()
         newFiles[realId] = { ...file, id: realId }
       })
@@ -450,6 +508,17 @@ async function loadFolderContentSync(
   const newFiles = { ...get().files }
   let hasChanges = false
 
+  // Helper to check if a file with the same name exists in Trash
+  const existsInTrash = (name: string) => {
+    return Object.values(newFiles).some((f: any) => (f as FileNode).parentId === FILE_IDS.TRASH && (f as FileNode).name === name)
+  }
+
+  const isRecentlyDeleted = (name: string) => {
+    const path = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
+    const expiry = get().tombstoneEntries[path]
+    return expiry && expiry > Date.now()
+  }
+
   // 1. 删除不存在的文件
   for (const child of currentChildren) {
     // Skip system/mount points which are not physical files in OPFS
@@ -467,10 +536,10 @@ async function loadFolderContentSync(
     // Filter out legacy system folders that should be in /home/user now
     // If we are scanning root, ignore these names to prevent duplicates
     if (folderId === FILE_IDS.ROOT) {
-        const legacyNames = ['Desktop', 'Documents', 'Downloads', 'Music', 'Pictures', 'Code'];
-        if (legacyNames.includes(name)) {
-            return null;
-        }
+      const legacyNames = ['Desktop', 'Documents', 'Downloads', 'Music', 'Pictures', 'Code'];
+      if (legacyNames.includes(name)) {
+        return null;
+      }
     }
 
     const childPath = fullPath.endsWith('/') ? `${fullPath}${name}` : `${fullPath}/${name}`
@@ -500,6 +569,12 @@ async function loadFolderContentSync(
         hasChanges = true
       }
     } else {
+      // FIX: If it's not in memory but it's in Trash, it's a ghost from OPFS. Skip adding it.
+      if (existsInTrash(name) || isRecentlyDeleted(name)) {
+        logger.debug(`[loadFolderContentSync] Skipping ghost file (exists in trash or recently deleted): ${name}`)
+        continue
+      }
+
       const childId = uuidv4()
       newFiles[childId] = {
         id: childId,

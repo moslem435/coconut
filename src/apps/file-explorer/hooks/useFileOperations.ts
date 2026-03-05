@@ -3,7 +3,7 @@
  * 处理复制、粘贴、删除、重命名等操作
  */
 
-import { useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useClipboardStore } from '@/os/kernel/useClipboardStore'
 import { useDialogStore } from '@/os/kernel/useDialogStore'
@@ -51,7 +51,10 @@ export function useFileOperations() {
     }
   }, [clipboard, pasteItems])
 
-  const handleDelete = useCallback(async (selectedIds: string[]) => {
+  // Ref 记录当前的临时删除 timeout
+  const pendingDeleteTimeouts = React.useRef<{ [toastId: string]: NodeJS.Timeout }>({})
+
+  const handleDelete = useCallback((selectedIds: string[]) => {
     if (selectedIds.length === 0) return
 
     // Check if any selected item is a system folder
@@ -64,21 +67,41 @@ export function useFileOperations() {
       return
     }
 
-    const confirmed = await openConfirm(
-      t('file_explorer.delete_confirm_title'),
-      t('file_explorer.delete_confirm_message', { count: selectedIds.length })
-    )
+    // 1. 软删除/预备删除 (将文件从当前视图先移走，暂时移入回收站)
+    // 假设正常删除逻辑是将文件移入 trash，我们先进行一次乐观更新或暂存
+    const trashId = 'trash'
+    const originalParents = selectedIds.reduce((acc, id) => {
+      acc[id] = files[id]?.parentId
+      return acc
+    }, {} as Record<string, string | null | undefined>)
 
-    if (confirmed) {
-      try {
-        await Promise.all(selectedIds.map(id => deleteItem(id)))
-        toast.success('Deleted', `${selectedIds.length} item(s) deleted successfully`)
-      } catch (error) {
-        console.error('Delete failed:', error)
-        toast.error('Delete Failed', String(error))
+    // 这里执行实名移动（把它送进回收站）
+    selectedIds.forEach(id => moveItem(id, trashId))
+
+    // 2. 抛出有撤销动作的 Toast
+    const toastId = toast.custom({
+      type: 'success',
+      title: '已移至回收站',
+      message: `${selectedIds.length} 个项目`,
+      duration: 6000,
+      action: {
+        label: '撤回',
+        onClick: () => {
+          // 撤销操作：把它从回收站移回原来的目录
+          if (pendingDeleteTimeouts.current[toastId]) {
+            clearTimeout(pendingDeleteTimeouts.current[toastId])
+            delete pendingDeleteTimeouts.current[toastId]
+          }
+
+          selectedIds.forEach(id => {
+            if (originalParents[id]) {
+              moveItem(id, originalParents[id] as string)
+            }
+          })
+        }
       }
-    }
-  }, [deleteItem, openConfirm, files, t])
+    })
+  }, [moveItem, openConfirm, files, t])
 
   const handleMove = useCallback(async (itemIds: string[], targetFolderId: string) => {
     // Check if any item is a system folder

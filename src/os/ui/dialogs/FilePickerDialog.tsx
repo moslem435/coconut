@@ -25,10 +25,11 @@ export function FilePickerDialog({
     onConfirm,
     onCancel
 }: FilePickerDialogProps) {
-    const { getItem, getChildren } = useFileSystemStore()
+    const { getItem, getChildren, loadFolderContent } = useFileSystemStore()
     const { t } = useLanguage()
     
     const [currentPath, setCurrentPath] = useState(initialPath)
+    const [isLoading, setIsLoading] = useState(false)
     const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
     const [fileName, setFileName] = useState(defaultFileName)
     const [history, setHistory] = useState<string[]>([initialPath])
@@ -42,6 +43,20 @@ export function FilePickerDialog({
             setHistory([initialPath])
         }
     }, [isOpen, initialPath, defaultFileName])
+
+    useEffect(() => {
+        if (!isOpen) return
+        
+        const load = async () => {
+            setIsLoading(true)
+            try {
+                await loadFolderContent(currentPath)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+        load()
+    }, [isOpen, currentPath, loadFolderContent])
 
     if (!isOpen) return null
 
@@ -128,7 +143,12 @@ export function FilePickerDialog({
                 </div>
 
                 {/* File List */}
-                <div className="flex-1 overflow-y-auto p-2">
+                <div className="flex-1 overflow-y-auto p-2 relative">
+                    {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--os-bg-window)]/50 z-10 backdrop-blur-sm">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--os-accent)]"></div>
+                        </div>
+                    )}
                     <div className="grid grid-cols-4 gap-2">
                         {filteredContents.map(item => (
                             <div 

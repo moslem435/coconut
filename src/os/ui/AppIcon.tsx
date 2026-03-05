@@ -60,7 +60,7 @@ export function AppIcon({
                     color: finalIconColor
                 }}
             >
-                <Icon size={size * 0.6} strokeWidth={2} />
+                <Icon size={Math.round(size * 0.6)} strokeWidth={2} />
             </div>
         )
     }

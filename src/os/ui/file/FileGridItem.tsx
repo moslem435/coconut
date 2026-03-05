@@ -32,12 +32,12 @@ export function FileGridItem({
   ...props
 }: FileGridItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
-  const { Icon, backgroundColor, useAppIcon, manifest } = iconTheme
+  const { Icon, backgroundColor, useAppIcon, manifest, color, fill } = iconTheme
   const IconComponent = Icon as any
   
   // App Bundle Logic
-  const isAppBundle = item.type === 'folder' && item.name.endsWith('.app')
-  const appBundleName = isAppBundle ? item.name.replace(/\.app$/, '') : displayName
+  const isAppBundle = item.type === 'folder' && item.name.endsWith('.coco')
+  const appBundleName = isAppBundle ? item.name.replace(/\.coco$/, '') : displayName
   const AppBundleIcon = AppWindow // or Package
 
   return (
@@ -57,7 +57,7 @@ export function FileGridItem({
             }}
           >
             <AppBundleIcon
-              size={iconSize * 0.6}
+              size={Math.round(iconSize * 0.6)}
               strokeWidth={1.5}
             />
           </div>
@@ -82,18 +82,18 @@ export function FileGridItem({
           </div>
         ) : (
           <div
-            className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200`, selected && 'scale-105', iconClassName)}
+            className={cn(`flex items-center justify-center rounded-xl transition-transform duration-200`, selected && 'scale-105', iconClassName, backgroundColor === 'transparent' ? '' : 'shadow-md')}
             style={{
               width: iconSize,
               height: iconSize,
               backgroundColor: backgroundColor,
-              color: '#ffffff'
+              color: backgroundColor === 'transparent' ? color || 'currentColor' : '#ffffff'
             }}
           >
             <IconComponent
-              size={iconSize * 0.6}
+              size={Math.round(iconSize * (backgroundColor === 'transparent' ? 0.9 : 0.6))}
               strokeWidth={2}
-              fill={item.type === 'folder' ? 'currentColor' : 'none'}
+              fill={fill ? 'currentColor' : 'none'}
             />
           </div>
         )}
@@ -101,13 +101,13 @@ export function FileGridItem({
         {/* System/ReadOnly Badge */}
         {(item.isSystem || item.isReadOnly) && (
           <div 
-            className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 shadow-md"
+            className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5 shadow-md border border-white/20"
             title={item.isSystem ? 'System Folder' : 'Read-Only'}
           >
             {item.isSystem ? (
-              <Shield size={12} className="text-white" />
+              <Shield size={10} className="text-white" />
             ) : (
-              <Lock size={12} className="text-white" />
+              <Lock size={10} className="text-white" />
             )}
           </div>
         )}

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
 import { cn } from '@/lib/utils'
-import { Folder, ArrowUp, ArrowDown } from 'lucide-react'
+import { Folder, ArrowUp, ArrowDown, Plus, Download } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useUIStore } from '@/os/kernel/useUIStore'
@@ -20,6 +20,8 @@ interface FileListProps {
   selectedIds: string[]
   onSelect: (id: string, e?: React.MouseEvent) => void
   onDrop?: (draggedIds: string[], targetId: string) => void
+  onNewFolder?: () => void
+  onUpload?: () => void
   sortConfig: { field: SortField, order: SortOrder }
   onSortChange: (field: SortField) => void
 }
@@ -54,7 +56,7 @@ const formatTime = (timestamp: number) => {
 
 export default function FileList({
   items, viewMode, onNavigate, onDoubleClick, onContextMenu,
-  selectedIds, onSelect, onDrop, sortConfig, onSortChange
+  selectedIds, onSelect, onDrop, onNewFolder, onUpload, sortConfig, onSortChange
 }: FileListProps) {
   const { t } = useLanguage()
 
@@ -160,13 +162,41 @@ export default function FileList({
   if (items.length === 0) {
     return (
       <div
-        className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)] select-none"
+        className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)] select-none p-8"
         onClick={() => onSelect('')}
       >
-        <div className="w-24 h-24 rounded-full bg-[var(--os-hover-bg)] flex items-center justify-center mb-4">
-          <Folder size={48} strokeWidth={1.5} className="opacity-50" />
+        <div className="relative mb-6">
+          <div className="absolute inset-0 rounded-full bg-[var(--os-accent)]/10 blur-2xl transform scale-150 animate-pulse" />
+          <div className="relative w-24 h-24 rounded-3xl bg-[var(--os-bg-panel)] border border-[var(--os-border)] flex items-center justify-center shadow-sm">
+            <Folder size={48} strokeWidth={1.2} className="opacity-40" />
+          </div>
         </div>
-        <span className="text-sm font-medium">{t('explorer.empty') || 'This folder is empty'}</span>
+
+        <div className="text-center space-y-2 mb-8">
+          <p className="text-sm font-semibold text-[var(--os-text-primary)]">
+            {t('explorer.empty') || '此文件夹为空'}
+          </p>
+          <p className="text-xs max-w-48 leading-relaxed opacity-70">
+            暂无项目。你可以现在创建一个文件夹或上传文件。
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); (onNewFolder as any)?.() }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all bg-[var(--os-accent)] text-white hover:brightness-110 active:scale-95 shadow-sm shadow-[var(--os-accent)]/20"
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            新建文件夹
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); (onUpload as any)?.() }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all border border-[var(--os-border)] hover:bg-[var(--os-hover-bg)] active:scale-95"
+          >
+            <Download size={14} strokeWidth={2.5} className="rotate-180" />
+            上传文件
+          </button>
+        </div>
       </div>
     )
   }

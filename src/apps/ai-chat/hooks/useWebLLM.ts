@@ -413,10 +413,10 @@ export function useWebLLM() {
     
     When a user asks you to CREATE an app, game, website, or tool:
     1. Reply briefly confirming what you will build.
-    2. Use the 'create_directory' tool to create a folder for the project with the '.app' extension (e.g., "${SYSTEM_PATHS.DESKTOP}/SnakeGame.app").
+    2. Use the 'create_directory' tool to create a folder for the project with the '.coco' extension (e.g., "${SYSTEM_PATHS.DESKTOP}/SnakeGame.coco").
     3. Use the 'create_file' tool to create the 'index.html' file inside that folder.
     4. Ensure the HTML file links to the CSS and JS files correctly (if you create them separately).
-    5. After creating all files, tell the user the app is ready and they can double-click the .app folder to run it.
+    5. After creating all files, tell the user the app is ready and they can double-click the .coco folder to run it.
     
     Do NOT output raw code blocks unless specifically asked to explain. Prefer creating files directly.`
             };
@@ -540,31 +540,24 @@ export function useWebLLM() {
 
                 let fullContent = '';
                 const toolCalls: any[] = [];
-                const currentToolCall: any = null;
 
                 for await (const chunk of reply) {
                     if (signal.aborted) break;
                     const delta = chunk.choices[0]?.delta;
 
+                    let hasNewData = false;
+
                     // Handle content
                     if (delta?.content) {
                         fullContent += delta.content;
                         totalInteractionContent += delta.content;
-
-                        // Filter out technical artifacts like empty arrays from streaming
-                        // We also filter out standalone newlines that might precede tool calls
-                        if (totalInteractionContent.trim() === '[]' || totalInteractionContent.trim() === '[' || totalInteractionContent.trim() === '') {
-                            // Do not update UI with empty JSON
-                        } else {
-                            onUpdate({ content: fullContent });
-                        }
+                        hasNewData = true;
                     }
 
                     // Handle tool calls
                     if (delta?.tool_calls) {
                         for (const toolCallDelta of delta.tool_calls) {
                             if (toolCallDelta.index !== undefined) {
-                                // Start new tool call or continue existing
                                 if (!toolCalls[toolCallDelta.index]) {
                                     toolCalls[toolCallDelta.index] = {
                                         id: toolCallDelta.id || '',
@@ -575,15 +568,28 @@ export function useWebLLM() {
                                         type: 'function'
                                     };
                                 } else {
-                                    // Append arguments
+                                    if (toolCallDelta.id) toolCalls[toolCallDelta.index].id = toolCallDelta.id;
+                                    if (toolCallDelta.function?.name) toolCalls[toolCallDelta.index].function.name += toolCallDelta.function.name;
                                     if (toolCallDelta.function?.arguments) {
                                         toolCalls[toolCallDelta.index].function.arguments += toolCallDelta.function.arguments;
                                     }
                                 }
                             }
                         }
-                        // Update UI with partial tool calls
-                        onUpdate({ tool_calls: toolCalls });
+                        hasNewData = true;
+                    }
+
+                    if (hasNewData) {
+                        // Filter out technical artifacts like empty arrays from streaming
+                        const trimmedTotal = totalInteractionContent.trim();
+                        if (trimmedTotal === '[]' || trimmedTotal === '[' || trimmedTotal === '') {
+                            if (toolCalls.length > 0) {
+                                onUpdate({ content: fullContent, tool_calls: [...toolCalls] });
+                            }
+                        } else {
+                            // IMPORTANT: Always send BOTH content and tool_calls to prevent store overwrite
+                            onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined });
+                        }
                     }
                 }
 

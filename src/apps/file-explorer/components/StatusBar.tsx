@@ -1,45 +1,70 @@
 import React from 'react'
 import { FileNode } from '@/os/kernel/useFileSystemStore'
+import { File, Folder, Clock } from 'lucide-react'
 
 interface StatusBarProps {
   totalItems: number
   selectedItems: FileNode[]
 }
 
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+const Divider = () => (
+  <div className="w-px h-3" style={{ background: 'var(--os-border)' }} />
+)
+
 export default function StatusBar({ totalItems, selectedItems }: StatusBarProps) {
   const selectedCount = selectedItems.length
-
-  // Calculate total size of selected files
-  const selectedSize = selectedItems.reduce((acc, item) => {
-    if (item.type === 'file') {
-      return acc + (item.size || 0)
-    }
-    return acc
-  }, 0)
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-  }
+  const fileCount = selectedItems.filter(i => i.type === 'file').length
+  const folderCount = selectedItems.filter(i => i.type === 'folder').length
+  const selectedSize = selectedItems.reduce((a, i) => a + (i.size || 0), 0)
 
   return (
-    <div className="h-8 border-t border-[var(--os-border)]/30 flex items-center px-4 text-[10px] text-[var(--os-text-muted)] select-none gap-4 bg-[var(--os-hover-bg)]/20">
-      <div>
-        {totalItems} items
-      </div>
+    <div className="shrink-0 flex items-center gap-2.5 px-4 h-6 text-[10px] select-none"
+      style={{
+        borderTop: '1px solid var(--os-border)',
+        background: 'var(--os-bg-panel)',
+        color: 'var(--os-text-muted)'
+      }}>
+      {/* Total */}
+      <span>{totalItems} 项</span>
+
       {selectedCount > 0 && (
         <>
-          <div className="w-px h-3 bg-white/10" />
-          <div>
-            {selectedCount} item{selectedCount > 1 ? 's' : ''} selected
+          <Divider />
+
+          {/* Selected breakdown */}
+          <div className="flex items-center gap-1.5">
+            {fileCount > 0 && (
+              <span className="flex items-center gap-1">
+                <File size={9} />
+                {fileCount} 文件
+              </span>
+            )}
+            {folderCount > 0 && fileCount > 0 && <span className="opacity-30">·</span>}
+            {folderCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Folder size={9} />
+                {folderCount} 文件夹
+              </span>
+            )}
           </div>
-          <div className="w-px h-3 bg-white/10" />
-          <div>
-            {formatSize(selectedSize)}
-          </div>
+
+          {selectedSize > 0 && (
+            <>
+              <Divider />
+              <span>{formatSize(selectedSize)}</span>
+            </>
+          )}
+
+          <Divider />
+          <span style={{ color: 'var(--os-accent)' }}>已选 {selectedCount} 项</span>
         </>
       )}
     </div>

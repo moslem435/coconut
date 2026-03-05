@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
-import { ExternalLink, FileEdit, Download, FileText, Trash2 } from 'lucide-react'
+import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
 import { useTrashStore } from '@/os/kernel/useTrashStore'
+import { useClipboardStore } from '@/os/kernel/useClipboardStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 
@@ -29,11 +30,21 @@ export function useFileMenuItems(
     const { setRenamingId } = useUIStore()
     const { openWindow } = useWindowStore()
     const { trashItems } = useTrashStore()
+    const { setClipboard } = useClipboardStore()
 
     return useMemo<MenuItem[]>(() => {
         if (!visible || !isVisibleType) return []
 
-        return [
+        const isProtected = () => {
+            if (!data) return false
+            const ids = data.selectedIds || (data.id ? [data.id] : [])
+            return ids.some(id => {
+                const item = getItem(id)
+                return item?.isSystem || item?.isReadOnly
+            })
+        }
+
+        const menuItems: MenuItem[] = [
             {
                 label: t('menu.open'),
                 icon: ExternalLink,
@@ -45,9 +56,35 @@ export function useFileMenuItems(
                     hideMenu()
                 }
             },
+            { type: 'separator' },
+            {
+                label: t('menu.copy'),
+                icon: Copy,
+                action: () => {
+                    const ids = data?.selectedIds || (data?.id ? [data.id] : [])
+                    if (ids.length > 0) {
+                        setClipboard(ids, 'copy')
+                    }
+                    hideMenu()
+                }
+            },
+            {
+                label: t('menu.cut'),
+                icon: Scissors,
+                disabled: isProtected(),
+                action: () => {
+                    const ids = data?.selectedIds || (data?.id ? [data.id] : [])
+                    if (ids.length > 0) {
+                        setClipboard(ids, 'cut')
+                    }
+                    hideMenu()
+                }
+            },
+            { type: 'separator' },
             {
                 label: t('menu.rename'),
                 icon: FileEdit,
+                disabled: isProtected(),
                 action: () => {
                     hideMenu()
                     if (data?.id) {
@@ -81,8 +118,11 @@ export function useFileMenuItems(
                     }
                 }
             },
-            { type: 'separator' },
-            {
+            { type: 'separator' }
+        ]
+
+        if (!isProtected()) {
+            menuItems.push({
                 label: t('menu.delete'),
                 icon: Trash2,
                 danger: true,
@@ -94,7 +134,9 @@ export function useFileMenuItems(
                         trashItems(ids)
                     }
                 }
-            }
-        ]
-    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu, trashItems])
+            })
+        }
+
+        return menuItems
+    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu, trashItems, setClipboard])
 }

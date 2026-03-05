@@ -7,9 +7,9 @@ import { SYSTEM_PATHS, FILE_IDS } from '@/os/config/paths'
 
 // SyncOptions for backward compatibility or future use
 export interface SyncOptions {
-  syncToOPFS?: boolean
-  syncToWebContainer?: boolean
-  syncToMemory?: boolean
+    syncToOPFS?: boolean
+    syncToWebContainer?: boolean
+    syncToMemory?: boolean
 }
 
 class FileSystemSyncService {
@@ -42,7 +42,7 @@ class FileSystemSyncService {
         try {
             const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore');
             const store = useWebContainerStore.getState();
-            
+
             // Skip if syncing from WebContainer to avoid loops
             if (store.isSyncingFromWC) return;
 
@@ -60,8 +60,8 @@ class FileSystemSyncService {
                     // Content might be in event or need reading
                     let content = data.content;
                     if (content === undefined) {
-                         const buffer = await fs.readFile(data.path);
-                         content = new TextDecoder().decode(buffer);
+                        const buffer = await fs.readFile(data.path);
+                        content = new TextDecoder().decode(buffer);
                     }
                     store.syncFile(data.path, content);
                     break;
@@ -73,9 +73,9 @@ class FileSystemSyncService {
                     // often implemented as read old -> write new -> delete old in higher levels
                     // or accessing instance directly
                     if (store.instance) {
-                         const wcOld = data.oldPath;
-                         const wcNew = data.newPath;
-                         await store.instance.fs.rename(wcOld, wcNew);
+                        const wcOld = data.oldPath;
+                        const wcNew = data.newPath;
+                        await store.instance.fs.rename(wcOld, wcNew);
                     }
                     break;
             }
@@ -86,7 +86,7 @@ class FileSystemSyncService {
 
     // Legacy methods kept for compatibility with initial sync and manual calls
     // but refactored to use FileSystemClient events implicitly or directly
-    
+
     // ... (rest of the initial sync logic) ...
     syncToOPFS = async (state: FileSystemState, set: (partial: Partial<FileSystemState>) => void) => {
         // Optimization: Use IndexedDB versioning to determine if sync is needed
@@ -96,30 +96,40 @@ class FileSystemSyncService {
 
             if (rootExists && installedVersion === FILESYSTEM_VERSION) {
                 console.log(`[SyncService] Version match (${FILESYSTEM_VERSION}), skipping sync.`)
-                
+
                 // Ensure critical system folders exist even if version matches
-                // This handles cases where Trash was missing in previous v11 runs
-                if (!(await fs.exists(SYSTEM_PATHS.TRASH))) {
-                    await fs.mkdir(SYSTEM_PATHS.TRASH);
+                // This handles cases where any system folders (Trash, Pictures, Music, etc.) were accidentally deleted
+                // Ensure ONLY critical absolute core folders exist even if version matches
+                // We allow users to delete Pictures, Music, etc. but Desktop and Trash are required for UI stability
+                const criticalSystemDirs = [
+                    SYSTEM_PATHS.TRASH,
+                    `${SYSTEM_PATHS.USER}/Desktop`
+                ];
+
+                for (const dirPath of criticalSystemDirs) {
+                    if (!(await fs.exists(dirPath))) {
+                        await fs.mkdir(dirPath, true);
+                        console.log(`[SyncService] Recreated missing critical system folder: ${dirPath}`);
+                    }
                 }
 
                 set({ isLoading: false })
                 return
             }
-            
+
             // Migration logic for v9 -> v10
             if (installedVersion && installedVersion < 10 && FILESYSTEM_VERSION >= 10) {
                 console.log('[SyncService] Migrating v9 -> v10 structure...');
                 await this.migrateV9toV10();
             }
-            
+
             // Ensure Trash exists for v11+
             if (FILESYSTEM_VERSION >= 11) {
-                 if (!(await fs.exists(SYSTEM_PATHS.TRASH))) {
+                if (!(await fs.exists(SYSTEM_PATHS.TRASH))) {
                     await fs.mkdir(SYSTEM_PATHS.TRASH);
                 }
             }
-            
+
         } catch (e) {
             console.warn('Failed to check version, proceeding with sync', e)
         }
@@ -174,7 +184,7 @@ class FileSystemSyncService {
                 console.warn(`Sync failed for ${path}`, err)
             }
         }
-        
+
         // Update version after successful sync
         try {
             await setIdx('fs_version', FILESYSTEM_VERSION)
@@ -202,12 +212,12 @@ class FileSystemSyncService {
                 FILE_IDS.PICTURES,
                 FILE_IDS.CODE
             ];
-            
+
             for (const id of foldersToMove) {
                 const folderName = INITIAL_FILES[id]?.name || id; // Fallback to id if not found, though should be there
                 const oldPath = `/${folderName}`;
                 const newPath = `${SYSTEM_PATHS.USER}/${folderName}`;
-                
+
                 if (await fs.exists(oldPath)) {
                     // Check if new path already exists (partial migration or initial sync created it)
                     if (await fs.exists(newPath)) {
@@ -222,14 +232,14 @@ class FileSystemSyncService {
                             }
                         }
                         // Remove old folder if empty
-                        try { await fs.unlink(oldPath, true); } catch {}
+                        try { await fs.unlink(oldPath, true); } catch { }
                     } else {
                         console.log(`[Migration] Moving ${oldPath} -> ${newPath}`);
                         await fs.rename(oldPath, newPath);
                     }
                 }
             }
-            
+
             console.log('[Migration] v9 -> v10 migration completed');
         } catch (e) {
             console.error('[Migration] Failed to migrate v9 -> v10:', e);
@@ -239,7 +249,7 @@ class FileSystemSyncService {
     // Proxy methods to maintain API compatibility but use fs directly
     // These methods are redundant now if everyone uses fs directly, 
     // but kept to avoid breaking changes in other files.
-    
+
     async syncCreate(path: string, type: 'file' | 'folder', content?: string | Uint8Array, options?: SyncOptions) {
         if (type === 'folder') await fs.mkdir(path);
         else await fs.writeFile(path, content || '');

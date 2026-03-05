@@ -24,7 +24,7 @@ export const INITIAL_ROOT_ID = FILE_IDS.ROOT
 export const INITIAL_HOME_ID = FILE_IDS.HOME
 export const INITIAL_USER_ID = FILE_IDS.USER
 
-export const FILESYSTEM_VERSION = 11; // Increment this to force re-sync
+export const FILESYSTEM_VERSION = 12; // Increment this to force re-sync
 
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {
@@ -69,7 +69,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Desktop',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     [FILE_IDS.DOCUMENTS]: {
         id: FILE_IDS.DOCUMENTS,
@@ -77,7 +78,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Documents',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     [FILE_IDS.PICTURES]: {
         id: FILE_IDS.PICTURES,
@@ -85,7 +87,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Pictures',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     // Removed gallery-* files as they are now mounted via StaticHttpProvider at /rom
     [FILE_IDS.DOWNLOADS]: {
@@ -94,7 +97,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Downloads',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     // Shortcuts
     'shortcut-portfolio': {
@@ -239,7 +243,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Music',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     [FILE_IDS.CODE]: {
         id: FILE_IDS.CODE,
@@ -247,7 +252,8 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         name: 'Code',
         type: 'folder',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        isSystem: true
     },
     // Sample Code Files
     'code-1': {

@@ -210,3 +210,22 @@ img {
 @utility backface-visible {
   backface-visibility: visible;
 }
+
+/* AI Chat — 流式光标闪烁动画 */
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: ai-cursor-blink 1s step-end infinite;
+  opacity: 0.7;
+}
+

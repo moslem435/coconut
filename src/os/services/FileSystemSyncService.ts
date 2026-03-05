@@ -4,6 +4,7 @@
  */
 
 import { ioService } from './FileSystemIOService'
+import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { eventBus } from '@/os/kernel/EventBus'
 
 export interface SyncOptions {
@@ -61,7 +62,7 @@ class FileSystemSyncService {
     }
 
     await this.executeTasks(tasks)
-    
+
     // Publish event
     eventBus.emit('fs:file:created', {
       id: path.split('/').pop() || '',
@@ -102,7 +103,7 @@ class FileSystemSyncService {
     }
 
     await this.executeTasks(tasks)
-    
+
     // Publish event (content might be Uint8Array, convert to string for event)
     eventBus.emit('fs:file:updated', {
       id: path.split('/').pop() || '',
@@ -124,7 +125,12 @@ class FileSystemSyncService {
       tasks.push(async () => {
         try {
           if (path && path !== '/') {
-            await ioService.unlink(path, true)
+            // Use fs.exists() to silently check OPFS presence before attempting delete.
+            // ioService.unlink on a missing path causes Worker to post an error message.
+            const exists = await fs.exists(path)
+            if (exists) {
+              await ioService.unlink(path, true)
+            }
           }
         } catch (error) {
           console.error('[SyncService] OPFS delete failed:', error)
@@ -144,7 +150,7 @@ class FileSystemSyncService {
     }
 
     await this.executeTasks(tasks)
-    
+
     // Publish event
     eventBus.emit('fs:file:deleted', {
       id: path.split('/').pop() || '',
@@ -165,6 +171,14 @@ class FileSystemSyncService {
     if (options.syncToOPFS) {
       tasks.push(async () => {
         try {
+          // Use fs.exists() directly — it sends an 'exists' message to the Worker,
+          // which returns true/false without ever throwing or posting an error message.
+          // ioService.exists() routes through stat(), which DOES post an error on missing files.
+          const sourceExists = await fs.exists(oldPath)
+          if (!sourceExists) {
+            console.warn(`[SyncService] syncRename: source not in OPFS, skipping: ${oldPath}`)
+            return
+          }
           await ioService.rename(oldPath, newPath)
         } catch (error) {
           console.error('[SyncService] OPFS rename failed:', error)
@@ -189,7 +203,7 @@ class FileSystemSyncService {
     }
 
     await this.executeTasks(tasks)
-    
+
     // Publish event
     eventBus.emit('fs:file:renamed', {
       id: newPath.split('/').pop() || '',

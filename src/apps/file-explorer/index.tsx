@@ -37,9 +37,11 @@ import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useDialogStore } from '@/os/kernel/useDialogStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
+import { useWindowContext } from '@/os/kernel/WindowContext'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { StickyNote, Eye } from 'lucide-react'
 import Fuse from 'fuse.js'
+import { AnimatePresence } from 'framer-motion'
 
 // 自定义 Hooks
 import { useFileOperations } from './hooks/useFileOperations'
@@ -54,6 +56,7 @@ import FileList from './components/FileList'
 import StatusBar from './components/StatusBar'
 import FileUploadZone from './components/FileUploadZone'
 import BatchProgressDialog from './components/BatchProgressDialog'
+import PreviewPanel from './components/PreviewPanel'
 
 /**
  * 文件资源管理器组件属性
@@ -72,11 +75,23 @@ export type SortOrder = 'asc' | 'desc'
  * 文件资源管理器主组件
  */
 export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps) {
+  const windowCtx = useWindowContext()
+  const windowId = windowCtx?.windowId
   // 视图状态
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortConfig, setSortConfig] = useState<{ field: SortField, order: SortOrder }>({ field: 'name', order: 'asc' })
   const [searchQuery, setSearchQuery] = useState('')
   const [isFolderLoading, setIsFolderLoading] = useState(false)
+  const [loadedPath, setLoadedPath] = useState<string | null>(null)
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false)
+
+  // 修复旧版本 localStorage 缓存没有 hideTitleBar 的问题
+  const { updateWindow, windows } = useWindowStore()
+  useEffect(() => {
+    if (windowId && windows[windowId] && !windows[windowId].hideTitleBar) {
+      updateWindow(windowId, { hideTitleBar: true, titleBarColor: 'auto' })
+    }
+  }, [windowId, windows, updateWindow])
 
   // Store 访问
   const {
@@ -129,6 +144,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
       setIsFolderLoading(true)
       try {
         await loadFolderContent(currentPathId)
+        setLoadedPath(currentPathId)
       } finally {
         setIsFolderLoading(false)
       }
@@ -443,7 +459,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
 
   return (
     <div
-      className="h-full flex flex-col bg-transparent text-[var(--os-text-primary)] pt-10 relative"
+      className="h-full flex flex-col bg-transparent text-[var(--os-text-primary)] relative"
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* 顶部工具栏 */}
@@ -465,6 +481,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
         onSearchChange={setSearchQuery}
         onNewFolder={handleCreateFolder}
         onUpload={handleManualUpload}
+        showPreviewPanel={showPreviewPanel}
+        onTogglePreviewPanel={() => setShowPreviewPanel(v => !v)}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -479,7 +497,7 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
           targetFolderId={currentPathId}
           onUploadComplete={handleUploadComplete}
         >
-          {isSystemLoading || isFolderLoading ? (
+          {isSystemLoading || isFolderLoading || loadedPath !== currentPathId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--os-text-muted)]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--os-border-active)] mb-4" />
               <span className="text-sm">Loading...</span>
@@ -496,9 +514,22 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
               selectedIds={selectedIds}
               onSelect={handleSelect}
               onDrop={handleFileDrop}
+              onNewFolder={handleCreateFolder}
+              onUpload={handleManualUpload}
             />
           )}
         </FileUploadZone>
+
+        {/* 右侧预览面板 */}
+        <AnimatePresence>
+          {showPreviewPanel && (
+            <PreviewPanel
+              items={children.filter(c => selectedIds.includes(c.id))}
+              allFiles={files}
+              onClose={() => setShowPreviewPanel(false)}
+            />
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 状态栏 */}

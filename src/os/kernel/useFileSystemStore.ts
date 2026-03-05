@@ -37,7 +37,8 @@ export const useFileSystemStore = create<FileSystemStore>()(
       skipHydration: true,
       partialize: (state) => ({
         files: state.files,
-        rootId: state.rootId
+        rootId: state.rootId,
+        tombstoneEntries: state.tombstoneEntries
       })
     }
   )

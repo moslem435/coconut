@@ -131,6 +131,9 @@ const zh: Record<string, string> = {
     "ai.mode.control": "系统控制",
     "ai.mode.builder": "应用构建",
     "ai.error.webgpu_init_failed": "WebGPU 初始化失败。请检查显卡驱动或浏览器设置。",
+    "ai.timeline.build_process": "构建过程",
+    "ai.timeline.steps": "步",
+    "ai.timeline.processing": "处理中...",
     "ai.error.generic": "发生未知错误",
     "emulator.download": "下载镜像",
     "emulator.status.ready": "已就绪 (本地缓存)",
@@ -340,6 +343,9 @@ const zh: Record<string, string> = {
     "menu.properties": "属性",
     "menu.delete": "删除",
     "menu.download": "下载",
+    "menu.copy": "复制",
+    "menu.cut": "剪切",
+    "menu.paste": "粘贴",
 
     // Messages / Notifications
     "msg.pinned": "已固定到任务栏",

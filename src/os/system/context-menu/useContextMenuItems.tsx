@@ -6,6 +6,7 @@ import { useExplorerMenuItems } from './useExplorerMenuItems'
 import { useWeatherMenuItems } from './useWeatherMenuItems'
 import { ContextMenuData, MenuType, Position } from '@/os/kernel/useContextMenuStore'
 import { MenuItem } from './types'
+import { useContextMenuRegistry } from '@/os/kernel/useContextMenuRegistry'
 
 export function useContextMenuItems(
     visible: boolean,
@@ -21,14 +22,36 @@ export function useContextMenuItems(
     const explorerItems = useExplorerMenuItems(visible, type === 'explorer-background', data, hideMenu)
     const weatherItems = useWeatherMenuItems(visible, type === 'weather-widget', data, hideMenu)
 
+    // Get dynamic items from registry
+    const { getMenuItems } = useContextMenuRegistry()
+    const dynamicItems = visible && type ? getMenuItems(type, data) : []
+
     if (!visible) return []
 
-    if (type === 'desktop') return desktopItems
-    if (type === 'window-titlebar') return windowItems
-    if (type === 'taskbar-icon') return taskbarItems
-    if (type === 'desktop-item') return fileItems
-    if (type === 'explorer-background') return explorerItems
-    if (type === 'weather-widget') return weatherItems
+    let items: MenuItem[] = []
 
-    return []
+    if (type === 'desktop') items = desktopItems
+    else if (type === 'window-titlebar') items = windowItems
+    else if (type === 'taskbar-icon') items = taskbarItems
+    else if (type === 'desktop-item') items = fileItems
+    else if (type === 'explorer-background') items = explorerItems
+    else if (type === 'weather-widget') items = weatherItems
+    
+    // Merge dynamic items
+    if (dynamicItems.length > 0) {
+        if (items.length > 0) {
+            items.push({ type: 'separator' })
+        }
+        // Map dynamic items to ensure hideMenu is called if action exists
+        const wrappedDynamicItems = dynamicItems.map(item => item.action ? ({
+            ...item,
+            action: () => {
+                item.action?.()
+                hideMenu()
+            }
+        }) : item)
+        items = [...items, ...wrappedDynamicItems]
+    }
+
+    return items
 }

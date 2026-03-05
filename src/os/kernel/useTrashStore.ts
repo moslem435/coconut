@@ -14,15 +14,16 @@ export const useTrashStore = create<TrashState>()((set, get) => ({
         ids.forEach(id => {
             const node = fsStore.files[id]
             if (node) {
-                // Use moveItem to ensure physical move in OPFS and trigger sync events
-                fsStore.moveItem(id, FILE_IDS.TRASH).then(() => {
+                try {
+                    // moveItem is synchronous — no .then() needed
+                    fsStore.moveItem(id, FILE_IDS.TRASH)
                     // Patch originalParentId after move
                     fsStore.patchNode(id, {
                         originalParentId: node.parentId
                     })
-                }).catch(err => {
+                } catch (err) {
                     console.error('Failed to move item to trash:', err)
-                })
+                }
             }
         })
     },
@@ -36,14 +37,15 @@ export const useTrashStore = create<TrashState>()((set, get) => ({
                 // Check if original parent still exists, if not, move to desktop
                 const targetParent = fsStore.files[originalParent] ? originalParent : FILE_IDS.DESKTOP
 
-                // Use moveItem to ensure physical move
-                fsStore.moveItem(id, targetParent).then(() => {
+                try {
+                    // moveItem is synchronous — no .then() needed
+                    fsStore.moveItem(id, targetParent)
                     fsStore.patchNode(id, {
                         originalParentId: null
                     })
-                }).catch(err => {
+                } catch (err) {
                     console.error('Failed to restore item:', err)
-                })
+                }
             }
         })
     },

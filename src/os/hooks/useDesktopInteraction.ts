@@ -56,8 +56,8 @@ export function useDesktopInteraction() {
 
     // 文件夹
     if (item.type === 'folder') {
-      // 检查是否为 App Bundle (.app)
-      if (item.name.endsWith('.app')) {
+      // 检查是否为 App Bundle (.coco)
+      if (item.name.endsWith('.coco')) {
         try {
           // 尝试读取入口文件 (index.html)
           // 注意：readFileContent 需要 ID，而不是路径。我们需要先找到子节点。
@@ -73,7 +73,7 @@ export function useDesktopInteraction() {
           // 启动 Code Runner
           launchApp(
             'app-run-' + item.id,
-            item.name.replace(/\.app$/, ''), // 去除后缀作为标题
+            item.name.replace(/\.coco$/, ''), // 去除后缀作为标题
             'code-runner',
             undefined, // 使用默认图标或应用特定图标
             { 

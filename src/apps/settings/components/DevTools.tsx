@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-    Cpu, HardDrive, Activity, Bell, 
+import {
+    Cpu, HardDrive, Activity, Bell,
     RefreshCw, Trash2, Download, Power,
     CheckCircle2, AlertTriangle, Info, Loader2,
     Zap, Terminal, FileJson, Save,
@@ -14,7 +14,7 @@ import { eventBus, SystemEvents } from '@/os/kernel/EventBus'
 
 export function DevTools() {
     const [activeTab, setActiveTab] = useState<'kernel' | 'storage' | 'logs'>('kernel')
-    
+
     return (
         <div className="flex flex-col gap-4 p-4 rounded-xl bg-[var(--os-bg-base)]/50 border border-[var(--os-border)] w-full">
             <div className="flex items-center justify-between">
@@ -28,23 +28,23 @@ export function DevTools() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-[var(--os-border)]/50 pb-2 overflow-x-auto no-scrollbar">
-                <TabButton 
-                    active={activeTab === 'kernel'} 
-                    onClick={() => setActiveTab('kernel')} 
-                    icon={<Cpu size={14} />} 
-                    label="Kernel" 
+                <TabButton
+                    active={activeTab === 'kernel'}
+                    onClick={() => setActiveTab('kernel')}
+                    icon={<Cpu size={14} />}
+                    label="Kernel"
                 />
-                <TabButton 
-                    active={activeTab === 'storage'} 
-                    onClick={() => setActiveTab('storage')} 
-                    icon={<HardDrive size={14} />} 
-                    label="Storage" 
+                <TabButton
+                    active={activeTab === 'storage'}
+                    onClick={() => setActiveTab('storage')}
+                    icon={<HardDrive size={14} />}
+                    label="Storage"
                 />
-                <TabButton 
-                    active={activeTab === 'logs'} 
-                    onClick={() => setActiveTab('logs')} 
-                    icon={<Activity size={14} />} 
-                    label="Logs" 
+                <TabButton
+                    active={activeTab === 'logs'}
+                    onClick={() => setActiveTab('logs')}
+                    icon={<Activity size={14} />}
+                    label="Logs"
                 />
             </div>
 
@@ -78,8 +78,8 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
             onClick={onClick}
             className={`
                 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                ${active 
-                    ? 'bg-[var(--os-accent)]/10 text-[var(--os-accent)] border border-[var(--os-accent)]/20' 
+                ${active
+                    ? 'bg-[var(--os-accent)]/10 text-[var(--os-accent)] border border-[var(--os-accent)]/20'
                     : 'text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)] hover:text-[var(--os-text-primary)]'}
             `}
         >
@@ -175,7 +175,7 @@ function KernelTab() {
                                 <td className="p-2">{p.name}</td>
                                 <td className="p-2 font-mono opacity-70">{p.memoryUsage}MB</td>
                                 <td className="p-2">
-                                    <button 
+                                    <button
                                         onClick={() => killProcess(p.pid)}
                                         className="p-1 rounded hover:bg-red-500/20 text-red-500 transition-colors"
                                         title="Kill Process"
@@ -197,22 +197,91 @@ import { useDialogStore } from '@/os/kernel/useDialogStore'
 function StorageTab() {
     const { files, createItem } = useFileSystemStore()
     const { openConfirm } = useDialogStore()
-    
     const handleReset = async () => {
         const confirmed = await openConfirm(
             'Factory Reset',
-            'Are you sure you want to reset the file system? This action cannot be undone.'
+            'Are you sure you want to reset the ENTIRE system? This will clear all files, settings, and API keys. This action cannot be undone.'
         )
 
         if (confirmed) {
-            // @ts-ignore
-            if (useFileSystemStore.persist) {
+            let hasErrors = false;
+
+            // 1. Clear IndexedDB backend for file system if available
+            try {
                 // @ts-ignore
-                useFileSystemStore.persist.clearStorage()
-            } else {
-                localStorage.removeItem('filesystem-storage')
-            }
-            window.location.reload()
+                if (useFileSystemStore.persist) useFileSystemStore.persist.clearStorage()
+            } catch (e) { console.warn(e); hasErrors = true; }
+
+            // 2. Clear real OPFS physical file storage
+            try {
+                const { fs } = await import('@/os/kernel/filesystem/FileSystemClient')
+                try {
+                    const rootChildren = await fs.readdir('/')
+                    for (const name of rootChildren) {
+                        await fs.unlink('/' + name, true).catch(console.warn)
+                    }
+                } catch (e) { console.warn('OPFS clean fail:', e) }
+            } catch (e) { console.warn(e); hasErrors = true; }
+
+            // 3. Delete initialization marks so system rebuilds initial tree next time
+            try {
+                const { del } = await import('idb-keyval')
+                await del('fs_version')
+            } catch (e) { console.warn(e); hasErrors = true; }
+
+            // 4. Clear all dynamically imported Zustand stores
+            const clearStore = async (action: () => Promise<any>, emptyState?: any) => {
+                try {
+                    const store = await action();
+                    if (store.persist) {
+                        try { store.persist.clearStorage(); } catch (e) { console.warn(e); }
+                    }
+                    if (emptyState) store.setState(emptyState);
+                } catch (e) { console.warn(e); hasErrors = true; }
+            };
+
+            await clearStore(async () => (await import('@/os/kernel/useWindowStore')).useWindowStore, { windows: {}, activeWindowId: null });
+            await clearStore(async () => (await import('@/os/kernel/useProcessStore')).useProcessStore, { processes: {} });
+            await clearStore(async () => (await import('@/os/kernel/useDesktopStore')).useDesktopStore, { iconPositions: {} });
+            await clearStore(async () => (await import('@/os/kernel/useSystemSettingsStore')).useSystemSettingsStore);
+            await clearStore(async () => (await import('@/os/kernel/useLanguageStore')).useLanguageStore);
+            await clearStore(async () => (await import('@/apps/ai-chat/store/useChatStore')).useChatStore);
+
+            try {
+                useFileSystemStore.setState({ files: {} as any });
+            } catch (e) { }
+
+            // 5. Annihilate all existing IndexedDB Databases
+            // This is the ONLY 100% foolproof way to kill idb-keyval and all custom Zustand web storage backends
+            try {
+                if (window.indexedDB && window.indexedDB.databases) {
+                    const dbs = await window.indexedDB.databases();
+                    for (const db of dbs) {
+                        if (db.name) {
+                            try {
+                                window.indexedDB.deleteDatabase(db.name);
+                            } catch (e) {
+                                console.warn('Could not delete DB', db.name);
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback for browsers without indexedDB.databases() like Firefox
+                    window.indexedDB.deleteDatabase('keyval-store'); // idb-keyval default
+                }
+            } catch (e) { console.warn('IDB global clean fail:', e); hasErrors = true; }
+
+            // 6. Aggressively prevent "last breath" saves from Zustand and clean
+            try {
+                localStorage.setItem = () => { };
+                sessionStorage.setItem = () => { };
+                localStorage.clear()
+                sessionStorage.clear()
+            } catch (e) { console.warn(e); hasErrors = true; }
+
+            // Give IDB and other async storage engines a moment to flush deletes
+            await new Promise(r => setTimeout(r, 1000));
+            window.location.replace('/');
         }
     }
 
@@ -239,26 +308,26 @@ function StorageTab() {
     return (
         <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-                <ActionButton 
+                <ActionButton
                     onClick={handleReset}
                     icon={<Trash2 size={14} />}
                     label="Factory Reset"
                     color="red"
                 />
-                <ActionButton 
+                <ActionButton
                     onClick={handleExport}
                     icon={<Download size={14} />}
                     label="Export Snapshot"
                     color="blue"
                 />
-                <ActionButton 
+                <ActionButton
                     onClick={handleTestWrite}
                     icon={<Save size={14} />}
                     label="Write Test File"
                     color="green"
                 />
             </div>
-            
+
             <div className="p-3 rounded-lg bg-[var(--os-bg-base)] border border-[var(--os-border)] text-xs text-[var(--os-text-secondary)] font-mono">
                 <div className="flex justify-between mb-1">
                     <span>Total Files:</span>
@@ -276,8 +345,8 @@ function StorageTab() {
 function LogsTab() {
     const [logs, setLogs] = useState<{
         id: string,
-        time: string, 
-        event: string, 
+        time: string,
+        event: string,
         data: any,
         category: 'system' | 'app' | 'error' | 'network' | 'perf'
     }[]>([])
@@ -289,12 +358,12 @@ function LogsTab() {
         const sub = eventBus.onAny((event, data) => {
             let category: 'system' | 'app' | 'error' | 'network' | 'perf' = 'system'
             const eventStr = String(event)
-            
+
             if (eventStr.startsWith('sys:error') || eventStr.startsWith('sys:warn')) category = 'error'
             else if (eventStr.startsWith('sys:network')) category = 'network'
             else if (eventStr.startsWith('sys:perf')) category = 'perf'
             else if (eventStr.startsWith('app:') || data?.appId) category = 'app'
-            
+
             setLogs(prev => {
                 const newLogs = [...prev, {
                     id: Math.random().toString(36).substr(2, 9),
@@ -330,23 +399,22 @@ function LogsTab() {
 
     return (
         <div className="space-y-3">
-             <div className="flex items-center justify-between p-2 bg-[var(--os-bg-base)] rounded-lg border border-[var(--os-border)]">
+            <div className="flex items-center justify-between p-2 bg-[var(--os-bg-base)] rounded-lg border border-[var(--os-border)]">
                 <div className="flex gap-2">
                     {['all', 'system', 'app', 'error', 'network', 'perf'].map(f => (
                         <button
                             key={f}
                             onClick={() => setFilter(f as any)}
-                            className={`px-2 py-1 text-[10px] rounded capitalize transition-colors ${
-                                filter === f 
-                                ? 'bg-[var(--os-accent)] text-white' 
+                            className={`px-2 py-1 text-[10px] rounded capitalize transition-colors ${filter === f
+                                ? 'bg-[var(--os-accent)] text-white'
                                 : 'text-[var(--os-text-secondary)] hover:bg-[var(--os-hover-bg)]'
-                            }`}
+                                }`}
                         >
                             {f}
                         </button>
                     ))}
                 </div>
-                <button 
+                <button
                     onClick={() => setLogs([])}
                     className="p-1 hover:bg-[var(--os-hover-bg)] rounded transition-colors text-[var(--os-text-secondary)]"
                     title="Clear Logs"
@@ -363,32 +431,31 @@ function LogsTab() {
                 ) : (
                     <div className="divide-y divide-[var(--os-border)]/30">
                         {filteredLogs.map((log) => (
-                            <div 
-                                key={log.id} 
+                            <div
+                                key={log.id}
                                 className={`
                                     group hover:bg-[var(--os-hover-bg)] transition-colors
                                     ${expandedId === log.id ? 'bg-[var(--os-hover-bg)]' : ''}
                                 `}
                             >
-                                <div 
+                                <div
                                     className="flex items-center gap-2 p-1.5 cursor-pointer"
                                     onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
                                 >
                                     <span className="text-[var(--os-text-secondary)] shrink-0 w-[60px]">{log.time}</span>
                                     <span className="shrink-0">{getIcon(log.category)}</span>
-                                    <span className={`font-bold shrink-0 ${
-                                        log.category === 'error' ? 'text-red-500' :
+                                    <span className={`font-bold shrink-0 ${log.category === 'error' ? 'text-red-500' :
                                         log.category === 'network' ? 'text-blue-500' :
-                                        log.category === 'app' ? 'text-green-500' :
-                                        'text-[var(--os-text-primary)]'
-                                    }`}>
+                                            log.category === 'app' ? 'text-green-500' :
+                                                'text-[var(--os-text-primary)]'
+                                        }`}>
                                         {log.event}
                                     </span>
                                     <span className="text-[var(--os-text-secondary)] truncate flex-1 opacity-70">
                                         {JSON.stringify(log.data)}
                                     </span>
                                 </div>
-                                
+
                                 {expandedId === log.id && (
                                     <div className="p-2 bg-black/5 border-t border-[var(--os-border)]/30 overflow-x-auto">
                                         <pre className="text-[var(--os-text-secondary)]">

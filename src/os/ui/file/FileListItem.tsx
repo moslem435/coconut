@@ -26,7 +26,7 @@ export function FileListItem({
   ...props
 }: FileListItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
-  const { Icon, backgroundColor, useAppIcon, manifest } = iconTheme
+  const { Icon, backgroundColor, useAppIcon, manifest, color } = iconTheme
   const IconComponent = Icon as any
 
   // App Bundle Logic
@@ -73,16 +73,16 @@ export function FileListItem({
           </div>
         ) : (
           <div
-            className="flex items-center justify-center rounded-md shadow-sm"
+            className={cn("flex items-center justify-center rounded-md", backgroundColor === 'transparent' ? '' : 'shadow-sm')}
             style={{
               width: iconSize,
               height: iconSize,
               backgroundColor: backgroundColor,
-              color: '#ffffff'
+              color: backgroundColor === 'transparent' ? color || 'currentColor' : '#ffffff'
             }}
           >
             <IconComponent
-              size={iconSize * 0.7}
+              size={backgroundColor === 'transparent' ? iconSize : iconSize * 0.7}
               strokeWidth={2}
             />
           </div>

@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { RefreshCw, FolderPlus, Terminal, FileText } from 'lucide-react'
+import { RefreshCw, FolderPlus, Terminal, FileText, Clipboard } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
+import { useClipboardStore } from '@/os/kernel/useClipboardStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 import { MenuItem } from './types'
@@ -16,15 +17,28 @@ export function useExplorerMenuItems(
     const { t } = useLanguage()
     const { getItem, createItem } = useFileSystemStore()
     const { openWindow } = useWindowStore()
+    const { clipboard, pasteItems } = useClipboardStore()
 
     return useMemo(() => {
         if (!visible || !isVisibleType) return []
 
-        return [
+        const menuItems: MenuItem[] = [
             {
                 label: t('menu.refresh'),
                 icon: RefreshCw,
                 action: () => {
+                    hideMenu()
+                }
+            },
+            { type: 'separator' },
+            {
+                label: t('menu.paste'),
+                icon: Clipboard,
+                disabled: clipboard.items.length === 0,
+                action: async () => {
+                    if (data?.pathId) {
+                        await pasteItems(data.pathId)
+                    }
                     hideMenu()
                 }
             },
@@ -51,5 +65,7 @@ export function useExplorerMenuItems(
                 }
             }
         ]
-    }, [visible, isVisibleType, data, t, getItem, createItem, openWindow, hideMenu])
+
+        return menuItems
+    }, [visible, isVisibleType, data, t, getItem, createItem, openWindow, hideMenu, clipboard, pasteItems])
 }

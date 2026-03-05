@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type MenuType = 'desktop' | 'taskbar-icon' | 'window-titlebar' | 'desktop-item' | 'explorer-background' | 'weather-widget' | 'default'
+export type MenuType = string // Allow string for custom types
 export type Position = { x: number, y: number }
 export type ContextMenuData = any // Flexible data object for menu context
 
