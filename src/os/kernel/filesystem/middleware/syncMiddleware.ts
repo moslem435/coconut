@@ -131,16 +131,17 @@ export function createSyncMiddleware(
           const { path, type, content } = operation.payload;
           const isFolder = type === 'folder';
 
-          // WRITE GUARD: Prevent overwriting disk with empty content if it's supposed to have data
+          // For files, if content is undefined, use empty string as default
+          let finalContent = content;
           if (!isFolder && content === undefined) {
-            console.warn(`[SyncMiddleware] Write Guard: Skipping syncCreate for ${path} because content is undefined. Preventing disk corruption.`);
-            break;
+            console.log(`[SyncMiddleware] Content undefined for new file ${path}, using empty string`);
+            finalContent = '';
           }
 
-          const byteLen = content ? (typeof content === 'string' ? content.length : content.byteLength) : 0;
+          const byteLen = finalContent ? (typeof finalContent === 'string' ? finalContent.length : finalContent.byteLength) : 0;
           console.log(`[SyncMiddleware] Executing syncCreate: ${path}, type: ${type}, body size: ${byteLen} bytes`);
 
-          await syncService.syncCreate(path, type, content)
+          await syncService.syncCreate(path, type, finalContent)
           break
         }
 
@@ -159,10 +160,10 @@ export function createSyncMiddleware(
         case 'update': {
           const { path, content } = operation.payload;
 
-          // WRITE GUARD: Skip update if content is undefined to prevent wiping file on disk
-          // This happens if the event payload lost the content during rapid state changes
+          // For updates, if content is undefined, this is likely an error
+          // We should not update a file without knowing its content
           if (content === undefined) {
-            console.warn(`[SyncMiddleware] Write Guard: Skipping syncUpdate for ${path} due to undefined content payload.`);
+            console.warn(`[SyncMiddleware] Update skipped for ${path}: content is undefined`);
             break;
           }
 

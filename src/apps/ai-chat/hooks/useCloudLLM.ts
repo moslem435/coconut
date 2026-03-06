@@ -277,34 +277,23 @@ CAPABILITIES:
 WHEN CREATING AN APP:
 1. Plan the folder structure. All apps go into "${SYSTEM_PATHS.USER}/apps/[app-name]".
 2. Use 'create_directory' to create the root folder.
-3. Initialize the project:
-   
-   FOR REACT APPS - DO NOT use 'npm create vite' (it's interactive). Instead:
-   a) Create package.json manually with 'create_file'
-   b) Install dependencies: 'npm install react react-dom vite @vitejs/plugin-react'
-   c) Create vite.config.js and index.html manually
-   
-   FOR EXPRESS BACKEND:
-   - Use 'npm init -y' (non-interactive)
-   - Then install: 'npm install express cors sqlite3 body-parser'
-   
-4. Write all necessary code files using 'create_file' or 'update_file'.
-5. For full-stack apps, ensure both frontend and backend can run.
+3. Initialize the project. 
+   - FOR FRONTEND: YOU MUST USE 'run_command' with 'npm create vite@latest . -- --template react' (or vue/svelte). DO NOT manually create package.json/vite.config.js/index.html unless you have a specific reason.
+   - FOR BACKEND: YOU MUST USE 'run_command' with 'npm init -y'.
+4. Install dependencies using 'run_command' (e.g., 'npm install').
+5. FOR TAILWIND CSS: Follow this EXACT sequence:
+   a) First run: 'npm install -D tailwindcss postcss autoprefixer'
+   b) Then run: 'npx tailwindcss init -p'
+   c) Update tailwind.config.js and add Tailwind directives to CSS
+6. Write/Update code using 'create_file' or 'update_file'.
+7. For full-stack apps, ensure both frontend and backend can run (e.g., using 'concurrently' or separate terminals).
 
 CRITICAL EXECUTION RULES:
 - NEVER use interactive commands: "npm create vite", "npm init" (use "npm init -y"), "create-react-app"
-- For React projects: Manually create package.json, vite.config.js, index.html, and install dependencies
 - After completing a major milestone (e.g., project initialized, dependencies installed), provide a brief progress update
 - When all setup is complete, STOP using tools and provide a final summary with next steps
 - Don't create unnecessary files or run redundant commands
 - Maximum 12-15 tool calls per task - plan efficiently
-
-REACT + VITE PROJECT TEMPLATE (use this instead of npm create vite):
-1. Create package.json with: {"name":"app","type":"module","scripts":{"dev":"vite","build":"vite build"},"dependencies":{"react":"^18","react-dom":"^18"},"devDependencies":{"vite":"^5","@vitejs/plugin-react":"^4"}}
-2. Create vite.config.js with: import react from '@vitejs/plugin-react'; export default { plugins: [react()] }
-3. Create index.html with basic HTML structure and <div id="root"></div>
-4. Create src/main.jsx with React.render code
-5. Run: npm install
 
 DEBUGGING:
 - If a command fails, read the output, fix the code/config, and try again.

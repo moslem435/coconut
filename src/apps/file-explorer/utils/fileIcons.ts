@@ -178,7 +178,7 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
   if (node.type === 'folder') {
     // Check for special system folders
     if (SYSTEM_FOLDERS[node.name]) {
-      const match = SYSTEM_FOLDERS[node.name]
+      const match = SYSTEM_FOLDERS[node.name]!
       return {
         Icon: match.icon,
         backgroundColor: match.color,
@@ -201,7 +201,7 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
 
   // 3. Exact Filename Match
   if (EXACT_MATCHES[lowerName]) {
-    const match = EXACT_MATCHES[lowerName]
+    const match = EXACT_MATCHES[lowerName]!
     return {
       Icon: match.icon,
       backgroundColor: match.color,
@@ -212,7 +212,7 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
   // 4. Extension Match
   const ext = lowerName.split('.').pop()
   if (ext && EXTENSION_MATCHES[ext]) {
-    const match = EXTENSION_MATCHES[ext]
+    const match = EXTENSION_MATCHES[ext]!
     return {
       Icon: match.icon,
       backgroundColor: match.color,

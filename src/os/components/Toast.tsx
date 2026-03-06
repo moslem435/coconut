@@ -6,10 +6,10 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react'
+import { CheckCircle, XCircle, AlertCircle, Info, X, Loader2 } from 'lucide-react'
 import { create } from 'zustand'
 
-export type ToastType = 'success' | 'error' | 'warning' | 'info'
+export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading'
 
 export interface Toast {
   id: string
@@ -76,6 +76,14 @@ export const toast = {
   info: (title: string, message?: string, duration?: number) => {
     return useToastStore.getState().addToast({ type: 'info', title, message, duration })
   },
+
+  loading: (title: string, message?: string) => {
+    return useToastStore.getState().addToast({ type: 'loading', title, message, duration: 0 })
+  },
+
+  dismiss: (id: string) => {
+    useToastStore.getState().removeToast(id)
+  },
   
   custom: (toast: Omit<Toast, 'id'>) => {
     return useToastStore.getState().addToast(toast)
@@ -94,6 +102,8 @@ const ToastIcon = ({ type }: { type: ToastType }) => {
       return <AlertCircle {...iconProps} className="text-yellow-400" />
     case 'info':
       return <Info {...iconProps} className="text-blue-400" />
+    case 'loading':
+      return <Loader2 {...iconProps} className="text-blue-400 animate-spin" />
   }
 }
 
@@ -115,7 +125,8 @@ const ToastItem = ({ toast: toastItem }: { toast: Toast }) => {
     success: 'bg-green-500/10 border-green-500/30',
     error: 'bg-red-500/10 border-red-500/30',
     warning: 'bg-yellow-500/10 border-yellow-500/30',
-    info: 'bg-blue-500/10 border-blue-500/30'
+    info: 'bg-blue-500/10 border-blue-500/30',
+    loading: 'bg-blue-500/10 border-blue-500/30'
   }[toastItem.type]
 
   return (

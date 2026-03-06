@@ -26,7 +26,24 @@ class FileSystemSyncService {
     content?: string | Uint8Array,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    const tasks: Array<() => Promise<void>> = []
+
+    // WebContainer 同步 (Non-blocking context initiation)
+    if (options.syncToWebContainer) {
+      // 开启异步任务不阻塞主流程，确保终端能尽快同步
+      (async () => {
+        try {
+          const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
+          if (type === 'folder') {
+            await useWebContainerStore.getState().syncMkdir(path)
+          } else {
+            const fileContent = content !== undefined ? content : '';
+            await useWebContainerStore.getState().syncFile(path, fileContent)
+          }
+        } catch (error) {
+          console.warn('[SyncService] WebContainer creation failed:', error)
+        }
+      })();
+    }
 
     // OPFS 同步 (Critical, await)
     if (options.syncToOPFS) {
@@ -38,24 +55,8 @@ class FileSystemSyncService {
           await ioService.writeFile(path, fileContent)
         }
       };
+      // 等待物理文件系统写入完成
       await this.executeTasks([opfsTask]);
-    }
-
-    // WebContainer 同步 (Non-critical, background)
-    if (options.syncToWebContainer) {
-      (async () => {
-        try {
-          const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
-          if (type === 'folder') {
-            useWebContainerStore.getState().syncMkdir(path)
-          } else {
-            const fileContent = content !== undefined ? content : '';
-            useWebContainerStore.getState().syncFile(path, fileContent)
-          }
-        } catch (error) {
-          console.warn('[SyncService] Background WebContainer creation failed (non-fatal):', error)
-        }
-      })();
     }
 
     // Publish event
@@ -74,22 +75,23 @@ class FileSystemSyncService {
     content: string | Uint8Array,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    if (options.syncToOPFS) {
-      const opfsTask = async () => {
-        await ioService.writeFile(path, content)
-      };
-      await this.executeTasks([opfsTask]);
-    }
 
     if (options.syncToWebContainer) {
       (async () => {
         try {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
-          useWebContainerStore.getState().syncFile(path, content)
+          await useWebContainerStore.getState().syncFile(path, content)
         } catch (error) {
           console.warn('[SyncService] Background WebContainer update failed:', error)
         }
       })();
+    }
+
+    if (options.syncToOPFS) {
+      const opfsTask = async () => {
+        await ioService.writeFile(path, content)
+      };
+      await this.executeTasks([opfsTask]);
     }
 
     // Publish event
@@ -107,6 +109,26 @@ class FileSystemSyncService {
     path: string,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
+
+    if (options.syncToWebContainer) {
+      (async () => {
+        try {
+          const { SYSTEM_PATHS } = await import('@/os/config/paths')
+          
+          // Skip WebContainer sync if path is outside /home/user (e.g., Trash)
+          if (!path.startsWith(SYSTEM_PATHS.USER)) {
+            console.log(`[SyncService] WebContainer delete skipped: path outside user home (${path})`)
+            return
+          }
+          
+          const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
+          await useWebContainerStore.getState().syncUnlink(path)
+        } catch (error) {
+          console.warn('[SyncService] Background WebContainer deletion failed:', error)
+        }
+      })();
+    }
+
     if (options.syncToOPFS) {
       const opfsTask = async () => {
         if (path && path !== '/') {
@@ -117,17 +139,6 @@ class FileSystemSyncService {
         }
       };
       await this.executeTasks([opfsTask]);
-    }
-
-    if (options.syncToWebContainer) {
-      (async () => {
-        try {
-          const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
-          useWebContainerStore.getState().syncUnlink(path)
-        } catch (error) {
-          console.warn('[SyncService] Background WebContainer deletion failed:', error)
-        }
-      })();
     }
 
     // Publish event
@@ -145,17 +156,6 @@ class FileSystemSyncService {
     newPath: string,
     options: SyncOptions = { syncToOPFS: true, syncToWebContainer: true }
   ): Promise<void> {
-    if (options.syncToOPFS) {
-      const opfsTask = async () => {
-        const sourceExists = await fs.exists(oldPath)
-        if (!sourceExists) {
-          console.warn(`[SyncService] syncRename: source not in OPFS, skipping: ${oldPath}`)
-          return
-        }
-        await ioService.rename(oldPath, newPath)
-      };
-      await this.executeTasks([opfsTask]);
-    }
 
     if (options.syncToWebContainer) {
       (async () => {
@@ -163,11 +163,76 @@ class FileSystemSyncService {
           const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore')
           const { instance, isSyncingFromWC } = useWebContainerStore.getState()
           if (!instance || isSyncingFromWC) return
-          await instance.fs.rename(oldPath, newPath)
+          
+          // Import SYSTEM_PATHS to convert VFS paths to WebContainer paths
+          const { SYSTEM_PATHS } = await import('@/os/config/paths')
+          
+          // Skip WebContainer sync if either path is outside /home/user
+          // (e.g., moving to/from Trash which is at /Trash)
+          if (!oldPath.startsWith(SYSTEM_PATHS.USER) || !newPath.startsWith(SYSTEM_PATHS.USER)) {
+            console.log(`[SyncService] WebContainer rename skipped: path outside user home (${oldPath} -> ${newPath})`)
+            
+            // If moving FROM user home TO trash, delete from WebContainer
+            if (oldPath.startsWith(SYSTEM_PATHS.USER) && !newPath.startsWith(SYSTEM_PATHS.USER)) {
+              const wcOldPath = oldPath.replace(SYSTEM_PATHS.USER, '') || '/'
+              try {
+                await instance.fs.rm(wcOldPath, { recursive: true })
+                console.log(`[SyncService] WebContainer deleted (moved to trash): ${wcOldPath}`)
+              } catch (error: any) {
+                if (error?.code !== 'ENOENT') {
+                  console.warn(`[SyncService] WebContainer delete failed:`, error)
+                }
+              }
+            }
+            return
+          }
+          
+          // Convert VFS paths to WebContainer paths
+          // VFS: /home/user/apps/file -> WC: /apps/file
+          const wcOldPath = oldPath.replace(SYSTEM_PATHS.USER, '') || '/'
+          const wcNewPath = newPath.replace(SYSTEM_PATHS.USER, '') || '/'
+          
+          // Check if source exists in WebContainer
+          try {
+            await instance.fs.readFile(wcOldPath)
+            await instance.fs.rename(wcOldPath, wcNewPath)
+            console.log(`[SyncService] WebContainer rename: ${wcOldPath} -> ${wcNewPath}`)
+          } catch (error: any) {
+            // If source doesn't exist, this might be a move of a file that was never synced
+            // Just skip the operation silently
+            if (error?.code === 'ENOENT') {
+              console.log(`[SyncService] WebContainer rename skipped: source doesn't exist: ${wcOldPath}`)
+            } else {
+              throw error
+            }
+          }
         } catch (error) {
           console.warn('[SyncService] Background WebContainer rename failed:', error)
         }
       })();
+    }
+
+    if (options.syncToOPFS) {
+      const opfsTask = async () => {
+        const sourceExists = await fs.exists(oldPath)
+        if (!sourceExists) {
+          console.log(`[SyncService] syncRename: source not in OPFS, skipping: ${oldPath}`)
+          return
+        }
+        
+        // Ensure target directory exists
+        const targetDir = newPath.substring(0, newPath.lastIndexOf('/'))
+        if (targetDir && targetDir !== '/') {
+          try {
+            await ioService.mkdir(targetDir)
+          } catch (error) {
+            // Directory might already exist, ignore
+          }
+        }
+        
+        await ioService.rename(oldPath, newPath)
+      };
+      await this.executeTasks([opfsTask]);
     }
 
     // Publish event

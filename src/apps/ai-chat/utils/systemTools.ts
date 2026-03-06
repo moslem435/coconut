@@ -123,7 +123,13 @@ export const systemToolsImplementation: Record<string, Function> = {
     },
 
     // --- Execution ---
-    run_command: async (args: { cmd: string, args?: string[], cwd?: string }) => {
+    run_command: async (args: { cmd: string, args?: string[], cwd?: string, detached?: boolean, successPattern?: string }) => {
+        // Prevent running long-running processes that would timeout (unless detached mode is requested)
+        const longRunningCommands = ['dev', 'start', 'watch', 'serve'];
+        if (args.cmd === 'npm' && args.args && args.args.some(arg => longRunningCommands.includes(arg)) && !args.detached) {
+            return `Command '${args.cmd} ${args.args.join(' ')}' skipped. Long-running processes (like dev servers) block execution. To run this, you MUST set "detached": true in the arguments.`;
+        }
+
         let output = '';
         
         try {
@@ -145,6 +151,10 @@ export const systemToolsImplementation: Record<string, Function> = {
                 }
             }
             
+            // Track the last output length when we dispatched a prompt
+            // This allows us to detect new prompts after user responds
+            let lastPromptOutputLength = 0;
+            
             // Dispatch a custom event to notify UI about the output stream
             // This is a temporary solution until we have a proper streaming tool response architecture
             const dispatchOutput = (data: string) => {
@@ -156,6 +166,139 @@ export const systemToolsImplementation: Record<string, Function> = {
                 window.dispatchEvent(new CustomEvent('ai-builder:command-output', { 
                     detail: { cmd: args.cmd, output: cleanData } 
                 }));
+
+                // Skip if output hasn't grown significantly since last prompt
+                // This prevents duplicate triggers for the same prompt
+                if (output.length - lastPromptOutputLength < 10) return;
+
+                // Heuristic detection for interactive prompts
+                // Check the FULL output (not just the current chunk) for better detection
+                const trimmed = cleanData.trim();
+                const fullOutput = output;
+                const fullOutputTrimmed = fullOutput.trim();
+                const fullOutputLower = fullOutput.toLowerCase();
+                
+                // 1. Detect prompt patterns (questions, colons, prompts)
+                const hasPromptPattern = 
+                    fullOutputTrimmed.endsWith('?') || 
+                    fullOutputTrimmed.endsWith(':') || 
+                    fullOutputTrimmed.endsWith('?:') || // Vite uses "?:"
+                    fullOutputTrimmed.endsWith('>') ||
+                    fullOutputTrimmed.endsWith('...') || // Waiting indicator
+                    // Yes/No confirmations (case insensitive)
+                    /\(y\/n\)/i.test(fullOutput) ||
+                    /\[y\/n\]/i.test(fullOutput) ||
+                    /\(yes\/no\)/i.test(fullOutput) ||
+                    /\[yes\/no\]/i.test(fullOutput) ||
+                    /\[y\/n\]/i.test(fullOutput) ||
+                    // Selection prompts
+                    fullOutputLower.includes('select a') ||
+                    fullOutputLower.includes('select an') ||
+                    fullOutputLower.includes('choose a') ||
+                    fullOutputLower.includes('choose an') ||
+                    fullOutputLower.includes('please select') ||
+                    fullOutputLower.includes('please choose') ||
+                    fullOutputLower.includes('pick a') ||
+                    fullOutputLower.includes('which') ||
+                    // Input prompts
+                    fullOutputLower.includes('enter your') ||
+                    fullOutputLower.includes('enter a') ||
+                    fullOutputLower.includes('enter the') ||
+                    fullOutputLower.includes('type your') ||
+                    fullOutputLower.includes('provide a') ||
+                    fullOutputLower.includes('input') ||
+                    // Common field names
+                    fullOutputLower.includes('package name:') ||
+                    fullOutputLower.includes('project name:') ||
+                    fullOutputLower.includes('name:') ||
+                    fullOutputLower.includes('version:') ||
+                    fullOutputLower.includes('description:') ||
+                    fullOutputLower.includes('author:') ||
+                    fullOutputLower.includes('license:') ||
+                    fullOutputLower.includes('dest dir:') ||
+                    fullOutputLower.includes('directory:') ||
+                    // Password/sensitive input
+                    fullOutputLower.includes('password:') ||
+                    fullOutputLower.includes('passphrase:') ||
+                    fullOutputLower.includes('token:') ||
+                    fullOutputLower.includes('secret:') ||
+                    // Framework/tool specific
+                    fullOutputLower.includes('use vite') ||
+                    fullOutputLower.includes('framework:') ||
+                    fullOutputLower.includes('template:') ||
+                    fullOutputLower.includes('variant:') ||
+                    // Special characters used by modern CLIs
+                    fullOutputLower.includes('◆') || // Vite
+                    fullOutputLower.includes('◇') || // Alternative
+                    fullOutputLower.includes('●') || // Bullet
+                    fullOutputLower.includes('○') || // Circle
+                    fullOutputLower.includes('▸') || // Arrow
+                    fullOutputLower.includes('❯') || // Prompt arrow
+                    fullOutputLower.includes('›'); // Right arrow
+                
+                // 2. Check for option markers (visual indicators of choices)
+                const hasOptions = /[○●•❯›│▸◆◇]\s+/g.test(output);
+                
+                // 3. Check for numbered options (1. Option, 1) Option, [1] Option)
+                const hasNumberedOptions = /^\s*[\[\(]?\d+[\.\)\]]\s+\w+/m.test(output);
+
+                // 4. Check for text input prompts (where no options might be present)
+                const isTextInputPrompt = 
+                    /project name:|package name:|enter your|enter a|enter the|name:|version:|description:|author:|license:|dest dir:|directory:|password:|passphrase:|token:|secret:/i.test(fullOutputTrimmed);
+                
+                // 5. Check for waiting state (output ends with colon or prompt and hasn't grown)
+                const looksLikeWaiting = 
+                    (fullOutputTrimmed.endsWith(':') || fullOutputTrimmed.endsWith('>')) &&
+                    output.length > 20 && 
+                    output.length < 500;
+                
+                // 6. Content length check (reasonable size for a prompt)
+                const hasReasonableContent = output.length > 20 && output.length < 3000;
+                
+                // Debug logging
+                if (hasPromptPattern || hasOptions || hasNumberedOptions || isTextInputPrompt || looksLikeWaiting) {
+                    console.log('[SystemTools] Prompt detection check:', {
+                        hasPromptPattern,
+                        hasOptions,
+                        hasNumberedOptions,
+                        isTextInputPrompt,
+                        looksLikeWaiting,
+                        hasReasonableContent,
+                        outputLength: output.length,
+                        lastLine: fullOutputTrimmed.split('\n').pop()?.slice(-100)
+                    });
+                }
+                
+                // Trigger interactive prompt if any of these conditions are met:
+                // 1. Prompt pattern + options (visual or numbered)
+                // 2. Text input prompt detected
+                // 3. Looks like waiting for input
+                // 4. Prompt pattern + reasonable content (not too short, not too long)
+                const shouldTrigger = 
+                    (hasPromptPattern && (hasOptions || hasNumberedOptions)) ||
+                    isTextInputPrompt ||
+                    looksLikeWaiting ||
+                    (hasPromptPattern && hasReasonableContent);
+                
+                if (shouldTrigger) {
+                    // Update the last prompt output length to allow future prompts
+                    lastPromptOutputLength = output.length;
+                    
+                    console.log('[SystemTools] ✅ Interactive prompt detected!');
+                    console.log('[SystemTools] Full output:', output);
+                    
+                    // Extract the prompt line (usually the last non-empty line)
+                    const lines = fullOutputTrimmed.split('\n').filter(l => l.trim());
+                    const promptLine = lines[lines.length - 1] || trimmed;
+                    
+                    window.dispatchEvent(new CustomEvent('ai-builder:interactive-prompt', { 
+                        detail: { 
+                            cmd: args.cmd, 
+                            prompt: promptLine,
+                            output: output
+                        } 
+                    }));
+                }
             };
 
             // Create a timeout promise (60 seconds for most commands)
@@ -172,12 +315,31 @@ export const systemToolsImplementation: Record<string, Function> = {
                     args.cmd, 
                     args.args || [], 
                     args.cwd || '/',
-                    dispatchOutput
+                    dispatchOutput,
+                    { 
+                        detached: args.detached,
+                        successPattern: args.successPattern
+                    }
                 ),
                 timeoutPromise
             ]);
             
+            // After command completes successfully, sync WebContainer to VFS
             if (exitCode === 0) {
+                console.log(`[SystemTools] Command succeeded, syncing WC to VFS...`);
+                try {
+                    // Always sync from root to catch all changes
+                    // This is especially important for commands like "npm create vite"
+                    // which create new directories
+                    await store.syncWCToVFS('/');
+                    console.log(`[SystemTools] ✅ Sync complete`);
+                } catch (syncError) {
+                    console.warn(`[SystemTools] Sync failed:`, syncError);
+                }
+                
+                if (args.detached) {
+                    return `Process started successfully in background.\nInitial Output:\n${output.slice(0, 2000)}`;
+                }
                 return `Command executed successfully.\nOutput:\n${output.slice(0, 1000)}${output.length > 1000 ? '...(truncated)' : ''}`;
             } else {
                 return `Command failed with exit code ${exitCode}.\nOutput:\n${output.slice(0, 1000)}`;
@@ -376,13 +538,15 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'run_command',
-            description: 'Run a shell command in the WebContainer environment. CRITICAL: Commands MUST be non-interactive and complete within 60 seconds. NEVER use: "npm create vite" (interactive), "npm init" (use "npm init -y"), or any command that waits for user input. Safe commands: "npm install", "npm init -y", "ls", "cat", etc.',
+            description: 'Run a shell command in the WebContainer environment. For long-running processes (like dev servers), use "detached": true. CRITICAL: Commands MUST be non-interactive and complete within 60 seconds (unless detached). NEVER use: "npm create vite" (interactive), "npm init" (use "npm init -y"), or any command that waits for user input.',
             parameters: {
                 type: 'object',
                 properties: {
                     cmd: { type: 'string', description: 'The command to run (e.g., "npm")' },
                     args: { type: 'array', items: { type: 'string' }, description: 'Arguments for the command (e.g., ["install", "react"])' },
-                    cwd: { type: 'string', description: 'Current working directory for the command (e.g. "/home/user/apps/myapp")' }
+                    cwd: { type: 'string', description: 'Current working directory for the command (e.g. "/home/user/apps/myapp")' },
+                    detached: { type: 'boolean', description: 'Set to true for long-running processes (e.g. npm run dev). Returns early after detecting successPattern.' },
+                    successPattern: { type: 'string', description: 'String to watch for in output to confirm successful start in detached mode (default: "Local:")' }
                 },
                 required: ['cmd']
             }

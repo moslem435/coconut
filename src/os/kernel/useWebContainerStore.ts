@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { WebContainer } from '@webcontainer/api'
 import { SYSTEM_PATHS } from '@/os/config/paths'
 
+interface SyncQueueItem {
+  type: 'mkdir' | 'file' | 'unlink'
+  path: string
+  content?: string | Uint8Array
+}
+
 interface WebContainerState {
   instance: WebContainer | null
   isBooting: boolean
@@ -15,16 +21,18 @@ interface WebContainerState {
   syncFile: (path: string, content: string | Uint8Array) => Promise<void>
   syncMkdir: (path: string) => Promise<void>
   syncUnlink: (path: string) => Promise<void>
+  syncWCToVFS: (wcPath: string) => Promise<void> // Manual sync from WebContainer to VFS
   isSyncingFromWC: boolean
   setSyncingFromWC: (val: boolean) => void
 
   // Execution
-  runCommand: (cmd: string, args: string[], cwd?: string, onOutput?: (data: string) => void) => Promise<number>
+  runCommand: (cmd: string, args: string[], cwd?: string, onOutput?: (data: string) => void, options?: { detached?: boolean, successPattern?: string }) => Promise<number>
 }
 
 let bootPromise: Promise<WebContainer> | null = null
 let initializationPromise: Promise<void> | null = null
 let globalWebContainerInstance: WebContainer | null = null
+let syncQueue: SyncQueueItem[] = []
 
 export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   instance: null,
@@ -36,29 +44,37 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   // New: Explicit Sync Methods for VFS (Optimized)
   syncFile: async (path, content) => {
     const { instance, isSyncingFromWC } = get()
-    if (!instance) return
     
     // If we are currently processing a change originating from WC, do not sync back to WC
     if (isSyncingFromWC) {
-      // console.log('[VFS->WC] Skipped sync (loop prevention):', path)
       return
     }
 
-    // Direct mapping: VFS path -> WC path (assuming path is absolute)
-    // Only sync user files (/home/user/...) to WC root
-    if (!path.startsWith(SYSTEM_PATHS.USER)) return
-    
+    // Ensure we only sync paths within the user home directory
+    if (!path.startsWith(SYSTEM_PATHS.USER)) {
+      console.warn(`[VFS->WC] Skipping sync for path outside user home: ${path}. WebContainer only mounts ${SYSTEM_PATHS.USER}`);
+      return
+    }
+
+    // If no instance, queue the operation
+    if (!instance) {
+      const contentLen = typeof content === 'string' ? content.length : content?.byteLength || 0
+      console.log(`[VFS->WC] Queueing file sync (no instance yet): ${path}, content: ${contentLen} bytes`)
+      syncQueue.push({ type: 'file', path, content })
+      return
+    }
+
     const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
-    
+
     try {
       // Ensure parent directory exists before writing file
       const parentPath = wcPath.split('/').slice(0, -1).join('/') || '/';
-      if (parentPath !== '/') {
-          await instance.fs.mkdir(parentPath, { recursive: true });
+      if (parentPath !== '/' && parentPath !== '') {
+        await instance.fs.mkdir(parentPath, { recursive: true });
       }
 
-      // console.log('[VFS->WC] writeFile:', wcPath)
       await instance.fs.writeFile(wcPath, content)
+      console.log('[VFS->WC] ✅ File synced:', wcPath)
     } catch (e) {
       console.warn('[VFS->WC] writeFile failed:', e)
     }
@@ -66,142 +82,411 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
   syncMkdir: async (path) => {
     const { instance, isSyncingFromWC } = get()
-    if (!instance) return
-
+    
     if (isSyncingFromWC) {
-       // console.log('[VFS->WC] Skipped mkdir (loop prevention):', path)
-       return
+      return
     }
 
-    // Only sync user files (/home/user/...) to WC root
-    if (!path.startsWith(SYSTEM_PATHS.USER)) return
-    
-    const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
+    if (!path.startsWith(SYSTEM_PATHS.USER)) {
+      console.warn(`[VFS->WC] Skipping mkdir for path outside user home: ${path}`);
+      return
+    }
 
+    // If no instance, queue the operation
+    if (!instance) {
+      console.log('[VFS->WC] Queueing mkdir (no instance yet):', path)
+      syncQueue.push({ type: 'mkdir', path })
+      return
+    }
+
+    const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
+    console.log('[VFS->WC] Creating directory:', wcPath)
     try {
-      // console.log('[VFS->WC] mkdir:', wcPath)
       await instance.fs.mkdir(wcPath, { recursive: true })
+      console.log('[VFS->WC] ✅ Directory created:', wcPath)
     } catch (e) {
-      console.warn('[VFS->WC] mkdir failed:', e)
+      console.warn('[VFS->WC] mkdir failed:', wcPath, e)
     }
   },
 
   syncUnlink: async (path) => {
     const { instance, isSyncingFromWC } = get()
-    if (!instance || isSyncingFromWC) return
-
-    // Only sync user files (/home/user/...) to WC root
-    if (!path.startsWith(SYSTEM_PATHS.USER)) return
     
+    if (isSyncingFromWC) {
+      return
+    }
+
+    if (!path.startsWith(SYSTEM_PATHS.USER)) {
+      console.warn(`[VFS->WC] Skipping unlink for path outside user home: ${path}`);
+      return
+    }
+
+    // If no instance, queue the operation
+    if (!instance) {
+      console.log('[VFS->WC] Queueing unlink (no instance yet):', path)
+      syncQueue.push({ type: 'unlink', path })
+      return
+    }
+
     const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
+    try {
+      await instance.fs.rm(wcPath, { recursive: true });
+      console.log('[VFS->WC] ✅ Deleted:', wcPath)
+    } catch (e) {
+      // Ignore if already deleted
+    }
+  },
+
+  // Manual sync from WebContainer to VFS
+  syncWCToVFS: async (wcPath: string = '/') => {
+    const { instance, isSyncingFromWC } = get()
+    if (!instance) {
+      console.warn('[WC->VFS] Cannot sync: WebContainer not booted')
+      return
+    }
+
+    // Set syncing flag to prevent circular sync
+    set({ isSyncingFromWC: true })
 
     try {
-      console.log('[VFS->WC] unlink:', wcPath)
-      await instance.fs.rm(wcPath, { recursive: true, force: true })
-    } catch (e) {
-      console.warn('[VFS->WC] unlink failed:', e)
+      const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
+      const { getNodeByPath, createItem, updateFileContent } = useFileSystemStore.getState()
+
+      console.log(`[WC->VFS] Starting manual sync from WC:${wcPath}`)
+      
+      let syncedFiles = 0
+      let syncedFolders = 0
+      const createdPaths: string[] = []
+
+      const syncDirectory = async (wcDir: string, vfsPath: string) => {
+        try {
+          console.log(`[WC->VFS] Syncing directory WC:${wcDir} -> VFS:${vfsPath}`)
+          const entries = await instance.fs.readdir(wcDir, { withFileTypes: true }) as any[]
+          
+          for (const entry of entries) {
+            // Skip hidden files and node_modules
+            if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+              console.log(`[WC->VFS] Skipping: ${entry.name}`)
+              continue
+            }
+
+            const wcItemPath = wcDir === '/' ? `/${entry.name}` : `${wcDir}/${entry.name}`
+            const vfsItemPath = `${vfsPath}/${entry.name}`
+
+            if (entry.isDirectory()) {
+              // Check if folder exists in VFS
+              let folderNode = getNodeByPath(vfsItemPath)
+              if (!folderNode) {
+                // Create folder
+                const parentNode = getNodeByPath(vfsPath)
+                if (parentNode) {
+                  console.log(`[WC->VFS] Creating folder: ${vfsItemPath}`)
+                  await createItem(parentNode.id, entry.name, 'folder')
+                  syncedFolders++
+                  createdPaths.push(vfsItemPath)
+                  // Wait for state update
+                  await new Promise(r => setTimeout(r, 50))
+                } else {
+                  console.warn(`[WC->VFS] Parent not found for folder: ${vfsPath}`)
+                }
+              }
+              // Recursively sync subdirectory
+              await syncDirectory(wcItemPath, vfsItemPath)
+            } else {
+              // Sync file
+              const content = await instance.fs.readFile(wcItemPath, 'utf-8') as string
+              const fileNode = getNodeByPath(vfsItemPath)
+              
+              if (!fileNode) {
+                // Create file
+                const parentNode = getNodeByPath(vfsPath)
+                if (parentNode) {
+                  console.log(`[WC->VFS] Creating file: ${vfsItemPath} (${content.length} bytes)`)
+                  await createItem(parentNode.id, entry.name, 'file', content)
+                  syncedFiles++
+                  createdPaths.push(vfsItemPath)
+                  // Small delay to allow state propagation
+                  await new Promise(r => setTimeout(r, 30))
+                } else {
+                  console.warn(`[WC->VFS] Parent not found for file: ${vfsPath}`)
+                }
+              } else {
+                // Update file if content changed
+                const currentContent = await useFileSystemStore.getState().readFileContent(fileNode.id)
+                if (currentContent !== content) {
+                  console.log(`[WC->VFS] Updating file: ${vfsItemPath} (${content.length} bytes)`)
+                  await updateFileContent(fileNode.id, content)
+                  syncedFiles++
+                  createdPaths.push(vfsItemPath)
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`[WC->VFS] Failed to sync directory ${wcDir}:`, e)
+        }
+      }
+
+      // Convert WC path to VFS path
+      // WC: /apps/intro-page -> VFS: /home/user/apps/intro-page
+      const vfsBasePath = `${SYSTEM_PATHS.USER}${wcPath === '/' ? '' : wcPath}`
+      
+      console.log(`[WC->VFS] Mapping WC:${wcPath} -> VFS:${vfsBasePath}`)
+      
+      // Ensure the base path exists in VFS
+      const baseNode = getNodeByPath(vfsBasePath)
+      if (!baseNode) {
+        console.warn(`[WC->VFS] Base path does not exist in VFS: ${vfsBasePath}`)
+        console.warn(`[WC->VFS] Will try to sync from root instead`)
+        // Fallback to syncing from root
+        await syncDirectory('/', SYSTEM_PATHS.USER)
+      } else {
+        await syncDirectory(wcPath, vfsBasePath)
+      }
+      
+      console.log(`[WC->VFS] ✅ Manual sync complete: ${syncedFolders} folders, ${syncedFiles} files`)
+      
+      // CRITICAL: Wait for all files to be synced to OPFS
+      // The syncMiddleware processes events asynchronously
+      // We need to wait a bit to ensure all files are written to OPFS
+      if (createdPaths.length > 0) {
+        console.log(`[WC->VFS] Waiting for OPFS sync to complete (${createdPaths.length} items)...`)
+        // Wait 2 seconds for OPFS sync to complete
+        await new Promise(r => setTimeout(r, 2000))
+        console.log(`[WC->VFS] ✅ OPFS sync should be complete`)
+      }
+    } finally {
+      // Reset sync flag
+      set({ isSyncingFromWC: false })
     }
   },
 
   // Helper: Run command
-  runCommand: async (cmd: string, args: string[], cwd: string = '/', onOutput?: (data: string) => void) => {
-      const { instance } = get()
-      if (!instance) throw new Error('WebContainer not booted')
+  runCommand: async (cmd: string, args: string[], cwd: string = '/', onOutput?: (data: string) => void, options: { detached?: boolean, successPattern?: string } = {}) => {
+    const { instance } = get()
+    if (!instance) throw new Error('WebContainer not booted')
 
-      // Ensure cwd is relative to WC root
-      let wcCwd = cwd;
-      if (cwd.startsWith(SYSTEM_PATHS.USER)) {
-          wcCwd = cwd.replace(SYSTEM_PATHS.USER, '') || '/';
-      }
+    // Ensure cwd is relative to WC root
+    let wcCwd = cwd;
+    if (cwd.startsWith(SYSTEM_PATHS.USER)) {
+      wcCwd = cwd.replace(SYSTEM_PATHS.USER, '') || '/';
+    }
 
-      console.log(`[WC] Spawning: ${cmd} ${args.join(' ')} in ${wcCwd}`)
+    console.log(`[WC] Spawning: ${cmd} ${args.join(' ')} in ${wcCwd} (detached: ${options.detached})`)
 
-      try {
-          const process = await instance.spawn(cmd, args, {
-              cwd: wcCwd,
-              env: {
-                  // Disable all interactive prompts
-                  npm_config_yes: 'true',           // Auto-confirm npm prompts
-                  CI: 'true',                        // CI mode - disable interactive
-                  FORCE_COLOR: '0',                  // Disable color codes
-                  NO_UPDATE_NOTIFIER: 'true',        // Disable update notifications
-                  npm_config_audit: 'false',         // Skip audit
-                  npm_config_fund: 'false',          // Skip funding messages
-                  ADBLOCK: 'true',                   // Disable ads
-                  DISABLE_OPENCOLLECTIVE: 'true',    // Disable opencollective
-                  // Vite specific
-                  VITE_CJS_IGNORE_WARNING: 'true',
-                  // Suppress prompts
-                  SHELL: '/bin/sh',
-                  TERM: 'dumb'
+    try {
+      const process = await instance.spawn(cmd, args, {
+        cwd: wcCwd,
+        env: {
+          npm_config_yes: 'true', // Auto-confirm npx prompts
+          TERM: 'dumb' // Dumb terminal to avoid escape codes, though some tools ignore this
+        }
+      })
+
+      // Expose stdin writer for interactive commands
+      const writer = process.input.getWriter();
+
+      // Listen for interactive input events from UI
+      const inputHandler = (e: CustomEvent) => {
+        if (e.detail?.cmd === cmd) {
+          writer.write(e.detail.input);
+        }
+      };
+      window.addEventListener('webcontainer:input', inputHandler as EventListener);
+
+      // If detached mode, we resolve early once we see success pattern or after a short delay
+      // We DO NOT await process.exit
+      let resolved = false;
+      let outputBuffer = '';
+      const successPattern = options.successPattern || 'Local:'; // Default Vite pattern
+
+      let streamPromise = Promise.resolve();
+
+      if (onOutput || options.detached) {
+        streamPromise = process.output.pipeTo(new WritableStream({
+          write(data) {
+            if (onOutput) onOutput(data);
+
+            if (options.detached && !resolved) {
+              outputBuffer += data;
+              if (outputBuffer.includes(successPattern)) {
+                resolved = true;
+                // Resolve promise early for detached process
+                // We keep the process running in background
               }
-          })
-
-          let streamPromise = Promise.resolve();
-          let fullOutput = '';
-          
-          if (onOutput) {
-              streamPromise = process.output.pipeTo(new WritableStream({
-                  write(data) {
-                      fullOutput += data;
-                      onOutput(data);
-                      
-                      // Detect interactive prompts
-                      const lowerOutput = fullOutput.toLowerCase();
-                      if (
-                          (lowerOutput.includes('? ') || lowerOutput.includes('(y/n)')) &&
-                          (lowerOutput.includes('yes') || lowerOutput.includes('no'))
-                      ) {
-                          // Dispatch event for interactive prompt detection
-                          window.dispatchEvent(new CustomEvent('webcontainer:interactive-prompt', {
-                              detail: {
-                                  cmd,
-                                  output: fullOutput,
-                                  process
-                              }
-                          }));
-                      }
-                  }
-              }))
+            }
           }
-
-          // Timeout promise (e.g. 5 minutes for install)
-          const timeoutMs = 300000;
-          const timeoutPromise = new Promise<number>((_, reject) => {
-              setTimeout(() => {
-                  process.kill();
-                  reject(new Error(`Command timed out after ${timeoutMs}ms`));
-              }, timeoutMs);
-          });
-
-          const exitCode = await Promise.race([process.exit, timeoutPromise]);
-          
-          // Wait for stream to finish flushing after process exits
-          try {
-              await Promise.all([streamPromise]);
-          } catch (e) {
-              // Ignore stream errors on close
-          }
-
-          if (exitCode !== 0) {
-              throw new Error(`Command failed with exit code ${exitCode}`)
-          }
-          return exitCode
-      } catch (e: any) {
-           console.error(`[WC] Command error:`, e)
-           throw e
+        }))
       }
+
+      if (options.detached) {
+        // Wait for success pattern or timeout
+        const checkInterval = 100;
+        const maxWait = 60000; // 60s timeout for server start
+        let elapsed = 0;
+
+        while (!resolved && elapsed < maxWait) {
+          await new Promise(r => setTimeout(r, checkInterval));
+          elapsed += checkInterval;
+        }
+
+        window.removeEventListener('webcontainer:input', inputHandler as EventListener);
+        writer.releaseLock();
+
+        if (!resolved) {
+          // If timed out waiting for success pattern, we still return success but warn
+          // The process is still running.
+          return 0;
+        }
+        return 0; // Success start
+      }
+
+      // Standard blocking mode
+      // Timeout promise (e.g. 5 minutes for install)
+      const timeoutMs = 300000;
+      const timeoutPromise = new Promise<number>((_, reject) => {
+        setTimeout(() => {
+          process.kill();
+          reject(new Error(`Command timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+
+      const exitCode = await Promise.race([process.exit, timeoutPromise]);
+
+      // Cleanup
+      window.removeEventListener('webcontainer:input', inputHandler as EventListener);
+      writer.releaseLock();
+
+      // Wait for stream to finish flushing after process exits
+      try {
+        await Promise.all([streamPromise]);
+      } catch (e) {
+        // Ignore stream errors on close
+      }
+
+      if (exitCode !== 0) {
+        throw new Error(`Command failed with exit code ${exitCode}`)
+      }
+      return exitCode
+    } catch (e: any) {
+      console.error(`[WC] Command error:`, e)
+      throw e
+    }
   },
 
   boot: async () => {
     const { instance, isBooting } = get()
-    
-    // If we already have an instance in the store, return it
-    if (instance) return
-    
+
+    // If we already have an instance in the store, check if there are queued operations
+    if (instance) {
+      console.log('[Boot] Instance already exists, checking for queued operations...')
+      
+      // Process any queued sync operations
+      if (syncQueue.length > 0) {
+        console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued operations from existing instance...`)
+        const queuedOps = [...syncQueue]
+        syncQueue = [] // Clear queue
+        
+        for (const op of queuedOps) {
+          try {
+            const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
+            
+            if (op.type === 'mkdir') {
+              await instance.fs.mkdir(wcPath, { recursive: true })
+              console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
+            } else if (op.type === 'file') {
+              const parentPath = wcPath.split('/').slice(0, -1).join('/') || '/'
+              if (parentPath !== '/' && parentPath !== '') {
+                await instance.fs.mkdir(parentPath, { recursive: true })
+              }
+              
+              const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
+              const hasContent = op.content !== undefined && op.content !== null
+              console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
+              
+              if (op.content === undefined || op.content === null) {
+                const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
+                const node = useFileSystemStore.getState().getNodeByPath(op.path)
+                if (node) {
+                  const content = await useFileSystemStore.getState().readFileContent(node.id)
+                  await instance.fs.writeFile(wcPath, content)
+                  console.log(`[Boot] ✅ Queued file (from VFS): ${wcPath} (${content.length} bytes)`)
+                } else {
+                  await instance.fs.writeFile(wcPath, '')
+                }
+              } else {
+                await instance.fs.writeFile(wcPath, op.content)
+                console.log(`[Boot] ✅ Queued file written: ${wcPath} (${contentLength} bytes)`)
+              }
+            } else if (op.type === 'unlink') {
+              await instance.fs.rm(wcPath, { recursive: true })
+              console.log(`[Boot] ✅ Queued unlink: ${wcPath}`)
+            }
+          } catch (e) {
+            console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
+          }
+        }
+        
+        console.log(`[Boot] ✅ Processed ${queuedOps.length} queued operations`)
+      }
+      
+      return
+    }
+
     // If we have a global instance but not in the store, restore it
     if (globalWebContainerInstance) {
+      console.log('[Boot] Restoring global WebContainer instance...')
       set({ instance: globalWebContainerInstance })
+      
+      // Process any queued sync operations
+      if (syncQueue.length > 0) {
+        console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued operations after restore...`)
+        const queuedOps = [...syncQueue]
+        syncQueue = [] // Clear queue
+        
+        for (const op of queuedOps) {
+          try {
+            const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
+            
+            if (op.type === 'mkdir') {
+              await globalWebContainerInstance.fs.mkdir(wcPath, { recursive: true })
+              console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
+            } else if (op.type === 'file') {
+              const parentPath = wcPath.split('/').slice(0, -1).join('/') || '/'
+              if (parentPath !== '/' && parentPath !== '') {
+                await globalWebContainerInstance.fs.mkdir(parentPath, { recursive: true })
+              }
+              
+              const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
+              const hasContent = op.content !== undefined && op.content !== null
+              console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
+              
+              if (op.content === undefined || op.content === null) {
+                const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
+                const node = useFileSystemStore.getState().getNodeByPath(op.path)
+                if (node) {
+                  const content = await useFileSystemStore.getState().readFileContent(node.id)
+                  await globalWebContainerInstance.fs.writeFile(wcPath, content)
+                  console.log(`[Boot] ✅ Queued file (from VFS): ${wcPath} (${content.length} bytes)`)
+                } else {
+                  await globalWebContainerInstance.fs.writeFile(wcPath, '')
+                }
+              } else {
+                await globalWebContainerInstance.fs.writeFile(wcPath, op.content)
+                console.log(`[Boot] ✅ Queued file written: ${wcPath} (${contentLength} bytes)`)
+              }
+            } else if (op.type === 'unlink') {
+              await globalWebContainerInstance.fs.rm(wcPath, { recursive: true })
+              console.log(`[Boot] ✅ Queued unlink: ${wcPath}`)
+            }
+          } catch (e) {
+            console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
+          }
+        }
+        
+        console.log(`[Boot] ✅ Processed ${queuedOps.length} queued operations`)
+      }
+      
       return
     }
 
@@ -212,16 +497,20 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
     // Start initialization process
     initializationPromise = (async () => {
-      set({ isBooting: true, error: null })
+      set({ isBooting: true, error: null, isSyncingFromWC: true }) // Lock sync during boot
 
       try {
         // Dynamically import to ensure we get the latest
         const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
 
+        // Wait for VFS hydration to complete
+        // This ensures we mount the full persisted file tree, not just the initial state
+        await useFileSystemStore.getState().waitForHydration()
+
         if (!bootPromise) {
           bootPromise = WebContainer.boot()
         }
-        
+
         let webcontainer;
         try {
           webcontainer = await bootPromise
@@ -230,29 +519,29 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         } catch (e: any) {
           // Handle "Only a single WebContainer instance can be booted"
           if (e.message && e.message.includes('Only a single WebContainer instance can be booted')) {
-               console.warn('WebContainer already booted, checking for existing instance...');
-               
-               // If we have a global instance, use it
-               if (globalWebContainerInstance) {
-                 console.log('Found existing global WebContainer instance, reusing it');
-                 set({ instance: globalWebContainerInstance, isBooting: false });
-                 initializationPromise = null;
-                 return;
-               }
-               
-               // Reset the boot promise to allow retry
-               bootPromise = null;
-               initializationPromise = null;
-               set({ isBooting: false });
-               
-               // If there's already an instance in the store, just return
-               const currentInstance = get().instance;
-               if (currentInstance) {
-                 return;
-               }
-               
-               // Last resort: ask user to refresh
-               throw new Error('WebContainer session conflict. Please refresh the page to reset the environment.');
+            console.warn('WebContainer already booted, checking for existing instance...');
+
+            // If we have a global instance, use it
+            if (globalWebContainerInstance) {
+              console.log('Found existing global WebContainer instance, reusing it');
+              set({ instance: globalWebContainerInstance, isBooting: false });
+              initializationPromise = null;
+              return;
+            }
+
+            // Reset the boot promise to allow retry
+            bootPromise = null;
+            initializationPromise = null;
+            set({ isBooting: false });
+
+            // If there's already an instance in the store, just return
+            const currentInstance = get().instance;
+            if (currentInstance) {
+              return;
+            }
+
+            // Last resort: ask user to refresh
+            throw new Error('WebContainer session conflict. Please refresh the page to reset the environment.');
           }
           throw e;
         }
@@ -275,16 +564,42 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // 2. Sync VFS -> WebContainer Tree
         const { files, rootId, getNodeByPath, createItem, updateFileContent, deleteItem } = useFileSystemStore.getState()
 
+        // Helper to sync initial WC files back to VFS
+        const syncInitialFilesToVFS = async () => {
+          const userNode = getNodeByPath(SYSTEM_PATHS.USER);
+          if (!userNode) return;
+
+          // Sync etc/motd
+          let etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
+          if (!etcNode) {
+            await createItem(userNode.id, 'etc', 'folder');
+            etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
+          }
+          if (etcNode) {
+            await createItem(etcNode.id, 'motd', 'file', 'Welcome to System Runtime');
+          }
+
+          // Sync project folder (created below)
+          // We do this after the mount and mkdir calls below, but defining helper here
+        };
+
         // Helper to build tree
-        const buildTree = async (parentId: string): Promise<any> => {
+        const buildTree = async (parentId: string, depth: number = 0): Promise<any> => {
           const children = Object.values(files).filter(f => f.parentId === parentId)
           const tree: any = {}
+          const indent = '  '.repeat(depth)
+
+          console.log(`${indent}[Boot] Building tree for parent ${parentId}, found ${children.length} children`)
 
           for (const child of children) {
+            console.log(`${indent}[Boot] Processing: ${child.name} (${child.type})`)
+
             if (child.type === 'folder') {
+              const subTree = await buildTree(child.id, depth + 1)
               tree[child.name] = {
-                directory: await buildTree(child.id)
+                directory: subTree
               }
+              console.log(`${indent}[Boot] ✓ Folder ${child.name} has ${Object.keys(subTree).length} items`)
             } else {
               try {
                 const content = await useFileSystemStore.getState().readFileContent(child.id)
@@ -293,8 +608,9 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                     contents: content
                   }
                 }
+                console.log(`${indent}[Boot] ✓ File ${child.name} (${content.length} bytes)`)
               } catch (e) {
-                console.warn(`Failed to read content for mount: ${child.name}`, e)
+                console.warn(`${indent}[Boot] ⚠️ Failed to read ${child.name}, using empty content:`, e)
                 tree[child.name] = {
                   file: {
                     contents: ''
@@ -309,25 +625,58 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // Build the tree starting from user home and mount it under WC root (~/)
         // This maps VFS /home/user -> WC ~/
         const userNode = getNodeByPath(SYSTEM_PATHS.USER)
-        let vfsTree = {}
+        let vfsTree: any = {}
         if (userNode) {
-           vfsTree = await buildTree(userNode.id)
+          console.log('[Boot] Building VFS tree from user node:', userNode.id)
+          vfsTree = await buildTree(userNode.id)
+          console.log('[Boot] VFS tree structure:', Object.keys(vfsTree))
+          console.log('[Boot] VFS tree details:', JSON.stringify(Object.keys(vfsTree).reduce((acc: any, key) => {
+            acc[key] = vfsTree[key].directory ? 'folder' : 'file'
+            return acc
+          }, {} as any), null, 2))
         } else {
-           // Fallback if user node not found (should not happen)
-           console.warn('User node not found, mounting root')
-           vfsTree = await buildTree(rootId)
+          // Fallback if user node not found (should not happen)
+          console.warn('User node not found, mounting root')
+          vfsTree = await buildTree(rootId)
         }
-        
+
         // Merge trees
         const finalTree = { ...mountTree, ...vfsTree }
+        console.log('[Boot] Final mount tree:', Object.keys(finalTree))
 
+        console.log('[Boot] Mounting tree to WebContainer...')
         await webcontainer.mount(finalTree)
+        console.log('[Boot] ✅ Mount complete')
+
+        // Skip the comprehensive sync - mount already handles this
+        // The file watcher will handle any future changes
+        console.log('[Boot] Skipping post-mount sync (mount already synced everything)')
+
+        // Sync initial mount files back to VFS (so they show up in File Explorer)
+        try {
+          const userNode = getNodeByPath(SYSTEM_PATHS.USER);
+          if (userNode) {
+            let etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
+            if (!etcNode) {
+              await createItem(userNode.id, 'etc', 'folder');
+              etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
+            }
+            if (etcNode) {
+              const motdNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc/motd`);
+              if (!motdNode) {
+                await createItem(etcNode.id, 'motd', 'file', 'Welcome to System Runtime');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to sync mount files to VFS:', e);
+        }
 
         // Ensure project directory exists (mapped to ~/project)
         const projectRelativePath = 'project' // SYSTEM_PATHS.PROJECT relative to /home/user
         try {
           await webcontainer.fs.mkdir(projectRelativePath, { recursive: true });
-          
+
           // Write default project files if they don't exist
           await webcontainer.fs.writeFile(`${projectRelativePath}/package.json`, JSON.stringify({
             name: 'web-os-terminal',
@@ -353,94 +702,332 @@ app.listen(port, () => {
   console.log(\`App running at http://localhost:\${port}\`);
 });`);
 
+          // Sync default project to VFS
+          // Re-fetch store methods to ensure fresh state
+          const fsStore = useFileSystemStore.getState();
+          const getNode = fsStore.getNodeByPath;
+          const create = fsStore.createItem;
+
+          const userNode = getNode(SYSTEM_PATHS.USER);
+          if (userNode) {
+            let projectNode = getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}`);
+            if (!projectNode) {
+              // Force sync wait to avoid race condition
+              await create(userNode.id, projectRelativePath, 'folder');
+              // Add small delay for state update propagation
+              await new Promise(r => setTimeout(r, 50));
+              projectNode = getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}`);
+            }
+            if (projectNode) {
+              // Sync package.json
+              if (!getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}/package.json`)) {
+                await create(projectNode.id, 'package.json', 'file', JSON.stringify({
+                  name: 'web-os-terminal',
+                  type: 'module',
+                  dependencies: {
+                    'express': 'latest',
+                    'nodemon': 'latest'
+                  },
+                  scripts: {
+                    'start': 'nodemon index.js'
+                  }
+                }, null, 2));
+              }
+              // Sync index.js
+              if (!getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}/index.js`)) {
+                await create(projectNode.id, 'index.js', 'file', `import express from 'express';
+const app = express();
+const port = 3000;
+
+app.get('/', (req, res) => {
+res.send('Hello from System Runtime!');
+});
+
+app.listen(port, () => {
+console.log(\`App running at http://localhost:\${port}\`);
+});`);
+              }
+            }
+          }
+
         } catch (e) {
           console.warn('Failed to setup default project:', e)
+        } finally {
+          // Release sync lock BEFORE processing queue
+          set({ isSyncingFromWC: false })
         }
+
+        // Set instance and isBooting BEFORE processing queue
+        // This allows queued operations to execute immediately
+        set({ instance: webcontainer, isBooting: false })
+        globalWebContainerInstance = webcontainer
+        
+        // Process queued sync operations
+        console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued sync operations...`)
+        if (syncQueue.length > 0) {
+          const queuedOps = [...syncQueue]
+          syncQueue = [] // Clear queue
+          
+          let processed = 0
+          for (const op of queuedOps) {
+            try {
+              const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
+              
+              if (op.type === 'mkdir') {
+                await webcontainer.fs.mkdir(wcPath, { recursive: true })
+                console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
+                processed++
+              } else if (op.type === 'file') {
+                // Ensure parent exists
+                const parentPath = wcPath.split('/').slice(0, -1).join('/') || '/'
+                if (parentPath !== '/' && parentPath !== '') {
+                  await webcontainer.fs.mkdir(parentPath, { recursive: true })
+                }
+                
+                // Debug: log content info
+                const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
+                const hasContent = op.content !== undefined && op.content !== null
+                console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
+                
+                // Check if content is undefined (not just empty string)
+                if (op.content === undefined || op.content === null) {
+                  console.warn(`[Boot] ⚠️ Content is undefined/null for ${wcPath}, trying to read from VFS...`)
+                  // Try to read from VFS
+                  try {
+                    const node = useFileSystemStore.getState().getNodeByPath(op.path)
+                    if (node) {
+                      const content = await useFileSystemStore.getState().readFileContent(node.id)
+                      await webcontainer.fs.writeFile(wcPath, content)
+                      console.log(`[Boot] ✅ Queued file (from VFS): ${wcPath} (${content.length} bytes)`)
+                    } else {
+                      console.warn(`[Boot] ⚠️ Node not found in VFS, writing empty file: ${wcPath}`)
+                      await webcontainer.fs.writeFile(wcPath, '')
+                    }
+                  } catch (readErr) {
+                    console.warn(`[Boot] ❌ Failed to read from VFS:`, readErr)
+                    await webcontainer.fs.writeFile(wcPath, '')
+                  }
+                } else {
+                  // Content exists (even if empty string), write it
+                  await webcontainer.fs.writeFile(wcPath, op.content)
+                  console.log(`[Boot] ✅ Queued file written: ${wcPath} (${contentLength} bytes)`)
+                }
+                processed++
+              } else if (op.type === 'unlink') {
+                await webcontainer.fs.rm(wcPath, { recursive: true })
+                console.log(`[Boot] ✅ Queued unlink: ${wcPath}`)
+                processed++
+              }
+            } catch (e) {
+              console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
+            }
+          }
+          
+          console.log(`[Boot] ✅ Processed ${processed}/${queuedOps.length} queued operations`)
+        }
+
+        // Skip final verification sync - mount already handled everything
+        console.log('[Boot] Skipping final verification sync (not needed)')
+        
+        // Load debug tools in development
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          try {
+            await import('@/os/utils/debugSync')
+          } catch (e) {
+            console.warn('[Boot] Failed to load debug tools:', e)
+          }
+        }
+
+        console.log('[Boot] ✅ Boot complete, all sync operations processed')
 
         // --- Bi-directional Sync Implementation ---
 
         // 3. WebContainer -> VFS (fs.watch)
         // Watch root to capture all changes
         webcontainer.fs.watch('/', { recursive: true }, async (event, filename) => {
+          // Set sync flag to prevent circular sync
+          set({ isSyncingFromWC: true })
+          
           try {
-              // Explicitly check if filename is string. fs.watch type definition might be loose.
-              if (typeof filename !== 'string' || !filename) return
+            // Explicitly check if filename is string. fs.watch type definition might be loose.
+            if (typeof filename !== 'string' || !filename) return
 
-              // Ignore node_modules and hidden files/directories
-              if (filename.includes('node_modules') || filename.includes('/.') || filename.startsWith('.')) return
+            console.log(`[WC->VFS] File change detected: ${event} ${filename}`)
 
-              set({ isSyncingFromWC: true })
+            // Ignore hidden files/directories
+            if (filename.includes('/.') || filename.startsWith('.')) return
 
-              // filename is relative to watched path ('/'), so "foo.txt" or "project/foo.txt"
-              // We map WC root to /home/user, so prepend SYSTEM_PATHS.USER
-              const cleanFilename = filename.startsWith('/') ? filename.slice(1) : filename
-              const vfsPath = `${SYSTEM_PATHS.USER}/${cleanFilename}`
+            // Special handling for node_modules:
+            // We DO NOT want to sync thousands of files to VFS (performance killer).
+            // Instead, we just ensure a "node_modules" folder exists in VFS so the user knows it's there.
+            if (filename.includes('node_modules')) {
+              // Only react if it's the root node_modules folder creation
+              // e.g. "apps/my-app/node_modules" or "node_modules"
+              if (filename.endsWith('node_modules') && event === 'rename') {
+                const cleanFilename = filename.startsWith('/') ? filename.slice(1) : filename
+                const vfsPath = `${SYSTEM_PATHS.USER}/${cleanFilename}`
 
-              // Check existence and type using readdir on parent to avoid 'stat' error
-              const parentWcPath = `/${cleanFilename.split('/').slice(0, -1).join('/')}`
-              const name = cleanFilename.split('/').pop()!
+                // Check if we need to create the placeholder folder
+                const existing = useFileSystemStore.getState().getNodeByPath(vfsPath);
+                if (!existing) {
+                  // Ensure parent exists first
+                  const parentPath = vfsPath.split('/').slice(0, -1).join('/');
+                  const parentNode = useFileSystemStore.getState().getNodeByPath(parentPath);
 
-              let entry: { isDirectory: () => boolean; name: string } | undefined
-              try {
-                  // @ts-ignore - readdir with options is valid in WebContainer but types might be missing
-                  const entries = await webcontainer.fs.readdir(parentWcPath, { withFileTypes: true })
-                  entry = entries.find((e: any) => e.name === name)
-              } catch (e) {
-                  // Parent might not exist or other error
+                  if (parentNode) {
+                    console.log('[WC->VFS] Creating node_modules placeholder:', vfsPath);
+                    // Create empty folder. We won't sync its children.
+                    await createItem(parentNode.id, 'node_modules', 'folder');
+                  }
+                }
+              }
+              return;
+            }
+
+            // filename is relative to watched path ('/'), so "foo.txt" or "project/foo.txt"
+            // We map WC root to /home/user, so prepend SYSTEM_PATHS.USER
+            const cleanFilename = filename.startsWith('/') ? filename.slice(1) : filename
+            const vfsPath = `${SYSTEM_PATHS.USER}/${cleanFilename}`
+
+            // Check existence and type using readdir on parent to avoid 'stat' error
+            const parentWcPath = `/${cleanFilename.split('/').slice(0, -1).join('/')}`
+            const name = cleanFilename.split('/').pop()!
+
+            let entry: { isDirectory: () => boolean; name: string } | undefined
+            try {
+              // @ts-ignore - readdir with options is valid in WebContainer but types might be missing
+              const entries = await webcontainer.fs.readdir(parentWcPath, { withFileTypes: true })
+              entry = entries.find((e: any) => e.name === name)
+            } catch (e) {
+              // Parent might not exist or other error
+            }
+
+            if (!entry) {
+              const node = useFileSystemStore.getState().getNodeByPath(vfsPath)
+              if (node) {
+                console.log('[WC->VFS] Deleting:', vfsPath)
+                await deleteItem(node.id)
+              }
+            } else {
+              // Recursive parent creation logic
+              const parentPath = vfsPath.split('/').slice(0, -1).join('/')
+
+              // Helper to recursively create parent directories if missing
+              const ensureParentExists = async (path: string): Promise<string | null> => {
+                if (!path || path === '') return rootId;
+
+                const existing = useFileSystemStore.getState().getNodeByPath(path);
+                if (existing) return existing.id;
+
+                // Recursively ensure grand-parent exists
+                const grandParentPath = path.split('/').slice(0, -1).join('/');
+                const grandParentId = await ensureParentExists(grandParentPath);
+
+                if (!grandParentId) return null;
+
+                // Create current directory
+                const dirName = path.split('/').pop() || '';
+                if (!dirName) return null;
+
+                console.log('[WC->VFS] Creating missing parent:', path);
+                await createItem(grandParentId, dirName, 'folder');
+
+                // Fetch the newly created node
+                // Add small delay for state propagation
+                await new Promise(r => setTimeout(r, 20));
+                const newNode = useFileSystemStore.getState().getNodeByPath(path);
+                return newNode ? newNode.id : null;
+              };
+
+              const parentId = await ensureParentExists(parentPath);
+              if (!parentId) {
+                console.warn('[WC->VFS] Failed to resolve parent for:', vfsPath);
+                return;
               }
 
-              if (!entry) {
-                  const node = useFileSystemStore.getState().getNodeByPath(vfsPath)
-                  if (node) {
-                  console.log('[WC->VFS] Deleting:', vfsPath)
-                  await deleteItem(node.id)
-                  }
+              const existingNode = useFileSystemStore.getState().getNodeByPath(vfsPath)
+
+              if (entry.isDirectory()) {
+                if (!existingNode) {
+                  console.log('[WC->VFS] Creating Folder:', vfsPath)
+                  await createItem(parentId, name, 'folder')
+                }
               } else {
-                  const parentPath = vfsPath.split('/').slice(0, -1).join('/')
-                  const parentNode = useFileSystemStore.getState().getNodeByPath(parentPath)
+                const fullWcPath = filename.startsWith('/') ? filename : `/${filename}`
+                const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8') as string
 
-                  if (!parentNode && parentPath !== '') return
+                if (!existingNode) {
+                  console.log('[WC->VFS] Creating File:', vfsPath)
+                  await createItem(parentId, name, 'file', content)
+                } else {
+                  // Compare content to avoid infinite sync loops (VFS -> WC -> VFS)
+                  // This is critical for watched files like vite.config.js
+                  const currentContent = await useFileSystemStore.getState().readFileContent(existingNode.id)
 
-                  const parentId = parentPath === '' ? rootId : parentNode?.id
-                  if (!parentId) return
-
-                  const existingNode = useFileSystemStore.getState().getNodeByPath(vfsPath)
-
-                  if (entry.isDirectory()) {
-                  if (!existingNode) {
-                      console.log('[WC->VFS] Creating Folder:', vfsPath)
-                      await createItem(parentId, name, 'folder')
+                  // Only update if content actually changed
+                  if (currentContent !== content) {
+                    console.log('[WC->VFS] Updating File (content changed):', vfsPath)
+                    await updateFileContent(existingNode.id, content)
                   }
-                  } else {
-                  const fullWcPath = filename.startsWith('/') ? filename : `/${filename}`
-                  const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8') as string
-
-                  if (!existingNode) {
-                      console.log('[WC->VFS] Creating File:', vfsPath)
-                      await createItem(parentId, name, 'file', content)
-                  } else {
-                      const currentContent = await useFileSystemStore.getState().readFileContent(existingNode.id)
-                      if (currentContent !== content) {
-                      console.log('[WC->VFS] Updating File:', vfsPath)
-                      await updateFileContent(existingNode.id, content)
-                      }
-                  }
-                  }
+                }
               }
-          } catch (e) {
-              console.error('[WC->VFS] Sync Error:', e)
+            }
+          } catch (e: any) {
+            // Suppress expected NotFoundError during rapid sync
+            if (e.message && (e.message.includes('not be found') || e.message.includes('ENOENT'))) {
+              // console.debug('[WC->VFS] Sync skipped (file missing):', filename)
+              return
+            }
+            console.error('[WC->VFS] Sync Error:', e)
           } finally {
-              setTimeout(() => set({ isSyncingFromWC: false }), 50)
+            // Reset sync flag after a short delay to allow the sync to complete
+            setTimeout(() => set({ isSyncingFromWC: false }), 100)
           }
         })
 
-        set({ instance: webcontainer, isBooting: false })
-        globalWebContainerInstance = webcontainer
+        webcontainer.on('server-ready', (port, url) => {
+          console.log(`[WC] Server ready: port=${port}, url=${url}`)
+
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('server-ready', {
+              detail: { port, url }
+            }));
+
+            setTimeout(async () => {
+              try {
+                const { useWindowStore } = await import('@/os/kernel/useWindowStore')
+                const { launchApp, windows } = useWindowStore.getState();
+
+                const existingBrowser = Object.values(windows).find(
+                  (w: any) => w.appId === 'browser' && w.componentProps?.initialUrl === url
+                );
+
+                if (!existingBrowser) {
+                  launchApp('browser', 'Browser', 'browser', undefined, {
+                    initialUrl: url,
+                    width: 1024,
+                    height: 768
+                  });
+                }
+              } catch (e) {
+                console.warn('Auto-launch browser error:', e);
+              }
+            }, 500);
+          }
+        })
+
+        // Don't set instance here, it's set before queue processing
+        // set({ instance: webcontainer, isBooting: false })
+        // globalWebContainerInstance = webcontainer
+        
+        // Process queued sync operations AFTER instance is set
+        // (This line is just a marker, actual processing happens above)
       } catch (err) {
         console.error('Failed to boot WebContainer:', err)
         set({
           error: err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? (err as any).message || JSON.stringify(err) : String(err)),
-          isBooting: false
+          isBooting: false,
+          isSyncingFromWC: false
         })
         bootPromise = null // Reset on failure
         initializationPromise = null // Allow retry

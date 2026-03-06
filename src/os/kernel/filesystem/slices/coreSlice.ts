@@ -9,12 +9,15 @@ import { INITIAL_FILES, INITIAL_ROOT_ID } from '../../initialFileTree'
 import * as indexManager from '../utils/indexManager'
 import type { ChildrenIndex } from '../utils/indexManager'
 import { SYSTEM_PATHS, FILE_IDS } from '@/os/config/paths'
+// Import store to access persist API
+import { useFileSystemStore } from '../../useFileSystemStore'
 
 export interface CoreSlice {
   // 状态
   files: Record<string, FileNode>
   rootId: string
   isLoading: boolean
+  isHydrated: boolean
   childrenIndex: ChildrenIndex
   tombstoneEntries: Record<string, number> // path -> expiry timestamp
 
@@ -25,6 +28,7 @@ export interface CoreSlice {
   _deleteFiles: (ids: string[]) => void
   _addTombstone: (path: string, duration?: number) => void
   _setLoading: (loading: boolean) => void
+  _setHydrated: (hydrated: boolean) => void
   _rebuildIndex: () => void
 
   // 查询方法（无副作用）
@@ -33,6 +37,7 @@ export interface CoreSlice {
   getPath: (id: string) => FileNode[]
   resolvePath: (id: string) => string
   getNodeByPath: (path: string) => FileNode | undefined
+  waitForHydration: () => Promise<void>
 }
 
 export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
@@ -40,6 +45,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
   files: INITIAL_FILES,
   rootId: INITIAL_ROOT_ID,
   isLoading: true,
+  isHydrated: false,
   childrenIndex: indexManager.buildIndex(INITIAL_FILES),
   tombstoneEntries: {},
 
@@ -108,6 +114,11 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
   }),
 
   _setLoading: (loading) => set({ isLoading: loading }),
+
+  _setHydrated: (hydrated) => {
+    console.log('[FileSystem] Setting hydrated:', hydrated);
+    set({ isHydrated: hydrated });
+  },
 
   _rebuildIndex: () => set((state) => ({
     childrenIndex: indexManager.buildIndex(state.files)
@@ -232,5 +243,56 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
       }
     }
     return state.files[currentId]
+  },
+
+  waitForHydration: async () => {
+    const getStore = () => get();
+    console.log('[FileSystem] Waiting for hydration, current state:', getStore().isHydrated);
+    
+    if (getStore().isHydrated) {
+      console.log('[FileSystem] Already hydrated');
+      return;
+    }
+
+    // Check if persist has already hydrated but state wasn't updated
+    // @ts-ignore - Zustand persist api access
+    if (useFileSystemStore?.persist?.hasHydrated()) {
+       console.log('[FileSystem] Persist already hydrated, updating state');
+       get()._setHydrated(true);
+       return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      console.log('[FileSystem] Starting hydration wait loop...');
+      
+      // 添加超时保护：10秒后强制继续
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        console.warn('[FileSystem] ⚠️ Hydration timeout (10s), forcing continue...');
+        get()._setHydrated(true);
+        resolve();
+      }, 10000);
+
+      const interval = setInterval(() => {
+        const store = getStore();
+        if (store.isHydrated) {
+          clearInterval(interval);
+          clearTimeout(timeout);
+          console.log('[FileSystem] ✅ Hydration complete');
+          resolve();
+          return;
+        }
+        
+        // Double check persist state in loop
+        // @ts-ignore
+        if (useFileSystemStore?.persist?.hasHydrated()) {
+           console.log('[FileSystem] ✅ Persist hydrated in loop');
+           store._setHydrated(true);
+           clearInterval(interval);
+           clearTimeout(timeout);
+           resolve();
+        }
+      }, 50);
+    });
   }
 })

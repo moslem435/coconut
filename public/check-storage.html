@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Storage Inspector</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    pre { background: #252526; padding: 10px; border-radius: 4px; overflow: auto; max-height: 600px; }
+    .section { margin: 20px 0; border: 1px solid #3e3e42; padding: 15px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Storage Inspector</h1>
+  
+  <div class="section">
+    <h2>1. Check localStorage</h2>
+    <button onclick="checkLocalStorage()">Check localStorage</button>
+    <pre id="localStorage-output"></pre>
+  </div>
+
+  <div class="section">
+    <h2>2. Clear All Storage</h2>
+    <button onclick="clearAllStorage()" style="background: #c00; color: white;">⚠️ Clear All Storage</button>
+    <pre id="clear-output"></pre>
+  </div>
+
+  <script>
+    window.checkLocalStorage = () => {
+      const output = document.getElementById('localStorage-output');
+      try {
+        const fsData = localStorage.getItem('filesystem-storage');
+        
+        if (!fsData) {
+          output.textContent = '❌ No filesystem-storage found in localStorage';
+          return;
+        }
+
+        const parsed = JSON.parse(fsData);
+        const state = parsed.state;
+        
+        let result = '✅ Found filesystem-storage\n\n';
+        result += `Files count: ${Object.keys(state.files || {}).length}\n`;
+        result += `Root ID: ${state.rootId}\n\n`;
+        
+        result += 'Files:\n';
+        Object.values(state.files || {}).forEach(file => {
+          const icon = file.type === 'folder' ? '📁' : '📄';
+          result += `${icon} ${file.name} (id: ${file.id.substring(0, 8)}..., parent: ${file.parentId?.substring(0, 8) || 'none'}...)\n`;
+        });
+        
+        result += '\n\nRaw data size: ' + fsData.length + ' bytes\n';
+        result += '\nFirst 500 chars:\n' + fsData.substring(0, 500);
+        
+        output.textContent = result;
+      } catch (e) {
+        output.textContent = '❌ Error: ' + e.message + '\n\n' + e.stack;
+      }
+    };
+
+    window.clearAllStorage = () => {
+      const output = document.getElementById('clear-output');
+      if (!confirm('⚠️ This will delete ALL data including your files! Are you sure?')) {
+        output.textContent = 'Cancelled';
+        return;
+      }
+      
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear IndexedDB
+        indexedDB.databases().then(dbs => {
+          dbs.forEach(db => {
+            indexedDB.deleteDatabase(db.name);
+          });
+        });
+        
+        output.textContent = '✅ All storage cleared. Please refresh the page.';
+      } catch (e) {
+        output.textContent = '❌ Error: ' + e.message;
+      }
+    };
+    
+    // Auto-check on load
+    window.addEventListener('load', () => {
+      checkLocalStorage();
+    });
+  </script>
+</body>
+</html>

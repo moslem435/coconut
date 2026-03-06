@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>终端调试工具</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #cccccc;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ec9b0;
+        }
+        .check-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #666;
+            background: #252526;
+        }
+        .check-item.pass {
+            border-left-color: #4ec9b0;
+        }
+        .check-item.fail {
+            border-left-color: #f48771;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status.pass {
+            color: #4ec9b0;
+        }
+        .status.fail {
+            color: #f48771;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        #log {
+            background: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            padding: 10px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+        .log-error {
+            color: #f48771;
+        }
+        .log-success {
+            color: #4ec9b0;
+        }
+        .log-info {
+            color: #569cd6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 终端调试工具</h1>
+        
+        <h2>环境检查</h2>
+        <div id="checks"></div>
+        
+        <h2>操作</h2>
+        <button onclick="runFullTest()">运行完整测试</button>
+        <button onclick="testWebContainer()">测试 WebContainer</button>
+        <button onclick="clearLog()">清空日志</button>
+        
+        <h2>日志</h2>
+        <div id="log"></div>
+    </div>
+
+    <script type="module">
+        const checksDiv = document.getElementById('checks');
+        const logDiv = document.getElementById('log');
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function addCheck(name, passed, details = '') {
+            const div = document.createElement('div');
+            div.className = `check-item ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <strong>${name}</strong>: 
+                <span class="status ${passed ? 'pass' : 'fail'}">${passed ? '✅ 通过' : '❌ 失败'}</span>
+                ${details ? `<br><small>${details}</small>` : ''}
+            `;
+            checksDiv.appendChild(div);
+        }
+
+        function checkEnvironment() {
+            checksDiv.innerHTML = '';
+            addLog('开始环境检查...', 'info');
+
+            // 1. SharedArrayBuffer
+            const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined';
+            addCheck('SharedArrayBuffer', hasSharedArrayBuffer, 
+                hasSharedArrayBuffer ? '支持' : '不支持 - WebContainer 需要此 API');
+            addLog(`SharedArrayBuffer: ${hasSharedArrayBuffer}`, hasSharedArrayBuffer ? 'success' : 'error');
+
+            // 2. Cross-Origin Isolation
+            const isCrossOriginIsolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated;
+            addCheck('Cross-Origin Isolation', isCrossOriginIsolated,
+                isCrossOriginIsolated ? '已启用' : '未启用 - 需要 COOP/COEP 头');
+            addLog(`crossOriginIsolated: ${isCrossOriginIsolated}`, isCrossOriginIsolated ? 'success' : 'error');
+
+            // 3. WebAssembly
+            const hasWebAssembly = typeof WebAssembly !== 'undefined';
+            addCheck('WebAssembly', hasWebAssembly,
+                hasWebAssembly ? '支持' : '不支持');
+            addLog(`WebAssembly: ${hasWebAssembly}`, hasWebAssembly ? 'success' : 'error');
+
+            // 4. Service Worker
+            const hasServiceWorker = 'serviceWorker' in navigator;
+            addCheck('Service Worker', hasServiceWorker,
+                hasServiceWorker ? '支持' : '不支持');
+            addLog(`Service Worker: ${hasServiceWorker}`, hasServiceWorker ? 'success' : 'error');
+
+            // 5. 检查响应头
+            fetch(window.location.href)
+                .then(response => {
+                    const coep = response.headers.get('Cross-Origin-Embedder-Policy');
+                    const coop = response.headers.get('Cross-Origin-Opener-Policy');
+                    
+                    addCheck('COEP Header', coep === 'require-corp',
+                        `值: ${coep || '未设置'}`);
+                    addCheck('COOP Header', coop === 'same-origin',
+                        `值: ${coop || '未设置'}`);
+                    
+                    addLog(`COEP: ${coep}`, coep === 'require-corp' ? 'success' : 'error');
+                    addLog(`COOP: ${coop}`, coop === 'same-origin' ? 'success' : 'error');
+                })
+                .catch(err => {
+                    addLog(`检查响应头失败: ${err.message}`, 'error');
+                });
+
+            return hasSharedArrayBuffer && isCrossOriginIsolated && hasWebAssembly;
+        }
+
+        async function testWebContainer() {
+            addLog('开始测试 WebContainer...', 'info');
+            
+            try {
+                addLog('导入 @webcontainer/api...', 'info');
+                const { WebContainer } = await import('https://esm.sh/@webcontainer/api@1.2.0');
+                addLog('✅ 成功导入 WebContainer API', 'success');
+
+                addLog('启动 WebContainer...', 'info');
+                const startTime = Date.now();
+                const instance = await WebContainer.boot();
+                const bootTime = Date.now() - startTime;
+                addLog(`✅ WebContainer 启动成功 (耗时: ${bootTime}ms)`, 'success');
+
+                addLog('测试文件系统...', 'info');
+                await instance.fs.writeFile('/test.txt', 'Hello WebContainer!');
+                const content = await instance.fs.readFile('/test.txt', 'utf-8');
+                addLog(`✅ 文件系统正常: ${content}`, 'success');
+
+                addLog('测试 Shell...', 'info');
+                const process = await instance.spawn('jsh', {
+                    terminal: { cols: 80, rows: 24 }
+                });
+                addLog('✅ Shell 启动成功', 'success');
+
+                // 读取一些输出
+                const reader = process.output.getReader();
+                const { value } = await reader.read();
+                if (value) {
+                    addLog(`Shell 输出: ${value.substring(0, 100)}...`, 'info');
+                }
+                reader.releaseLock();
+
+                addLog('🎉 所有测试通过！', 'success');
+            } catch (error) {
+                addLog(`❌ 测试失败: ${error.message}`, 'error');
+                console.error('详细错误:', error);
+            }
+        }
+
+        window.runFullTest = async function() {
+            clearLog();
+            const envOk = checkEnvironment();
+            
+            if (envOk) {
+                addLog('环境检查通过，开始测试 WebContainer...', 'success');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await testWebContainer();
+            } else {
+                addLog('环境检查未通过，跳过 WebContainer 测试', 'error');
+            }
+        };
+
+        window.testWebContainer = testWebContainer;
+
+        window.clearLog = function() {
+            logDiv.innerHTML = '';
+        };
+
+        // 自动运行环境检查
+        checkEnvironment();
+    </script>
+</body>
+</html>

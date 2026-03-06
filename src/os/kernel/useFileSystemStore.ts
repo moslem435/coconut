@@ -35,11 +35,43 @@ export const useFileSystemStore = create<FileSystemStore>()(
     {
       name: 'filesystem-storage',
       skipHydration: true,
-      partialize: (state) => ({
-        files: state.files,
-        rootId: state.rootId,
-        tombstoneEntries: state.tombstoneEntries
-      })
+      partialize: (state) => {
+        const persisted = {
+          files: state.files,
+          rootId: state.rootId,
+          tombstoneEntries: state.tombstoneEntries
+        };
+        const fileCount = Object.keys(persisted.files).length;
+        const userNode = state.getNodeByPath('/home/user');
+        const userChildren = userNode ? state.getChildren(userNode.id).map(f => f.name) : [];
+        
+        console.log('[FileSystem] Partializing state for persistence:', fileCount, 'files');
+        console.log('[FileSystem] /home/user children being saved:', userChildren);
+        return persisted;
+      },
+      onRehydrateStorage: () => {
+        console.log('[FileSystem] onRehydrateStorage callback triggered');
+        return (state) => {
+          if (state) {
+            const fileCount = Object.keys(state.files).length;
+            const fileNames = Object.values(state.files).map((f: any) => f.name).slice(0, 20);
+            console.log('[FileSystem] Rehydration complete, files count:', fileCount);
+            console.log('[FileSystem] First 20 file names:', fileNames);
+            console.log('[FileSystem] Root children after rehydration:', state.getChildren(state.rootId).map((f: any) => f.name));
+            
+            // Check /home/user children
+            const userNode = state.getNodeByPath('/home/user');
+            if (userNode) {
+              const userChildren = state.getChildren(userNode.id).map((f: any) => f.name);
+              console.log('[FileSystem] /home/user children after rehydration:', userChildren);
+            }
+            
+            state._setHydrated(true);
+          } else {
+            console.warn('[FileSystem] Rehydration returned null state');
+          }
+        };
+      }
     }
   )
 )

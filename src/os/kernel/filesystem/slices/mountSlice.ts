@@ -19,6 +19,7 @@ import { VirtualFolderProvider } from '../providers/VirtualFolderProvider'
 import { IFileSystemProvider } from '../IFileSystemProvider'
 import { ReadOnlyWrapper } from '../wrappers/ReadOnlyWrapper'
 import { PathNormalizationWrapper } from '../wrappers/PathNormalizationWrapper'
+import { useFileSystemStore } from '../../useFileSystemStore'
 
 // 文件数阈值：超过此数量使用 Worker
 const WORKER_THRESHOLD = 100
@@ -265,15 +266,36 @@ export const createMountSlice: StateCreator<
 
   initialize: async () => {
     try {
-      // FIX: Wait for persistence hydration BEFORE any physical scan to prevent ghost file "resurrection"
-      // Since skipHydration is true, we must manually ensure we are ready.
+      console.log('[FileSystem] 🚀 Starting initialization...');
+      
+      console.log('[FileSystem] 📊 Files BEFORE rehydrate:', Object.keys(get().files).length);
+      
+      // FIX: Access persist API from the store directly, not from get()
       // @ts-ignore - persist exists on the store
-      const store = get() as any
-      if (store.persist && !store.persist.hasHydrated()) {
-        logger.debug('[mountSlice] Waiting for hydration...');
-        await store.persist.rehydrate();
-        logger.debug('[mountSlice] Hydration complete.');
+      const persistAPI = useFileSystemStore.persist;
+      
+      if (persistAPI) {
+        const hasHydrated = persistAPI.hasHydrated();
+        console.log('[FileSystem] Persist hasHydrated:', hasHydrated);
+        
+        if (!hasHydrated) {
+          console.log('[FileSystem] ⏳ Calling rehydrate...');
+          await persistAPI.rehydrate();
+          console.log('[FileSystem] ✅ Rehydrate call complete');
+          
+          // Wait a bit for state to update
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } else {
+          console.log('[FileSystem] ✅ Already hydrated');
+        }
+      } else {
+        console.error('[FileSystem] ❌ No persist API found!');
       }
+      
+      // Log current file count after hydration
+      const filesAfterHydration = get().files;
+      console.log('[FileSystem] 📊 Files AFTER rehydrate:', Object.keys(filesAfterHydration).length);
+      console.log('[FileSystem] 📁 Root children:', get().getChildren(get().rootId).map(f => f.name));
 
       // 0. Mount Static ROM
       await get().mountStaticProvider();

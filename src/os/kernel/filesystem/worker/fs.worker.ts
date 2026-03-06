@@ -59,19 +59,31 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                 case 'readFile': {
                     if (!root || !path) throw new Error('Invalid arguments');
                     const handle = await getFileHandle(root, path);
+
+                    if (!handle) throw new Error(`File not found: ${path}`);
+
                     try {
                         const file = await handle.getFile();
                         const buffer = await file.arrayBuffer();
                         result = new Uint8Array(buffer);
                     } catch (readError) {
-                        const accessHandle = await handle.createSyncAccessHandle();
-                        try {
-                            const fileSize = accessHandle.getSize();
-                            const buffer = new Uint8Array(fileSize);
-                            accessHandle.read(buffer, { at: 0 });
-                            result = buffer;
-                        } finally {
-                            accessHandle.close();
+                        // Fallback to sync access handle if getFile fails (e.g. locked file)
+                        if ('createSyncAccessHandle' in handle) {
+                            try {
+                                const accessHandle = await handle.createSyncAccessHandle();
+                                try {
+                                    const fileSize = accessHandle.getSize();
+                                    const buffer = new Uint8Array(fileSize);
+                                    accessHandle.read(buffer, { at: 0 });
+                                    result = buffer;
+                                } finally {
+                                    accessHandle.close();
+                                }
+                            } catch (innerE) {
+                                throw readError;
+                            }
+                        } else {
+                            throw readError;
                         }
                     }
                     break;
@@ -231,11 +243,16 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                             sourceHandle = await getDirHandle(root, actualOldPath);
                             isFile = false;
                         } catch {
-                            throw new Error(`Source path not found: ${actualOldPath}`);
+                            // Source doesn't exist - this can happen when moving a file that was never synced to OPFS
+                            console.log(`[OPFS Worker] Rename skipped: source not found: ${actualOldPath}`);
+                            break; // Exit gracefully instead of throwing
                         }
                     }
 
-                    if (!sourceHandle) throw new Error(`Source handle not found: ${actualOldPath}`);
+                    if (!sourceHandle) {
+                        console.log(`[OPFS Worker] Rename skipped: source handle not found: ${actualOldPath}`);
+                        break; // Exit gracefully
+                    }
 
                     if (isFile) {
                         const oldFileHandle = sourceHandle as FileSystemFileHandle;
@@ -340,41 +357,55 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
 
 // --- Helpers ---
 
-async function getFileHandle(root: FileSystemDirectoryHandle, path: string, create = false) {
-    const parts = path.split('/').filter(p => p.length > 0);
-    const fileName = parts.pop();
-    if (!fileName) throw new Error('Invalid file path');
+const getDirHandle = async (current: FileSystemDirectoryHandle, path: string, create: boolean = false): Promise<FileSystemDirectoryHandle | null> => {
+    if (!path) return current
 
-    const current = await getDirHandle(root, parts.join('/'), create);
-    return await current.getFileHandle(fileName, { create });
-}
+    const parts = path.split('/').filter(p => p.length > 0)
 
-async function getDirHandle(root: FileSystemDirectoryHandle, path: string, create = false): Promise<FileSystemDirectoryHandle> {
-    if (!path || path === '/' || path === '') return root;
-    const parts = path.split('/').filter(p => p.length > 0);
-    let current = root;
     for (const part of parts) {
         let retries = 3;
         while (retries > 0) {
             try {
-                current = await current.getDirectoryHandle(part, { create });
+                current = await current.getDirectoryHandle(part, { create })
                 break;
             } catch (e: any) {
-                if (create && e.name === 'NotFoundError' && retries > 1) {
-                    // Concurrent creation race: subdirectory might have just been created or indexed
-                    await new Promise(r => setTimeout(r, 50));
+                if (e.name === 'NotFoundError' && create) {
+                    // If creating, retry in case of race condition
                     retries--;
-                    continue;
+                    if (retries === 0) throw e;
+                    await new Promise(r => setTimeout(r, 50));
+                } else if (!create && e.name === 'NotFoundError') {
+                    // Return null instead of throwing if not creating
+                    return null;
+                } else {
+                    throw e;
                 }
-                // Enhance error message for debugging
-                if (!create && e.name === 'NotFoundError') {
-                    throw new Error(`Directory not found: ${part} in path ${path}`);
-                }
-                throw e;
             }
         }
     }
-    return current;
+    return current
+}
+
+const getFileHandle = async (current: FileSystemDirectoryHandle, path: string, create: boolean = false): Promise<FileSystemFileHandle | null> => {
+    const parts = path.split('/').filter(p => p.length > 0)
+    const fileName = parts.pop()
+
+    if (!fileName) throw new Error('File name missing')
+
+    if (parts.length > 0) {
+        const dir = await getDirHandle(current, parts.join('/'), create)
+        if (!dir) return null; // Directory not found
+        current = dir;
+    }
+
+    try {
+        return await current.getFileHandle(fileName, { create })
+    } catch (e: any) {
+        if (!create && e.name === 'NotFoundError') {
+            return null;
+        }
+        throw e;
+    }
 }
 
 async function moveDirectory(root: FileSystemDirectoryHandle, oldPath: string, newPath: string) {

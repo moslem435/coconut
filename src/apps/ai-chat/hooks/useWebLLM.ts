@@ -428,12 +428,16 @@ export function useWebLLM() {
     WHEN CREATING AN APP:
     1. Plan the folder structure. All apps go into "${SYSTEM_PATHS.USER}/apps/[app-name]".
     2. Use 'create_directory' to create the root folder.
-    3. Initialize the project. PREFER using 'run_command' to use scaffolders like:
-       - 'npm create vite@latest . -- --template react' (for frontend)
-       - 'npm init -y' (for backend)
+    3. Initialize the project. 
+       - FOR FRONTEND: YOU MUST USE 'run_command' with 'npm create vite@latest . -- --template react' (or vue/svelte). DO NOT manually create package.json/vite.config.js/index.html unless you have a specific reason.
+       - FOR BACKEND: YOU MUST USE 'run_command' with 'npm init -y'.
     4. Install dependencies using 'run_command' (e.g., 'npm install').
-    5. Write/Update code using 'create_file' or 'update_file'.
-    6. For full-stack apps, ensure both frontend and backend can run (e.g., using 'concurrently' or separate terminals).
+    5. FOR TAILWIND CSS: Follow this EXACT sequence:
+       a) First run: 'npm install -D tailwindcss postcss autoprefixer'
+       b) Then run: 'npx tailwindcss init -p'
+       c) Update tailwind.config.js and add Tailwind directives to CSS
+    6. Write/Update code using 'create_file' or 'update_file'.
+    7. For full-stack apps, ensure both frontend and backend can run (e.g., using 'concurrently' or separate terminals).
 
     DEBUGGING:
     - If a command fails, read the output, fix the code/config, and try again.

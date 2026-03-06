@@ -25,7 +25,14 @@ import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { SYSTEM_PATHS, SYSTEM_CONFIG } from '@/os/config/paths'
 import { logger } from '@/os/utils/logger'
+import { checkWebContainerSupport, logWebContainerState } from '@/os/utils/terminalDebug'
 import '@xterm/xterm/css/xterm.css'
+
+// 导入同步和诊断工具（会自动暴露到 window 对象）
+import '@/os/utils/syncVFSToWebContainer'
+import '@/os/utils/quickSync'
+import '@/os/utils/diagnosticSync'
+import '@/os/utils/autoFix'
 
 /**
  * XTerm 组件属性
@@ -76,7 +83,20 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
       error,
       isReady
     })
+    logWebContainerState({
+      hasInstance: !!instance,
+      isBooting,
+      error,
+      isReady
+    })
   }, [instance, isBooting, error, isReady])
+
+  /**
+   * 初始化时检查浏览器环境
+   */
+  useEffect(() => {
+    checkWebContainerSupport()
+  }, [])
 
   /**
    * 主题更新：动态切换终端配色方案
@@ -116,12 +136,29 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
    */
   useEffect(() => {
     logger.debug('[XTerm] Calling WebContainer boot...')
+    
+    // 设置超时检测
+    const bootTimeout = setTimeout(() => {
+      if (!instance && !error) {
+        logger.error('[XTerm] WebContainer boot timeout (30s)')
+        console.error('⏱️ WebContainer 启动超时，可能的原因：')
+        console.error('1. 网络问题导致 WASM 文件加载失败')
+        console.error('2. 浏览器不支持必要的 API')
+        console.error('3. 文件系统初始化卡住')
+        console.error('4. 请检查浏览器控制台是否有其他错误')
+      }
+    }, 30000)
+    
     boot().then(() => {
+      clearTimeout(bootTimeout)
       logger.debug('[XTerm] WebContainer boot completed')
     }).catch((err) => {
+      clearTimeout(bootTimeout)
       logger.error('[XTerm] WebContainer boot failed:', err)
     })
-  }, [boot])
+    
+    return () => clearTimeout(bootTimeout)
+  }, [boot, instance, error])
 
   /**
    * 步骤 2：初始化 xterm.js 实例
@@ -210,11 +247,35 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
         term.writeln('')
 
         logger.debug('[XTerm] Spawning jsh shell...')
+        console.log('🚀 正在启动 Shell 进程...')
 
         // Spawn jsh (JavaScript Shell)
         // Fix: Map VFS path (/home/user/project) to WC internal path (/project)
         // Since we mount /home/user content to WC root, the project folder is at /project
-        const wcCwd = SYSTEM_PATHS.PROJECT.replace(SYSTEM_PATHS.USER, '') || '/'
+        let wcCwd = SYSTEM_PATHS.PROJECT.replace(SYSTEM_PATHS.USER, '') || '/'
+        
+        // Fallback: 如果 project 目录不存在，使用根目录
+        try {
+          await instance.fs.readdir(wcCwd)
+          console.log('📂 工作目录存在:', wcCwd)
+        } catch (e) {
+          console.warn('⚠️ 工作目录不存在，使用根目录:', wcCwd)
+          wcCwd = '/'
+        }
+        
+        console.log('📂 最终工作目录:', wcCwd)
+        console.log('🔧 环境变量:', {
+          TERM: 'xterm-256color',
+          HOME: '/',
+        })
+        
+        // 添加超时保护
+        const spawnTimeout = setTimeout(() => {
+          console.error('⏱️ Shell 启动超时 (10s)')
+          term.writeln('\x1b[33m⚠ Shell startup timeout\x1b[0m')
+          term.writeln('This may indicate a problem with the working directory.')
+          term.writeln('Try refreshing the page.')
+        }, 10000)
         
         const shellProcess = await instance.spawn('jsh', {
           terminal: {
@@ -228,6 +289,8 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
           cwd: wcCwd
         })
 
+        clearTimeout(spawnTimeout)
+        console.log('✅ Shell 进程启动成功')
         processRef.current = shellProcess
 
         // Pipe process output to XTerm with prompt cleanup
@@ -265,15 +328,35 @@ const XTerm: React.FC<XTermProps> = ({ className, style }) => {
 
         setIsReady(true)
         logger.debug('[XTerm] Terminal ready')
+        console.log('🎉 终端已就绪')
 
         // Return cleanup function to be used by the outer scope if needed, 
         // but since we are in a useEffect we handle cleanup via a pattern that TS accepts.
       } catch (error) {
         logger.error('[XTerm] Failed to start shell:', error)
+        console.error('❌ Shell 启动失败:', error)
+        
         term.clear()
         term.writeln('\x1b[31m✖ Failed to start terminal\x1b[0m')
         term.writeln('')
-        term.writeln(`Error: ${error instanceof Error ? error.message : String(error)}`)
+        
+        if (error instanceof Error) {
+          term.writeln(`Error: ${error.message}`)
+          
+          // 提供更具体的错误提示
+          if (error.message.includes('ENOENT')) {
+            term.writeln('')
+            term.writeln('可能原因：工作目录不存在')
+            term.writeln('尝试：检查文件系统是否正确初始化')
+          } else if (error.message.includes('spawn')) {
+            term.writeln('')
+            term.writeln('可能原因：Shell 进程启动失败')
+            term.writeln('尝试：刷新页面重试')
+          }
+        } else {
+          term.writeln(`Error: ${String(error)}`)
+        }
+        
         term.writeln('')
         term.writeln('Please check browser console for details')
       }

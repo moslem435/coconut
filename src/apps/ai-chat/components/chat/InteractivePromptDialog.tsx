@@ -18,17 +18,28 @@ export function InteractivePromptDialog({
     onCancel
 }: InteractivePromptDialogProps) {
     const [selectedOption, setSelectedOption] = useState<string>('');
+    const [textInput, setTextInput] = useState<string>('');
 
     // Parse options from output
     const options = parseOptions(output);
+    const isTextInput = options.length === 0;
 
     useEffect(() => {
-        if (options.length > 0 && !selectedOption) {
+        if (options.length > 0 && !selectedOption && options[0]) {
             setSelectedOption(options[0]);
         }
     }, [options, selectedOption]);
 
     if (!isOpen) return null;
+
+    const handleSubmit = () => {
+        if (isTextInput) {
+            onResponse(textInput);
+            setTextInput('');
+        } else {
+            onResponse(selectedOption);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -68,32 +79,46 @@ export function InteractivePromptDialog({
                         {prompt}
                     </div>
 
-                    {/* Options */}
-                    <div className="space-y-2">
-                        {options.map((option) => (
-                            <label
-                                key={option}
-                                className={cn(
-                                    "flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all",
-                                    selectedOption === option
-                                        ? "border-amber-500 bg-amber-500/5"
-                                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
-                                )}
-                            >
-                                <input
-                                    type="radio"
-                                    name="option"
-                                    value={option}
-                                    checked={selectedOption === option}
-                                    onChange={(e) => setSelectedOption(e.target.value)}
-                                    className="w-4 h-4 text-amber-500 focus:ring-amber-500"
-                                />
-                                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                    {option}
-                                </span>
-                            </label>
-                        ))}
-                    </div>
+                    {/* Options or Text Input */}
+                    {isTextInput ? (
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                value={textInput}
+                                onChange={(e) => setTextInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                                className="w-full px-4 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                placeholder="输入内容..."
+                                autoFocus
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {options.map((option) => (
+                                <label
+                                    key={option}
+                                    className={cn(
+                                        "flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all",
+                                        selectedOption === option
+                                            ? "border-amber-500 bg-amber-500/5"
+                                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                                    )}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="option"
+                                        value={option}
+                                        checked={selectedOption === option}
+                                        onChange={(e) => setSelectedOption(e.target.value)}
+                                        className="w-4 h-4 text-amber-500 focus:ring-amber-500"
+                                    />
+                                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                        {option}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -105,8 +130,8 @@ export function InteractivePromptDialog({
                         取消
                     </button>
                     <button
-                        onClick={() => onResponse(selectedOption)}
-                        disabled={!selectedOption}
+                        onClick={handleSubmit}
+                        disabled={isTextInput ? !textInput.trim() : !selectedOption}
                         className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         确认
@@ -123,17 +148,56 @@ function parseOptions(output: string): string[] {
     const options: string[] = [];
 
     for (const line of lines) {
-        // Match patterns like "○ Yes", "● No", "• Option"
-        const match = line.match(/[○●•]\s+(.+)/);
+        // Match various option formats:
+        // - "│ ○ Yes" or "○ Yes" (Vite style with bullets)
+        // - "❯ Option" or "› Option" (arrow indicators)
+        // - "1. Option" or "1) Option" (numbered)
+        // - "[1] Option" (bracketed numbers)
+        // - "• Option" (bullet points)
+        
+        // Visual markers (bullets, arrows, etc.)
+        let match = line.match(/[│\s]*[○●•❯›▸◆◇]\s+(.+)/);
         if (match && match[1]) {
-            options.push(match[1].trim());
+            const option = match[1].trim();
+            // Skip empty options or lines that are just decorative
+            if (option && !option.match(/^[─│┌┐└┘├┤┬┴┼]+$/)) {
+                options.push(option);
+            }
+            continue;
+        }
+        
+        // Numbered options: "1. Option" or "1) Option"
+        match = line.match(/^\s*\d+[\.\)]\s+(.+)/);
+        if (match && match[1]) {
+            const option = match[1].trim();
+            if (option) {
+                options.push(option);
+            }
+            continue;
+        }
+        
+        // Bracketed numbers: "[1] Option"
+        match = line.match(/^\s*\[\d+\]\s+(.+)/);
+        if (match && match[1]) {
+            const option = match[1].trim();
+            if (option) {
+                options.push(option);
+            }
+            continue;
         }
     }
 
-    // Fallback: look for Yes/No pattern
-    if (options.length === 0 && (output.toLowerCase().includes('yes') || output.toLowerCase().includes('no'))) {
-        if (output.toLowerCase().includes('yes')) options.push('Yes');
-        if (output.toLowerCase().includes('no')) options.push('No');
+    // Fallback: look for Yes/No pattern if explicitly asked
+    const lowerOutput = output.toLowerCase();
+    if (options.length === 0) {
+        // Check for various Yes/No formats
+        if (lowerOutput.includes('(y/n)') || 
+            lowerOutput.includes('[y/n]') || 
+            lowerOutput.includes('(yes/no)') ||
+            lowerOutput.includes('[yes/no]')) {
+            options.push('Yes');
+            options.push('No');
+        }
     }
 
     return options;

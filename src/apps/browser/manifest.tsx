@@ -20,6 +20,7 @@ export const manifest: AppManifest = {
         width: 1024,
         height: 768,
         titleBarColor: 'auto',
-        isResizable: true
+        isResizable: true,
+        hideTitleBar: false, // Keep title bar but make it minimal
     }
 }

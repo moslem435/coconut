@@ -314,7 +314,7 @@ export const useWindowStore = create<WindowStore>()(
              * 
              * 性能优化：
              * - 如果窗口已经是顶层且活跃，跳过更新
-             * - 使用虚拟化 z-index，只更新前 3 个窗口的层级
+             * - 只要窗口不是最顶层，就强制提升 z-index，确保点击任务栏时置顶
              * 
              * @param id - 窗口 ID
              */
@@ -328,33 +328,18 @@ export const useWindowStore = create<WindowStore>()(
                     return
                 }
 
-                // 虚拟化 z-index：只更新必要的窗口
-                const sortedWindows = Object.values(windows)
-                    .filter(w => !w.isMinimized)
-                    .sort((a, b) => b.zIndex - a.zIndex)
-
-                const needsUpdate = sortedWindows.slice(0, VIRTUAL_Z_INDEX_THRESHOLD).some(w => w.id === id)
-
-                if (needsUpdate || sortedWindows.length <= VIRTUAL_Z_INDEX_THRESHOLD) {
-                    const newZ = maxZIndex + 1
-                    set(state => ({
-                        activeWindowId: id,
-                        maxZIndex: newZ,
-                        windows: {
-                            ...state.windows,
-                            [id]: { ...targetWindow, zIndex: newZ, isMinimized: false }
-                        }
-                    }))
-                } else {
-                    // 只更新活跃状态，不改变 z-index
-                    set(state => ({
-                        activeWindowId: id,
-                        windows: {
-                            ...state.windows,
-                            [id]: { ...targetWindow, isMinimized: false }
-                        }
-                    }))
-                }
+                // 强制提升 z-index
+                // 之前的虚拟化逻辑会导致点击任务栏时，如果窗口处于第4层及以下，只更新 activeId 但不提升 zIndex
+                // 从而导致窗口虽然被激活了，但依然被上面的窗口遮挡
+                const newZ = maxZIndex + 1
+                set(state => ({
+                    activeWindowId: id,
+                    maxZIndex: newZ,
+                    windows: {
+                        ...state.windows,
+                        [id]: { ...targetWindow, zIndex: newZ, isMinimized: false }
+                    }
+                }))
 
                 eventBus.emit('window:focused', { id })
             },

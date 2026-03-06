@@ -124,7 +124,7 @@ export default function Toolbar({
           </div>
           <span className="text-[12px] font-medium"
             style={{ color: 'var(--os-text-primary)' }}>
-            {currentPath.length > 0 ? getDisplayName(currentPath[currentPath.length - 1]) : 'Files'}
+            {currentPath.length > 0 ? getDisplayName(currentPath[currentPath.length - 1]!) : 'Files'}
           </span>
         </div>
 

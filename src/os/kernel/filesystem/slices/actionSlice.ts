@@ -281,6 +281,12 @@ export const createActionSlice: StateCreator<
 
   // 获取文件 Blob（委托给 syncService）
   getFileBlob: async (id) => {
+    // 1. Try to create Blob from memory content first
+    const node = get().files[id]
+    if (node && typeof node.content === 'string') {
+      return new Blob([node.content], { type: 'application/octet-stream' })
+    }
+
     const path = get().resolvePath(id)
     if (!path) return null
 

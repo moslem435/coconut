@@ -9,7 +9,9 @@ export const DEFAULT_CSP_CONFIG = {
         "blob:",
         "https://*.stackblitz.com",
         "https://stackblitz.com",
-        "http://yume.noktt.cn"
+        "http://yume.noktt.cn",
+        "https://*.local-corp.webcontainer.api.io",
+        "https://*.webcontainer.io"
     ],
     "connect-src": ["'self'", "https:", "ws:", "wss:"],
     "worker-src": ["'self'", "blob:"],

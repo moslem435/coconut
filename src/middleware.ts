@@ -5,6 +5,11 @@ import { DEFAULT_CSP_CONFIG, CSP_COOKIE_NAME } from './os/config/csp'
 export function middleware(request: NextRequest) {
     const response = NextResponse.next()
     
+    // Skip security headers for test page
+    if (request.nextUrl.pathname.includes('/test-webcontainer-iframe.html')) {
+        return response;
+    }
+    
     // Clone default config
     const cspConfig = JSON.parse(JSON.stringify(DEFAULT_CSP_CONFIG))
     
@@ -41,13 +46,14 @@ export function middleware(request: NextRequest) {
     
     // Security Headers
     response.headers.set('X-Content-Type-Options', 'nosniff')
-    response.headers.set('X-Frame-Options', 'DENY')
+    // X-Frame-Options removed to allow WebContainer iframes
+    // response.headers.set('X-Frame-Options', 'DENY')
     response.headers.set('X-XSS-Protection', '1; mode=block')
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     
-    // COOP/COEP
-    response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp')
+    // COOP only - COEP removed to allow WebContainer iframes
+    // Note: This may affect SharedArrayBuffer availability in some contexts
     response.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
 
     return response

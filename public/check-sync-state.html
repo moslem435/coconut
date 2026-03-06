@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sync State Checker</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    pre { background: #252526; padding: 10px; border-radius: 4px; overflow: auto; }
+    .section { margin: 20px 0; border: 1px solid #3e3e42; padding: 15px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Sync State Checker</h1>
+  
+  <div class="section">
+    <h2>1. Check VFS State</h2>
+    <button onclick="checkVFS()">Check VFS /home/user</button>
+    <pre id="vfs-output"></pre>
+  </div>
+
+  <div class="section">
+    <h2>2. Check WebContainer State</h2>
+    <button onclick="checkWC()">Check WebContainer /</button>
+    <pre id="wc-output"></pre>
+  </div>
+
+  <div class="section">
+    <h2>3. Check Sync Queue</h2>
+    <button onclick="checkQueue()">Check Queue State</button>
+    <pre id="queue-output"></pre>
+  </div>
+
+  <div class="section">
+    <h2>4. Manual Sync</h2>
+    <button onclick="manualSync()">Force Sync VFS → WC</button>
+    <pre id="sync-output"></pre>
+  </div>
+
+  <script type="module">
+    window.checkVFS = async () => {
+      const output = document.getElementById('vfs-output');
+      try {
+        const { useFileSystemStore } = await import('/src/os/kernel/useFileSystemStore.ts');
+        const { files, getNodeByPath } = useFileSystemStore.getState();
+        
+        const userNode = getNodeByPath('/home/user');
+        if (!userNode) {
+          output.textContent = '❌ /home/user not found in VFS';
+          return;
+        }
+
+        const children = Object.values(files).filter(f => f.parentId === userNode.id);
+        
+        let result = `✅ VFS /home/user (${children.length} items):\n\n`;
+        
+        for (const child of children) {
+          const icon = child.type === 'folder' ? '📁' : '📄';
+          result += `${icon} ${child.name}\n`;
+          
+          if (child.type === 'folder') {
+            const subChildren = Object.values(files).filter(f => f.parentId === child.id);
+            for (const sub of subChildren) {
+              const subIcon = sub.type === 'folder' ? '📁' : '📄';
+              result += `  ${subIcon} ${sub.name}\n`;
+            }
+          }
+        }
+        
+        output.textContent = result;
+      } catch (e) {
+        output.textContent = '❌ Error: ' + e.message;
+      }
+    };
+
+    window.checkWC = async () => {
+      const output = document.getElementById('wc-output');
+      try {
+        const { useWebContainerStore } = await import('/src/os/kernel/useWebContainerStore.ts');
+        const { instance } = useWebContainerStore.getState();
+        
+        if (!instance) {
+          output.textContent = '❌ WebContainer not booted';
+          return;
+        }
+
+        const entries = await instance.fs.readdir('/', { withFileTypes: true });
+        
+        let result = `✅ WebContainer / (${entries.length} items):\n\n`;
+        
+        for (const entry of entries) {
+          const icon = entry.isDirectory() ? '📁' : '📄';
+          result += `${icon} ${entry.name}\n`;
+          
+          if (entry.isDirectory()) {
+            try {
+              const subEntries = await instance.fs.readdir(`/${entry.name}`, { withFileTypes: true });
+              for (const sub of subEntries) {
+                const subIcon = sub.isDirectory() ? '📁' : '📄';
+                result += `  ${subIcon} ${sub.name}\n`;
+              }
+            } catch (e) {
+              result += `  ⚠️ Cannot read directory\n`;
+            }
+          }
+        }
+        
+        output.textContent = result;
+      } catch (e) {
+        output.textContent = '❌ Error: ' + e.message;
+      }
+    };
+
+    window.checkQueue = async () => {
+      const output = document.getElementById('queue-output');
+      try {
+        const { useWebContainerStore } = await import('/src/os/kernel/useWebContainerStore.ts');
+        const state = useWebContainerStore.getState();
+        
+        let result = `Instance: ${state.instance ? '✅ Ready' : '❌ Not Ready'}\n`;
+        result += `Booting: ${state.isBooting ? '⏳ Yes' : '✅ No'}\n`;
+        result += `Syncing from WC: ${state.isSyncingFromWC ? '🔄 Yes' : '✅ No'}\n`;
+        
+        output.textContent = result;
+      } catch (e) {
+        output.textContent = '❌ Error: ' + e.message;
+      }
+    };
+
+    window.manualSync = async () => {
+      const output = document.getElementById('sync-output');
+      output.textContent = '🔄 Starting manual sync...\n';
+      
+      try {
+        const { useFileSystemStore } = await import('/src/os/kernel/useFileSystemStore.ts');
+        const { useWebContainerStore } = await import('/src/os/kernel/useWebContainerStore.ts');
+        
+        const { files, getNodeByPath } = useFileSystemStore.getState();
+        const { instance } = useWebContainerStore.getState();
+        
+        if (!instance) {
+          output.textContent += '❌ WebContainer not ready\n';
+          return;
+        }
+
+        const userNode = getNodeByPath('/home/user');
+        if (!userNode) {
+          output.textContent += '❌ /home/user not found\n';
+          return;
+        }
+
+        let synced = 0;
+        let errors = 0;
+
+        const syncNode = async (nodeId, wcParentPath = '') => {
+          const children = Object.values(files).filter(f => f.parentId === nodeId);
+          
+          for (const child of children) {
+            const wcPath = wcParentPath ? `${wcParentPath}/${child.name}` : child.name;
+            
+            try {
+              if (child.type === 'folder') {
+                await instance.fs.mkdir(wcPath, { recursive: true });
+                output.textContent += `✅ Created folder: ${wcPath}\n`;
+                synced++;
+                await syncNode(child.id, wcPath);
+              } else {
+                const content = await useFileSystemStore.getState().readFileContent(child.id);
+                await instance.fs.writeFile(wcPath, content);
+                output.textContent += `✅ Created file: ${wcPath} (${content.length} bytes)\n`;
+                synced++;
+              }
+            } catch (e) {
+              output.textContent += `❌ Failed: ${wcPath} - ${e.message}\n`;
+              errors++;
+            }
+          }
+        };
+
+        await syncNode(userNode.id);
+        
+        output.textContent += `\n✅ Sync complete: ${synced} items synced, ${errors} errors\n`;
+      } catch (e) {
+        output.textContent += '❌ Error: ' + e.message + '\n' + e.stack;
+      }
+    };
+  </script>
+</body>
+</html>

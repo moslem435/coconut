@@ -27,7 +27,7 @@ export const WindowPreview = memo(({ windowId, appId, title, icon: Icon, isActiv
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 5, pointerEvents: 'none' }}
       transition={{ duration: useAnimations ? 0.2 : 0, ease: [0.32, 0.72, 0, 1] }}
-      className="absolute bottom-[130%] left-1/2 -translate-x-1/2 w-48 aspect-[16/10] z-[300] pointer-events-auto flex flex-col"
+      className="absolute bottom-[130%] left-1/2 -translate-x-1/2 w-48 aspect-[16/10] z-[10001] pointer-events-auto flex flex-col"
       onMouseEnter={() => onPeek?.(true)}
       onMouseLeave={() => onPeek?.(false)}
       onClick={(e) => {
