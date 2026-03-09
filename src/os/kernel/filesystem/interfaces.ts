@@ -54,7 +54,7 @@ export interface FileSystemProvider {
      * Rename/Move a file or directory
      */
     rename(oldPath: string, newPath: string): Promise<void>;
-    
+
     /**
      * Check if a path exists
      */

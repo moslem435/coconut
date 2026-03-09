@@ -105,9 +105,9 @@ export function MessageItem({
                         msg.tool_calls.forEach((tc: any) => {
                             // Check for duplicates (just in case)
                             if (!timelineEvents.find(e => e.type === 'tool' && e.toolCall?.id === tc.id)) {
-                                timelineEvents.push({ 
-                                    type: 'tool', 
-                                    toolCall: tc, 
+                                timelineEvents.push({
+                                    type: 'tool',
+                                    toolCall: tc,
                                     result: null,
                                     status: 'loading'
                                 });
