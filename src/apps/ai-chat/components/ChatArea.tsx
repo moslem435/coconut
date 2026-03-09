@@ -96,9 +96,9 @@ export function ChatArea() {
         addMessage(currentSessionId!, 'user', input, chatMode);
 
         // Add placeholder assistant message that will be streamed into
-        addMessage(currentSessionId!, 'assistant', '', chatMode);
+        const startTime = Date.now();
+        const assistantMsgId = addMessage(currentSessionId!, 'assistant', '', chatMode);
 
-        const userInput = input;
         setInput('');
 
         // Get the latest messages snapshot (including the user message just added)
@@ -113,7 +113,14 @@ export function ChatArea() {
                 messagesToSend,
                 onUpdate,
                 onNewMessage,
-                () => { }, // onFinish
+                () => {
+                    // onFinish - 计算耗时
+                    const duration = Date.now() - startTime;
+                    useChatStore.getState().updateMessageById(currentSessionId!, assistantMsgId, {
+                        startTime,
+                        duration
+                    });
+                },
                 (err: any) => {
                     setSendError(err?.message || t('ai.error.unknown'));
                 },

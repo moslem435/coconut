@@ -9,19 +9,19 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'
 
 interface DesktopIconProps {
-  item: FileNode
-  pos: { x: number; y: number }
-  isSelected: boolean
-  scaleFactor: number
-  currentGridSize: number
-  currentGridPadding: number
-  snapToGrid: boolean
-  textColor: string
-  onSelect: (id: string) => void
-  onDragEnd: (id: string, x: number, y: number) => void
-  onDragPreview: (preview: { x: number; y: number } | null) => void
-  onClick: (id: string, e: React.MouseEvent) => void
-  onDoubleClick: (id: string) => void
+    item: FileNode
+    pos: { x: number; y: number }
+    isSelected: boolean
+    scaleFactor: number
+    currentGridSize: number
+    currentGridPadding: number
+    snapToGrid: boolean
+    textColor: string
+    onSelect: (id: string) => void
+    onDragEnd: (id: string, x: number, y: number) => void
+    onDragPreview: (preview: { x: number; y: number } | null) => void
+    onClick: (id: string, e: React.MouseEvent) => void
+    onDoubleClick: (id: string) => void
 }
 
 export function DesktopIcon({
@@ -100,7 +100,7 @@ export function DesktopIcon({
                 renaming={renamingId === item.id}
                 onRename={(newName) => {
                     if (newName && newName !== item.name) {
-                        renameItem(item.id, newName).catch(console.error)
+                        renameItem(item.id, newName)
                     }
                     setRenamingId(null)
                 }}

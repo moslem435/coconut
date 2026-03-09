@@ -10,7 +10,7 @@ import { useContextMenuItems } from '@/os/system/context-menu/useContextMenuItem
 import { MenuItem } from '@/os/system/context-menu/types'
 
 // SubMenu Component
-const SubMenu = ({ items, parentRef, onClose }: { items: MenuItem[], parentRef: React.RefObject<HTMLButtonElement>, onClose: () => void }) => {
+const SubMenu = ({ items, parentRef, onClose }: { items: MenuItem[], parentRef: React.RefObject<HTMLButtonElement | null>, onClose: () => void }) => {
   const { useAnimations } = useSystemSettings()
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
@@ -19,7 +19,7 @@ const SubMenu = ({ items, parentRef, onClose }: { items: MenuItem[], parentRef: 
     if (parentRef.current && menuRef.current) {
       const parentRect = parentRef.current.getBoundingClientRect()
       const menuRect = menuRef.current.getBoundingClientRect()
-      
+
       let left = parentRect.right
       let top = parentRect.top
 
@@ -58,7 +58,7 @@ const SubMenu = ({ items, parentRef, onClose }: { items: MenuItem[], parentRef: 
 const MenuItemComponent = ({ item, onClose }: { item: MenuItem, onClose: () => void }) => {
   const [showSubMenu, setShowSubMenu] = useState(false)
   const itemRef = useRef<HTMLButtonElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = () => {
     if (item.submenu) {
@@ -69,8 +69,8 @@ const MenuItemComponent = ({ item, onClose }: { item: MenuItem, onClose: () => v
   const handleMouseLeave = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     if (item.submenu) {
-        // Delay hiding to allow moving to submenu
-        timeoutRef.current = setTimeout(() => setShowSubMenu(false), 300) 
+      // Delay hiding to allow moving to submenu
+      timeoutRef.current = setTimeout(() => setShowSubMenu(false), 300)
     }
   }
 
@@ -81,10 +81,10 @@ const MenuItemComponent = ({ item, onClose }: { item: MenuItem, onClose: () => v
   const Icon = item.icon
 
   return (
-    <div 
-        className="px-1 relative"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+    <div
+      className="px-1 relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <button
         ref={itemRef}
@@ -107,9 +107,9 @@ const MenuItemComponent = ({ item, onClose }: { item: MenuItem, onClose: () => v
           <span>{item.label}</span>
         </div>
         <div className="flex items-center gap-2">
-            {item.shortcut && <span className="text-[10px] opacity-50">{item.shortcut}</span>}
-            {item.checked && <Check size={14} className="opacity-80" />}
-            {item.submenu && <ChevronRight size={14} className="opacity-50" />}
+          {item.shortcut && <span className="text-[10px] opacity-50">{item.shortcut}</span>}
+          {item.checked && <Check size={14} className="opacity-80" />}
+          {item.submenu && <ChevronRight size={14} className="opacity-50" />}
         </div>
       </button>
 
@@ -140,16 +140,16 @@ export default function SystemContextMenu() {
   // Handle outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-        // Check if click is inside menu or any submenu
-        // Since submenus are portals/fixed, we need to be careful
-        // But here we rely on React event propagation or checking composedPath
-        // Actually, for simplicity, if we click outside the main menu ref, we hide.
-        // But submenus are outside main menu DOM.
-        // So we need to check if target is inside any context menu container.
-        const target = e.target as HTMLElement
-        if (!target.closest('[class*="bg-[var(--os-bg-panel)]"]')) {
-            hideMenu()
-        }
+      // Check if click is inside menu or any submenu
+      // Since submenus are portals/fixed, we need to be careful
+      // But here we rely on React event propagation or checking composedPath
+      // Actually, for simplicity, if we click outside the main menu ref, we hide.
+      // But submenus are outside main menu DOM.
+      // So we need to check if target is inside any context menu container.
+      const target = e.target as HTMLElement
+      if (!target.closest('[class*="bg-[var(--os-bg-panel)]"]')) {
+        hideMenu()
+      }
     }
     const handleScroll = () => hideMenu()
 

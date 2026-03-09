@@ -13,11 +13,11 @@ interface TooltipProps {
   className?: string
 }
 
-export function Tooltip({ 
-  content, 
-  children, 
-  side = 'top', 
-  offset = 8, 
+export function Tooltip({
+  content,
+  children,
+  side = 'top',
+  offset = 8,
   delay = 300,
   className = ''
 }: TooltipProps) {
@@ -78,19 +78,19 @@ export function Tooltip({
 
   // Update position on scroll or resize if visible
   useEffect(() => {
-    if (isVisible) {
-      window.addEventListener('scroll', updatePosition)
-      window.addEventListener('resize', updatePosition)
-      return () => {
-        window.removeEventListener('scroll', updatePosition)
-        window.removeEventListener('resize', updatePosition)
-      }
+    if (!isVisible) return undefined
+
+    window.addEventListener('scroll', updatePosition)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('resize', updatePosition)
     }
   }, [isVisible])
 
   return (
     <>
-      <div 
+      <div
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}

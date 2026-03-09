@@ -128,7 +128,7 @@ export function createSyncMiddleware(
 
       switch (operation.type) {
         case 'create': {
-          const { path, type, content } = operation.payload;
+          const { path, type, content, source } = operation.payload;
           const isFolder = type === 'folder';
 
           // For files, if content is undefined, use empty string as default
@@ -141,12 +141,18 @@ export function createSyncMiddleware(
           const byteLen = finalContent ? (typeof finalContent === 'string' ? finalContent.length : finalContent.byteLength) : 0;
           console.log(`[SyncMiddleware] Executing syncCreate: ${path}, type: ${type}, body size: ${byteLen} bytes`);
 
-          await syncService.syncCreate(path, type, finalContent)
+          await syncService.syncCreate(path, type, finalContent, {
+            syncToOPFS: true,
+            syncToWebContainer: source !== 'wc'
+          })
           break
         }
 
         case 'delete':
-          await syncService.syncDelete(operation.payload.path)
+          await syncService.syncDelete(operation.payload.path, {
+            syncToOPFS: true,
+            syncToWebContainer: operation.payload.source !== 'wc'
+          })
           break
 
         case 'rename':
@@ -158,7 +164,7 @@ export function createSyncMiddleware(
           break
 
         case 'update': {
-          const { path, content } = operation.payload;
+          const { path, content, source } = operation.payload;
 
           // For updates, if content is undefined, this is likely an error
           // We should not update a file without knowing its content
@@ -170,7 +176,10 @@ export function createSyncMiddleware(
           const byteLen = typeof content === 'string' ? content.length : (content as any).byteLength;
           console.log(`[SyncMiddleware] Executing syncUpdate: ${path}, body size: ${byteLen} bytes`);
 
-          await syncService.syncUpdate(path, content)
+          await syncService.syncUpdate(path, content, {
+            syncToOPFS: true,
+            syncToWebContainer: source !== 'wc'
+          })
           break
         }
       }

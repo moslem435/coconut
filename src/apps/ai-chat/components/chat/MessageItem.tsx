@@ -184,6 +184,11 @@ export function MessageItem({
                         {message.timestamp && !isGenerating && (
                             <span className="ml-auto text-[10px] text-zinc-400/50 tabular-nums">
                                 {formatTime(message.timestamp)}
+                                {message.duration && (
+                                    <span className="ml-2 text-emerald-400/70">
+                                        ({(message.duration / 1000).toFixed(2)}s)
+                                    </span>
+                                )}
                             </span>
                         )}
                     </div>

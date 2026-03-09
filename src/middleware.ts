@@ -52,9 +52,11 @@ export function middleware(request: NextRequest) {
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     
-    // COOP only - COEP removed to allow WebContainer iframes
-    // Note: This may affect SharedArrayBuffer availability in some contexts
-    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+    // WebContainer requires SharedArrayBuffer, which requires Cross-Origin Isolation.
+    // This means both COOP and COEP must be set.
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
     return response
 }

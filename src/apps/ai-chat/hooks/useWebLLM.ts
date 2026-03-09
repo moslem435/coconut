@@ -508,8 +508,8 @@ export function useWebLLM() {
 
             let totalInteractionContent = ''; // NEW: Cumulative content across the loop
 
-            // Loop for handling tool calls (max 5 iterations to prevent infinite loops)
-            for (let i = 0; i < 5; i++) {
+            // Loop for handling tool calls (max 50 iterations to prevent infinite loops)
+            for (let i = 0; i < 50; i++) {
                 // If this is a follow-up turn (after tool execution), we need a new assistant message placeholder in the UI
                 if (i > 0) {
                     onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });

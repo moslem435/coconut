@@ -64,10 +64,23 @@ function TextStep({ content }: { content: string }) {
 // ── Tool Step ─────────────────────────────────────────────────────────────────
 function ToolStep({ event }: { event: TimelineEvent }) {
     const { toolCall, result, isError, status } = event;
-    const args = (() => { try { return JSON.parse(toolCall?.function?.arguments || '{}'); } catch { return {}; } })();
+    const rawArgs = toolCall?.function?.arguments || '';
+    const args = (() => {
+        try {
+            return JSON.parse(rawArgs);
+        } catch {
+            // Fallback for streaming JSON: try to grab 'path' using Regex
+            const pathMatch = rawArgs.match(/"path"\s*:\s*"?([^"]+)"?/);
+            const cmdMatch = rawArgs.match(/"cmd"\s*:\s*"?([^"]+)"?/);
+            return {
+                path: pathMatch ? pathMatch[1] : undefined,
+                cmd: cmdMatch ? cmdMatch[1] : undefined
+            };
+        }
+    })();
     const toolName = toolCall?.function?.name || '';
     const toolMeta = getToolMeta(toolName, args);
-    
+
     // Determine status: explicit status > isError flag > result analysis > loading
     let currentStatus: TimelineStatus;
     if (status) {
@@ -83,7 +96,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
     } else {
         currentStatus = 'loading';
     }
-    
+
     // Command output streaming state
     const [streamOutput, setStreamOutput] = useState('');
     const [isExpanded, setIsExpanded] = useState(false);
@@ -126,7 +139,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
 
         window.addEventListener('ai-builder:command-output', outputHandler as EventListener);
         window.addEventListener('ai-builder:interactive-prompt', promptHandler as EventListener);
-        
+
         return () => {
             window.removeEventListener('ai-builder:command-output', outputHandler as EventListener);
             window.removeEventListener('ai-builder:interactive-prompt', promptHandler as EventListener);
@@ -156,7 +169,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
     const isCommand = toolName === 'run_command';
     const hasOutput = streamOutput.length > 0 || (result && isCommand);
     const showDetails = isExpanded && (hasOutput || result || waitingForInput);
-    
+
     // Auto-expand if loading command
     useEffect(() => {
         if (currentStatus === 'loading' && isCommand) {
@@ -192,7 +205,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
 
                 {/* Label + result */}
                 <div className="flex flex-col min-w-0 flex-1">
-                    <div 
+                    <div
                         className="flex items-center gap-1.5 cursor-pointer group select-none"
                         onClick={() => (hasOutput || waitingForInput) && setIsExpanded(!isExpanded)}
                     >
@@ -214,24 +227,31 @@ function ToolStep({ event }: { event: TimelineEvent }) {
                         )}>
                             {toolMeta.label}
                         </span>
-                        
+
                         {(hasOutput || waitingForInput) && (
                             <div className="text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </div>
                         )}
                     </div>
-                    
+
                     {!isCommand && resultLine && !isError && !isExpanded && (
                         <span className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500 truncate mt-0.5 pl-0.5">
                             {resultLine}
                         </span>
                     )}
-                    
+
                     {!isCommand && isError && result && (
                         <span className="text-[11px] font-mono text-red-400 dark:text-red-500 mt-0.5 pl-0.5 line-clamp-2">
                             {cleanResult}
                         </span>
+                    )}
+
+                    {!isCommand && currentStatus === 'loading' && (toolName === 'create_file' || toolName === 'update_file') && rawArgs.length > 20 && (
+                        <div className="text-[10px] text-indigo-400/80 dark:text-indigo-400/70 mt-0.5 pl-0.5 flex items-center gap-1.5 font-mono">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                            正在接收代码流... ({(rawArgs.length / 1024).toFixed(1)} KB)
+                        </div>
                     )}
                 </div>
             </div>
@@ -239,13 +259,13 @@ function ToolStep({ event }: { event: TimelineEvent }) {
             {/* Command Output / Detailed Result */}
             {showDetails && (
                 <div className="ml-6 mt-1 mb-2 flex flex-col gap-2">
-                    <div 
+                    <div
                         ref={outputRef}
                         className="bg-black/5 dark:bg-black/30 rounded border border-black/5 dark:border-white/5 p-2 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto scrollbar-thin"
                     >
                         {streamOutput || cleanResult || (currentStatus === 'loading' ? 'Waiting for output...' : 'No output')}
                     </div>
-                    
+
                     {/* Interactive Input */}
                     {waitingForInput && (
                         <div className="flex flex-col gap-2 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded border border-zinc-200 dark:border-zinc-700/50">
@@ -286,7 +306,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <form onSubmit={handleInputSubmit} className="flex gap-2">
                                 <input
                                     type="text"
@@ -305,7 +325,7 @@ function ToolStep({ event }: { event: TimelineEvent }) {
                                     className="flex-1 px-2 py-1.5 text-[11px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded focus:outline-none focus:border-indigo-500 transition-colors"
                                     autoFocus
                                 />
-                                <button 
+                                <button
                                     type="submit"
                                     className="px-3 py-1.5 text-[10px] font-medium bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors shadow-sm"
                                 >
@@ -347,25 +367,21 @@ export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
 
     // Listen for server-ready events
     useEffect(() => {
-        const handleServerReady = async (e: CustomEvent) => {
-            console.log('[BuilderTimeline] Server ready:', e.detail);
-            const url = e.detail.url;
-            
-            // Diagnose: Check if URL is accessible
-            try {
-                const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-                console.log('[BuilderTimeline] URL fetch test:', response);
-            } catch (err) {
-                console.error('[BuilderTimeline] URL fetch failed:', err);
-            }
-            
-            setPreviewUrl(url);
+        const handleServerReady = async (e: Event) => {
+            const customEvent = e as CustomEvent;
+            console.log('[BuilderTimeline] Server ready:', customEvent.detail);
+            const originalUrl = customEvent.detail.url;
+
+            // WebContainer URLs are designed to be accessible from the browser
+            console.log('[BuilderTimeline] Using URL:', originalUrl);
+
+            setPreviewUrl(originalUrl);
             setShowPreview(true);
         };
 
-        window.addEventListener('server-ready', handleServerReady as EventListener);
+        window.addEventListener('server-ready', handleServerReady);
         return () => {
-            window.removeEventListener('server-ready', handleServerReady as EventListener);
+            window.removeEventListener('server-ready', handleServerReady);
         };
     }, []);
 
@@ -442,16 +458,36 @@ export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
                             <X size={12} className="text-emerald-600 dark:text-emerald-400" />
                         </button>
                     </div>
-                    
+
                     {/* Preview Iframe */}
                     <div className="relative w-full h-[400px] bg-white">
+                        {iframeError && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/10 p-4">
+                                <div className="text-center">
+                                    <X size={32} className="text-red-500 mx-auto mb-2" />
+                                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">预览加载失败</p>
+                                    <p className="text-xs text-red-500/70">{iframeError}</p>
+                                    <button
+                                        onClick={() => window.open(previewUrl!, '_blank')}
+                                        className="mt-3 px-3 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                                    >
+                                        在新标签页中打开
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         <iframe
+                            ref={iframeRef}
                             src={previewUrl}
                             className="absolute inset-0 w-full h-full border-0"
                             title="App Preview"
                             allow="cross-origin-isolated; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            onError={() => setIframeError('Iframe 加载错误')}
+                            onLoad={() => {
+                                console.log('[BuilderTimeline] Iframe loaded successfully');
+                                setIframeError(null);
+                            }}
                         />
-                    </div>
                     </div>
                 </div>
             )}

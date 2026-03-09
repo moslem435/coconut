@@ -177,7 +177,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
     const mountIndex = pathNodes.findIndex(n => n.isMount)
 
     if (mountIndex !== -1) {
-      const mountNode = pathNodes[mountIndex]
+      const mountNode = pathNodes[mountIndex]!
       const relativePath = pathNodes.slice(mountIndex + 1).map(n => n.name).join('/')
 
       if (mountNode.id === FILE_IDS.ROM) {
@@ -248,7 +248,7 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
   waitForHydration: async () => {
     const getStore = () => get();
     console.log('[FileSystem] Waiting for hydration, current state:', getStore().isHydrated);
-    
+
     if (getStore().isHydrated) {
       console.log('[FileSystem] Already hydrated');
       return;
@@ -257,14 +257,14 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
     // Check if persist has already hydrated but state wasn't updated
     // @ts-ignore - Zustand persist api access
     if (useFileSystemStore?.persist?.hasHydrated()) {
-       console.log('[FileSystem] Persist already hydrated, updating state');
-       get()._setHydrated(true);
-       return;
+      console.log('[FileSystem] Persist already hydrated, updating state');
+      get()._setHydrated(true);
+      return;
     }
 
     return new Promise<void>((resolve, reject) => {
       console.log('[FileSystem] Starting hydration wait loop...');
-      
+
       // 添加超时保护：10秒后强制继续
       const timeout = setTimeout(() => {
         clearInterval(interval);
@@ -282,15 +282,15 @@ export const createCoreSlice: StateCreator<CoreSlice> = (set, get) => ({
           resolve();
           return;
         }
-        
+
         // Double check persist state in loop
         // @ts-ignore
         if (useFileSystemStore?.persist?.hasHydrated()) {
-           console.log('[FileSystem] ✅ Persist hydrated in loop');
-           store._setHydrated(true);
-           clearInterval(interval);
-           clearTimeout(timeout);
-           resolve();
+          console.log('[FileSystem] ✅ Persist hydrated in loop');
+          store._setHydrated(true);
+          clearInterval(interval);
+          clearTimeout(timeout);
+          resolve();
         }
       }, 50);
     });

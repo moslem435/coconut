@@ -84,9 +84,9 @@ class PerformanceMonitor {
     const min = Math.min(...values)
     const max = Math.max(...values)
     const sorted = [...values].sort((a, b) => a - b)
-    const p50 = sorted[Math.floor(sorted.length * 0.5)]
-    const p95 = sorted[Math.floor(sorted.length * 0.95)]
-    const p99 = sorted[Math.floor(sorted.length * 0.99)]
+    const p50 = sorted[Math.floor(sorted.length * 0.5)] || 0
+    const p95 = sorted[Math.floor(sorted.length * 0.95)] || 0
+    const p99 = sorted[Math.floor(sorted.length * 0.99)] || 0
 
     return {
       count: filtered.length,
@@ -134,7 +134,7 @@ class PerformanceMonitor {
    * 监控 FPS
    */
   startFPSMonitor(): () => void {
-    if (!this.enabled) return () => {}
+    if (!this.enabled) return () => { }
 
     let frameCount = 0
     let lastTime = performance.now()
@@ -169,13 +169,13 @@ class PerformanceMonitor {
     console.group('📊 Performance Report')
 
     const categories: PerformanceMetric['category'][] = ['render', 'network', 'memory', 'custom']
-    
+
     for (const category of categories) {
       const metrics = this.getMetrics(category)
       if (metrics.length === 0) continue
 
       console.group(`${category.toUpperCase()}`)
-      
+
       const uniqueNames = [...new Set(metrics.map(m => m.name))]
       for (const name of uniqueNames) {
         const stats = this.getStats(name)
@@ -190,7 +190,7 @@ class PerformanceMonitor {
           })
         }
       }
-      
+
       console.groupEnd()
     }
 
@@ -214,16 +214,16 @@ export const performanceMonitor = new PerformanceMonitor()
 
 // 开发环境下暴露到 window
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  ;(window as any).__perfMonitor = performanceMonitor
-  
+  ; (window as any).__perfMonitor = performanceMonitor
+
   // 定期记录内存使用
   setInterval(() => {
     performanceMonitor.recordMemory()
   }, 5000)
-  
+
   // 启动 FPS 监控
   performanceMonitor.startFPSMonitor()
-  
+
   // 添加快捷键打印报告
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'P') {

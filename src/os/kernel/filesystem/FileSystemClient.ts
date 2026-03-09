@@ -170,16 +170,16 @@ export class FileSystemClient implements IFileSystemProvider {
 
     async getFileBlob(path: string): Promise<Blob> {
         const { provider, relativePath } = this.resolveProvider(path);
-        
+
         if (provider) {
-             if (provider.getFileBlob) {
-                 return provider.getFileBlob(relativePath);
-             }
-             // Fallback
-             const content = await provider.readFile(relativePath);
-             return new Blob([content]);
+            if (provider.getFileBlob) {
+                return provider.getFileBlob(relativePath);
+            }
+            // Fallback
+            const content = await provider.readFile(relativePath);
+            return new Blob([content as any]);
         }
-        
+
         return this.sendWorker<Blob>('getFileBlob', { path });
     }
 
@@ -196,15 +196,15 @@ export class FileSystemClient implements IFileSystemProvider {
         if (path === '/' || path === '') {
             let opfsFiles: string[] = [];
             try {
-                 opfsFiles = await this.route<string[]>('/', 'readdir');
+                opfsFiles = await this.route<string[]>('/', 'readdir');
             } catch (e) {
                 console.warn('Failed to read OPFS root:', e);
             }
-            
+
             const mountPoints = Array.from(this.mounts.keys())
                 .filter(p => p.split('/').length === 2) // Top level mounts e.g. /rom, /mnt
                 .map(p => p.slice(1)); // Remove leading /
-            
+
             // Deduplicate
             return Array.from(new Set([...opfsFiles, ...mountPoints]));
         }
@@ -277,29 +277,29 @@ export class FileSystemClient implements IFileSystemProvider {
     /**
      * Check if an operation is allowed on a path
      */
-    async checkPermission(path: string, operation: 'read' | 'write' | 'delete'): Promise<{allowed: boolean, reason?: string}> {
+    async checkPermission(path: string, operation: 'read' | 'write' | 'delete'): Promise<{ allowed: boolean, reason?: string }> {
         const { provider } = this.resolveProvider(path);
 
         if (provider) {
             if (provider.readonly && ['write', 'delete'].includes(operation)) {
-                return { 
-                    allowed: false, 
-                    reason: `Read-only file system: ${provider.name}` 
+                return {
+                    allowed: false,
+                    reason: `Read-only file system: ${provider.name}`
                 };
             }
-            
+
             // Native driver permission check
             if (provider instanceof NativeDriver) {
-                 const mode = operation === 'read' ? 'read' : 'readwrite';
-                 const hasPermission = await provider.verifyPermission(mode);
-                 if (!hasPermission) {
-                    return { 
-                        allowed: false, 
-                        reason: `Permission required for ${operation} operation` 
+                const mode = operation === 'read' ? 'read' : 'readwrite';
+                const hasPermission = await provider.verifyPermission(mode);
+                if (!hasPermission) {
+                    return {
+                        allowed: false,
+                        reason: `Permission required for ${operation} operation`
                     };
                 }
             }
-            
+
             return { allowed: true };
         }
 

@@ -30,7 +30,7 @@ export default function Taskbar({
   onShutdown
 }: TaskbarProps) {
   const { t, language, toggleLanguage } = useLanguage()
-  
+
   // Taskbar needs list of all open window IDs/AppIDs
   // We use useShallow with a composite key string to avoid re-renders when other window properties change
   const openWindowsStrings = useWindowStore(
@@ -38,7 +38,7 @@ export default function Taskbar({
       .filter(w => w.isOpen)
       .map(w => `${w.id}|${w.appId || ''}`))
   )
-  
+
   const launchingAppIds = useWindowStore(useShallow(state => state.launchingAppIds))
   const { pinnedAppIds } = useSystemSettings()
 
@@ -88,7 +88,7 @@ export default function Taskbar({
       // Launch as sidebar by default
       const app = APPS_REGISTRY['ai-chat']
       if (app) {
-          launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { ...app.defaultWindowOptions, isSidebar: true })
+        launchApp('ai-chat', 'AI Assistant', 'ai-chat', undefined, { ...app.defaultWindowOptions, isSidebar: true })
       }
     }
   }
@@ -103,21 +103,25 @@ export default function Taskbar({
     pinnedAppIds.forEach(appId => {
       // Skip AI Chat if it's pinned (it has a special button)
       if (appId === 'ai-chat') return
-      
+
       items.push({ id: appId, appId: appId })
       addedIds.add(appId)
     })
 
     // 2. Add remaining Open Windows that aren't pinned
     openWindowsStrings.forEach(str => {
-      const [id, appId] = str.split('|')
-      
+      const parts = str.split('|')
+      const id = parts[0]
+      const appId = parts[1]
+
+      if (!id) return
+
       // Skip AI Chat window from regular list
       if (appId === 'ai-chat') return
-      
+
       // If the window ID is already added (e.g. it's a pinned app that is open), skip
       if (addedIds.has(id)) return
-      
+
       items.push({ id, appId: appId || id }) // Fallback to id if appId is empty
       addedIds.add(id)
     })
@@ -151,7 +155,7 @@ export default function Taskbar({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         initial={{ y: 0, x: "-50%" }}
-        animate={{ 
+        animate={{
           y: shouldHide ? "150%" : 0,
           x: "-50%"
         }}
@@ -164,7 +168,7 @@ export default function Taskbar({
         className="fixed bottom-4 left-1/2 h-14 z-[10000] flex justify-center w-fit max-w-[calc(100vw-2rem)]"
       >
         {/* Visual Taskbar Panel */}
-        <div 
+        <div
           className="flex items-center justify-between gap-4 select-none shadow-2xl backdrop-blur-3xl backdrop-saturate-150 rounded-2xl px-3 h-full"
           style={{
             backgroundColor: 'rgba(var(--os-bg-panel-rgb), 0.65)',
@@ -271,7 +275,7 @@ export default function Taskbar({
               WebkitBackdropFilter: 'blur(40px) saturate(150%)'
             }}
             onClick={handleAIClick}
-            whileHover={{ 
+            whileHover={{
               scale: 1.05
             }}
             whileTap={{ scale: 0.95 }}

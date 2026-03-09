@@ -131,7 +131,7 @@ export const systemToolsImplementation: Record<string, Function> = {
         }
 
         let output = '';
-        
+
         try {
             // Ensure WebContainer is ready
             const store = useWebContainerStore.getState();
@@ -150,21 +150,21 @@ export const systemToolsImplementation: Record<string, Function> = {
                     return `Failed to initialize WebContainer: ${bootError.message || bootError}`;
                 }
             }
-            
+
             // Track the last output length when we dispatched a prompt
             // This allows us to detect new prompts after user responds
             let lastPromptOutputLength = 0;
-            
+
             // Dispatch a custom event to notify UI about the output stream
             // This is a temporary solution until we have a proper streaming tool response architecture
             const dispatchOutput = (data: string) => {
                 // Strip ANSI escape codes (colors, cursor movements, etc.)
                 // eslint-disable-next-line no-control-regex
                 const cleanData = data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-                
+
                 output += cleanData;
-                window.dispatchEvent(new CustomEvent('ai-builder:command-output', { 
-                    detail: { cmd: args.cmd, output: cleanData } 
+                window.dispatchEvent(new CustomEvent('ai-builder:command-output', {
+                    detail: { cmd: args.cmd, output: cleanData }
                 }));
 
                 // Skip if output hasn't grown significantly since last prompt
@@ -177,11 +177,11 @@ export const systemToolsImplementation: Record<string, Function> = {
                 const fullOutput = output;
                 const fullOutputTrimmed = fullOutput.trim();
                 const fullOutputLower = fullOutput.toLowerCase();
-                
+
                 // 1. Detect prompt patterns (questions, colons, prompts)
-                const hasPromptPattern = 
-                    fullOutputTrimmed.endsWith('?') || 
-                    fullOutputTrimmed.endsWith(':') || 
+                const hasPromptPattern =
+                    fullOutputTrimmed.endsWith('?') ||
+                    fullOutputTrimmed.endsWith(':') ||
                     fullOutputTrimmed.endsWith('?:') || // Vite uses "?:"
                     fullOutputTrimmed.endsWith('>') ||
                     fullOutputTrimmed.endsWith('...') || // Waiting indicator
@@ -235,26 +235,26 @@ export const systemToolsImplementation: Record<string, Function> = {
                     fullOutputLower.includes('▸') || // Arrow
                     fullOutputLower.includes('❯') || // Prompt arrow
                     fullOutputLower.includes('›'); // Right arrow
-                
+
                 // 2. Check for option markers (visual indicators of choices)
                 const hasOptions = /[○●•❯›│▸◆◇]\s+/g.test(output);
-                
+
                 // 3. Check for numbered options (1. Option, 1) Option, [1] Option)
                 const hasNumberedOptions = /^\s*[\[\(]?\d+[\.\)\]]\s+\w+/m.test(output);
 
                 // 4. Check for text input prompts (where no options might be present)
-                const isTextInputPrompt = 
+                const isTextInputPrompt =
                     /project name:|package name:|enter your|enter a|enter the|name:|version:|description:|author:|license:|dest dir:|directory:|password:|passphrase:|token:|secret:/i.test(fullOutputTrimmed);
-                
+
                 // 5. Check for waiting state (output ends with colon or prompt and hasn't grown)
-                const looksLikeWaiting = 
+                const looksLikeWaiting =
                     (fullOutputTrimmed.endsWith(':') || fullOutputTrimmed.endsWith('>')) &&
-                    output.length > 20 && 
+                    output.length > 20 &&
                     output.length < 500;
-                
+
                 // 6. Content length check (reasonable size for a prompt)
                 const hasReasonableContent = output.length > 20 && output.length < 3000;
-                
+
                 // Debug logging
                 if (hasPromptPattern || hasOptions || hasNumberedOptions || isTextInputPrompt || looksLikeWaiting) {
                     console.log('[SystemTools] Prompt detection check:', {
@@ -268,35 +268,35 @@ export const systemToolsImplementation: Record<string, Function> = {
                         lastLine: fullOutputTrimmed.split('\n').pop()?.slice(-100)
                     });
                 }
-                
+
                 // Trigger interactive prompt if any of these conditions are met:
                 // 1. Prompt pattern + options (visual or numbered)
                 // 2. Text input prompt detected
                 // 3. Looks like waiting for input
                 // 4. Prompt pattern + reasonable content (not too short, not too long)
-                const shouldTrigger = 
+                const shouldTrigger =
                     (hasPromptPattern && (hasOptions || hasNumberedOptions)) ||
                     isTextInputPrompt ||
                     looksLikeWaiting ||
                     (hasPromptPattern && hasReasonableContent);
-                
+
                 if (shouldTrigger) {
                     // Update the last prompt output length to allow future prompts
                     lastPromptOutputLength = output.length;
-                    
+
                     console.log('[SystemTools] ✅ Interactive prompt detected!');
                     console.log('[SystemTools] Full output:', output);
-                    
+
                     // Extract the prompt line (usually the last non-empty line)
                     const lines = fullOutputTrimmed.split('\n').filter(l => l.trim());
                     const promptLine = lines[lines.length - 1] || trimmed;
-                    
-                    window.dispatchEvent(new CustomEvent('ai-builder:interactive-prompt', { 
-                        detail: { 
-                            cmd: args.cmd, 
+
+                    window.dispatchEvent(new CustomEvent('ai-builder:interactive-prompt', {
+                        detail: {
+                            cmd: args.cmd,
                             prompt: promptLine,
                             output: output
-                        } 
+                        }
                     }));
                 }
             };
@@ -310,20 +310,61 @@ export const systemToolsImplementation: Record<string, Function> = {
             });
 
             // Race between command execution and timeout
-            const exitCode = await Promise.race([
-                store.runCommand(
-                    args.cmd, 
-                    args.args || [], 
-                    args.cwd || '/',
-                    dispatchOutput,
-                    { 
-                        detached: args.detached,
-                        successPattern: args.successPattern
-                    }
-                ),
-                timeoutPromise
-            ]);
-            
+            let exitCode = -1;
+            try {
+                exitCode = await Promise.race([
+                    store.runCommand(
+                        args.cmd,
+                        args.args || [],
+                        args.cwd || '/',
+                        dispatchOutput,
+                        {
+                            detached: args.detached,
+                            successPattern: args.successPattern
+                        }
+                    ),
+                    timeoutPromise
+                ]);
+            } catch (cmdError: any) {
+                // WebContainer / npx fallback: file system might not have fully flushed bin symlinks yet
+                const isNpxError = args.cmd === 'npx' && (
+                    output.includes('could not determine executable to run') ||
+                    cmdError.message?.includes('exit code 1')
+                );
+
+                if (isNpxError && args.args && args.args.length > 0) {
+                    console.log(`[SystemTools] npx execution failed (possibly timing). Retrying in 2 seconds...`);
+
+                    // Wait 2 seconds for WebContainer file system to settle
+                    await new Promise(r => setTimeout(r, 2000));
+
+                    output = ''; // Reset output buffer
+                    console.log(`[SystemTools] Retrying original npx command...`);
+
+                    const retryTimeoutPromise = new Promise<number>((_, reject) => {
+                        setTimeout(() => {
+                            reject(new Error(`Fallback command timed out after ${timeoutMs / 1000} seconds.`));
+                        }, timeoutMs);
+                    });
+
+                    exitCode = await Promise.race([
+                        store.runCommand(
+                            args.cmd,
+                            args.args,
+                            args.cwd || '/',
+                            dispatchOutput,
+                            {
+                                detached: args.detached,
+                                successPattern: args.successPattern
+                            }
+                        ),
+                        retryTimeoutPromise
+                    ]);
+                } else {
+                    throw cmdError;
+                }
+            }
+
             // After command completes successfully, sync WebContainer to VFS
             if (exitCode === 0) {
                 console.log(`[SystemTools] Command succeeded, syncing WC to VFS...`);
@@ -336,7 +377,7 @@ export const systemToolsImplementation: Record<string, Function> = {
                 } catch (syncError) {
                     console.warn(`[SystemTools] Sync failed:`, syncError);
                 }
-                
+
                 if (args.detached) {
                     return `Process started successfully in background.\nInitial Output:\n${output.slice(0, 2000)}`;
                 }
@@ -348,24 +389,24 @@ export const systemToolsImplementation: Record<string, Function> = {
             // Include output in error message if available
             // This is crucial for commands that fail but output useful stderr info
             const outputInfo = (output && output.length > 0) ? `\nOutput before failure:\n${output.slice(0, 1000)}` : '';
-            
+
             // Check if it's a timeout error
             if (e.message && e.message.includes('timed out')) {
                 return `Error: ${e.message}${outputInfo}\n\nTip: Avoid interactive commands. Use non-interactive alternatives (e.g., 'npm init -y' instead of 'npm init', or add '-y' flag to skip prompts).`;
             }
-            
+
             return `Error running command: ${e.message || e}${outputInfo}`;
         }
     },
-    
+
     get_file_tree: (args: { path: string, depth?: number }) => {
         try {
-             // Basic recursive listing (simplified for now)
-             // In real implementation we might want a tree structure
-             const files = System.fs.readDir(args.path);
-             return JSON.stringify(files.map(f => f.name));
-        } catch(e) {
-             return `Error getting file tree: ${e}`;
+            // Basic recursive listing (simplified for now)
+            // In real implementation we might want a tree structure
+            const files = System.fs.readDir(args.path);
+            return JSON.stringify(files.map(f => f.name));
+        } catch (e) {
+            return `Error getting file tree: ${e}`;
         }
     }
 };

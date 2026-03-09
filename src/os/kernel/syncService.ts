@@ -39,11 +39,15 @@ class FileSystemSyncService {
     }
 
     private async syncToWebContainer(action: string, data: any) {
+        // Critical Fix: Skip if the event explicitly originated from WebContainer
+        // This avoids race conditions with the global isSyncingFromWC state
+        if (data.source === 'wc') return;
+
         try {
             const { useWebContainerStore } = await import('@/os/kernel/useWebContainerStore');
             const store = useWebContainerStore.getState();
 
-            // Skip if syncing from WebContainer to avoid loops
+            // Fallback: Skip if syncing from WebContainer globally
             if (store.isSyncingFromWC) return;
 
             switch (action) {

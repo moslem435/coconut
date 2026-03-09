@@ -43,7 +43,6 @@ import { DesktopIcons } from './desktop/DesktopIcons'
 import { DesktopWidgets } from './desktop/DesktopWidgets'
 import { SplashScreenPortal } from './desktop/SplashScreenPortal'
 
-import { DesktopSelectionBox } from './desktop/DesktopSelectionBox'
 
 /**
  * 桌面主组件
@@ -83,14 +82,14 @@ export default function Desktop() {
         const checkBrightness = async () => {
             try {
                 let brightness = 128
-                
+
                 // For images, we need to load and analyze
                 // Use activeType to ensure we treat the current wallpaper correctly
                 // Fallback to wallpaper.type if activeType is not ready (though activeWallpaper check above handles most cases)
                 const type = activeType || wallpaper?.type || ''
                 if (['image', 'daily', 'dynamic-time'].includes(type)) {
                     brightness = await getImageBrightness(activeWallpaper)
-                } 
+                }
                 // For CSS values (solid, gradient, preset)
                 else {
                     // For gradients, this is tricky. We might just default to dark for now or parse.
@@ -101,7 +100,7 @@ export default function Desktop() {
                     // For now, let's just try getColorBrightness.
                     brightness = getColorBrightness(activeWallpaper)
                 }
-                
+
                 setIsDarkBackground(isDarkBrightness(brightness))
             } catch (e) {
                 console.warn('Failed to calculate brightness', e)
@@ -212,7 +211,7 @@ export default function Desktop() {
                 error: event.error
             })
         }
-        
+
         const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
             eventBus.emit('sys:error', {
                 source: 'promise',
@@ -280,7 +279,7 @@ export default function Desktop() {
 
         // 查找在区域内的图标
         const newSelectedIds: string[] = []
-        
+
         desktopItems.forEach(item => {
             const pos = iconPositions[item.id]
             if (!pos) return
@@ -304,16 +303,16 @@ export default function Desktop() {
         // 更新选中项
         // 注意：这里简单的实现是直接替换选中项。如果要支持 Ctrl+框选（追加），逻辑会更复杂
         if (newSelectedIds.length > 0 || (newSelectedIds.length === 0 && selectedIcons.length > 0)) {
-             // 只有当选中项发生变化时才更新，避免频繁渲染
-             // 这里为了简化，直接设置。优化方案是可以比较数组是否相同。
-             const isSame = newSelectedIds.length === selectedIcons.length && 
-                            newSelectedIds.every(id => selectedIcons.includes(id))
-             
-             if (!isSame) {
-                 setSelectedIcons(newSelectedIds)
-             }
+            // 只有当选中项发生变化时才更新，避免频繁渲染
+            // 这里为了简化，直接设置。优化方案是可以比较数组是否相同。
+            const isSame = newSelectedIds.length === selectedIcons.length &&
+                newSelectedIds.every(id => selectedIcons.includes(id))
+
+            if (!isSame) {
+                setSelectedIcons(newSelectedIds)
+            }
         }
-        
+
     }, [selectionBox, desktopItems, iconPositions, currentGridSize, scaleFactor, selectedIcons, setSelectedIcons])
 
     /**
@@ -351,8 +350,8 @@ export default function Desktop() {
                 }}
             >
                 {/* Background */}
-                <DesktopBackground 
-                    wallpaper={wallpaper} 
+                <DesktopBackground
+                    wallpaper={wallpaper}
                     isVisible={isDesktopVisible}
                     activeWallpaper={activeWallpaper}
                     activeType={activeType}

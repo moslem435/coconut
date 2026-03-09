@@ -40,7 +40,7 @@ export function useFileMenuItems(
         const isProtected = () => {
             if (!data) return false
             const ids = data.selectedIds || (data.id ? [data.id] : [])
-            return ids.some(id => {
+            return ids.some((id: string) => {
                 const item = getItem(id)
                 return item?.isSystem || item?.isReadOnly
             })
@@ -95,25 +95,25 @@ export function useFileMenuItems(
                 }
             },
             {
-                label: data?.selectedIds?.length && data.selectedIds.length > 1 
-                    ? t('menu.download.zip') 
+                label: data?.selectedIds?.length && data.selectedIds.length > 1
+                    ? t('menu.download.zip')
                     : (data?.id && getItem(data.id)?.type === 'folder' ? t('menu.download.zip') : t('menu.download')),
                 icon: Download,
                 action: async () => {
                     hideMenu()
-                    
+
                     const ids = data?.selectedIds || (data?.id ? [data.id] : [])
                     if (ids.length === 0) return
 
                     // Check if we need to zip (folder or multiple files)
-                    const items = ids.map(id => getItem(id)).filter(Boolean)
-                    const hasFolder = items.some(item => item?.type === 'folder')
+                    const items = ids.map((id: string) => getItem(id)).filter(Boolean)
+                    const hasFolder = items.some((item: any) => item?.type === 'folder')
                     const isMultiple = items.length > 1
-                    
+
                     if (hasFolder || isMultiple) {
                         const zip = new JSZip()
                         const toastId = toast.loading(t('menu.downloading'))
-                        
+
                         try {
                             // Recursive function to add files to zip
                             const addFilesToZip = async (folderId: string, currentPath: string) => {
@@ -126,7 +126,7 @@ export function useFileMenuItems(
 
                                 // 2. Get children from store
                                 const children = getChildren(folderId)
-                                
+
                                 for (const child of children) {
                                     if (child.type === 'folder') {
                                         await addFilesToZip(child.id, `${currentPath}${child.name}/`)
@@ -152,7 +152,7 @@ export function useFileMenuItems(
                             // Process selected items
                             for (const item of items) {
                                 if (!item) continue
-                                
+
                                 if (item.type === 'folder') {
                                     // Root items also need to be loaded first
                                     try {
@@ -188,7 +188,7 @@ export function useFileMenuItems(
                             a.click()
                             document.body.removeChild(a)
                             URL.revokeObjectURL(url)
-                            
+
                             toast.dismiss(toastId)
                             // toast.success(t('menu.download'), 'Download started')
                         } catch (e) {
@@ -203,7 +203,7 @@ export function useFileMenuItems(
                             try {
                                 const blob = await getFileBlob(file.id)
                                 let url: string
-                                
+
                                 if (blob) {
                                     url = URL.createObjectURL(blob)
                                 } else {
@@ -211,7 +211,7 @@ export function useFileMenuItems(
                                     const textBlob = new Blob([content], { type: 'text/plain' })
                                     url = URL.createObjectURL(textBlob)
                                 }
-                                
+
                                 const a = document.createElement('a')
                                 a.href = url
                                 a.download = file.name

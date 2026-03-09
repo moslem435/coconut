@@ -7,6 +7,8 @@ export interface Message {
     mode?: 'chat' | 'control' | 'builder';
     tool_calls?: any[];
     tool_call_id?: string;
+    startTime?: number; // AI回复开始时间
+    duration?: number; // AI回复耗时（毫秒）
 }
 
 export interface ChatSession {

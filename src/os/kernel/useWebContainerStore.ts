@@ -44,7 +44,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   // New: Explicit Sync Methods for VFS (Optimized)
   syncFile: async (path, content) => {
     const { instance, isSyncingFromWC } = get()
-    
+
     // If we are currently processing a change originating from WC, do not sync back to WC
     if (isSyncingFromWC) {
       return
@@ -82,7 +82,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
   syncMkdir: async (path) => {
     const { instance, isSyncingFromWC } = get()
-    
+
     if (isSyncingFromWC) {
       return
     }
@@ -111,7 +111,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
   syncUnlink: async (path) => {
     const { instance, isSyncingFromWC } = get()
-    
+
     if (isSyncingFromWC) {
       return
     }
@@ -153,7 +153,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       const { getNodeByPath, createItem, updateFileContent } = useFileSystemStore.getState()
 
       console.log(`[WC->VFS] Starting manual sync from WC:${wcPath}`)
-      
+
       let syncedFiles = 0
       let syncedFolders = 0
       const createdPaths: string[] = []
@@ -162,7 +162,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         try {
           console.log(`[WC->VFS] Syncing directory WC:${wcDir} -> VFS:${vfsPath}`)
           const entries = await instance.fs.readdir(wcDir, { withFileTypes: true }) as any[]
-          
+
           for (const entry of entries) {
             // Skip hidden files and node_modules
             if (entry.name.startsWith('.') || entry.name === 'node_modules') {
@@ -181,7 +181,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                 const parentNode = getNodeByPath(vfsPath)
                 if (parentNode) {
                   console.log(`[WC->VFS] Creating folder: ${vfsItemPath}`)
-                  await createItem(parentNode.id, entry.name, 'folder')
+                  await createItem(parentNode.id, entry.name, 'folder', undefined, undefined, { source: 'wc' })
                   syncedFolders++
                   createdPaths.push(vfsItemPath)
                   // Wait for state update
@@ -196,13 +196,13 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
               // Sync file
               const content = await instance.fs.readFile(wcItemPath, 'utf-8') as string
               const fileNode = getNodeByPath(vfsItemPath)
-              
+
               if (!fileNode) {
                 // Create file
                 const parentNode = getNodeByPath(vfsPath)
                 if (parentNode) {
                   console.log(`[WC->VFS] Creating file: ${vfsItemPath} (${content.length} bytes)`)
-                  await createItem(parentNode.id, entry.name, 'file', content)
+                  await createItem(parentNode.id, entry.name, 'file', content, undefined, { source: 'wc' })
                   syncedFiles++
                   createdPaths.push(vfsItemPath)
                   // Small delay to allow state propagation
@@ -215,7 +215,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                 const currentContent = await useFileSystemStore.getState().readFileContent(fileNode.id)
                 if (currentContent !== content) {
                   console.log(`[WC->VFS] Updating file: ${vfsItemPath} (${content.length} bytes)`)
-                  await updateFileContent(fileNode.id, content)
+                  await updateFileContent(fileNode.id, content, { source: 'wc' })
                   syncedFiles++
                   createdPaths.push(vfsItemPath)
                 }
@@ -230,9 +230,9 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       // Convert WC path to VFS path
       // WC: /apps/intro-page -> VFS: /home/user/apps/intro-page
       const vfsBasePath = `${SYSTEM_PATHS.USER}${wcPath === '/' ? '' : wcPath}`
-      
+
       console.log(`[WC->VFS] Mapping WC:${wcPath} -> VFS:${vfsBasePath}`)
-      
+
       // Ensure the base path exists in VFS
       const baseNode = getNodeByPath(vfsBasePath)
       if (!baseNode) {
@@ -243,9 +243,9 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       } else {
         await syncDirectory(wcPath, vfsBasePath)
       }
-      
+
       console.log(`[WC->VFS] ✅ Manual sync complete: ${syncedFolders} folders, ${syncedFiles} files`)
-      
+
       // CRITICAL: Wait for all files to be synced to OPFS
       // The syncMiddleware processes events asynchronously
       // We need to wait a bit to ensure all files are written to OPFS
@@ -380,17 +380,17 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     // If we already have an instance in the store, check if there are queued operations
     if (instance) {
       console.log('[Boot] Instance already exists, checking for queued operations...')
-      
+
       // Process any queued sync operations
       if (syncQueue.length > 0) {
         console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued operations from existing instance...`)
         const queuedOps = [...syncQueue]
         syncQueue = [] // Clear queue
-        
+
         for (const op of queuedOps) {
           try {
             const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
-            
+
             if (op.type === 'mkdir') {
               await instance.fs.mkdir(wcPath, { recursive: true })
               console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
@@ -399,11 +399,11 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
               if (parentPath !== '/' && parentPath !== '') {
                 await instance.fs.mkdir(parentPath, { recursive: true })
               }
-              
+
               const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
               const hasContent = op.content !== undefined && op.content !== null
               console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
-              
+
               if (op.content === undefined || op.content === null) {
                 const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
                 const node = useFileSystemStore.getState().getNodeByPath(op.path)
@@ -426,10 +426,10 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
             console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
           }
         }
-        
+
         console.log(`[Boot] ✅ Processed ${queuedOps.length} queued operations`)
       }
-      
+
       return
     }
 
@@ -437,17 +437,17 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     if (globalWebContainerInstance) {
       console.log('[Boot] Restoring global WebContainer instance...')
       set({ instance: globalWebContainerInstance })
-      
+
       // Process any queued sync operations
       if (syncQueue.length > 0) {
         console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued operations after restore...`)
         const queuedOps = [...syncQueue]
         syncQueue = [] // Clear queue
-        
+
         for (const op of queuedOps) {
           try {
             const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
-            
+
             if (op.type === 'mkdir') {
               await globalWebContainerInstance.fs.mkdir(wcPath, { recursive: true })
               console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
@@ -456,11 +456,11 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
               if (parentPath !== '/' && parentPath !== '') {
                 await globalWebContainerInstance.fs.mkdir(parentPath, { recursive: true })
               }
-              
+
               const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
               const hasContent = op.content !== undefined && op.content !== null
               console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
-              
+
               if (op.content === undefined || op.content === null) {
                 const { useFileSystemStore } = await import('@/os/kernel/useFileSystemStore')
                 const node = useFileSystemStore.getState().getNodeByPath(op.path)
@@ -483,10 +483,10 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
             console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
           }
         }
-        
+
         console.log(`[Boot] ✅ Processed ${queuedOps.length} queued operations`)
       }
-      
+
       return
     }
 
@@ -564,24 +564,6 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // 2. Sync VFS -> WebContainer Tree
         const { files, rootId, getNodeByPath, createItem, updateFileContent, deleteItem } = useFileSystemStore.getState()
 
-        // Helper to sync initial WC files back to VFS
-        const syncInitialFilesToVFS = async () => {
-          const userNode = getNodeByPath(SYSTEM_PATHS.USER);
-          if (!userNode) return;
-
-          // Sync etc/motd
-          let etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
-          if (!etcNode) {
-            await createItem(userNode.id, 'etc', 'folder');
-            etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
-          }
-          if (etcNode) {
-            await createItem(etcNode.id, 'motd', 'file', 'Welcome to System Runtime');
-          }
-
-          // Sync project folder (created below)
-          // We do this after the mount and mkdir calls below, but defining helper here
-        };
 
         // Helper to build tree
         const buildTree = async (parentId: string, depth: number = 0): Promise<any> => {
@@ -658,13 +640,13 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
           if (userNode) {
             let etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
             if (!etcNode) {
-              await createItem(userNode.id, 'etc', 'folder');
+              await createItem(userNode.id, 'etc', 'folder', undefined, undefined, { source: 'wc' });
               etcNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc`);
             }
             if (etcNode) {
               const motdNode = getNodeByPath(`${SYSTEM_PATHS.USER}/etc/motd`);
               if (!motdNode) {
-                await createItem(etcNode.id, 'motd', 'file', 'Welcome to System Runtime');
+                await createItem(etcNode.id, 'motd', 'file', 'Welcome to System Runtime', undefined, { source: 'wc' });
               }
             }
           }
@@ -713,7 +695,7 @@ app.listen(port, () => {
             let projectNode = getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}`);
             if (!projectNode) {
               // Force sync wait to avoid race condition
-              await create(userNode.id, projectRelativePath, 'folder');
+              await create(userNode.id, projectRelativePath, 'folder', undefined, undefined, { source: 'wc' });
               // Add small delay for state update propagation
               await new Promise(r => setTimeout(r, 50));
               projectNode = getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}`);
@@ -731,7 +713,7 @@ app.listen(port, () => {
                   scripts: {
                     'start': 'nodemon index.js'
                   }
-                }, null, 2));
+                }, null, 2), undefined, { source: 'wc' });
               }
               // Sync index.js
               if (!getNode(`${SYSTEM_PATHS.USER}/${projectRelativePath}/index.js`)) {
@@ -745,7 +727,7 @@ res.send('Hello from System Runtime!');
 
 app.listen(port, () => {
 console.log(\`App running at http://localhost:\${port}\`);
-});`);
+});`, undefined, { source: 'wc' });
               }
             }
           }
@@ -761,18 +743,18 @@ console.log(\`App running at http://localhost:\${port}\`);
         // This allows queued operations to execute immediately
         set({ instance: webcontainer, isBooting: false })
         globalWebContainerInstance = webcontainer
-        
+
         // Process queued sync operations
         console.log(`[Boot] 🔄 Processing ${syncQueue.length} queued sync operations...`)
         if (syncQueue.length > 0) {
           const queuedOps = [...syncQueue]
           syncQueue = [] // Clear queue
-          
+
           let processed = 0
           for (const op of queuedOps) {
             try {
               const wcPath = op.path.replace(SYSTEM_PATHS.USER, '') || '/'
-              
+
               if (op.type === 'mkdir') {
                 await webcontainer.fs.mkdir(wcPath, { recursive: true })
                 console.log(`[Boot] ✅ Queued mkdir: ${wcPath}`)
@@ -783,12 +765,12 @@ console.log(\`App running at http://localhost:\${port}\`);
                 if (parentPath !== '/' && parentPath !== '') {
                   await webcontainer.fs.mkdir(parentPath, { recursive: true })
                 }
-                
+
                 // Debug: log content info
                 const contentLength = typeof op.content === 'string' ? op.content.length : op.content?.byteLength || 0
                 const hasContent = op.content !== undefined && op.content !== null
                 console.log(`[Boot] 📝 Processing queued file: ${wcPath}, hasContent: ${hasContent}, length: ${contentLength} bytes`)
-                
+
                 // Check if content is undefined (not just empty string)
                 if (op.content === undefined || op.content === null) {
                   console.warn(`[Boot] ⚠️ Content is undefined/null for ${wcPath}, trying to read from VFS...`)
@@ -822,13 +804,13 @@ console.log(\`App running at http://localhost:\${port}\`);
               console.warn(`[Boot] ⚠️ Failed to process queued operation:`, op, e)
             }
           }
-          
+
           console.log(`[Boot] ✅ Processed ${processed}/${queuedOps.length} queued operations`)
         }
 
         // Skip final verification sync - mount already handled everything
         console.log('[Boot] Skipping final verification sync (not needed)')
-        
+
         // Load debug tools in development
         if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
           try {
@@ -847,7 +829,7 @@ console.log(\`App running at http://localhost:\${port}\`);
         webcontainer.fs.watch('/', { recursive: true }, async (event, filename) => {
           // Set sync flag to prevent circular sync
           set({ isSyncingFromWC: true })
-          
+
           try {
             // Explicitly check if filename is string. fs.watch type definition might be loose.
             if (typeof filename !== 'string' || !filename) return
@@ -877,7 +859,7 @@ console.log(\`App running at http://localhost:\${port}\`);
                   if (parentNode) {
                     console.log('[WC->VFS] Creating node_modules placeholder:', vfsPath);
                     // Create empty folder. We won't sync its children.
-                    await createItem(parentNode.id, 'node_modules', 'folder');
+                    await createItem(parentNode.id, 'node_modules', 'folder', undefined, undefined, { source: 'wc' });
                   }
                 }
               }
@@ -906,7 +888,7 @@ console.log(\`App running at http://localhost:\${port}\`);
               const node = useFileSystemStore.getState().getNodeByPath(vfsPath)
               if (node) {
                 console.log('[WC->VFS] Deleting:', vfsPath)
-                await deleteItem(node.id)
+                await deleteItem(node.id, { source: 'wc' })
               }
             } else {
               // Recursive parent creation logic
@@ -930,7 +912,7 @@ console.log(\`App running at http://localhost:\${port}\`);
                 if (!dirName) return null;
 
                 console.log('[WC->VFS] Creating missing parent:', path);
-                await createItem(grandParentId, dirName, 'folder');
+                await createItem(grandParentId, dirName, 'folder', undefined, undefined, { source: 'wc' });
 
                 // Fetch the newly created node
                 // Add small delay for state propagation
@@ -950,7 +932,7 @@ console.log(\`App running at http://localhost:\${port}\`);
               if (entry.isDirectory()) {
                 if (!existingNode) {
                   console.log('[WC->VFS] Creating Folder:', vfsPath)
-                  await createItem(parentId, name, 'folder')
+                  await createItem(parentId, name, 'folder', undefined, undefined, { source: 'wc' })
                 }
               } else {
                 const fullWcPath = filename.startsWith('/') ? filename : `/${filename}`
@@ -958,7 +940,7 @@ console.log(\`App running at http://localhost:\${port}\`);
 
                 if (!existingNode) {
                   console.log('[WC->VFS] Creating File:', vfsPath)
-                  await createItem(parentId, name, 'file', content)
+                  await createItem(parentId, name, 'file', content, undefined, { source: 'wc' })
                 } else {
                   // Compare content to avoid infinite sync loops (VFS -> WC -> VFS)
                   // This is critical for watched files like vite.config.js
@@ -967,7 +949,7 @@ console.log(\`App running at http://localhost:\${port}\`);
                   // Only update if content actually changed
                   if (currentContent !== content) {
                     console.log('[WC->VFS] Updating File (content changed):', vfsPath)
-                    await updateFileContent(existingNode.id, content)
+                    await updateFileContent(existingNode.id, content, { source: 'wc' })
                   }
                 }
               }
@@ -1019,7 +1001,7 @@ console.log(\`App running at http://localhost:\${port}\`);
         // Don't set instance here, it's set before queue processing
         // set({ instance: webcontainer, isBooting: false })
         // globalWebContainerInstance = webcontainer
-        
+
         // Process queued sync operations AFTER instance is set
         // (This line is just a marker, actual processing happens above)
       } catch (err) {

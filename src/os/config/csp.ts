@@ -10,7 +10,10 @@ export const DEFAULT_CSP_CONFIG = {
         "https://*.stackblitz.com",
         "https://stackblitz.com",
         "http://yume.noktt.cn",
+        "http://localhost:*",
+        "http://127.0.0.1:*",
         "https://*.local-corp.webcontainer.api.io",
+        "https://*.local-corp.webcontainer-api.io",
         "https://*.webcontainer.io"
     ],
     "connect-src": ["'self'", "https:", "ws:", "wss:"],

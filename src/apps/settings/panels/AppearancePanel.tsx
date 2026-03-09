@@ -26,16 +26,16 @@ export function AppearancePanel() {
 
     const accentColors = getAccentColors(t)
     const wallpaperOptions = getWallpaperOptions(t)
-    
+
     // Local state for color picker to prevent lag
     const [localColor, setLocalColor] = useState(accentColor)
-    const timeoutRef = useRef<NodeJS.Timeout>()
-    
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
     // Local state for transparency and blur to prevent lag
     const [localTransparency, setLocalTransparency] = useState(transparencyLevel)
     const [localBlur, setLocalBlur] = useState(blurLevel)
-    const transparencyTimeoutRef = useRef<NodeJS.Timeout>()
-    const blurTimeoutRef = useRef<NodeJS.Timeout>()
+    const transparencyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     // Sync local color when external changes happen
     useEffect(() => {
@@ -72,7 +72,7 @@ export function AppearancePanel() {
         if (transparencyTimeoutRef.current) clearTimeout(transparencyTimeoutRef.current)
         transparencyTimeoutRef.current = setTimeout(() => {
             setTransparencyLevel(value)
-            transparencyTimeoutRef.current = undefined
+            transparencyTimeoutRef.current = null
         }, 50) // 50ms delay
     }
 
@@ -81,22 +81,22 @@ export function AppearancePanel() {
         if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
         blurTimeoutRef.current = setTimeout(() => {
             setBlurLevel(value)
-            blurTimeoutRef.current = undefined
+            blurTimeoutRef.current = null
         }, 50) // 50ms delay
     }
 
     const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newColor = e.target.value
         setLocalColor(newColor)
-        
+
         // Debounce the actual system update
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
         }
-        
+
         timeoutRef.current = setTimeout(() => {
             setAccentColor(newColor)
-            timeoutRef.current = undefined
+            timeoutRef.current = null
         }, 50) // 50ms delay for smoother dragging
     }
 
@@ -202,12 +202,11 @@ export function AppearancePanel() {
 
                     {/* Custom Color Picker */}
                     <div className="w-px h-8 bg-[var(--os-border)] mx-2" />
-                    
+
                     <div className="flex items-center gap-3">
                         <Tooltip content={t('settings.appearance.customColor')} side="top">
-                            <label className={`relative flex items-center justify-center w-10 h-10 rounded-full overflow-hidden border-2 transition-all hover:scale-110 active:scale-95 cursor-pointer ${
-                                !accentColors.some(c => c.value === accentColor) ? 'scale-110 border-[var(--os-text-primary)]' : 'border-transparent'
-                            }`}>
+                            <label className={`relative flex items-center justify-center w-10 h-10 rounded-full overflow-hidden border-2 transition-all hover:scale-110 active:scale-95 cursor-pointer ${!accentColors.some(c => c.value === accentColor) ? 'scale-110 border-[var(--os-text-primary)]' : 'border-transparent'
+                                }`}>
                                 <input
                                     type="color"
                                     value={localColor}
@@ -217,7 +216,7 @@ export function AppearancePanel() {
                                 <div className="absolute inset-0 bg-gradient-to-br from-red-500 via-green-500 to-blue-500" />
                             </label>
                         </Tooltip>
-                        
+
                         {!accentColors.some(c => c.value === accentColor) && (
                             <div className="flex flex-col">
                                 <span className="text-xs font-medium text-[var(--os-text-primary)]">

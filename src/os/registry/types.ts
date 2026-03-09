@@ -17,8 +17,8 @@ export interface AppManifest {
     /** Optional splash screen component, rendered before window opens */
     splashScreen?: ComponentType<{ onComplete: () => void }>
     defaultWindowOptions?: {
-        width?: number | string
-        height?: number | string
+        width?: number
+        height?: number
         isMaximized?: boolean
         isResizable?: boolean
         /** Content color theme for the title bar text/icons */

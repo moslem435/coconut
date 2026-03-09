@@ -19,13 +19,14 @@ export interface ActionSlice {
     name: string,
     type: FileType,
     content?: string | Uint8Array,
-    appId?: string
+    appId?: string,
+    options?: { source?: string }
   ) => Promise<string>
 
-  deleteItem: (id: string) => Promise<void>
+  deleteItem: (id: string, options?: { source?: string }) => Promise<void>
   renameItem: (id: string, newName: string) => void
   moveItem: (id: string, newParentId: string) => void
-  updateFileContent: (id: string, content: string | Uint8Array) => void
+  updateFileContent: (id: string, content: string | Uint8Array, options?: { source?: string }) => void
   patchNode: (id: string, updates: Partial<FileNode>) => void
 
   // 内容访问
@@ -39,7 +40,7 @@ export const createActionSlice: StateCreator<
   [],
   ActionSlice
 > = (set, get) => ({
-  createItem: async (parentId, name, type, content, appId) => {
+  createItem: async (parentId, name, type, content, appId, options) => {
     const id = uuidv4()
     const newItem: FileNode = {
       id,
@@ -66,13 +67,14 @@ export const createActionSlice: StateCreator<
       id,
       path,
       type,
-      content // Pass original content (string or Uint8Array) to sync service
+      content, // Pass original content (string or Uint8Array) to sync service
+      source: options?.source
     } as any)
 
     return id
   },
 
-  deleteItem: async (id) => {
+  deleteItem: async (id, options) => {
     const node = get().files[id]
     if (!node) return
 
@@ -85,8 +87,7 @@ export const createActionSlice: StateCreator<
       )
       eventBus.emit('sys:error', {
         source: 'filesystem',
-        message: `Cannot delete system folder "${node.name}"`,
-        severity: 'warning'
+        message: `Cannot delete system folder "${node.name}"`
       })
       return
     }
@@ -105,8 +106,7 @@ export const createActionSlice: StateCreator<
         )
         eventBus.emit('sys:error', {
           source: 'filesystem',
-          message: `Cannot delete: folder contains system item "${descendant.name}"`,
-          severity: 'warning'
+          message: `Cannot delete system file/folder "${descendant.name}" inside directory`
         })
         return
       }
@@ -120,11 +120,11 @@ export const createActionSlice: StateCreator<
       get()._addTombstone(path)
     }
 
-    // 3. 发出事件（SyncMiddleware 监听并执行 IO）
     eventBus.emit('fs:file:deleted', {
       id,
       path,
-      itemsToDelete: Array.from(itemsToDelete)
+      itemsToDelete: Array.from(itemsToDelete),
+      source: options?.source
     } as any)
   },
 
@@ -141,8 +141,7 @@ export const createActionSlice: StateCreator<
       )
       eventBus.emit('sys:error', {
         source: 'filesystem',
-        message: `Cannot rename system folder "${node.name}"`,
-        severity: 'warning'
+        message: `Cannot rename system folder "${node.name}"`
       })
       return
     }
@@ -156,8 +155,7 @@ export const createActionSlice: StateCreator<
       )
       eventBus.emit('sys:error', {
         source: 'filesystem',
-        message: `Cannot rename read-only item "${node.name}"`,
-        severity: 'warning'
+        message: `A file or folder with the name "${newName}" already exists in this location.`
       })
       return
     }
@@ -191,8 +189,7 @@ export const createActionSlice: StateCreator<
       )
       eventBus.emit('sys:error', {
         source: 'filesystem',
-        message: `Cannot move system folder "${node.name}"`,
-        severity: 'warning'
+        message: `Cannot move system folder "${node.name}"`
       })
       return
     }
@@ -215,7 +212,7 @@ export const createActionSlice: StateCreator<
     } as any)
   },
 
-  updateFileContent: (id, content) => {
+  updateFileContent: (id, content, options) => {
     const node = get().files[id]
     if (!node) return
 
@@ -244,7 +241,8 @@ export const createActionSlice: StateCreator<
     eventBus.emit('fs:file:updated', {
       id,
       path,
-      content
+      content,
+      source: options?.source
     } as any)
   },
 
@@ -292,8 +290,14 @@ export const createActionSlice: StateCreator<
 
     try {
       return await syncService.getFileBlob(path)
-    } catch (e) {
-      console.warn(`Failed to get blob for ${id}`, e)
+    } catch (e: any) {
+      if (e?.message?.includes('File not found')) {
+        // Known case: WebContainer created the file but it hasn't synced to OPFS yet.
+        // It's safe to return null and let the UI retry later or show a placeholder.
+        console.warn(`[VFS] getFileBlob delayed for ${path} (not in OPFS yet)`);
+      } else {
+        console.warn(`[VFS] Failed to get blob for ${id}`, e)
+      }
       return null
     }
   }

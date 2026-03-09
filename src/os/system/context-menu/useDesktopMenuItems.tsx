@@ -37,7 +37,7 @@ export function useDesktopMenuItems(
 
         const handleAddWebApp = async () => {
             hideMenu()
-            
+
             const url = await openPrompt(t('menu.webapp.url.title'), 'https://', t('menu.webapp.url.placeholder'))
             if (!url) return
 
@@ -48,8 +48,8 @@ export function useDesktopMenuItems(
             const fileName = `${name}.web`
             const fileContent = JSON.stringify({ url, name })
 
-            const id = createItem('desktop', fileName, 'file', fileContent)
-            
+            const id = await createItem('desktop', fileName, 'file', fileContent)
+
             const scaleFactor = displayScale / 100
             const currentGridSize = GRID_SIZE * scaleFactor
             const currentGridPadding = GRID_PADDING * scaleFactor
@@ -79,9 +79,9 @@ export function useDesktopMenuItems(
             {
                 label: t('menu.newfolder'),
                 icon: FolderPlus,
-                action: () => {
-                    const id = createItem('desktop', 'New Folder', 'folder')
-                    
+                action: async () => {
+                    const id = await createItem('desktop', 'New Folder', 'folder')
+
                     const scaleFactor = displayScale / 100
                     const currentGridSize = GRID_SIZE * scaleFactor
                     const currentGridPadding = GRID_PADDING * scaleFactor

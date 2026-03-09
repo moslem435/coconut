@@ -92,6 +92,7 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                 case 'getFileBlob': {
                     if (!root || !path) throw new Error('Invalid arguments');
                     const handle = await getFileHandle(root, path);
+                    if (!handle) throw new Error(`File not found: ${path}`);
                     const file = await handle.getFile();
                     result = file;
                     break;
@@ -105,10 +106,11 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                     const fileName = parts.pop();
                     if (!fileName) throw new Error('Invalid file path');
 
-                    let current: FileSystemDirectoryHandle;
+                    let current: FileSystemDirectoryHandle | null;
                     try {
                         // Re-use logic for recursive directory creation
                         current = await getDirHandle(root, parts.join('/'), true);
+                        if (!current) throw new Error('Directory creation failed');
                     } catch (e) {
                         throw new Error(`Failed to ensure parent directory for ${path}: ${e}`);
                     }
@@ -181,6 +183,7 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                     if (!root || !path) throw new Error('Invalid arguments');
                     try {
                         const handle = await getFileHandle(root, path);
+                        if (!handle) throw new Error('Not found');
                         const file = await handle.getFile();
                         result = {
                             size: file.size,
@@ -194,6 +197,7 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                     } catch {
                         try {
                             const dirHandle = await getDirHandle(root, path);
+                            if (!dirHandle) throw new Error('Not found');
                             result = {
                                 size: 0,
                                 mtime: Date.now(), // Directories don't have standard mtime in OPFS
@@ -212,11 +216,13 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                 case 'exists': {
                     if (!root || !path) throw new Error('Invalid arguments');
                     try {
-                        await getFileHandle(root, path);
+                        const fileHandle = await getFileHandle(root, path);
+                        if (!fileHandle) throw new Error('Not found');
                         result = true;
                     } catch {
                         try {
-                            await getDirHandle(root, path);
+                            const dirHandle = await getDirHandle(root, path);
+                            if (!dirHandle) throw new Error('Not found');
                             result = true;
                         } catch {
                             result = false;
@@ -237,10 +243,10 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                     let isFile = true;
 
                     try {
-                        sourceHandle = await getFileHandle(root, actualOldPath);
+                        sourceHandle = await getFileHandle(root, actualOldPath) || undefined;
                     } catch {
                         try {
-                            sourceHandle = await getDirHandle(root, actualOldPath);
+                            sourceHandle = await getDirHandle(root, actualOldPath) || undefined;
                             isFile = false;
                         } catch {
                             // Source doesn't exist - this can happen when moving a file that was never synced to OPFS

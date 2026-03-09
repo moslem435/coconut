@@ -8,7 +8,7 @@ import { FileSystemError } from '../errors/FileSystemError';
 export class ReadOnlyWrapper implements IFileSystemProvider {
     readonly = true;
 
-    constructor(private provider: IFileSystemProvider) {}
+    constructor(private provider: IFileSystemProvider) { }
 
     get name(): string {
         return this.provider.name;
@@ -44,7 +44,7 @@ export class ReadOnlyWrapper implements IFileSystemProvider {
         }
         // Fallback if underlying provider doesn't support blobs
         const content = await this.provider.readFile(path);
-        return new Blob([content]);
+        return new Blob([content as any]);
     }
 
     async readdir(path: string): Promise<string[]> {

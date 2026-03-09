@@ -25,10 +25,10 @@ export class PathNormalizationWrapper implements IFileSystemProvider {
      */
     private normalize(path: string): string {
         if (!path) return '/';
-        
+
         // Ensure start with /
         const normalized = path.startsWith('/') ? path : '/' + path;
-        
+
         // Split and process segments
         const parts = normalized.split('/').filter(p => p.length > 0 && p !== '.');
         const stack: string[] = [];
@@ -54,7 +54,7 @@ export class PathNormalizationWrapper implements IFileSystemProvider {
             return this.provider.getFileBlob(this.normalize(path));
         }
         const content = await this.readFile(path);
-        return new Blob([content]);
+        return new Blob([content as any]);
     }
 
     async writeFile(path: string, content: Uint8Array | string): Promise<void> {

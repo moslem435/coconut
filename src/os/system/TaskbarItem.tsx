@@ -22,7 +22,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     const { useTaskbarPreviews } = useSystemSettings()
     const buttonRef = useRef<HTMLButtonElement>(null)
     const peekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    
+
     // Select specific window state - specific fields to avoid re-renders on position change
     const windowState = useWindowStore(useShallow(state => {
         const win = state.windows[id]
@@ -34,11 +34,11 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
             isDefaultTitle: win?.isDefaultTitle
         }
     }))
-    
+
     const isActive = useWindowStore(state => state.activeWindowId === id)
     const isLoading = useWindowStore(state => state.launchingAppIds.includes(appId) && !windowState.isOpen)
     const snapshot = useWindowStore(state => state.getSnapshot(id))
-    
+
     // Actions
     const focusWindow = useWindowStore(state => state.focusWindow)
     const minimizeWindow = useWindowStore(state => state.minimizeWindow)
@@ -56,7 +56,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
 
     // Derived Data
     const app = APPS_REGISTRY[appId]
-    const title = windowState.isOpen 
+    const title = windowState.isOpen
         ? (windowState.isDefaultTitle ? t(`app.${appId}`) : windowState.title)
         : t(`app.${appId}`)
     const icon = windowState.icon || app?.icon
@@ -64,7 +64,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     // Report Position
     useLayoutEffect(() => {
         if (!buttonRef.current || !windowState.isOpen) return
-        
+
         const updatePos = () => {
             const el = buttonRef.current
             if (el) {
@@ -72,7 +72,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                 updateTaskbarPosition(id, { x: rect.left + rect.width / 2, y: rect.top })
             }
         }
-        
+
         // Update initially and on resize
         updatePos()
         window.addEventListener('resize', updatePos)
@@ -84,6 +84,8 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
         updateHovered(false)
         setPeekWindowId(null)
         if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+
+        if (!app) return
 
         if (app.externalUrl) {
             window.open(app.externalUrl, '_blank')
@@ -104,11 +106,11 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
             if (app) {
                 const rect = buttonRef.current?.getBoundingClientRect()
                 const taskbarPos = rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined
-                
+
                 // If multiInstance and shift-click (or forced), generate new ID
                 // BUT keep original ID for the first instance to match pinned item
-                const targetId = (isShiftClick && app.multiInstance) 
-                    ? `${app.id}-${Date.now()}` 
+                const targetId = (isShiftClick && app.multiInstance)
+                    ? `${app.id}-${Date.now()}`
                     : app.id
 
                 launchApp(targetId, t(`app.${appId}`), app.id, app.icon, {
@@ -122,12 +124,13 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
     }
 
     const handleAuxClick = (e: React.MouseEvent) => {
+        if (!app) return
         // Middle click to open new instance
-        if (e.button === 1 && app?.multiInstance) {
+        if (e.button === 1 && app.multiInstance) {
             e.preventDefault()
             const rect = buttonRef.current?.getBoundingClientRect()
             const taskbarPos = rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined
-            
+
             launchApp(`${app.id}-${Date.now()}`, t(`app.${appId}`), app.id, app.icon, {
                 ...app.defaultWindowOptions,
                 taskbarPosition: taskbarPos,
@@ -168,7 +171,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                     className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 active:scale-95 relative group ${isLoading ? 'animate-pulse cursor-wait' : ''}`}
                     style={{
                         backgroundColor: isActive && !windowState.isMinimized
-                            ? 'var(--os-accent-dim)' 
+                            ? 'var(--os-accent-dim)'
                             : undefined
                     }}
                 >
@@ -198,7 +201,7 @@ export function TaskbarItem({ id, appId }: TaskbarItemProps) {
                         snapshot={snapshot}
                         onPeek={(shouldPeek) => {
                             if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
-                            
+
                             // Prevent peeking if we're not hovered anymore (even if component is exiting)
                             if (shouldPeek && !hoveredRef.current) return
 

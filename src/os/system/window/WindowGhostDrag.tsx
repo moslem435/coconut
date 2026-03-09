@@ -8,7 +8,7 @@ interface WindowGhostDragProps {
     width: number
     height: number
     onDragStart: () => void
-    onDrag: (offset: { y: number }) => void
+    onDrag: (offset: { x: number; y: number }) => void
     onDragEnd: (offset: { x: number; y: number }) => void
 }
 

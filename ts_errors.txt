@@ -1,0 +1,13 @@
+﻿src/os/system/context-menu/useDesktopMenuItems.tsx(63,17): error TS2345: Argument of type 'Promise<string>' is not assignable to parameter of type 'string'.
+src/os/system/context-menu/useDesktopMenuItems.tsx(69,32): error TS2345: Argument of type 'Promise<string>' is not assignable to parameter of type 'string'.
+src/os/system/context-menu/useDesktopMenuItems.tsx(95,25): error TS2345: Argument of type 'Promise<string>' is not assignable to parameter of type 'string'.
+src/os/system/context-menu/useDesktopMenuItems.tsx(101,40): error TS2345: Argument of type 'Promise<string>' is not assignable to parameter of type 'string'.
+src/os/system/context-menu/useFileMenuItems.tsx(43,29): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/os/system/context-menu/useFileMenuItems.tsx(109,43): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/os/system/context-menu/useFileMenuItems.tsx(110,50): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/os/system/TaskbarItem.tsx(88,13): error TS18048: 'app' is possibly 'undefined'.
+src/os/system/TaskbarItem.tsx(89,25): error TS18048: 'app' is possibly 'undefined'.
+src/os/system/TaskbarItem.tsx(94,48): error TS18048: 'app' is possibly 'undefined'.
+src/os/system/Window.tsx(346,60): error TS2339: Property 'x' does not exist on type '{ y: number; }'.
+src/os/system/Window.tsx(353,32): error TS2345: Argument of type 'null' is not assignable to parameter of type 'SetStateAction<boolean>'.
+src/os/ui/Tooltip.tsx(80,13): error TS7030: Not all code paths return a value.

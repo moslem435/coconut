@@ -23,17 +23,17 @@ export const getImageBrightness = (src: string): Promise<number> => {
       canvas.height = 50
 
       ctx.drawImage(img, 0, 0, 50, 50)
-      
+
       try {
         const imageData = ctx.getImageData(0, 0, 50, 50)
         const data = imageData.data
-        let r, g, b, avg
+        let r = 0, g = 0, b = 0, avg = 0
         let colorSum = 0
 
         for (let x = 0, len = data.length; x < len; x += 4) {
-          r = data[x]
-          g = data[x + 1]
-          b = data[x + 2]
+          r = data[x] || 0
+          g = data[x + 1] || 0
+          b = data[x + 2] || 0
 
           // 使用感知亮度公式 (Perceived brightness)
           // weights: R=0.299, G=0.587, B=0.114
@@ -84,7 +84,7 @@ export const getColorBrightness = (color: string): number => {
   const match = rgb.match(/\d+/g)
   if (!match || match.length < 3) return 128
 
-  const [r, g, b] = match.map(Number)
+  const [r = 0, g = 0, b = 0] = match.map(Number)
   // Perceived brightness
   return Math.floor(0.299 * r + 0.587 * g + 0.114 * b)
 }
