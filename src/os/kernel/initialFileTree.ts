@@ -2,6 +2,17 @@ import { FILE_IDS } from '../config/paths'
 
 export type FileType = 'file' | 'folder'
 
+export interface AppBundleConfig {
+    icon?: string;
+    window?: {
+        width?: number;
+        height?: number;
+        title?: string;
+    };
+    type?: 'web-app' | 'native-app';
+    entry?: string;
+}
+
 export interface FileNode {
     id: string
     parentId: string | null
@@ -18,6 +29,10 @@ export interface FileNode {
     size?: number
     isSystem?: boolean // System folder/file, cannot be deleted or moved
     isReadOnly?: boolean // Read-only folder/file, cannot be modified
+    
+    // Phase 1: Metadata for App Bundle
+    isAppBundle?: boolean;
+    appConfig?: AppBundleConfig;
 }
 
 export const INITIAL_ROOT_ID = FILE_IDS.ROOT

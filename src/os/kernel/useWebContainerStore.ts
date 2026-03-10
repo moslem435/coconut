@@ -52,14 +52,14 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
     // Ensure we only sync paths within the user home directory
     if (!path.startsWith(SYSTEM_PATHS.USER)) {
-      console.warn(`[VFS->WC] Skipping sync for path outside user home: ${path}. WebContainer only mounts ${SYSTEM_PATHS.USER}`);
+      // console.warn(`[VFS->WC] Skipping sync for path outside user home: ${path}. WebContainer only mounts ${SYSTEM_PATHS.USER}`);
       return
     }
 
     // If no instance, queue the operation
     if (!instance) {
       const contentLen = typeof content === 'string' ? content.length : content?.byteLength || 0
-      console.log(`[VFS->WC] Queueing file sync (no instance yet): ${path}, content: ${contentLen} bytes`)
+      // console.log(`[VFS->WC] Queueing file sync (no instance yet): ${path}, content: ${contentLen} bytes`)
       syncQueue.push({ type: 'file', path, content })
       return
     }
@@ -74,7 +74,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       }
 
       await instance.fs.writeFile(wcPath, content)
-      console.log('[VFS->WC] ✅ File synced:', wcPath)
+      // console.log('[VFS->WC] ✅ File synced:', wcPath)
     } catch (e) {
       console.warn('[VFS->WC] writeFile failed:', e)
     }
@@ -88,22 +88,22 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     }
 
     if (!path.startsWith(SYSTEM_PATHS.USER)) {
-      console.warn(`[VFS->WC] Skipping mkdir for path outside user home: ${path}`);
+      // console.warn(`[VFS->WC] Skipping mkdir for path outside user home: ${path}`);
       return
     }
 
     // If no instance, queue the operation
     if (!instance) {
-      console.log('[VFS->WC] Queueing mkdir (no instance yet):', path)
+      // console.log('[VFS->WC] Queueing mkdir (no instance yet):', path)
       syncQueue.push({ type: 'mkdir', path })
       return
     }
 
     const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
-    console.log('[VFS->WC] Creating directory:', wcPath)
+    // console.log('[VFS->WC] Creating directory:', wcPath)
     try {
       await instance.fs.mkdir(wcPath, { recursive: true })
-      console.log('[VFS->WC] ✅ Directory created:', wcPath)
+      // console.log('[VFS->WC] ✅ Directory created:', wcPath)
     } catch (e) {
       console.warn('[VFS->WC] mkdir failed:', wcPath, e)
     }
@@ -117,13 +117,13 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     }
 
     if (!path.startsWith(SYSTEM_PATHS.USER)) {
-      console.warn(`[VFS->WC] Skipping unlink for path outside user home: ${path}`);
+      // console.warn(`[VFS->WC] Skipping unlink for path outside user home: ${path}`);
       return
     }
 
     // If no instance, queue the operation
     if (!instance) {
-      console.log('[VFS->WC] Queueing unlink (no instance yet):', path)
+      // console.log('[VFS->WC] Queueing unlink (no instance yet):', path)
       syncQueue.push({ type: 'unlink', path })
       return
     }
@@ -131,7 +131,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     const wcPath = path.replace(SYSTEM_PATHS.USER, '') || '/'
     try {
       await instance.fs.rm(wcPath, { recursive: true });
-      console.log('[VFS->WC] ✅ Deleted:', wcPath)
+      // console.log('[VFS->WC] ✅ Deleted:', wcPath)
     } catch (e) {
       // Ignore if already deleted
     }
@@ -158,17 +158,24 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       let syncedFolders = 0
       const createdPaths: string[] = []
 
+      // --- Phase 4 Restore Logic: Check for snapshots in current dir ---
+      // If we are syncing a folder that contains a node_modules.tar snapshot in OPFS,
+      // we should restore it to WebContainer!
+      // NOTE: We don't have easy access to "current OPFS state" here without async calls.
+      // But we can blindly try to restore if we see a node_modules folder is missing but tar exists?
+      // Actually, better place for restore is during directory traversal or explicit app launch.
+      // For now, let's just allow .tar files to sync back to VFS so they are visible.
+
       const syncDirectory = async (wcDir: string, vfsPath: string) => {
         try {
-          console.log(`[WC->VFS] Syncing directory WC:${wcDir} -> VFS:${vfsPath}`)
+          // console.log(`[WC->VFS] Syncing directory WC:${wcDir} -> VFS:${vfsPath}`)
           const entries = await instance.fs.readdir(wcDir, { withFileTypes: true }) as any[]
 
           for (const entry of entries) {
-            // Skip hidden files and node_modules
-            if (entry.name.startsWith('.') || entry.name === 'node_modules') {
-              console.log(`[WC->VFS] Skipping: ${entry.name}`)
-              continue
-            }
+            // Skip hidden files and node_modules FOLDER
+            // BUT allow node_modules.tar file!
+            if (entry.name.startsWith('.')) continue;
+            if (entry.name === 'node_modules') continue; 
 
             const wcItemPath = wcDir === '/' ? `/${entry.name}` : `${wcDir}/${entry.name}`
             const vfsItemPath = `${vfsPath}/${entry.name}`
@@ -180,7 +187,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                 // Create folder
                 const parentNode = getNodeByPath(vfsPath)
                 if (parentNode) {
-                  console.log(`[WC->VFS] Creating folder: ${vfsItemPath}`)
+                  // console.log(`[WC->VFS] Creating folder: ${vfsItemPath}`)
                   await createItem(parentNode.id, entry.name, 'folder', undefined, undefined, { source: 'wc' })
                   syncedFolders++
                   createdPaths.push(vfsItemPath)
@@ -201,7 +208,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                 // Create file
                 const parentNode = getNodeByPath(vfsPath)
                 if (parentNode) {
-                  console.log(`[WC->VFS] Creating file: ${vfsItemPath} (${content.length} bytes)`)
+                  // console.log(`[WC->VFS] Creating file: ${vfsItemPath} (${content.length} bytes)`)
                   await createItem(parentNode.id, entry.name, 'file', content, undefined, { source: 'wc' })
                   syncedFiles++
                   createdPaths.push(vfsItemPath)
@@ -214,7 +221,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
                 // Update file if content changed
                 const currentContent = await useFileSystemStore.getState().readFileContent(fileNode.id)
                 if (currentContent !== content) {
-                  console.log(`[WC->VFS] Updating file: ${vfsItemPath} (${content.length} bytes)`)
+                  // console.log(`[WC->VFS] Updating file: ${vfsItemPath} (${content.length} bytes)`)
                   await updateFileContent(fileNode.id, content, { source: 'wc' })
                   syncedFiles++
                   createdPaths.push(vfsItemPath)
@@ -362,6 +369,41 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         await Promise.all([streamPromise]);
       } catch (e) {
         // Ignore stream errors on close
+      }
+
+      // --- Phase 4: Persistence Optimization (Snapshotting) ---
+      // If this was a successful 'npm install', we should snapshot node_modules
+      if (exitCode === 0 && cmd === 'npm' && args.includes('install')) {
+         console.log('[WC] npm install success! Triggering node_modules snapshot...');
+         try {
+             // 1. Create tarball of node_modules inside WebContainer
+             // Note: 'tar' is available in WebContainer environment
+             // We use -cf (create file)
+             const tarProcess = await instance.spawn('tar', ['-cf', 'node_modules.tar', 'node_modules'], { cwd: wcCwd });
+             await tarProcess.exit;
+             
+             // 2. Read the tarball buffer
+             // We read it as binary
+             const tarBuffer = await instance.fs.readFile(`${wcCwd}/node_modules.tar`);
+             
+             // 3. Write directly to OPFS (Persistent Storage)
+             // We bypass the VFS store state to avoid clogging Zustand with a large binary file
+             // We use the raw 'fs' client which writes to OPFS
+             const { fs } = await import('@/os/kernel/filesystem/FileSystemClient');
+             
+             // Construct absolute path for OPFS
+             const opfsPath = cwd.endsWith('/') ? `${cwd}node_modules.tar` : `${cwd}/node_modules.tar`;
+             
+             console.log(`[Persistence] Saving snapshot to OPFS: ${opfsPath} (${tarBuffer.byteLength} bytes)`);
+             await fs.writeFile(opfsPath, tarBuffer);
+             
+             // 4. Cleanup tarball from WebContainer to save memory
+             await instance.fs.rm(`${wcCwd}/node_modules.tar`);
+             
+             console.log('[Persistence] Snapshot complete!');
+         } catch (e) {
+             console.warn('[Persistence] Snapshot failed:', e);
+         }
       }
 
       if (exitCode !== 0) {
@@ -564,70 +606,95 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // 2. Sync VFS -> WebContainer Tree
         const { files, rootId, getNodeByPath, createItem, updateFileContent, deleteItem } = useFileSystemStore.getState()
 
+        // --- Phase 4 Restore Logic: Check for tarball snapshots ---
+        // Before we boot or mount, let's scan VFS for any .tar files that might be backups
+        // and add them to our restoration queue.
+        // Actually, we can just do this AFTER boot by running tar -xf.
+        
+        // Helper to convert VFS tree to WebContainer mount tree
+        const buildMountTree = async (nodeId: string): Promise<any> => {
+          const node = files[nodeId]
+          if (!node) return null
 
-        // Helper to build tree
-        const buildTree = async (parentId: string, depth: number = 0): Promise<any> => {
-          const children = Object.values(files).filter(f => f.parentId === parentId)
-          const tree: any = {}
-          const indent = '  '.repeat(depth)
-
-          console.log(`${indent}[Boot] Building tree for parent ${parentId}, found ${children.length} children`)
-
-          for (const child of children) {
-            console.log(`${indent}[Boot] Processing: ${child.name} (${child.type})`)
-
-            if (child.type === 'folder') {
-              const subTree = await buildTree(child.id, depth + 1)
-              tree[child.name] = {
-                directory: subTree
+          if (node.type === 'file') {
+            // Read content from VFS (which reads from OPFS/IndexedDB)
+            try {
+              const content = await useFileSystemStore.getState().readFileContent(node.id)
+              // Handle binary content if needed, but MountTree expects string or Uint8Array
+              return {
+                file: {
+                  contents: content
+                }
               }
-              console.log(`${indent}[Boot] ✓ Folder ${child.name} has ${Object.keys(subTree).length} items`)
-            } else {
-              try {
-                const content = await useFileSystemStore.getState().readFileContent(child.id)
-                tree[child.name] = {
-                  file: {
-                    contents: content
-                  }
-                }
-                console.log(`${indent}[Boot] ✓ File ${child.name} (${content.length} bytes)`)
-              } catch (e) {
-                console.warn(`${indent}[Boot] ⚠️ Failed to read ${child.name}, using empty content:`, e)
-                tree[child.name] = {
-                  file: {
-                    contents: ''
-                  }
-                }
+            } catch (e) {
+              console.warn(`Failed to read file for mount: ${node.name}`, e)
+              return null
+            }
+          } else {
+            // Directory
+            const children = useFileSystemStore.getState().getChildren(node.id)
+            const dirContent: any = {}
+            
+            for (const child of children) {
+              // Skip node_modules folder (it's too big and should be restored via tarball)
+              if (child.name === 'node_modules') continue;
+              
+              const childTree = await buildMountTree(child.id)
+              if (childTree) {
+                dirContent[child.name] = childTree
               }
             }
+            
+            return {
+              directory: dirContent
+            }
           }
-          return tree
         }
 
-        // Build the tree starting from user home and mount it under WC root (~/)
-        // This maps VFS /home/user -> WC ~/
+        // Get User Home tree
         const userNode = getNodeByPath(SYSTEM_PATHS.USER)
-        let vfsTree: any = {}
         if (userNode) {
-          console.log('[Boot] Building VFS tree from user node:', userNode.id)
-          vfsTree = await buildTree(userNode.id)
-          console.log('[Boot] VFS tree structure:', Object.keys(vfsTree))
-          console.log('[Boot] VFS tree details:', JSON.stringify(Object.keys(vfsTree).reduce((acc: any, key) => {
-            acc[key] = vfsTree[key].directory ? 'folder' : 'file'
-            return acc
-          }, {} as any), null, 2))
-        } else {
-          // Fallback if user node not found (should not happen)
-          console.warn('User node not found, mounting root')
-          vfsTree = await buildTree(rootId)
+          const userTree = await buildMountTree(userNode.id)
+          if (userTree && userTree.directory) {
+            // Merge into root mount tree
+            // Since we mount to root, we need to ensure structure matches
+            // WebContainer root is effectively our SYSTEM_PATHS.USER
+            Object.assign(mountTree, userTree.directory)
+          }
         }
 
-        // Merge trees
-        const finalTree = { ...mountTree, ...vfsTree }
-        console.log('[Boot] Final mount tree:', Object.keys(finalTree))
+        // Boot with mounted file system
+        // console.log('[WC] Booting with mount tree:', Object.keys(mountTree))
+        await webcontainer.mount(mountTree)
+        
+        // --- Phase 4 Restore Logic: Restore snapshots ---
+        // After mount, scan for node_modules.tar files and extract them
+        const restoreSnapshots = async (dirPath: string) => {
+             try {
+                 const entries = await webcontainer.fs.readdir(dirPath, { withFileTypes: true });
+                 for (const entry of entries) {
+                     if (entry.isDirectory()) {
+                         await restoreSnapshots(dirPath === '/' ? entry.name : `${dirPath}/${entry.name}`);
+                     } else if (entry.name === 'node_modules.tar') {
+                         const fullPath = dirPath === '/' ? entry.name : `${dirPath}/${entry.name}`;
+                         const targetDir = dirPath === '/' ? '.' : dirPath;
+                         console.log(`[Persistence] Found snapshot at ${fullPath}, restoring...`);
+                         try {
+                             await webcontainer.spawn('tar', ['-xf', 'node_modules.tar'], { cwd: targetDir });
+                             console.log(`[Persistence] Restored node_modules in ${targetDir}`);
+                         } catch (e) {
+                             console.warn(`[Persistence] Failed to restore snapshot ${fullPath}:`, e);
+                         }
+                     }
+                 }
+             } catch (e) {
+                 // ignore errors
+             }
+        };
+        
+        // Start restoration in background
+        restoreSnapshots('/').catch(e => console.warn('Snapshot restore error:', e));
 
-        console.log('[Boot] Mounting tree to WebContainer...')
-        await webcontainer.mount(finalTree)
         console.log('[Boot] ✅ Mount complete')
 
         // Skip the comprehensive sync - mount already handles this

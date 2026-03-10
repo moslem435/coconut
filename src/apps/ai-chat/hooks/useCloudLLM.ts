@@ -194,11 +194,13 @@ WHEN CREATING AN APP:
 2. Use 'create_directory' to create the root folder.
 3. Initialize the project. 
    - FOR FRONTEND: YOU MUST USE 'run_command' with 'npm create vite@latest . -- --template react' (or vue/svelte). DO NOT manually create package.json/vite.config.js/index.html unless you have a specific reason.
+   - FOR BACKEND: YOU MUST USE 'run_command' with 'npm init -y'.
+   - IMPORTANT: Update 'package.json' to include 'cocount' field (icon, window: {width, height, title}).
 4. Install dependencies using 'run_command' (e.g., 'npm install').
 5. FOR TAILWIND CSS: Follow this EXACT sequence:
-   a) First run: 'npm install -D tailwindcss postcss autoprefixer'
-   b) Then run: 'npx tailwindcss init -p'
-   c) Update tailwind.config.js and add Tailwind directives to CSS
+   a) First run: 'npm install -D tailwindcss@3.4.17 postcss autoprefixer' (MUST use v3, v4 breaks config)
+   b) DO NOT run 'npx tailwindcss init'. Instead, DIRECTLY create 'tailwind.config.js' and 'postcss.config.js' with the correct content using 'create_file'.
+   c) Add Tailwind directives to your CSS file (e.g., src/index.css).
 6. Write/Update code using 'create_file' or 'update_file'.
 7. **CRITICAL: SECURITY HEADERS**: To avoid "Website Blocked" errors in the browser, YOU MUST configure the dev server (e.g., in \`vite.config.ts\`) to include these headers:
    \`\`\`javascript

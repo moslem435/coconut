@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard } from 'lucide-react'
+import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus } from 'lucide-react'
 import JSZip from 'jszip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -37,9 +37,74 @@ export function useFileMenuItems(
     return useMemo<MenuItem[]>(() => {
         if (!visible || !isVisibleType) return []
 
+        const ids = data.selectedIds || (data.id ? [data.id] : [])
+        const firstItem = ids.length === 1 ? getItem(ids[0]) : null
+        
+        // App Bundle Detection
+        const isAppBundle = firstItem?.type === 'folder' && (firstItem.name.endsWith('.app') || (firstItem as any).isAppBundle)
+
+        if (isAppBundle && firstItem) {
+            return [
+                {
+                    label: t('menu.open'),
+                    icon: ExternalLink,
+                    action: () => {
+                        // TODO: Phase 3 - Implement Launch Logic
+                        // For now, open as folder
+                        const explorerApp = APPS_REGISTRY['file-explorer']
+                        if (explorerApp) {
+                             openWindow(
+                                 `${explorerApp.id}-${Date.now()}`,
+                                 firstItem.name,
+                                 explorerApp.id,
+                                 explorerApp.icon,
+                                 { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                             )
+                        }
+                        hideMenu()
+                    }
+                },
+                {
+                    label: 'Show Package Contents',
+                    icon: FolderPlus,
+                    action: () => {
+                        const explorerApp = APPS_REGISTRY['file-explorer']
+                        if (explorerApp) {
+                             openWindow(
+                                 `${explorerApp.id}-${Date.now()}`,
+                                 firstItem.name,
+                                 explorerApp.id,
+                                 explorerApp.icon,
+                                 { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                             )
+                        }
+                        hideMenu()
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: t('menu.rename'),
+                    icon: FileEdit,
+                    action: () => {
+                        setRenamingId(firstItem.id)
+                        hideMenu()
+                    }
+                },
+                {
+                    label: t('menu.delete'),
+                    icon: Trash2,
+                    danger: true,
+                    action: () => {
+                        trashItems([firstItem.id])
+                        hideMenu()
+                    }
+                }
+            ]
+        }
+
         const isProtected = () => {
             if (!data) return false
-            const ids = data.selectedIds || (data.id ? [data.id] : [])
+            // const ids = data.selectedIds || (data.id ? [data.id] : []) // Already calculated above
             return ids.some((id: string) => {
                 const item = getItem(id)
                 return item?.isSystem || item?.isReadOnly
@@ -54,6 +119,18 @@ export function useFileMenuItems(
                     if (data?.appId) {
                         const app = APPS_REGISTRY[data.appId]
                         if (app) openWindow(app.id, t(`app.${app.id}`), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
+                    } else if (firstItem?.type === 'folder') {
+                         // Fallback for folder opening if not appId
+                         const explorerApp = APPS_REGISTRY['file-explorer']
+                         if (explorerApp) {
+                              openWindow(
+                                  `${explorerApp.id}-${Date.now()}`,
+                                  firstItem.name,
+                                  explorerApp.id,
+                                  explorerApp.icon,
+                                  { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                              )
+                         }
                     }
                     hideMenu()
                 }

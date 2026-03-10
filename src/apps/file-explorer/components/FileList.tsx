@@ -10,6 +10,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { SortField, SortOrder } from '../index'
 import { FileGridItem } from '@/os/ui/file/FileGridItem'
 import { FileListItem } from '@/os/ui/file/FileListItem'
+import { useWindowStore } from '@/os/kernel/useWindowStore'
 
 interface FileListProps {
   items: FileNode[]
@@ -201,6 +202,32 @@ export default function FileList({
     )
   }
 
+  const { openWindow } = useWindowStore()
+  const appLauncher = useWindowStore(state => state.appLauncher)
+
+  // App Bundle Logic
+  const handleItemClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const item = items.find(i => i.id === id)
+    if (!item) return
+    
+    // Check if App Bundle
+    const isAppBundle = item.type === 'folder' && (item.name.endsWith('.app') || item.isAppBundle)
+    
+    if (e.detail === 2) { // Double click
+      if (isAppBundle && appLauncher) {
+        // Launch App Bundle!
+        console.log('Launching App Bundle:', item.name)
+        appLauncher.launch(item)
+        return
+      }
+      
+      onDoubleClick(id)
+    } else {
+      onSelect(id, e)
+    }
+  }
+
   // Grid view - virtualized
   if (viewMode === 'grid') {
     const virtualRows = gridVirtualizer.getVirtualItems()
@@ -245,6 +272,9 @@ export default function FileList({
                       key={node.id}
                       item={node}
                       selected={isSelected}
+                      onClick={(e) => handleItemClick(node.id, e)}
+                      onContextMenu={(e) => onContextMenu(e, node.id)}
+                      onDoubleClick={(e) => e.stopPropagation()}
                       renaming={renamingId === node.id}
                       onRename={(newName) => {
                         if (newName && newName !== node.name) {
@@ -353,14 +383,14 @@ export default function FileList({
                   width: '100%',
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
-                onClick={(e) => handleMouseDown(e, node.id)}
-                onDoubleClick={() => onDoubleClick(node.id)}
+                onClick={(e) => handleItemClick(node.id, e)}
+                onDoubleClick={(e) => e.stopPropagation()}
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
-                  "flex items-center px-3 py-1.5 rounded-md text-sm text-[var(--os-text-primary)] transition-colors cursor-default group",
+                  "flex items-center h-9 px-1 rounded-md text-sm text-[var(--os-text-primary)] transition-colors cursor-pointer group",
                   isSelected
                     ? "bg-[var(--os-bg-selection)]"
-                    : "odd:bg-[var(--os-text-primary)]/[0.02]",
+                    : "hover:bg-[var(--os-hover-bg)]",
                   dropTargetId === node.id && "bg-[var(--os-accent-dim)] border border-[var(--os-accent)]/30",
                   draggedIds.includes(node.id) && "opacity-50"
                 )}
@@ -368,6 +398,7 @@ export default function FileList({
                 <FileListItem
                   item={node}
                   className="flex-[2] min-w-[200px]"
+                  selected={isSelected}
                   renaming={renamingId === node.id}
                   onRename={(newName) => {
                     if (newName && newName !== node.name) {

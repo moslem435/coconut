@@ -42,6 +42,24 @@ export const createActionSlice: StateCreator<
 > = (set, get) => ({
   createItem: async (parentId, name, type, content, appId, options) => {
     const id = uuidv4()
+
+    // Check if creating a package.json
+    if (name === 'package.json' && content) {
+      try {
+        const textContent = typeof content === 'string' ? content : new TextDecoder().decode(content)
+        const json = JSON.parse(textContent)
+        if (json.cocount) {
+           // Update parent node using internal action
+           get()._updateFile(parentId, {
+             isAppBundle: true,
+             appConfig: json.cocount
+           })
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+    }
+
     const newItem: FileNode = {
       id,
       parentId,
@@ -228,6 +246,23 @@ export const createActionSlice: StateCreator<
         message: `Cannot modify read-only file "${node.name}"`
       })
       return
+    }
+
+    // Check if updating package.json
+    if (node.name === 'package.json') {
+      try {
+        const textContent = typeof content === 'string' ? content : new TextDecoder().decode(content)
+        const json = JSON.parse(textContent)
+        const parentId = node.parentId
+        if (parentId && json.cocount) {
+           get()._updateFile(parentId, {
+             isAppBundle: true,
+             appConfig: json.cocount
+           })
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
     }
 
     // 1. 更新元数据和内容

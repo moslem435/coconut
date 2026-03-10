@@ -36,9 +36,13 @@ export function FileGridItem({
   const IconComponent = Icon as any
   
   // App Bundle Logic
-  const isAppBundle = item.type === 'folder' && item.name.endsWith('.coco')
-  const appBundleName = isAppBundle ? item.name.replace(/\.coco$/, '') : displayName
+  const isAppBundle = item.type === 'folder' && (item.name.endsWith('.app') || item.isAppBundle)
+  const appBundleName = isAppBundle ? item.name.replace(/\.app$/, '') : displayName
   const AppBundleIcon = AppWindow // or Package
+  
+  // Custom Bundle Icon
+  const customBundleIcon = item.appConfig?.icon;
+  const isEmojiIcon = customBundleIcon && !customBundleIcon.startsWith('http');
 
   return (
     <div
@@ -48,18 +52,26 @@ export function FileGridItem({
       <div className="relative group">
         {isAppBundle ? (
            <div
-            className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200`, selected && 'scale-105', iconClassName)}
+            className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200 overflow-hidden`, selected && 'scale-105', iconClassName)}
             style={{
               width: iconSize,
               height: iconSize,
-              backgroundColor: '#3b82f6', // Blue for apps
+              backgroundColor: isEmojiIcon ? 'transparent' : '#3b82f6', // Blue for apps
               color: '#ffffff'
             }}
           >
-            <AppBundleIcon
-              size={Math.round(iconSize * 0.6)}
-              strokeWidth={1.5}
-            />
+             {customBundleIcon ? (
+                isEmojiIcon ? (
+                   <span style={{ fontSize: iconSize * 0.8, lineHeight: 1 }}>{customBundleIcon}</span>
+                ) : (
+                   <img src={customBundleIcon} alt="" className="w-full h-full object-cover" />
+                )
+             ) : (
+                <AppBundleIcon
+                  size={Math.round(iconSize * 0.6)}
+                  strokeWidth={1.5}
+                />
+             )}
           </div>
         ) : useAppIcon && manifest ? (
           <AppIcon

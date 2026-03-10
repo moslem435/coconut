@@ -90,8 +90,14 @@ interface WindowStore {
     peekWindowId: string | null
     /** 正在启动的应用 ID 列表 */
     launchingAppIds: string[]
+    /** 全局应用启动器服务（单例模式） */
+    appLauncher: {
+        launch: (file: any) => Promise<void>
+    } | null
 
     // 操作方法
+    /** 注册应用启动器 */
+    registerAppLauncher: (launcher: { launch: (file: any) => Promise<void> }) => void
     /** 打开窗口 */
     openWindow: (id: string, title: string, appId: string, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; isSidebar?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; isDefaultTitle?: boolean; hideTitleBar?: boolean;[key: string]: unknown }) => void
     /** 启动应用（支持多实例） */
@@ -145,6 +151,9 @@ export const useWindowStore = create<WindowStore>()(
             snapshotCache: new Map(),
             peekWindowId: null,
             launchingAppIds: [],
+            appLauncher: null,
+
+            registerAppLauncher: (launcher) => set({ appLauncher: launcher }),
 
             /**
              * 打开窗口
@@ -256,7 +265,11 @@ export const useWindowStore = create<WindowStore>()(
                 set(state => ({ launchingAppIds: [...state.launchingAppIds, id] }))
 
                 openWindow(id, title, appId, icon, options)
-                set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
+                
+                // Remove from launching list after a delay
+                setTimeout(() => {
+                    set(state => ({ launchingAppIds: state.launchingAppIds.filter(appId => appId !== id) }))
+                }, 1000)
             },
 
             /**
