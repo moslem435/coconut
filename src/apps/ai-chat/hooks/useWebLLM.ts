@@ -420,32 +420,18 @@ export function useWebLLM() {
     2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
     3. **Decoupling**: The app should not depend on system-wide configuration changes.
 
-    CAPABILITIES:
-    - You have a full Node.js environment (WebContainer).
-    - You can run shell commands like 'npm install', 'npm run dev', 'node server.js'.
-    - You can create multi-file projects (React, Vue, Express, etc.).
-
     WHEN CREATING AN APP:
-    1. Plan the folder structure. All apps go into "${SYSTEM_PATHS.USER}/apps/[app-name]".
-    2. Use 'create_directory' to create the root folder.
-    3. Initialize the project. 
-       - **STRONGLY RECOMMENDED**: Do NOT use 'npm create vite'. It is unstable in this environment.
-       - **INSTEAD**: Use 'create_file' to MANUALLY write the essential files:
-         - 'package.json' (Include 'cocount' metadata here directly!)
-         - 'vite.config.js'
-         - 'index.html'
-         - 'src/main.jsx' (or .tsx)
-         - 'src/App.jsx'
-       - If you MUST use a command, ensure the directory is empty first. But manual creation is safer.
-       - FOR BACKEND: You can use 'npm init -y', but ensure to add 'cocount' field afterwards.
-    4. Install dependencies using 'run_command' (e.g., 'npm install').
-    5. FOR TAILWIND CSS: Follow this EXACT sequence:
-       a) First run: 'npm install -D tailwindcss@3.4.17 postcss autoprefixer' (MUST use v3, v4 breaks config)
-       b) DO NOT run 'npx tailwindcss init'. Instead, DIRECTLY create 'tailwind.config.js' and 'postcss.config.js' with the correct content using 'create_file'.
-       c) Add Tailwind directives to your CSS file (e.g., src/index.css).
-    6. Write/Update code using 'create_file' or 'update_file'.
-    7. For full-stack apps, ensure both frontend and backend can run (e.g., using 'concurrently' or separate terminals).
-    8. COMPLETION: When done, tell the user "App created! Double-click [App Name] in File Explorer to run. Right-click to view source.". Do NOT tell them to run npm install/dev manually.
+    1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
+    2. **MANDATORY SCAFFOLDING**:
+       - **NEVER** manually create the root folder or 'index.html' from scratch.
+       - **ALWAYS** start by calling a scaffolding tool:
+         - **SIMPLE/STATIC**: Call 'scaffold_static_app({ name, title, icon })'. 
+           - This automatically creates the folder, package.json, and index.html.
+         - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
+           - This creates the full Vite structure.
+    3. **CUSTOMIZE**: After scaffolding, use 'create_file' or 'update_file' to modify files.
+       - **IMPORTANT**: If creating multiple files or writing long code, do it step-by-step. Do NOT try to write everything in one single response to avoid JSON truncation errors.
+    4. **COMPLETION**: When done, tell the user "App created! Double-click [App Name] in File Explorer to run.".
 
     DEBUGGING:
     - If a command fails, read the output, fix the code/config, and try again.

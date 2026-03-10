@@ -41,24 +41,21 @@ export const createActionSlice: StateCreator<
   ActionSlice
 > = (set, get) => ({
   createItem: async (parentId, name, type, content, appId, options) => {
-    const id = uuidv4()
-
-    // Check if creating a package.json
-    if (name === 'package.json' && content) {
-      try {
-        const textContent = typeof content === 'string' ? content : new TextDecoder().decode(content)
-        const json = JSON.parse(textContent)
-        if (json.cocount) {
-           // Update parent node using internal action
-           get()._updateFile(parentId, {
-             isAppBundle: true,
-             appConfig: json.cocount
-           })
-        }
-      } catch (e) {
-        // Ignore JSON parse errors
-      }
+    console.log(`[ActionSlice] createItem: ${name}, type: ${type}, content length: ${content?.length}`);
+    // Check for duplicate names in the same directory
+    const siblings = get().getChildren(parentId)
+    const duplicate = siblings.find(c => c.name === name)
+    if (duplicate) {
+      const itemType = type === 'folder' ? '文件夹' : '文件'
+      console.warn(`[FileSystem] Duplicate ${itemType} name: "${name}" already exists in parent ${parentId}`)
+      toast.warning(
+        'Name Already Exists',
+        `A ${type === 'folder' ? 'folder' : 'file'} named "${name}" already exists in this location.`
+      )
+      throw new Error(`A ${type === 'folder' ? 'folder' : 'file'} named "${name}" already exists.`)
     }
+
+    const id = uuidv4()
 
     const newItem: FileNode = {
       id,
@@ -71,15 +68,32 @@ export const createActionSlice: StateCreator<
       updatedAt: Date.now()
     }
 
-    // 1. 乐观更新状态
+    // 1. 乐观更新状态 — 先添加文件节点
     get()._addFile(newItem)
 
-    // 2. 发出事件（SyncMiddleware 监听并执行 IO）
-    const path = get().resolvePath(id)
+    // 2. 检测 package.json 中的 cocount 配置
+    // IMPORTANT: 必须在 _addFile 之后执行！
+    // 因为 _updateFile 会触发 Zustand 通知 UI 组件，
+    // UI 组件可能立即尝试读取 package.json 等文件，
+    // 如果 _addFile 还没执行，文件就不存在于 VFS 中。
+    if (name === 'package.json' && content) {
+      try {
+        const textContent = typeof content === 'string' ? content : new TextDecoder().decode(content)
+        const json = JSON.parse(textContent)
+        if (json.cocount) {
+          console.log(`[ActionSlice] Detected App Bundle in ${parentId}, updating metadata...`);
+          get()._updateFile(parentId, {
+            isAppBundle: true,
+            appConfig: json.cocount
+          })
+        }
+      } catch (e) {
+        console.warn('[ActionSlice] Failed to parse package.json for App Bundle detection:', e);
+      }
+    }
 
-    // Use a Promise to track the sync operation if needed, but here we just emit
-    // However, to satisfy the interface change to Promise, we wrap it.
-    // In a real implementation, we might wait for syncService acknowledgment
+    // 3. 发出事件（SyncMiddleware 监听并执行 IO）
+    const path = get().resolvePath(id)
 
     eventBus.emit('fs:file:created', {
       id,
@@ -255,13 +269,14 @@ export const createActionSlice: StateCreator<
         const json = JSON.parse(textContent)
         const parentId = node.parentId
         if (parentId && json.cocount) {
-           get()._updateFile(parentId, {
-             isAppBundle: true,
-             appConfig: json.cocount
-           })
+          console.log(`[ActionSlice] Detected App Bundle update in ${parentId}, updating metadata...`);
+          get()._updateFile(parentId, {
+            isAppBundle: true,
+            appConfig: json.cocount
+          })
         }
       } catch (e) {
-        // Ignore JSON parse errors
+        console.warn('[ActionSlice] Failed to parse updated package.json:', e);
       }
     }
 

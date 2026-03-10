@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { RefreshCw, FolderPlus, Terminal, FileText, Clipboard } from 'lucide-react'
+import { RefreshCw, FolderPlus, Terminal, FileText, Clipboard, FilePlus } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
@@ -49,6 +49,16 @@ export function useExplorerMenuItems(
                 action: () => {
                     if (data?.pathId) {
                         createItem(data.pathId, 'New Folder', 'folder').catch(console.error)
+                    }
+                    hideMenu()
+                }
+            },
+            {
+                label: t('menu.newfile'),
+                icon: FilePlus,
+                action: () => {
+                    if (data?.pathId) {
+                        createItem(data.pathId, 'New Text Document.txt', 'file', '').catch(console.error)
                     }
                     hideMenu()
                 }

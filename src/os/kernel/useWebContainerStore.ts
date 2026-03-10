@@ -1006,12 +1006,24 @@ console.log(\`App running at http://localhost:\${port}\`);
                 const content = await webcontainer.fs.readFile(fullWcPath, 'utf-8') as string
 
                 if (!existingNode) {
+                  // CRITICAL: If file is new but content is empty, skip to avoid ghost files
+                  if (content === '') {
+                    console.log('[WC->VFS] Skipping creation of empty file:', vfsPath)
+                    return
+                  }
                   console.log('[WC->VFS] Creating File:', vfsPath)
                   await createItem(parentId, name, 'file', content, undefined, { source: 'wc' })
                 } else {
                   // Compare content to avoid infinite sync loops (VFS -> WC -> VFS)
                   // This is critical for watched files like vite.config.js
                   const currentContent = await useFileSystemStore.getState().readFileContent(existingNode.id)
+
+                  // CRITICAL PROTECTION: Never overwrite a non-empty VFS file with empty WC content
+                  // This happens during race conditions where WC watcher triggers before file is flushed to disk
+                  if (content === '' && currentContent !== '') {
+                    console.log('[WC->VFS] Protected: Skipping overwrite of non-empty file with empty content:', vfsPath)
+                    return
+                  }
 
                   // Only update if content actually changed
                   if (currentContent !== content) {

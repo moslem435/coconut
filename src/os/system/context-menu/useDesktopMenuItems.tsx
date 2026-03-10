@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { RefreshCw, FolderPlus, Terminal, ArrowDownAZ, Grid3X3, Palette, Monitor, Globe } from 'lucide-react'
+import { RefreshCw, FolderPlus, Terminal, ArrowDownAZ, Grid3X3, Palette, Monitor, Globe, FilePlus } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -81,6 +81,33 @@ export function useDesktopMenuItems(
                 icon: FolderPlus,
                 action: async () => {
                     const id = await createItem('desktop', 'New Folder', 'folder')
+
+                    const scaleFactor = displayScale / 100
+                    const currentGridSize = GRID_SIZE * scaleFactor
+                    const currentGridPadding = GRID_PADDING * scaleFactor
+
+                    const startX = position?.x || currentGridPadding
+                    const startY = position?.y || currentGridPadding
+
+                    const pos = findFreePosition(
+                        startX,
+                        startY,
+                        id,
+                        iconPositions,
+                        currentGridSize,
+                        currentGridPadding
+                    )
+
+                    updateIconPosition(id, pos)
+
+                    hideMenu()
+                }
+            },
+            {
+                label: t('menu.newfile'),
+                icon: FilePlus,
+                action: async () => {
+                    const id = await createItem('desktop', 'New Text Document.txt', 'file', '')
 
                     const scaleFactor = displayScale / 100
                     const currentGridSize = GRID_SIZE * scaleFactor

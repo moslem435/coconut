@@ -88,11 +88,10 @@
   display: none;
 }
 
-/* File Manager specific scrollbar - Visible */
+/* Custom Scrollbar for file manager and other scrollable areas */
 .file-manager-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
-  display: block;
 }
 
 .file-manager-scrollbar::-webkit-scrollbar-track {
@@ -100,15 +99,44 @@
 }
 
 .file-manager-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.3);
+  background-color: transparent;
   border-radius: 3px;
+  transition: background-color 0.2s;
 }
 
-.file-manager-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 128, 128, 0.5);
+.file-manager-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: var(--os-border);
 }
 
-/* --- DARK MODE --- */
+
+
+/* --- Global Modern Scrollbar --- */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.2); /* very light gray */
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.3s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.5); /* darker on hover */
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* --- DARK MODE --- */
 [data-theme='dark'] {
   --background: #0a0a0a;
   --foreground: #ededed;
@@ -171,13 +199,13 @@ img {
   /* Optional: prevents interaction completely if desired, but user-drag is usually enough for copy protection */
 }
 
-/* VS Code Custom Scrollbars */
-::-webkit-scrollbar {
+/* VS Code Custom Scrollbars - Remove to avoid conflict */
+/* ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
-}
+} */
 
-::-webkit-scrollbar-track {
+/* ::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -192,7 +220,7 @@ img {
 
 ::-webkit-scrollbar-corner {
   background: transparent;
-}
+} */
 
 @utility mask-gradient {
   mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);

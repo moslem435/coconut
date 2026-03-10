@@ -22,11 +22,12 @@ class FileSystemSyncService {
         eventBus.on('fs:file:moved', this.handleFileRenamed.bind(this)); // Handle moved same as renamed for sync
     }
 
-    private async handleFileCreated(data: { id: string; path: string; type: 'file' | 'folder' }) {
+    private async handleFileCreated(data: { id: string; path: string; type: 'file' | 'folder'; content?: string | Uint8Array }) {
+        console.log(`[SyncService] handleFileCreated: ${data.path}, content length: ${data.content?.length}`);
         await this.syncToWebContainer('create', data);
     }
 
-    private async handleFileUpdated(data: { id: string; path: string; content?: string }) {
+    private async handleFileUpdated(data: { id: string; path: string; content?: string | Uint8Array }) {
         await this.syncToWebContainer('update', data);
     }
 
@@ -55,19 +56,42 @@ class FileSystemSyncService {
                     if (data.type === 'folder') {
                         store.syncMkdir(data.path);
                     } else {
-                        // Content might not be available in event, read it
-                        const content = await fs.readFile(data.path);
-                        store.syncFile(data.path, new TextDecoder().decode(content));
+                        // Use content from event if available to avoid race condition with OPFS write
+                        let content = data.content;
+                        
+                        if (content === undefined) {
+                            try {
+                                const buffer = await fs.readFile(data.path);
+                                content = new TextDecoder().decode(buffer);
+                            } catch (e: any) {
+                                // If file not found in OPFS yet (race condition), and no content provided,
+                                // we can't sync it to WebContainer yet. 
+                                // The SyncMiddleware will eventually write it to OPFS.
+                                console.warn(`[SyncService] Delayed WebContainer sync for ${data.path} (content not ready)`);
+                                return;
+                            }
+                        } else if (typeof content !== 'string') {
+                            content = new TextDecoder().decode(content);
+                        }
+                        
+                        store.syncFile(data.path, content);
                     }
                     break;
                 case 'update':
                     // Content might be in event or need reading
-                    let content = data.content;
-                    if (content === undefined) {
-                        const buffer = await fs.readFile(data.path);
-                        content = new TextDecoder().decode(buffer);
+                    let updateContent = data.content;
+                    if (updateContent === undefined) {
+                        try {
+                            const buffer = await fs.readFile(data.path);
+                            updateContent = new TextDecoder().decode(buffer);
+                        } catch (e) {
+                             console.warn(`[SyncService] Delayed WebContainer update for ${data.path} (content not ready)`);
+                             return;
+                        }
+                    } else if (typeof updateContent !== 'string') {
+                         updateContent = new TextDecoder().decode(updateContent);
                     }
-                    store.syncFile(data.path, content);
+                    store.syncFile(data.path, updateContent);
                     break;
                 case 'delete':
                     store.syncUnlink(data.path);

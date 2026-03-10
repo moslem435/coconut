@@ -39,7 +39,7 @@ export function useFileMenuItems(
 
         const ids = data.selectedIds || (data.id ? [data.id] : [])
         const firstItem = ids.length === 1 ? getItem(ids[0]) : null
-        
+
         // App Bundle Detection
         const isAppBundle = firstItem?.type === 'folder' && (firstItem.name.endsWith('.app') || (firstItem as any).isAppBundle)
 
@@ -53,13 +53,13 @@ export function useFileMenuItems(
                         // For now, open as folder
                         const explorerApp = APPS_REGISTRY['file-explorer']
                         if (explorerApp) {
-                             openWindow(
-                                 `${explorerApp.id}-${Date.now()}`,
-                                 firstItem.name,
-                                 explorerApp.id,
-                                 explorerApp.icon,
-                                 { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
-                             )
+                            openWindow(
+                                `${explorerApp.id}-${Date.now()}`,
+                                firstItem.name,
+                                explorerApp.id,
+                                explorerApp.icon,
+                                { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                            )
                         }
                         hideMenu()
                     }
@@ -70,13 +70,13 @@ export function useFileMenuItems(
                     action: () => {
                         const explorerApp = APPS_REGISTRY['file-explorer']
                         if (explorerApp) {
-                             openWindow(
-                                 `${explorerApp.id}-${Date.now()}`,
-                                 firstItem.name,
-                                 explorerApp.id,
-                                 explorerApp.icon,
-                                 { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
-                             )
+                            openWindow(
+                                `${explorerApp.id}-${Date.now()}`,
+                                firstItem.name,
+                                explorerApp.id,
+                                explorerApp.icon,
+                                { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                            )
                         }
                         hideMenu()
                     }
@@ -120,17 +120,17 @@ export function useFileMenuItems(
                         const app = APPS_REGISTRY[data.appId]
                         if (app) openWindow(app.id, t(`app.${app.id}`), app.id, app.icon, { ...app.defaultWindowOptions, isDefaultTitle: true })
                     } else if (firstItem?.type === 'folder') {
-                         // Fallback for folder opening if not appId
-                         const explorerApp = APPS_REGISTRY['file-explorer']
-                         if (explorerApp) {
-                              openWindow(
-                                  `${explorerApp.id}-${Date.now()}`,
-                                  firstItem.name,
-                                  explorerApp.id,
-                                  explorerApp.icon,
-                                  { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
-                              )
-                         }
+                        // Fallback for folder opening if not appId
+                        const explorerApp = APPS_REGISTRY['file-explorer']
+                        if (explorerApp) {
+                            openWindow(
+                                `${explorerApp.id}-${Date.now()}`,
+                                firstItem.name,
+                                explorerApp.id,
+                                explorerApp.icon,
+                                { ...explorerApp.defaultWindowOptions, initialPath: firstItem.id }
+                            )
+                        }
                     }
                     hideMenu()
                 }

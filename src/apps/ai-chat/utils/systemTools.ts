@@ -15,6 +15,264 @@ export interface ToolDefinition {
 
 // Map of function names to their implementations
 export const systemToolsImplementation: Record<string, Function> = {
+    // --- Scaffolding ---
+    scaffold_static_app: async (args: { name: string, title: string, icon: string }) => {
+        const { name, title, icon } = args;
+        const appPath = `${SYSTEM_PATHS.USER}/apps/${name}`;
+
+        try {
+            await System.fs.createDirectory(appPath);
+
+            // 1. index.html (MUST be created BEFORE package.json!)
+            // Reason: package.json with cocount triggers isAppBundle detection,
+            // which causes UI components to immediately try reading index.html.
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #app {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 { margin-top: 0; color: #1a73e8; }
+        .hint { color: #666; font-size: 0.9rem; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>${icon} ${title}</h1>
+        <div id="content">
+            <p>正在准备应用内容...</p>
+        </div>
+        <div class="hint">由 Cocount AI 助手生成</div>
+    </div>
+    <script>
+        console.log('${title} 启动成功！');
+    </script>
+</body>
+</html>`;
+            console.log(`[SystemTools] Writing index.html, length: ${html.length}`);
+            await System.fs.writeFile(`${appPath}/index.html`, html);
+
+            // 2. package.json (LAST! triggers isAppBundle detection)
+            const pkgJson = {
+                name: name,
+                version: "1.0.0",
+                cocount: {
+                    type: "web-static",
+                    icon: icon,
+                    window: { title, width: 800, height: 600 }
+                }
+            };
+            await System.fs.writeFile(`${appPath}/package.json`, JSON.stringify(pkgJson, null, 2));
+
+            // Wait for VFS state to fully propagate
+            await new Promise(r => setTimeout(r, 200));
+
+            return `Static app '${name}' created at ${appPath}. You can now add business logic to index.html.`;
+        } catch (e: any) {
+            return `Failed to scaffold static app: ${e.message}`;
+        }
+    },
+
+    scaffold_react_app: async (args: { name: string, title: string, icon: string }) => {
+        const { name, title, icon } = args;
+        const appPath = `${SYSTEM_PATHS.USER}/apps/${name}`;
+
+        try {
+            await System.fs.createDirectory(appPath);
+            await System.fs.createDirectory(`${appPath}/src`);
+            await System.fs.createDirectory(`${appPath}/public`);
+
+            // Create ALL files BEFORE package.json!
+            // Reason: package.json with cocount triggers isAppBundle detection,
+            // which causes UI components to immediately try reading other files.
+
+            // 1. vite.config.js
+            const viteConfig = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+  }
+})`;
+            await System.fs.writeFile(`${appPath}/vite.config.js`, viteConfig);
+
+            // 2. tailwind.config.js (v3)
+            const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}`;
+            await System.fs.writeFile(`${appPath}/tailwind.config.js`, tailwindConfig);
+
+            // 3. postcss.config.js
+            const postcssConfig = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`;
+            await System.fs.writeFile(`${appPath}/postcss.config.js`, postcssConfig);
+
+            // 4. index.html
+            const indexHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${title}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>`;
+            await System.fs.writeFile(`${appPath}/index.html`, indexHtml);
+
+            // 5. src/main.jsx
+            const mainJsx = `import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)`;
+            await System.fs.writeFile(`${appPath}/src/main.jsx`, mainJsx);
+
+            // 6. src/index.css
+            const indexCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+}`;
+            await System.fs.writeFile(`${appPath}/src/index.css`, indexCss);
+
+            // 7. src/App.jsx (Starter Template)
+            const appJsx = `import { useState } from 'react'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="w-full h-screen flex flex-col items-center justify-center p-4">
+      <h1 className="text-4xl font-bold mb-4">${title}</h1>
+      <div className="card p-6 bg-white/10 rounded-xl shadow-lg text-center">
+        <button 
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            onClick={() => setCount((count) => count + 1)}
+        >
+          count is {count}
+        </button>
+        <p className="mt-4 text-sm opacity-70">
+          Edit <code>src/App.jsx</code> and save to test HMR
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default App`;
+            await System.fs.writeFile(`${appPath}/src/App.jsx`, appJsx);
+
+            // 8. package.json (LAST! triggers isAppBundle detection)
+            const pkgJson = {
+                name: name,
+                version: "1.0.0",
+                type: "module",
+                scripts: {
+                    "dev": "vite",
+                    "build": "vite build",
+                    "preview": "vite preview"
+                },
+                dependencies: {
+                    "react": "^18.2.0",
+                    "react-dom": "^18.2.0",
+                    "lucide-react": "^0.300.0",
+                    "clsx": "^2.1.0",
+                    "tailwind-merge": "^2.2.0"
+                },
+                devDependencies: {
+                    "@types/react": "^18.2.43",
+                    "@types/react-dom": "^18.2.17",
+                    "@vitejs/plugin-react": "^4.2.1",
+                    "autoprefixer": "^10.4.16",
+                    "postcss": "^8.4.32",
+                    "tailwindcss": "^3.4.1", // Lock to v3
+                    "vite": "^5.0.8"
+                },
+                cocount: {
+                    type: "web-container",
+                    icon: icon,
+                    window: { title, width: 1000, height: 800 }
+                }
+            };
+            await System.fs.writeFile(`${appPath}/package.json`, JSON.stringify(pkgJson, null, 2));
+
+            // Wait for VFS state to fully propagate
+            await new Promise(r => setTimeout(r, 200));
+
+            return `React app '${name}' scaffolded at ${appPath}. Dependencies configured. Ready to run 'npm install'!`;
+        } catch (e: any) {
+            return `Failed to scaffold React app: ${e.message}`;
+        }
+    },
+
     // --- System Settings ---
     set_theme: (args: { mode: ThemeMode }) => {
         System.settings.setTheme(args.mode);
@@ -413,6 +671,58 @@ export const systemToolsImplementation: Record<string, Function> = {
 
 // Definitions for the LLM
 export const systemToolsDefinitions: ToolDefinition[] = [
+    // --- Scaffold Tools ---
+    {
+        type: 'function',
+        function: {
+            name: 'scaffold_static_app',
+            description: 'Create a lightweight static web app (HTML/CSS/JS) with NO build steps. FASTEST way to build. Supports Tailwind via CDN and modern ES6+. Use this for: landing pages, tools, games, dashboards, and any single-page app that doesn\'t strictly require React/NPM.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'App folder name (e.g., "calculator"). lowercase, no spaces.'
+                    },
+                    title: {
+                        type: 'string',
+                        description: 'App window title (e.g., "Simple Calculator")'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Emoji icon for the app (e.g., "🧮")'
+                    }
+                },
+                required: ['name', 'title', 'icon']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'scaffold_react_app',
+            description: 'ONLY use if the user EXPLICITLY requests React, complex state management, or specific NPM packages. This requires a slow "npm install" process.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'App folder name (e.g., "todo-list"). lowercase, no spaces.'
+                    },
+                    title: {
+                        type: 'string',
+                        description: 'App window title (e.g., "Advanced Todo")'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Emoji icon for the app (e.g., "✅")'
+                    }
+                },
+                required: ['name', 'title', 'icon']
+            }
+        }
+    },
+    // --- System Settings ---
     {
         type: 'function',
         function: {
@@ -511,7 +821,7 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: `The directory path (e.g. "${SYSTEM_PATHS.DESKTOP}/MyApp.coco")` }
+                    path: { type: 'string', description: `The directory path (e.g. "${SYSTEM_PATHS.USER}/apps/my-app")` }
                 },
                 required: ['path']
             }
@@ -629,11 +939,14 @@ export const TOOL_CATEGORIES = {
         'get_file_tree'
     ],
     builder: [
+        'scaffold_static_app',
+        'scaffold_react_app',
         'create_directory',
         'create_file',
         'read_file',
         'update_file',
         'run_command',
-        'get_file_tree'
+        'get_file_tree',
+        'list_directory'
     ]
 };

@@ -1,9 +1,9 @@
 export const DEFAULT_CSP_CONFIG = {
     "default-src": ["'self'"],
     "script-src": ["'self'", "'unsafe-eval'", "'unsafe-inline'", "blob:"],
-    "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "blob:", "data:", "https:"],
-    "font-src": ["'self'", "data:"],
+    "style-src": ["'self'", "'unsafe-inline'", "https:", "http:"],
+    "img-src": ["'self'", "blob:", "data:", "https:", "http:"],
+    "font-src": ["'self'", "data:", "https:", "http:"],
     "frame-src": [
         "'self'",
         "blob:",
@@ -16,7 +16,7 @@ export const DEFAULT_CSP_CONFIG = {
         "https://*.local-corp.webcontainer-api.io",
         "https://*.webcontainer.io"
     ],
-    "connect-src": ["'self'", "https:", "ws:", "wss:"],
+    "connect-src": ["'self'", "https:", "ws:", "wss:", "blob:"],
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

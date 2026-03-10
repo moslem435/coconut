@@ -324,6 +324,7 @@ const zh: Record<string, string> = {
     "menu.snap.right": "右侧分屏",
     "menu.refresh": "刷新",
     "menu.newfolder": "新建文件夹",
+    "menu.newfile": "新建文件",
     "menu.webapp.add": "添加网站",
     "menu.webapp.url.title": "网站地址",
     "menu.webapp.url.placeholder": "请输入网址 (例如 https://google.com)",

@@ -9,7 +9,7 @@ export interface AppBundleConfig {
         height?: number;
         title?: string;
     };
-    type?: 'web-app' | 'native-app';
+    type?: 'web-app' | 'native-app' | 'web-static' | 'web-container'; // web-app is legacy for web-container
     entry?: string;
 }
 
@@ -29,7 +29,7 @@ export interface FileNode {
     size?: number
     isSystem?: boolean // System folder/file, cannot be deleted or moved
     isReadOnly?: boolean // Read-only folder/file, cannot be modified
-    
+
     // Phase 1: Metadata for App Bundle
     isAppBundle?: boolean;
     appConfig?: AppBundleConfig;

@@ -26,8 +26,13 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { AppIcon } from '@/os/registry/types'
+import { AppIcon } from '@/os/ui/AppIcon'
 import { eventBus } from '@/os/kernel/EventBus'
+
+// Define the AppLauncher interface
+export interface AppLauncher {
+    launch: (file: any) => Promise<boolean>;
+}
 
 /**
  * 窗口状态接口
@@ -91,13 +96,11 @@ interface WindowStore {
     /** 正在启动的应用 ID 列表 */
     launchingAppIds: string[]
     /** 全局应用启动器服务（单例模式） */
-    appLauncher: {
-        launch: (file: any) => Promise<void>
-    } | null
+    appLauncher: AppLauncher | null
 
     // 操作方法
     /** 注册应用启动器 */
-    registerAppLauncher: (launcher: { launch: (file: any) => Promise<void> }) => void
+    registerAppLauncher: (launcher: AppLauncher) => void
     /** 打开窗口 */
     openWindow: (id: string, title: string, appId: string, icon?: AppIcon, options?: { size?: { width: number; height: number }; width?: number; height?: number; isMaximized?: boolean; isResizable?: boolean; isSidebar?: boolean; taskbarPosition?: { x: number; y: number }; titleBarColor?: 'light' | 'dark' | 'auto'; isDefaultTitle?: boolean; hideTitleBar?: boolean;[key: string]: unknown }) => void
     /** 启动应用（支持多实例） */

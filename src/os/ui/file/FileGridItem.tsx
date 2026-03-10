@@ -29,6 +29,7 @@ export function FileGridItem({
   iconClassName,
   textClassName,
   noTruncate,
+  onDoubleClick, // Explicitly extract onDoubleClick
   ...props
 }: FileGridItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
@@ -47,6 +48,12 @@ export function FileGridItem({
   return (
     <div
       className={cn("flex flex-col items-center gap-2 select-none", className)}
+      onDoubleClick={(e) => {
+          console.log('[FileGridItem] DoubleClick captured!')
+          if (onDoubleClick) {
+              onDoubleClick(e)
+          }
+      }}
       {...props}
     >
       <div className="relative group">

@@ -11,7 +11,7 @@ interface RenameInputProps {
 export function RenameInput({ initialValue, className, onComplete, onCancel }: RenameInputProps) {
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef<HTMLInputElement>(null)
-  
+
   // Auto-resize logic using a hidden span
   const [width, setWidth] = useState<number>(0)
   const spanRef = useRef<HTMLSpanElement>(null)

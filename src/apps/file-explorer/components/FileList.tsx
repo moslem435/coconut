@@ -11,6 +11,7 @@ import { SortField, SortOrder } from '../index'
 import { FileGridItem } from '@/os/ui/file/FileGridItem'
 import { FileListItem } from '@/os/ui/file/FileListItem'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
+import { AppLauncherService } from '@/os/kernel/AppLauncherService'
 
 interface FileListProps {
   items: FileNode[]
@@ -63,6 +64,8 @@ export default function FileList({
 
   const { renamingId, setRenamingId } = useUIStore()
   const { renameItem } = useFileSystemStore()
+  const { openWindow } = useWindowStore()
+  // const appLauncher = useWindowStore(state => state.appLauncher) // Removed: Use direct instance
 
   const [draggedIds, setDraggedIds] = useState<string[]>([])
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
@@ -202,30 +205,40 @@ export default function FileList({
     )
   }
 
-  const { openWindow } = useWindowStore()
-  const appLauncher = useWindowStore(state => state.appLauncher)
-
-  // App Bundle Logic
+  // App Bundle Logic - Separate handlers for Click and Double Click
   const handleItemClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    onSelect(id, e)
+  }
+
+  const handleItemDoubleClick = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    console.log('[FileList] Double click triggered for ID:', id)
+    
     const item = items.find(i => i.id === id)
-    if (!item) return
-    
-    // Check if App Bundle
-    const isAppBundle = item.type === 'folder' && (item.name.endsWith('.app') || item.isAppBundle)
-    
-    if (e.detail === 2) { // Double click
-      if (isAppBundle && appLauncher) {
-        // Launch App Bundle!
-        console.log('Launching App Bundle:', item.name)
-        appLauncher.launch(item)
+    if (!item) {
+        console.error('[FileList] Item not found for ID:', id)
         return
-      }
-      
-      onDoubleClick(id)
-    } else {
-      onSelect(id, e)
     }
+
+    console.log('[FileList] Double click on:', item.name, 'Type:', item.type)
+
+    // Try to launch as App Bundle first
+    if (item.type === 'folder') {
+        const appLauncher = AppLauncherService.getInstance()
+        if (appLauncher) {
+            console.log('[FileList] Attempting to launch via AppLauncher (Direct Instance)...')
+            // Force detection even if not marked as bundle yet
+            const launched = await appLauncher.launch(item)
+            console.log('[FileList] Launch result:', launched)
+            if (launched) return
+        } else {
+            console.warn('[FileList] AppLauncher instance not found!')
+        }
+    }
+    
+    console.log('[FileList] Fallback to standard open')
+    onDoubleClick(id)
   }
 
   // Grid view - virtualized
@@ -272,9 +285,12 @@ export default function FileList({
                       key={node.id}
                       item={node}
                       selected={isSelected}
+                      // Main Interaction Handlers
                       onClick={(e) => handleItemClick(node.id, e)}
+                      onDoubleClick={(e) => handleItemDoubleClick(node.id, e)}
+                      // Context Menu
                       onContextMenu={(e) => onContextMenu(e, node.id)}
-                      onDoubleClick={(e) => e.stopPropagation()}
+                      // Rename Props
                       renaming={renamingId === node.id}
                       onRename={(newName) => {
                         if (newName && newName !== node.name) {
@@ -283,15 +299,14 @@ export default function FileList({
                         setRenamingId(null)
                       }}
                       onCancelRename={() => setRenamingId(null)}
+                      // Drag & Drop
                       draggable
                       onDragStart={(e) => handleDragStart(e, node.id)}
                       onDragOver={(e) => handleDragOver(e, node.id)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, node.id)}
                       onDragEnd={handleDragEnd}
-                      onClick={(e) => handleMouseDown(e, node.id)}
-                      onDoubleClick={() => onDoubleClick(node.id)}
-                      onContextMenu={(e) => onContextMenu(e, node.id)}
+                      
                       className={cn(
                         "p-3 rounded-xl transition-[background-color,border-color,opacity,box-shadow] duration-200 border border-transparent cursor-default",
                         isSelected

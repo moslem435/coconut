@@ -56,11 +56,7 @@ export function WindowTitleBar({
 }: WindowTitleBarProps) {
     const { t } = useLanguage()
 
-    // Dynamic contrast colors
-    // We use white color with mix-blend-mode: difference to achieve dynamic contrast against any background
-    const dynamicTextColor = '#ffffff'
-    const dynamicIconColor = '#ffffff'
-    
+    // We use theme variables instead of mix-blend-mode for better reliability over iframes
     const manifest = appId ? APPS_REGISTRY[appId] : undefined
     
     const displayTitle = isDefaultTitle && appId ? t(`app.${appId}`) : title
@@ -76,26 +72,25 @@ export function WindowTitleBar({
                 e.preventDefault()
                 if (isResizable) onMaximize()
             }}
-            className="h-10 flex items-center justify-between px-3 select-none shrink-0 cursor-grab active:cursor-grabbing group/titlebar"
+            className="h-8 flex items-center justify-between px-2.5 select-none shrink-0 cursor-grab active:cursor-grabbing group/titlebar bg-black/5 backdrop-blur-xl transition-colors duration-200 z-50 absolute top-0 left-0 w-full"
             style={{
-                backgroundColor: 'transparent',
+                // backgroundColor handled by class
             }}
         >
             {/* Left: Icon + Title */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
                 <div className="relative z-10">
                     <AppIcon 
                         manifest={manifest}
                         icon={Icon}
-                        size={20}
-                        className="drop-shadow-sm"
+                        size={16}
+                        className="drop-shadow-sm opacity-90"
                     />
                 </div>
                 <span
-                    className="text-sm font-medium tracking-wide transition-colors mix-blend-difference"
+                    className="text-xs font-medium tracking-wide transition-opacity text-white/90 drop-shadow-md"
                     style={{ 
-                        color: dynamicTextColor,
-                        opacity: isActive ? 1 : 0.6
+                        opacity: isActive ? 1 : 0.8
                     }}
                 >
                     {displayTitle}
@@ -109,12 +104,11 @@ export function WindowTitleBar({
                     <button
                         onClick={onMinimize}
                         aria-label={labels.minimize}
-                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-[var(--os-hover-bg)]"
+                        className="group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-white/10"
                     >
                         <Minus 
-                            size={16} 
-                            className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
-                            style={{ color: dynamicIconColor }} 
+                            size={14} 
+                            className="text-white/80 transition-opacity group-hover:opacity-100"
                         />
                     </button>
                 </Tooltip>
@@ -125,19 +119,17 @@ export function WindowTitleBar({
                     <button
                         onClick={onMaximize}
                         aria-label={isMaximized ? labels.restore : labels.maximize}
-                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-[var(--os-hover-bg)]"
+                        className="group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-white/10"
                     >
                         {isMaximized ? (
                             <Minimize2 
-                                size={16} 
-                                className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
-                                style={{ color: dynamicIconColor }}
+                                size={14} 
+                                className="text-white/80 transition-opacity group-hover:opacity-100"
                             />
                         ) : (
                             <Maximize2 
-                                size={16} 
-                                className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-[var(--os-text-primary)]"
-                                style={{ color: dynamicIconColor }}
+                                size={14} 
+                                className="text-white/80 transition-opacity group-hover:opacity-100"
                             />
                         )}
                     </button>
@@ -149,12 +141,11 @@ export function WindowTitleBar({
                     <button
                         onClick={onClose}
                         aria-label={labels.close}
-                        className="group w-8 h-8 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 hover:bg-red-500 active:scale-90"
+                        className="group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 hover:bg-red-500/80 active:scale-90"
                     >
                         <X 
-                            size={16} 
-                            className="mix-blend-difference transition-colors group-hover:mix-blend-normal group-hover:text-white"
-                            style={{ color: dynamicIconColor }}
+                            size={14} 
+                            className="text-white/80 transition-colors group-hover:text-white group-hover:opacity-100"
                         />
                     </button>
                 </Tooltip>

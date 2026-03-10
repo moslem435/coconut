@@ -16,6 +16,7 @@ export const System = {
       return store.readFileContent(node.id)
     },
     writeFile: async (path: string, content: string): Promise<string> => {
+      console.log(`[System.fs] writeFile: ${path}, length: ${content?.length}`);
       const store = useFileSystemStore.getState()
       const node = store.getNodeByPath(path)
 
