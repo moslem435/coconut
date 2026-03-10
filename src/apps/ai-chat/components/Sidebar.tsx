@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '../store/useChatStore';
-import { useTranslation, useWindow } from '@/os/sdk';
-import { useWindowStore } from '@/os/kernel/useWindowStore';
+import { useTranslation } from '@/os/sdk';
 import {
     Plus,
     Trash2,
@@ -59,7 +58,6 @@ export function Sidebar() {
         }
     };
 
-    const { update: updateWindow } = useWindow();
     const [searchQuery, setSearchQuery] = useState('');
     const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
     const [sidebarMode, setSidebarMode] = useState<'chat' | 'settings'>('chat');
@@ -232,15 +230,6 @@ export function Sidebar() {
 
     const handleToggle = () => {
         toggleSidebar();
-        const appWindow = useWindowStore.getState().windows['ai-chat'];
-        if (appWindow && !appWindow.isMaximized) {
-            updateWindow('ai-chat', {
-                size: {
-                    ...appWindow.size,
-                    width: appWindow.size.width - sidebarWidth // Use current width
-                }
-            });
-        }
     };
 
     const filteredSessions = useMemo(() => {

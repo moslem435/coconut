@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { WebContainer } from '@webcontainer/api'
 import { SYSTEM_PATHS } from '@/os/config/paths'
+import { toast } from '@/os/components/Toast'
 
 interface SyncQueueItem {
   type: 'mkdir' | 'file' | 'unlink'
@@ -1057,17 +1058,61 @@ console.log(\`App running at http://localhost:\${port}\`);
             setTimeout(async () => {
               try {
                 const { useWindowStore } = await import('@/os/kernel/useWindowStore')
-                const { launchApp, windows } = useWindowStore.getState();
+                const { launchApp, windows, activeWindowId, updateWindow, focusWindow } = useWindowStore.getState();
+
+                const activeWin = activeWindowId ? (windows as any)[activeWindowId] : undefined
+                const isWaitingBrowser = (w: any) =>
+                  w?.appId === 'browser' &&
+                  w?.componentProps &&
+                  (w.componentProps as any).waitForServer === true
+
+                let targetBrowser: any | undefined = undefined
+                if (isWaitingBrowser(activeWin)) {
+                  targetBrowser = activeWin
+                } else {
+                  const waiting = Object.values(windows).filter(isWaitingBrowser) as any[]
+                  if (waiting.length > 0) {
+                    targetBrowser = waiting.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0]
+                  }
+                }
+
+                if (targetBrowser) {
+                  updateWindow(targetBrowser.id, {
+                    componentProps: {
+                      ...(targetBrowser.componentProps || {}),
+                      initialUrl: url,
+                      url,
+                      waitForServer: false,
+                      launchStatus: undefined,
+                      launchLabel: undefined
+                    }
+                  })
+                  focusWindow(targetBrowser.id)
+                  return
+                }
 
                 const existingBrowser = Object.values(windows).find(
                   (w: any) => w.appId === 'browser' && w.componentProps?.initialUrl === url
                 );
 
                 if (!existingBrowser) {
-                  launchApp('browser', 'Browser', 'browser', undefined, {
-                    initialUrl: url,
-                    width: 1024,
-                    height: 768
+                  // Do not auto-launch browser for background processes
+                  // Instead, show a toast with action
+                  toast.custom({
+                    type: 'success',
+                    title: 'App Server Ready',
+                    message: `Port ${port} is now listening`,
+                    duration: 5000,
+                    action: {
+                      label: 'Open',
+                      onClick: () => {
+                        launchApp('browser', 'Browser', 'browser', undefined, {
+                          initialUrl: url,
+                          width: 1024,
+                          height: 768
+                        });
+                      }
+                    }
                   });
                 }
               } catch (e) {

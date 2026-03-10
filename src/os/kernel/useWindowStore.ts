@@ -26,7 +26,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { AppIcon } from '@/os/ui/AppIcon'
+import type { AppIcon } from '@/os/registry/types'
 import { eventBus } from '@/os/kernel/EventBus'
 
 // Define the AppLauncher interface

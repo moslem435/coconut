@@ -58,10 +58,11 @@ export function ChatHeader({
                 isSidebar && "pt-0",
                 !isSidebar && "pt-0"
             )}>
-            <div className="flex items-center gap-3 min-w-0 px-1 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 min-w-0 px-1 py-1.5">
                 {/* Show sidebar toggle button if sidebar is closed */}
                 {!isSidebarOpen && (
                     <button
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={onToggleSidebar}
                         className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                     >
@@ -69,6 +70,7 @@ export function ChatHeader({
                     </button>
                 )}
                 <button
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => createSession()}
                     className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                     title={t('ai.sidebar.new_chat')}
@@ -78,6 +80,7 @@ export function ChatHeader({
                 {isEditingTitle ? (
                     <div className="flex items-center gap-2 min-w-[200px]">
                         <input
+                            onPointerDown={(e) => e.stopPropagation()}
                             autoFocus
                             value={titleInput}
                             onChange={(e) => onTitleChange(e.target.value)}
@@ -111,9 +114,10 @@ export function ChatHeader({
                 </div>
             </div>
 
-            <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
                 {isSidebar && (
                     <button
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={onDetach}
                         className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                         title={t('ai.header.detach')}
@@ -125,6 +129,7 @@ export function ChatHeader({
                 {!isSidebar && (
                     <div className="flex items-center h-8 ml-2 border-l border-black/10 dark:border-white/10 pl-2 gap-1">
                         <button
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                             onClick={onMinimize}
                             title={t('menu.minimize')}
@@ -132,6 +137,7 @@ export function ChatHeader({
                             <Minus size={14} />
                         </button>
                         <button
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                             onClick={onMaximize}
                             title={isMaximized ? t('menu.restore') : t('menu.maximize')}
@@ -139,6 +145,7 @@ export function ChatHeader({
                             {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                         </button>
                         <button
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="p-1.5 hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 rounded-lg text-zinc-500 dark:text-zinc-400 transition-colors"
                             onClick={onClose}
                             title={t('menu.close')}

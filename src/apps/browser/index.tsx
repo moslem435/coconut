@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
-import { AlertCircle, RotateCcw, ExternalLink } from 'lucide-react';
+import { AlertCircle, RotateCcw, ExternalLink, Loader2 } from 'lucide-react';
 
 interface BrowserProps {
   url?: string;
   initialUrl?: string; // Support both prop names
   isAppMode?: boolean; // Hide address bar for app-like experience
   filePath?: string;   // Original file path for static app recovery
+  waitForServer?: boolean;
+  launchStatus?: string;
+  launchLabel?: string;
 }
 
-const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserProps) => {
+const BrowserApp = ({ 
+  url, 
+  initialUrl, 
+  isAppMode = false, 
+  filePath, 
+  waitForServer = false,
+  launchStatus = 'booting',
+  launchLabel
+}: BrowserProps) => {
   // Use initialUrl if provided, otherwise fall back to url, then default
   const startUrl = initialUrl || url || 'https://google.com';
 
@@ -19,6 +30,11 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
 
   const [urlInput, setUrlInput] = useState(startUrl);
   const [iframeUrl, setIframeUrl] = useState(startUrl);
+  const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+  const [showAppOverlay, setShowAppOverlay] = useState(isAppMode && (waitForServer || !isIframeLoaded));
+  const [lastUrlChangeAt, setLastUrlChangeAt] = useState<number>(() => Date.now());
+  const [lastIframeLoadAt, setLastIframeLoadAt] = useState<number | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [iframeError, setIframeError] = React.useState<string | null>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
@@ -67,11 +83,89 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
     const newUrl = initialUrl || url;
     if (newUrl && newUrl !== iframeUrl) {
       console.log('[Browser] Updating URL from props:', newUrl);
+      setIsIframeLoaded(false);
+      setLastIframeLoadAt(null);
+      setLastUrlChangeAt(Date.now());
+      setLoadingProgress(0);
       setUrlInput(newUrl);
       setIframeUrl(newUrl);
       setIframeError(null);
     }
   }, [initialUrl, url]);
+
+  React.useEffect(() => {
+    if (!isAppMode || iframeError) {
+      setLoadingProgress(0);
+      return;
+    }
+    if (waitForServer || !isIframeLoaded) {
+      const tick = window.setInterval(() => {
+        setLoadingProgress((p) => {
+          // Determine target cap based on status
+          let cap = 95;
+          let speed = 0.06;
+
+          if (waitForServer) {
+            if (launchStatus === 'booting') {
+               cap = 25;
+               speed = 0.1; 
+            } else if (launchStatus === 'installing') {
+               cap = 65;
+               speed = 0.02; // Install is slow
+            } else if (launchStatus === 'starting') {
+               cap = 90;
+               speed = 0.08;
+            } else {
+               cap = 92; // Default fallback
+            }
+          } else {
+             // Server ready, waiting for iframe load
+             cap = 98;
+             speed = 0.15;
+          }
+
+          // If current progress is far behind target (e.g. status jump), accelerate
+          if (cap - p > 15) speed = 0.2;
+
+          const next = p + (cap - p) * speed + 0.1;
+          return Math.min(cap, Math.max(p, next));
+        });
+      }, 120);
+      return () => window.clearInterval(tick);
+    }
+    setLoadingProgress(100);
+    return undefined;
+  }, [isAppMode, waitForServer, isIframeLoaded, iframeError, iframeUrl, launchStatus]);
+
+  React.useEffect(() => {
+    if (!isAppMode || iframeError) {
+      setShowAppOverlay(false);
+      return;
+    }
+    if (waitForServer || !isIframeLoaded) {
+      setShowAppOverlay(true);
+      return;
+    }
+    const isWebContainerUrl =
+      iframeUrl.includes('localhost') ||
+      iframeUrl.includes('webcontainer') ||
+      iframeUrl.includes('127.0.0.1') ||
+      iframeUrl.includes('.local-corp.webcontainer.api.io') ||
+      iframeUrl.includes('.local-corp.webcontainer-api.io');
+
+    const holdMs = isWebContainerUrl ? 150 : 0;
+    const anchor = lastIframeLoadAt ?? lastUrlChangeAt;
+    const remaining = holdMs - (Date.now() - anchor);
+
+    if (remaining > 0) {
+      setShowAppOverlay(true);
+      const t = window.setTimeout(() => setShowAppOverlay(false), remaining);
+      return () => window.clearTimeout(t);
+    }
+
+    setShowAppOverlay(false);
+    return undefined;
+  }, [isAppMode, waitForServer, isIframeLoaded, iframeError, iframeUrl, lastUrlChangeAt, lastIframeLoadAt]);
 
   // Monitor iframe load errors
   React.useEffect(() => {
@@ -81,6 +175,9 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
     const handleLoad = () => {
       console.log('[Browser] Iframe loaded successfully:', iframeUrl);
       setIframeError(null);
+      setIsIframeLoaded(true);
+      setLastIframeLoadAt(Date.now());
+      setLoadingProgress(100);
 
       // Inject custom scrollbar styles into the iframe
       try {
@@ -113,6 +210,7 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
 
     const handleError = (e: ErrorEvent) => {
       console.error('[Browser] Iframe load error:', e);
+      setIsIframeLoaded(false);
       // Don't show generic error immediately for blob URLs, as they might be stale
       if (!iframeUrl.startsWith('blob:')) {
          setIframeError('Failed to load content');
@@ -140,6 +238,10 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
     if (!target.startsWith('http')) {
       target = `https://${target}`;
     }
+    setIsIframeLoaded(false);
+    setLastIframeLoadAt(null);
+    setLastUrlChangeAt(Date.now());
+    setLoadingProgress(0);
     setIframeUrl(target);
     setUrlInput(target);
   };
@@ -185,21 +287,48 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
           </div>
         )}
 
-        {/* Background Hint */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center z-0">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <AlertCircle size={32} className="text-gray-400" />
+        {showAppOverlay && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-200 p-8 text-center z-50 bg-black/70 pointer-events-none transition-opacity duration-300">
+            <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center mb-4">
+              <Loader2 size={28} className="text-gray-200 animate-spin" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-100 mb-2">
+              {launchLabel || (waitForServer ? '正在启动开发服务器' : '正在加载应用')}
+            </h3>
+            <p className="text-sm max-w-md opacity-80 min-h-[20px]">
+              {/* Optional detail text, maybe just keep it simple or remove if label is detailed */}
+              {(!launchLabel && waitForServer) ? '首次启动会自动安装依赖，完成后将自动打开页面' : ''}
+            </p>
+            <div className="w-80 max-w-[80vw] mt-6">
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-white/60 transition-[width] duration-200"
+                  style={{ width: `${Math.max(2, Math.min(100, loadingProgress))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs opacity-70 tabular-nums">
+                {Math.round(Math.min(100, loadingProgress))}%
+              </div>
+            </div>
           </div>
-          <h3 className="text-lg font-medium text-gray-600 mb-2">
-            {isWebContainerUrl ? 'Development Server Ready' : 'Content Blocked?'}
-          </h3>
-          <p className="text-sm max-w-md mb-6">
-            {isWebContainerUrl
-              ? 'If the page is blank or shows an error, ensure your dev server (e.g. vite.config.ts) is configured with COOP/COEP headers.'
-              : `If you see this, ${iframeUrl} might be blocking embeds or requires adding to the whitelist in Settings.`
-            }
-          </p>
-        </div>
+        )}
+
+        {!isAppMode && !waitForServer && !iframeError && !isIframeLoaded && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center z-0 pointer-events-none">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle size={32} className="text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-600 mb-2">
+              {isWebContainerUrl ? 'Development Server Ready' : 'Content Blocked?'}
+            </h3>
+            <p className="text-sm max-w-md mb-6">
+              {isWebContainerUrl
+                ? 'If the page is blank or shows an error, ensure your dev server (e.g. vite.config.ts) is configured with COOP/COEP headers.'
+                : `If you see this, ${iframeUrl} might be blocking embeds or requires adding to the whitelist in Settings.`
+              }
+            </p>
+          </div>
+        )}
 
         {/* Iframe - absolute positioning to fill parent */}
         {isWebContainerUrl ? (
@@ -208,7 +337,7 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
             ref={iframeRef}
             key={iframeUrl}
             src={iframeUrl}
-            className="absolute inset-0 w-full h-full border-0 bg-transparent"
+            className="absolute inset-0 w-full h-full border-0 bg-black z-10"
             title="Browser"
             allow="cross-origin-isolated; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
@@ -219,7 +348,7 @@ const BrowserApp = ({ url, initialUrl, isAppMode = false, filePath }: BrowserPro
             ref={iframeRef}
             key={iframeUrl}
             src={iframeUrl}
-            className="absolute inset-0 w-full h-full border-0 bg-transparent"
+            className="absolute inset-0 w-full h-full border-0 bg-black z-10"
             title="Browser"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen

@@ -362,7 +362,10 @@ export function useWebLLM() {
         _cloudConfig?: any,    // ignored in local mode
         _modelSettings?: any   // ignored in local mode, for interface compatibility
     ) => {
-        if (!engineRef.current || !state.isModelLoaded) return;
+        if (!engineRef.current || !state.isModelLoaded) {
+            setState(prev => ({ ...prev, isLoading: false }));
+            return;
+        }
 
         // Create a new abort controller for this generation
         if (activeGenerationAbortControllerRef.current) {
@@ -794,20 +797,20 @@ export function useWebLLM() {
             }
 
             onFinish();
-            setState(prev => ({ ...prev, isLoading: false }));
         } catch (err: any) {
             if (err.name === 'AbortError') {
                 console.log("Generation aborted by user or system");
-                setState(prev => ({ ...prev, isLoading: false }));
                 return;
             }
             console.error("Chat error:", err);
             setState(prev => ({
                 ...prev,
-                isLoading: false,
                 error: err.message || "Failed to generate response"
             }));
             onError(err);
+        } finally {
+            setState(prev => ({ ...prev, isLoading: false }));
+            activeGenerationAbortControllerRef.current = null;
         }
     }, [state.isModelLoaded]);
 

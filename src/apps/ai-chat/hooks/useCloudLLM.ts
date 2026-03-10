@@ -468,8 +468,8 @@ export function useCloudLLM() {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
-            setState(prev => ({ ...prev, isLoading: false }));
         }
+        setState(prev => ({ ...prev, isLoading: false }));
     }, []);
 
     const generateResponse = useCallback(async (

@@ -360,30 +360,6 @@ function LoadingPulse() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
     const { t } = useTranslation();
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [showPreview, setShowPreview] = useState(false);
-    const [iframeError, setIframeError] = useState<string | null>(null);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-
-    // Listen for server-ready events
-    useEffect(() => {
-        const handleServerReady = async (e: Event) => {
-            const customEvent = e as CustomEvent;
-            console.log('[BuilderTimeline] Server ready:', customEvent.detail);
-            const originalUrl = customEvent.detail.url;
-
-            // WebContainer URLs are designed to be accessible from the browser
-            console.log('[BuilderTimeline] Using URL:', originalUrl);
-
-            setPreviewUrl(originalUrl);
-            setShowPreview(true);
-        };
-
-        window.addEventListener('server-ready', handleServerReady);
-        return () => {
-            window.removeEventListener('server-ready', handleServerReady);
-        };
-    }, []);
 
     const validEvents = events.filter(e =>
         e.type === 'tool' ? true : (e.content?.trim().length ?? 0) > 0
@@ -438,59 +414,6 @@ export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
                 </div>
             </div>
 
-            {/* Inline Preview Panel */}
-            {previewUrl && showPreview && (
-                <div className="rounded-lg border border-emerald-500/20 dark:border-emerald-500/30 overflow-hidden bg-white dark:bg-zinc-900">
-                    {/* Preview Header */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50/60 dark:bg-emerald-900/10 border-b border-emerald-500/10">
-                        <Check size={11} className="text-emerald-500" />
-                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 tracking-wide">
-                            应用预览
-                        </span>
-                        <span className="text-[10px] font-mono text-emerald-500/60 ml-auto truncate max-w-[200px]">
-                            {previewUrl}
-                        </span>
-                        <button
-                            onClick={() => setShowPreview(false)}
-                            className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded transition-colors"
-                            title="关闭预览"
-                        >
-                            <X size={12} className="text-emerald-600 dark:text-emerald-400" />
-                        </button>
-                    </div>
-
-                    {/* Preview Iframe */}
-                    <div className="relative w-full h-[400px] bg-white">
-                        {iframeError && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/10 p-4">
-                                <div className="text-center">
-                                    <X size={32} className="text-red-500 mx-auto mb-2" />
-                                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">预览加载失败</p>
-                                    <p className="text-xs text-red-500/70">{iframeError}</p>
-                                    <button
-                                        onClick={() => window.open(previewUrl!, '_blank')}
-                                        className="mt-3 px-3 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                                    >
-                                        在新标签页中打开
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                        <iframe
-                            ref={iframeRef}
-                            src={previewUrl}
-                            className="absolute inset-0 w-full h-full border-0"
-                            title="App Preview"
-                            allow="cross-origin-isolated; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            onError={() => setIframeError('Iframe 加载错误')}
-                            onLoad={() => {
-                                console.log('[BuilderTimeline] Iframe loaded successfully');
-                                setIframeError(null);
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

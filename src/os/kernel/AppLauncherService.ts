@@ -14,6 +14,18 @@ import { AppBundleConfig } from './initialFileTree'
  */
 export class AppLauncherService {
     private static instance: AppLauncherService
+    private static webContainerLaunchPromises = new Map<string, Promise<void>>()
+    private static webContainerStartupUrls = new Map<string, string>()
+
+    private static getWebContainerStartupUrl(cacheKey: string, title: string) {
+        const cached = AppLauncherService.webContainerStartupUrls.get(cacheKey)
+        if (cached) return cached
+        const html = `<html><head><meta charset="utf-8"/></head><body style="margin:0;background:#0b1220;height:100vh;"></body></html>`
+        const blob = new Blob([html], { type: 'text/html' })
+        const url = URL.createObjectURL(blob)
+        AppLauncherService.webContainerStartupUrls.set(cacheKey, url)
+        return url
+    }
 
     private constructor() {
         // Register self to WindowStore
@@ -75,25 +87,24 @@ export class AppLauncherService {
                 // Fallback: Try to read directory directly from physical storage to ensure it's not a cache miss
                 try {
                     const { resolvePath, getPath } = useFileSystemStore.getState()
-                    // Use a more robust way to get system fs
-                    const system = (await import('@/os/sdk/system')).default
-                    if (!system || !system.fs) {
+                    const { System } = await import('@/os/sdk/system')
+                    if (!System || !System.fs) {
                         throw new Error('System FS not available')
                     }
-                    const fs = system.fs
+                    const fs = System.fs
                     
                     // Try to resolve path, fallback to manual build if it looks broken
-                    let path = resolvePath(file.id)
-                    if (path === '/' || path === '') {
+                    let physicalPath = resolvePath(file.id)
+                    if (physicalPath === '/' || physicalPath === '') {
                         const nodes = getPath(file.id)
-                        path = '/' + nodes.slice(1).map(n => n.name).join('/')
-                        console.log('[AppLauncher] Path resolved to root, manual rebuild:', path)
+                        physicalPath = '/' + nodes.slice(1).map(n => n.name).join('/')
+                        console.log('[AppLauncher] Path resolved to root, manual rebuild:', physicalPath)
                     }
                     
-                    console.log('[AppLauncher] Attempting physical read at:', `${path}/package.json`)
+                    console.log('[AppLauncher] Attempting physical read at:', `${physicalPath}/package.json`)
                     
                     // Check for package.json physically
-                    const pkgContent = await fs.readFile(`${path}/package.json`)
+                    const pkgContent = await fs.readFile(`${physicalPath}/package.json`)
                     if (pkgContent) {
                          const pkg = JSON.parse(pkgContent)
                          console.log('[AppLauncher] Found package.json via physical read:', pkg.name)
@@ -108,7 +119,7 @@ export class AppLauncherService {
                              let hasEntry = !!pkg.entry
                              if (!hasEntry) {
                                  try {
-                                     await fs.readFile(`${path}/index.html`)
+                                     await fs.readFile(`${physicalPath}/index.html`)
                                      hasEntry = true
                                  } catch {}
                              }
@@ -127,7 +138,7 @@ export class AppLauncherService {
                          }
                     }
                 } catch (physicalErr) {
-                    console.warn('[AppLauncher] Physical read fallback failed for path:', path, physicalErr)
+                    console.warn('[AppLauncher] Physical read fallback failed:', physicalErr)
                 }
             } else {
                  console.log('[AppLauncher] Children found:', children.map(c => c.name))
@@ -305,12 +316,62 @@ export class AppLauncherService {
     }
 
     private async launchWebContainerApp(file: any, appId: string, title: string, icon: any, options: any) {
-        const { launchApp } = useWindowStore.getState()
+        const { launchApp, focusWindow, updateWindow, windows } = useWindowStore.getState()
         const wcStore = useWebContainerStore.getState()
 
+        const startUrl = AppLauncherService.getWebContainerStartupUrl(appId, title)
+        
+        // Helper to update launch status
+        const updateStatus = (status: string, label: string) => {
+            const { windows, updateWindow } = useWindowStore.getState()
+            const win = windows[appId]
+            if (win) {
+                updateWindow(appId, {
+                    componentProps: {
+                        ...(win.componentProps || {}),
+                        launchStatus: status,
+                        launchLabel: label
+                    }
+                })
+            }
+        }
+
+        const existingWin = windows[appId]
+        if (existingWin) {
+            updateWindow(appId, {
+                componentProps: {
+                    ...(existingWin.componentProps || {}),
+                    initialUrl: startUrl,
+                    isAppMode: true,
+                    waitForServer: true,
+                    launchStatus: 'booting',
+                    launchLabel: 'Starting System Runtime...'
+                }
+            })
+            focusWindow(appId)
+        } else {
+            launchApp(appId, title, 'browser', icon, {
+                ...options,
+                initialUrl: startUrl,
+                isAppMode: true,
+                waitForServer: true,
+                launchStatus: 'booting',
+                launchLabel: 'Starting System Runtime...'
+            })
+        }
+
+        const existingPromise = AppLauncherService.webContainerLaunchPromises.get(appId)
+        if (existingPromise) {
+            focusWindow(appId)
+            await existingPromise
+            return
+        }
+
+        const launchPromise = (async () => {
         // Check if WebContainer is ready, try to boot if not
         if (!wcStore.instance) {
-            toast.info('Starting Runtime', 'System Runtime is booting, please wait...')
+            updateStatus('booting', 'Booting System Runtime...')
+            // toast.info('Starting Runtime', 'System Runtime is booting, please wait...')
             try {
                 await wcStore.boot()
                 if (!useWebContainerStore.getState().instance) {
@@ -350,7 +411,8 @@ export class AppLauncherService {
 
             if (!hasNodeModules) {
                 console.log(`[AppLauncher] node_modules not found, running npm install...`)
-                toast.info('Installing Dependencies', `Running npm install for "${title}"...`)
+                updateStatus('installing', 'Installing Dependencies...')
+                // toast.info('Installing Dependencies', `Running npm install for "${title}"...`)
                 try {
                     await runCommand('npm', ['install'], appPath, (data) => {
                         console.log(`[${file.name} install] ${data}`)
@@ -364,21 +426,22 @@ export class AppLauncherService {
             }
 
             // Run dev server
+            updateStatus('starting', 'Starting Dev Server...')
             runCommand('npm', ['run', 'dev'], appPath, (data) => {
                 // console.log(`[${file.name}] ${data}`)
             }, { detached: true, successPattern: 'Local:' })
-            
-            // Launch browser immediately with a "Waiting..." state
-            launchApp(appId, title, 'browser', icon, {
-                ...options,
-                initialUrl: 'about:blank', // Will be updated by server-ready
-                isAppMode: true,
-                waitForServer: true // Flag for browser to listen for next server-ready
-            })
 
         } catch (e: any) {
             console.error('[AppLauncher] Failed to launch web container app:', e)
             toast.error('Launch Failed', `Failed to launch "${title}": ${e.message}`)
+        }
+        })()
+
+        AppLauncherService.webContainerLaunchPromises.set(appId, launchPromise)
+        try {
+            await launchPromise
+        } finally {
+            AppLauncherService.webContainerLaunchPromises.delete(appId)
         }
     }
 }

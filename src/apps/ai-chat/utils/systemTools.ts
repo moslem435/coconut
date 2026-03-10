@@ -33,41 +33,110 @@ export const systemToolsImplementation: Record<string, Function> = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #111111;
+            --acc: #3b82f6;
+            --muted: #666666;
+            --border: #e5e5e5;
+            --radius: 16px;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #09090b;
+                --fg: #ededed;
+                --acc: #60a5fa;
+                --muted: #a1a1aa;
+                --border: #27272a;
+            }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #f0f2f5;
-            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--fg);
+            height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            justify-content: center;
+            overflow: hidden;
+            background-image: radial-gradient(var(--border) 1px, transparent 1px);
+            background-size: 24px 24px;
         }
-        #app {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        .card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 40px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
             text-align: center;
-            max-width: 500px;
-            width: 100%;
+            position: relative;
+            overflow: hidden;
         }
-        h1 { margin-top: 0; color: #1a73e8; }
-        .hint { color: #666; font-size: 0.9rem; margin-top: 1rem; }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--acc), #a855f7);
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: inline-block;
+            animation: bounce 2s infinite;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+        p {
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        .btn {
+            display: inline-block;
+            background: var(--fg);
+            color: var(--bg);
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--acc);
+            margin-bottom: 24px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
     </style>
 </head>
 <body>
-    <div id="app">
-        <h1>${icon} ${title}</h1>
-        <div id="content">
-            <p>正在准备应用内容...</p>
-        </div>
-        <div class="hint">由 Cocount AI 助手生成</div>
+    <div class="card">
+        <div class="badge">Static App</div>
+        <div class="icon">${icon}</div>
+        <h1>${title}</h1>
+        <p>Your minimalist static template is ready. Start editing <code>index.html</code> to build something amazing.</p>
+        <a href="#" class="btn" onclick="alert('Hello World!')">Get Started</a>
     </div>
-    <script>
-        console.log('${title} 启动成功！');
-    </script>
 </body>
 </html>`;
             console.log(`[SystemTools] Writing index.html, length: ${html.length}`);
@@ -178,51 +247,124 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --bg: 255 255 255;
+    --fg: 24 24 27;
+    --muted: 113 113 122;
+    --border: 228 228 231;
+    --accent: 249 115 22; /* Orange-500 */
   }
-}`;
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: 9 9 11;
+      --fg: 250 250 250;
+      --muted: 161 161 170;
+      --border: 39 39 42;
+      --accent: 249 115 22;
+    }
+  }
+  
+  body {
+    background-color: rgb(var(--bg));
+    color: rgb(var(--fg));
+    font-family: 'Inter', sans-serif;
+    background-image: linear-gradient(to right, rgba(var(--border), 0.5) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(var(--border), 0.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-lg font-medium transition-all duration-200;
+  }
+  .btn-primary {
+    @apply bg-orange-500 text-white hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20;
+  }
+  .card {
+    @apply bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl;
+  }
+}`; 
             await System.fs.writeFile(`${appPath}/src/index.css`, indexCss);
 
             // 7. src/App.jsx (Starter Template)
             const appJsx = `import { useState } from 'react'
+import { Sparkles, Terminal, Cpu, Zap } from 'lucide-react'
 
 function App() {
   const [count, setCount] = useState(0)
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center p-4">
-      <h1 className="text-4xl font-bold mb-4">${title}</h1>
-      <div className="card p-6 bg-white/10 rounded-xl shadow-lg text-center">
-        <button 
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            onClick={() => setCount((count) => count + 1)}
-        >
-          count is {count}
-        </button>
-        <p className="mt-4 text-sm opacity-70">
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
+    <div className="min-h-screen w-full flex items-center justify-center p-8">
+      <div className="card w-full max-w-3xl overflow-hidden">
+        {/* Header Strip */}
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 to-amber-500" />
+        
+        <div className="p-10 md:p-14 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wider mb-8 border border-orange-500/20">
+            <Sparkles size={14} /> System Ready
+          </div>
+
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-zinc-900 dark:text-white">
+            ${title}
+          </h1>
+          
+          <p className="text-lg text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto mb-10 leading-relaxed">
+            A high-performance React application template. Engineered for speed, designed for clarity.
+          </p>
+
+          <div className="flex justify-center gap-4 mb-16">
+            <button 
+              onClick={() => setCount(c => c + 1)}
+              className="btn btn-primary group"
+            >
+              <Zap size={18} className="mr-2 group-hover:fill-current transition-all" />
+              Interactive: {count}
+            </button>
+            <button className="btn bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100">
+              Documentation
+            </button>
+          </div>
+
+          {/* Grid Features */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <Feature 
+              icon={<Terminal size={20} />}
+              title="Modern Stack"
+              desc="Vite + React + Tailwind configured for production."
+            />
+            <Feature 
+              icon={<Cpu size={20} />}
+              title="Performance"
+              desc="Optimized build setup with minimal overhead."
+            />
+            <Feature 
+              icon={<Sparkles size={20} />}
+              title="Aesthetics"
+              desc="Clean, grid-based layout with refined typography."
+            />
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-zinc-50 dark:bg-zinc-950/50 p-4 text-center text-xs text-zinc-400 border-t border-zinc-100 dark:border-zinc-800/50 font-mono">
+          src/App.jsx
+        </div>
       </div>
+    </div>
+  )
+}
+
+function Feature({ icon, title, desc }) {
+  return (
+    <div className="p-4 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800">
+      <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3 text-zinc-900 dark:text-white">
+        {icon}
+      </div>
+      <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">{title}</h3>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">{desc}</p>
     </div>
   )
 }
