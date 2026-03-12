@@ -1,5 +1,5 @@
 /**
- * Shell 组件 - 操作系统外壳
+ * @fileoverview Shell 组件 - 操作系统外壳与初始化入口
  * 
  * 功能：
  * - 系统初始化（内核、文件系统、进程管理）
@@ -21,8 +21,10 @@
  * - AnimatePresence 管理窗口的进入/退出动画
  * - 进程管理采用定时器轮询（2 秒间隔）
  * 
- * @author System
- * @created 2024
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-04
+ * @module src/os/system/Shell
  */
 
 import { useEffect } from 'react'

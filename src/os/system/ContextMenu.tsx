@@ -1,5 +1,13 @@
-'use client'
+/**
+ * @fileoverview 右键菜单组件 - 渲染动态右键菜单
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-09
+ * @module src/os/system/ContextMenu
+ */
 
+'use client'
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronRight } from 'lucide-react'

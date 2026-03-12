@@ -1,15 +1,34 @@
 'use client'
 
+/**
+ * @fileoverview 系统设置 Store - 外观、主题、声音、壁纸等全局设置管理
+ * 
+ * 架构亮点：
+ * - 使用 subscribeWithSelector 中间件：支持对具体字段订阅，适用于 DOM 副作用
+ * - DOM 副作用在 Store 外部处理：避免在 React 组件内添加 useEffect，使应用弹性更强
+ * - 副作用包括：应用主题类、主题色、显示缩放、亮度遮罩层
+ * 
+ * @author yume
+ * @created 2026-02-13
+ * @lastModified 2026-03-12
+ * @module src/os/kernel/useSystemSettingsStore
+ */
+
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 
+/** 主题模式类型 */
 export type ThemeMode = 'dark' | 'light'
 
+/** 壁纸配置类型 */
 export interface Wallpaper {
     type: 'preset' | 'image' | 'solid' | 'video' | 'daily' | 'dynamic-time'
     value: string
 }
 
+/**
+ * 全局系统设置字段定义
+ */
 export interface SystemSettings {
     theme: ThemeMode
     accentColor: string
@@ -59,6 +78,7 @@ interface SystemSettingsActions {
 
 type SystemSettingsState = SystemSettings & SystemSettingsActions
 
+/** 默认系统设置，新用户首次加载将使用这些值 */
 const DEFAULT_SETTINGS: SystemSettings = {
     theme: 'dark',
     accentColor: '#06b6d4',
@@ -143,10 +163,16 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
 )
 
 // ============================================================================
-// DOM Side Effects (replaces the 4 useEffects from SystemSettingsContext)
-// These run outside React, triggered by Zustand subscribe.
+// DOM 副作用（替代 React 组件中的 useEffect）
+// 为什么在 Store 外部处理而非 React 组件内部：
+// - 避免每次设置变化时都需要组件已挂载
+// - Store 订阅在应用启动时立即生效，即使没有任何组件渲染
 // ============================================================================
 
+/**
+ * 将十六进制颜色转换为 RGB 分量
+ * 用于 CSS 变量设置 rgba()时提取颜色分量
+ */
 function hexToRgb(hex: string) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? {
@@ -156,6 +182,10 @@ function hexToRgb(hex: string) {
     } : null
 }
 
+/**
+ * 应用主题和透明度设置到 DOM
+ * 为什么用 data attribute：方便 CSS 选择器匹配，如 [data-theme='dark']
+ */
 function applyTheme(theme: ThemeMode, useTransparency: boolean) {
     const root = document.documentElement
     root.dataset.theme = theme
@@ -169,6 +199,10 @@ function applyTheme(theme: ThemeMode, useTransparency: boolean) {
     }
 }
 
+/**
+ * 将主题色应用到 CSS 变量
+ * 为什么需要三个变川：实体色、半透明背景、极小发光三种场景不同
+ */
 function applyAccentColor(color: string) {
     const root = document.documentElement
     const rgb = hexToRgb(color)
@@ -180,10 +214,20 @@ function applyAccentColor(color: string) {
     }
 }
 
+/**
+ * 应用显示缩放到 HTML 元素字体大小
+ * 为什么用 rem 单位：所有使用 rem 的元素水平缩放，无需修改每个元素
+ */
 function applyDisplayScale(scale: number) {
     document.documentElement.style.fontSize = `${16 * scale / 100}px`
 }
 
+/**
+ * 通过黑色遮罩层模拟亮度调节
+ * 为什么不用 CSS filter brightness：
+ * - filter 会影响子元素的 position: fixed 定位
+ * - 遮罩层方案不影响子元素，安全性更高
+ */
 function applyBrightness(brightness: number) {
     // 方案: 使用遮罩层模拟
     // 计算遮罩透明度: 100% 亮度 = 0 透明度, 0% 亮度 = 0.8 透明度 (避免全黑)
@@ -203,9 +247,9 @@ function applyBrightness(brightness: number) {
     overlay.style.opacity = opacity.toString();
 }
 
-// Subscribe to state changes and apply DOM side effects
+// 应用初始设置并订阅属属变化，实时更新 DOM
 if (typeof window !== 'undefined') {
-    // Apply initial state on load
+    // 页面加载时立即应用当前设置，避免闪烁
     const initialState = useSystemSettingsStore.getState()
     applyTheme(initialState.theme, initialState.useTransparency)
     applyAccentColor(initialState.accentColor)

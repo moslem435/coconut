@@ -1,3 +1,17 @@
+/**
+ * @fileoverview 全局对话框组件 - 渲染全局模态对话框 UI
+ * 
+ * 为什么单独抽离对话框 UI 而非内嵌到业务组件：
+ * - 对话框需要展示在最顶层（z-99999）
+ * - 单一对话框实例共享于整个系统
+ * - UI 层与 Store 分离，业务逻辑通过 useDialogStore 解耦
+ * 
+ * @author yume
+ * @created 2026-02-11
+ * @lastModified 2026-03-05
+ * @module src/os/system/GlobalDialogs
+ */
+
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useDialogStore } from '@/os/kernel/useDialogStore'

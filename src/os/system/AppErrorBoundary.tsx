@@ -1,3 +1,21 @@
+/**
+ * @fileoverview 应用错误边界组件 - 捕获应用内未处理异常
+ * 
+ * 为什么需要 Error Boundary：
+ * - 应用级到错误不应该崩溃整个系统
+ * - 每个窗口独立包裹，一个应用崩溃不影响其他
+ * - 展示友好错误界面，允许用户重试或关闭应用
+ * 
+ * 为什么使用 Class 组件：
+ * - React Error Boundary 只能是 Class 组件（getDerivedStateFromError/componentDidCatch）
+ * - 函数组件无法据错误
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-02-06
+ * @module src/os/system/AppErrorBoundary
+ */
+
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, XCircle } from 'lucide-react'
 

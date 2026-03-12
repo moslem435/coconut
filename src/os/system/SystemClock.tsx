@@ -1,5 +1,17 @@
-'use client'
+/**
+ * @fileoverview 系统时钟组件 - 任务栏时间与日期显示
+ * 
+ * 为什么使用自定义实现而非原生 Date 时间转换：
+ * - 需要支持多语言时间格式（中英文不同格式）
+ * - 每秒驱动时钟更新不需要外部组件库
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-02-09
+ * @module src/os/system/SystemClock
+ */
 
+'use client'
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 

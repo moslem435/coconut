@@ -1,5 +1,15 @@
-'use client'
+/**
+ * @fileoverview 任务栏项组件 - 单个应用窗口的任务栏图标
+ * 
+ * 支持预览悬浮（Peek）、右键菜单和动画效果
+ * 
+ * @author yume
+ * @created 2026-02-10
+ * @lastModified 2026-03-09
+ * @module src/os/system/TaskbarItem
+ */
 
+'use client'
 import { useRef, useState, useLayoutEffect } from 'react'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
 import { useContextMenuStore } from '@/os/kernel/useContextMenuStore'

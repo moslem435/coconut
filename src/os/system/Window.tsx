@@ -1,3 +1,23 @@
+/**
+ * @fileoverview 窗口组件 - 应用窗口框架与交互控制
+ * 
+ * 功能：
+ * - 窗口拖拽（通过 framer-motion DragControls）
+ * - 窗口调整大小（应用 useWindowResize hook）
+ * - 窗口层级控制（z-index 由 useWindowStore 管理）
+ * - 标题栏（最小化、最大化、关闭按鈕）
+ * - 窗口动画（通过 framer-motion 实现弹弹窗口）
+ * 
+ * 为什么使用 framer-motion 拖拽而非原生事件：
+ * - useDragControls 允许指定拖拽履柄（仅标题栏）
+ * - 集成的动画支持更流畅的窗口切换动画
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-09
+ * @module src/os/system/Window
+ */
+
 'use client'
 
 import { useDragControls, motion, AnimatePresence } from 'framer-motion'

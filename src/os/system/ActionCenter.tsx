@@ -1,5 +1,13 @@
-'use client'
+/**
+ * @fileoverview 操作中心组件 - 系统通知与快捷操作面板
+ * 
+ * @author yume
+ * @created 2026-02-09
+ * @lastModified 2026-02-24
+ * @module src/os/system/ActionCenter
+ */
 
+'use client'
 import { useRef, useEffect, useState, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'

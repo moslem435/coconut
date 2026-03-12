@@ -1,5 +1,5 @@
 /**
- * 桌面组件
+ * @fileoverview 桌面组件 - 桌面背景、图标布局与交互
  * 
  * 功能：
  * - 显示桌面背景（壁纸、渐变、纯色）
@@ -21,8 +21,10 @@
  * - 图标位置计算采用网格布局算法
  * - 背景亮度分析用于自适应文字颜色
  * 
- * @author System
- * @created 2024
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-09
+ * @module src/os/system/Desktop
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'

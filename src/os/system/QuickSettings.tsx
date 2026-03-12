@@ -1,5 +1,13 @@
-'use client'
+/**
+ * @fileoverview 快速设置面板组件 - 快速切换主题、妥咖、调出设置
+ * 
+ * @author yume
+ * @created 2026-02-09
+ * @lastModified 2026-02-24
+ * @module src/os/system/QuickSettings
+ */
 
+'use client'
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'

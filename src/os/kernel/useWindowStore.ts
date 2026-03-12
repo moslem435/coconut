@@ -1,5 +1,5 @@
 /**
- * 窗口管理 Store
+ * @fileoverview 窗口管理 Store - 系统窗口生命周期与层级控制核心
  * 
  * 功能：
  * - 窗口生命周期管理（打开、关闭、最小化、最大化）
@@ -12,16 +12,17 @@
  * 架构设计：
  * - 虚拟化 z-index：只有前 3 个窗口参与层级计算，减少不必要的更新
  * - LRU 快照缓存：最多缓存 10 个窗口快照，自动清理旧快照
- * - 事件驱动：通过 EventBus 与进程管理器解耦
+ * - 事件驱动：通过 EventBus 与进程管理器解耦，避免直接依赖
  * - 序列化优化：持久化时排除不可序列化的 React 组件（icon）
  * 
  * 性能优化：
  * - 使用 partialize 只持久化必要字段
- * - 使用 skipHydration 延迟水合
  * - 窗口聚焦时跳过不必要的 z-index 更新
  * 
- * @author System
- * @created 2024
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-10
+ * @module src/os/kernel/useWindowStore
  */
 
 import { create } from 'zustand'

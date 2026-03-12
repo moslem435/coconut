@@ -1,3 +1,18 @@
+/**
+ * @fileoverview 全局快捷键组件 - 系统级快捷键绑定
+ * 
+ * 注册所有系统级快捷键，包括：
+ * - Win 键切换开始菜单
+ * - Alt+F4 关闭当前窗口
+ * - Win+D 显示桌面
+ * - Win+E 打开文件管理器
+ * 
+ * @author yume
+ * @created 2026-02-10
+ * @lastModified 2026-02-13
+ * @module src/os/system/GlobalShortcuts
+ */
+
 import { useEffect, useRef } from 'react'
 import { useSystemStore } from '@/os/kernel/useSystemStore'
 import { useWindowStore } from '@/os/kernel/useWindowStore'

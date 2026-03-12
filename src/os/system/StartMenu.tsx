@@ -1,5 +1,13 @@
-'use client'
+/**
+ * @fileoverview 开始菜单组件 - 应用浏览与快速访问
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-02-24
+ * @module src/os/system/StartMenu
+ */
 
+'use client'
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'

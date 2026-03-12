@@ -1,5 +1,20 @@
-'use client'
+/**
+ * @fileoverview 任务栏组件 - 应用快捷方式、系统托盘与窗口切换
+ * 
+ * 功能：
+ * - 固定应用快捷方式（Dock 风格）
+ * - 已打开窗口列表与切换
+ * - 系统时钟和日期
+ * - 展开操作中心和快速设置
+ * - 展开开始菜单
+ * 
+ * @author yume
+ * @created 2026-02-06
+ * @lastModified 2026-03-09
+ * @module src/os/system/Taskbar
+ */
 
+'use client'
 import { useState, useRef, useMemo } from 'react'
 import { Volume2, Palmtree, Settings2, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
