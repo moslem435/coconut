@@ -160,6 +160,18 @@ const en: Record<string, string> = {
     "boot.kernel": "LOADING KERNEL...",
     "boot.fs": "MOUNTING FILESYSTEM...",
     "boot.uplink": "ESTABLISHING UPLINK...",
+    
+    // App Launch
+    "launch.booting": "Booting System Runtime",
+    "launch.installing": "Installing Dependencies",
+    "launch.restoring": "Restoring Cache",
+    "launch.extracting": "Extracting Template",
+    "launch.starting": "Starting Dev Server",
+    "launch.ready": "Ready",
+    "launch.error": "Error",
+    "launch.loading": "Loading",
+    "launch.installing.desc": "First run requires dependency installation. This is a one-time process.",
+    "launch.ready.desc": "App environment ready. Launching interface...",
 
     // Action Center
     "action.notifications": "Notifications",
@@ -184,6 +196,10 @@ const en: Record<string, string> = {
     "settings.desc.network": "Manage network connections and security policies",
     "settings.data": "Data",
     "settings.desc.data": "Manage system data and backups",
+    "settings.developer": "Developer",
+    "settings.desc.developer": "Advanced system settings",
+    "settings.developer.cache": "Shared Dependency Cache",
+    "settings.developer.cache.desc": "Enable shared node_modules cache for faster startup. Disable to force fresh install.",
     "settings.data.reset": "Reset System Settings",
     "settings.data.reset.desc": "Restore all settings to default values. Requires refresh.",
     "settings.data.export": "Export Data",

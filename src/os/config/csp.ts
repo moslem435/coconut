@@ -1,6 +1,14 @@
 export const DEFAULT_CSP_CONFIG = {
     "default-src": ["'self'"],
-    "script-src": ["'self'", "'unsafe-eval'", "'unsafe-inline'", "blob:"],
+    "script-src": [
+        "'self'",
+        "'unsafe-eval'",
+        "'unsafe-inline'",
+        "blob:",
+        "https://cdn.tailwindcss.com",
+        "https://cdn.jsdelivr.net",
+        "https://unpkg.com"
+    ],
     "style-src": ["'self'", "'unsafe-inline'", "https:", "http:"],
     "img-src": ["'self'", "blob:", "data:", "https:", "http:"],
     "font-src": ["'self'", "data:", "https:", "http:"],

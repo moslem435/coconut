@@ -69,6 +69,33 @@ export const INITIAL_FILES: Record<string, FileNode> = {
         updatedAt: Date.now(),
         isSystem: true
     },
+    'user-cache': {
+        id: 'user-cache',
+        parentId: INITIAL_USER_ID,
+        name: '.cache',
+        type: 'folder',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isSystem: true
+    },
+    'user-cache-deps': {
+        id: 'user-cache-deps',
+        parentId: 'user-cache',
+        name: 'deps',
+        type: 'folder',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isSystem: true
+    },
+    'user-cache-npm': {
+        id: 'user-cache-npm',
+        parentId: 'user-cache',
+        name: 'npm',
+        type: 'folder',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isSystem: true
+    },
     [FILE_IDS.TRASH]: {
         id: FILE_IDS.TRASH,
         parentId: INITIAL_ROOT_ID,

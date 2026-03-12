@@ -38,6 +38,7 @@ interface FileSystemRequest {
 // Global serial execution chain for OPFS operations
 // This prevents physical race conditions in the browser's handle indexing
 let operationChain = Promise.resolve();
+let lastCacheWriteLogAt = 0;
 
 self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
     const { id, type } = e.data;
@@ -127,7 +128,12 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                                 data = content as Uint8Array;
                             }
 
-                            console.log(`[FS Worker] SyncWrite: ${path}, size: ${data.length}`);
+                            const isCachePath = path.startsWith('/home/user/.cache/deps/') || path.startsWith('/home/user/.cache/npm/')
+                            const now = Date.now()
+                            if (!isCachePath || now - lastCacheWriteLogAt > 2000) {
+                                if (isCachePath) lastCacheWriteLogAt = now
+                                console.log(`[FS Worker] SyncWrite: ${path}, size: ${data.length}`);
+                            }
                             accessHandle.truncate(0);
                             accessHandle.write(data, { at: 0 });
                             accessHandle.flush();
@@ -135,7 +141,10 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                             accessHandle.close();
                         }
                     } catch (lockError: any) {
-                        console.warn(`[FS Worker] SyncWrite failed for ${path}, falling back to Writable:`, lockError.name || lockError.message);
+                        const isCachePath = path.startsWith('/home/user/.cache/deps/') || path.startsWith('/home/user/.cache/npm/')
+                        if (!isCachePath) {
+                            console.warn(`[FS Worker] SyncWrite failed for ${path}, falling back to Writable:`, lockError.name || lockError.message);
+                        }
                         if (lockError.name === 'NoModificationAllowedError' || lockError.message.includes('Access Handle')) {
                             const writable = await handle.createWritable();
                             try {

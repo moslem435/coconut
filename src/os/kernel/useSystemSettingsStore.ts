@@ -29,6 +29,7 @@ export interface SystemSettings {
     pinnedAppIds: string[]
     wallpaper: Wallpaper
     devMode: boolean
+    useDependencyCache: boolean
 }
 
 interface SystemSettingsActions {
@@ -52,6 +53,7 @@ interface SystemSettingsActions {
     unpinApp: (appId: string) => void
     setWallpaper: (wallpaper: Wallpaper) => void
     setDevMode: (enable: boolean) => void
+    setUseDependencyCache: (enable: boolean) => void
     isSettingsLoaded: boolean
 }
 
@@ -78,7 +80,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
         type: 'preset',
         value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'
     },
-    devMode: false
+    devMode: false,
+    useDependencyCache: true
 }
 
 export const useSystemSettingsStore = create<SystemSettingsState>()(
@@ -113,6 +116,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 })),
                 setWallpaper: (wallpaper) => set({ wallpaper }),
                 setDevMode: (enable) => set({ devMode: enable }),
+                setUseDependencyCache: (enable) => set({ useDependencyCache: enable }),
             }),
             {
                 name: 'cloud-os-settings',
@@ -122,6 +126,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                         setTransparencyLevel, setBlurLevel, setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
                         setIconTheme, setDisplayScale, setVolume, setBrightness, setMuted, toggleMute,
                         setSnapToGrid, setShowWeatherWidget, pinApp, unpinApp, setWallpaper, setDevMode,
+                        setUseDependencyCache,
                         ...settings } = state
                     return settings
                 },

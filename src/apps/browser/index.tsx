@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AlertCircle, RotateCcw, ExternalLink, Loader2 } from 'lucide-react';
+import { AlertCircle, RotateCcw, ExternalLink } from 'lucide-react';
+import { AppLoader } from './AppLoader';
 
 interface BrowserProps {
   url?: string;
@@ -9,6 +10,8 @@ interface BrowserProps {
   waitForServer?: boolean;
   launchStatus?: string;
   launchLabel?: string;
+  icon?: string;
+  title?: string;
 }
 
 const BrowserApp = ({ 
@@ -17,8 +20,10 @@ const BrowserApp = ({
   isAppMode = false, 
   filePath, 
   waitForServer = false,
-  launchStatus = 'booting',
-  launchLabel
+  launchStatus = 'loading',
+  launchLabel,
+  icon,
+  title
 }: BrowserProps) => {
   // Use initialUrl if provided, otherwise fall back to url, then default
   const startUrl = initialUrl || url || 'https://google.com';
@@ -31,52 +36,28 @@ const BrowserApp = ({
   const [urlInput, setUrlInput] = useState(startUrl);
   const [iframeUrl, setIframeUrl] = useState(startUrl);
   const [isIframeLoaded, setIsIframeLoaded] = useState(false);
-  const [showAppOverlay, setShowAppOverlay] = useState(isAppMode && (waitForServer || !isIframeLoaded));
+  const [hasWaitedForServer, setHasWaitedForServer] = useState(waitForServer);
+  const [showAppOverlay, setShowAppOverlay] = useState(waitForServer);
   const [lastUrlChangeAt, setLastUrlChangeAt] = useState<number>(() => Date.now());
   const [lastIframeLoadAt, setLastIframeLoadAt] = useState<number | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [iframeError, setIframeError] = React.useState<string | null>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const isRecoveringRef = React.useRef(false);
 
-  // Recovery logic for static apps (Blob URLs) after refresh
+  const isWebContainerUrl = React.useMemo(() => (
+    iframeUrl.includes('localhost') ||
+    iframeUrl.includes('webcontainer') ||
+    iframeUrl.includes('127.0.0.1') ||
+    iframeUrl.includes('.local-corp.webcontainer.api.io') ||
+    iframeUrl.includes('.local-corp.webcontainer-api.io')
+  ), [iframeUrl]);
+
+  const effectiveAppMode = isAppMode || isWebContainerUrl;
+
   React.useEffect(() => {
-    const tryRecover = async () => {
-      // Check if we need recovery:
-      // 1. We are in app mode
-      // 2. We have a source file path
-      // 3. Current URL is a blob URL
-      if (isAppMode && filePath && iframeUrl.startsWith('blob:')) {
-        let isExpired = false;
-        try {
-          // Try to fetch HEAD to check validity
-          const response = await fetch(iframeUrl, { method: 'HEAD' });
-          if (!response.ok) isExpired = true;
-        } catch (e) {
-          // Network error usually means blob is gone
-          isExpired = true;
-        }
-
-        if (isExpired) {
-          console.log('[Browser] Blob URL expired, attempting recovery using filePath:', filePath);
-          try {
-            // Dynamically import to avoid circular dependency issues
-            const { AppLauncherService } = await import('@/os/kernel/AppLauncherService');
-            const newUrl = await AppLauncherService.getInstance().getStaticAppBlobUrl(filePath);
-            if (newUrl) {
-              console.log('[Browser] Recovered new Blob URL:', newUrl);
-              setIframeUrl(newUrl);
-              setUrlInput(newUrl);
-              setIframeError(null);
-            }
-          } catch (err) {
-            console.error('[Browser] Recovery failed:', err);
-          }
-        }
-      }
-    };
-
-    tryRecover();
-  }, []); // Run ONCE on mount only
+    if (waitForServer) setHasWaitedForServer(true);
+  }, [waitForServer]);
 
   // Update URL when props change (e.g., when server-ready event fires)
   React.useEffect(() => {
@@ -94,11 +75,15 @@ const BrowserApp = ({
   }, [initialUrl, url]);
 
   React.useEffect(() => {
-    if (!isAppMode || iframeError) {
+    if (!effectiveAppMode || iframeError) {
       setLoadingProgress(0);
       return;
     }
-    if (waitForServer || !isIframeLoaded) {
+    if (waitForServer || (hasWaitedForServer && !isIframeLoaded) || (!waitForServer && !isIframeLoaded)) {
+      // If we are waiting for server, we should NOT rely on iframe load events yet
+      // Because the iframe might load a 404 or "Connecting..." page which triggers onLoad
+      // We must strictly follow the launchStatus until it becomes 'ready' or we get a server-ready signal
+      
       const tick = window.setInterval(() => {
         setLoadingProgress((p) => {
           // Determine target cap based on status
@@ -108,20 +93,20 @@ const BrowserApp = ({
           if (waitForServer) {
             if (launchStatus === 'booting') {
                cap = 25;
-               speed = 0.1; 
+               speed = 0.05; 
             } else if (launchStatus === 'installing') {
                cap = 65;
-               speed = 0.02; // Install is slow
+               speed = 0.01; // Install is slow
             } else if (launchStatus === 'starting') {
                cap = 90;
-               speed = 0.08;
+               speed = 0.04;
             } else {
                cap = 92; // Default fallback
             }
           } else {
              // Server ready, waiting for iframe load
              cap = 98;
-             speed = 0.15;
+             speed = 0.12;
           }
 
           // If current progress is far behind target (e.g. status jump), accelerate
@@ -133,16 +118,19 @@ const BrowserApp = ({
       }, 120);
       return () => window.clearInterval(tick);
     }
-    setLoadingProgress(100);
+    // Only set to 100 if we are NOT waiting for server AND iframe is loaded
+    if (isIframeLoaded && !waitForServer) {
+        setLoadingProgress(100);
+    }
     return undefined;
-  }, [isAppMode, waitForServer, isIframeLoaded, iframeError, iframeUrl, launchStatus]);
+  }, [effectiveAppMode, waitForServer, hasWaitedForServer, isIframeLoaded, iframeError, iframeUrl, launchStatus]);
 
   React.useEffect(() => {
-    if (!isAppMode || iframeError) {
+    if (!effectiveAppMode || iframeError) {
       setShowAppOverlay(false);
       return;
     }
-    if (waitForServer || !isIframeLoaded) {
+    if (waitForServer || (hasWaitedForServer && !isIframeLoaded) || (!waitForServer && !isIframeLoaded)) {
       setShowAppOverlay(true);
       return;
     }
@@ -165,7 +153,7 @@ const BrowserApp = ({
 
     setShowAppOverlay(false);
     return undefined;
-  }, [isAppMode, waitForServer, isIframeLoaded, iframeError, iframeUrl, lastUrlChangeAt, lastIframeLoadAt]);
+  }, [effectiveAppMode, waitForServer, hasWaitedForServer, isIframeLoaded, iframeError, iframeUrl, lastUrlChangeAt, lastIframeLoadAt]);
 
   // Monitor iframe load errors
   React.useEffect(() => {
@@ -177,7 +165,12 @@ const BrowserApp = ({
       setIframeError(null);
       setIsIframeLoaded(true);
       setLastIframeLoadAt(Date.now());
-      setLoadingProgress(100);
+      
+      // Only complete progress if we are NOT waiting for server (i.e. AppLauncher says it's ready)
+      // This prevents "Booting... 100%" visual bug
+      if (!waitForServer) {
+          setLoadingProgress(100);
+      }
 
       // Inject custom scrollbar styles into the iframe
       try {
@@ -197,7 +190,7 @@ const BrowserApp = ({
             }
             /* Add padding to avoid TitleBar overlap in App Mode */
             body {
-              padding-top: ${isAppMode ? '32px' : '0px'};
+              padding-top: ${effectiveAppMode ? '32px' : '0px'};
             }
           `;
           doc.head.appendChild(style);
@@ -211,10 +204,29 @@ const BrowserApp = ({
     const handleError = (e: ErrorEvent) => {
       console.error('[Browser] Iframe load error:', e);
       setIsIframeLoaded(false);
-      // Don't show generic error immediately for blob URLs, as they might be stale
-      if (!iframeUrl.startsWith('blob:')) {
-         setIframeError('Failed to load content');
+      if (iframeUrl.startsWith('blob:') && isAppMode && filePath && !isRecoveringRef.current) {
+        isRecoveringRef.current = true;
+        (async () => {
+          try {
+            const { AppLauncherService } = await import('@/os/kernel/AppLauncherService');
+            const newUrl = await AppLauncherService.getInstance().getStaticAppBlobUrl(filePath);
+            if (newUrl) {
+              setIframeUrl(newUrl);
+              setUrlInput(newUrl);
+              setIframeError(null);
+            } else {
+              setIframeError('Failed to load content');
+            }
+          } catch (err) {
+            console.error('[Browser] Recovery failed:', err);
+            setIframeError('Failed to load content');
+          } finally {
+            isRecoveringRef.current = false;
+          }
+        })();
+        return;
       }
+      setIframeError('Failed to load content');
     };
 
     iframe.addEventListener('load', handleLoad);
@@ -224,14 +236,7 @@ const BrowserApp = ({
       iframe.removeEventListener('load', handleLoad);
       iframe.removeEventListener('error', handleError as any);
     };
-  }, [iframeUrl]);
-
-  // Check if this is a WebContainer URL
-  const isWebContainerUrl = iframeUrl.includes('localhost') ||
-    iframeUrl.includes('webcontainer') ||
-    iframeUrl.includes('127.0.0.1') ||
-    iframeUrl.includes('.local-corp.webcontainer.api.io') ||
-    iframeUrl.includes('.local-corp.webcontainer-api.io');
+  }, [iframeUrl, effectiveAppMode]);
 
   const handleNavigate = () => {
     let target = urlInput;
@@ -247,9 +252,9 @@ const BrowserApp = ({
   };
 
   return (
-    <div className={`h-full w-full flex flex-col bg-transparent ${isAppMode ? '' : 'pt-10'}`}>
+    <div className={`h-full w-full flex flex-col bg-transparent ${effectiveAppMode ? '' : 'pt-10'}`}>
       {/* Address Bar - Only show in browser mode */}
-      {!isAppMode && (
+      {!effectiveAppMode && (
         <div className="h-12 bg-white border-b flex items-center px-3 gap-2 shrink-0">
           <button
             onClick={() => setIframeUrl(urlInput)}
@@ -288,32 +293,17 @@ const BrowserApp = ({
         )}
 
         {showAppOverlay && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-200 p-8 text-center z-50 bg-black/70 pointer-events-none transition-opacity duration-300">
-            <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center mb-4">
-              <Loader2 size={28} className="text-gray-200 animate-spin" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-100 mb-2">
-              {launchLabel || (waitForServer ? '正在启动开发服务器' : '正在加载应用')}
-            </h3>
-            <p className="text-sm max-w-md opacity-80 min-h-[20px]">
-              {/* Optional detail text, maybe just keep it simple or remove if label is detailed */}
-              {(!launchLabel && waitForServer) ? '首次启动会自动安装依赖，完成后将自动打开页面' : ''}
-            </p>
-            <div className="w-80 max-w-[80vw] mt-6">
-              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-white/60 transition-[width] duration-200"
-                  style={{ width: `${Math.max(2, Math.min(100, loadingProgress))}%` }}
-                />
-              </div>
-              <div className="mt-2 text-xs opacity-70 tabular-nums">
-                {Math.round(Math.min(100, loadingProgress))}%
-              </div>
-            </div>
-          </div>
+          <AppLoader 
+            status={launchStatus || 'loading'} 
+            label={launchLabel}
+            progress={loadingProgress}
+            appName={title || 'Application'}
+            appIcon={icon}
+            onRetry={() => window.location.reload()} // Simple retry for now
+          />
         )}
 
-        {!isAppMode && !waitForServer && !iframeError && !isIframeLoaded && (
+        {!effectiveAppMode && !waitForServer && !iframeError && !isIframeLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center z-0 pointer-events-none">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <AlertCircle size={32} className="text-gray-400" />

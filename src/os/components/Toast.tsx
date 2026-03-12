@@ -84,6 +84,20 @@ export const toast = {
   dismiss: (id: string) => {
     useToastStore.getState().removeToast(id)
   },
+
+  promise: async <T>(promise: Promise<T>, msgs: { loading: string; success: string; error: string }) => {
+    const id = toast.loading(msgs.loading)
+    try {
+      const data = await promise
+      toast.dismiss(id)
+      toast.success(msgs.success)
+      return data
+    } catch (e) {
+      toast.dismiss(id)
+      toast.error(msgs.error, e instanceof Error ? e.message : String(e))
+      throw e
+    }
+  },
   
   custom: (toast: Omit<Toast, 'id'>) => {
     return useToastStore.getState().addToast(toast)

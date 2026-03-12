@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { WebContainer } from '@webcontainer/api'
 import { SYSTEM_PATHS } from '@/os/config/paths'
 import { toast } from '@/os/components/Toast'
+import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 
 interface SyncQueueItem {
   type: 'mkdir' | 'file' | 'unlink'
@@ -34,6 +35,8 @@ let bootPromise: Promise<WebContainer> | null = null
 let initializationPromise: Promise<void> | null = null
 let globalWebContainerInstance: WebContainer | null = null
 let syncQueue: SyncQueueItem[] = []
+let npmCacheRestoredForSession = false
+let npmCacheDirForSession: string | null = null
 
 export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   instance: null,
@@ -159,14 +162,6 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
       let syncedFolders = 0
       const createdPaths: string[] = []
 
-      // --- Phase 4 Restore Logic: Check for snapshots in current dir ---
-      // If we are syncing a folder that contains a node_modules.tar snapshot in OPFS,
-      // we should restore it to WebContainer!
-      // NOTE: We don't have easy access to "current OPFS state" here without async calls.
-      // But we can blindly try to restore if we see a node_modules folder is missing but tar exists?
-      // Actually, better place for restore is during directory traversal or explicit app launch.
-      // For now, let's just allow .tar files to sync back to VFS so they are visible.
-
       const syncDirectory = async (wcDir: string, vfsPath: string) => {
         try {
           // console.log(`[WC->VFS] Syncing directory WC:${wcDir} -> VFS:${vfsPath}`)
@@ -174,8 +169,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
           for (const entry of entries) {
             // Skip hidden files and node_modules FOLDER
-            // BUT allow node_modules.tar file!
-            if (entry.name.startsWith('.')) continue;
+            if (entry.name.startsWith('.') && entry.name !== '.cache') continue;
             if (entry.name === 'node_modules') continue; 
 
             const wcItemPath = wcDir === '/' ? `/${entry.name}` : `${wcDir}/${entry.name}`
@@ -274,6 +268,270 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     const { instance } = get()
     if (!instance) throw new Error('WebContainer not booted')
 
+    let useDependencyCache = true
+    try {
+      const { useSystemSettingsStore } = await import('@/os/kernel/useSystemSettingsStore')
+      useDependencyCache = !!useSystemSettingsStore.getState().useDependencyCache
+    } catch {}
+
+    const safeWcReaddir = async (path: string): Promise<string[] | null> => {
+      try {
+        const entries = await instance.fs.readdir(path)
+        return entries as any
+      } catch {
+        return null
+      }
+    }
+
+    const spawnCollectStdout = async (spawnCmd: string, spawnArgs: string[], spawnCwd: string, spawnEnv: Record<string, string>) => {
+      const p = await instance.spawn(spawnCmd, spawnArgs, { cwd: spawnCwd, env: spawnEnv })
+      let out = ''
+      try {
+        const reader = p.output.getReader()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          out += value
+        }
+      } catch {}
+      await p.exit
+      return out.trim()
+    }
+
+    const ensureNpmCacheDir = async () => {
+      if (npmCacheDirForSession) return npmCacheDirForSession
+      const preferred = useDependencyCache ? '/.cache/npm' : '/tmp/npm-cache'
+      try {
+        await instance.fs.mkdir(`${preferred}/_cacache/tmp`, { recursive: true })
+        npmCacheDirForSession = preferred
+        return preferred
+      } catch {}
+      const fallback = '/tmp/npm-cache'
+      await instance.fs.mkdir(`${fallback}/_cacache/tmp`, { recursive: true })
+      npmCacheDirForSession = fallback
+      return fallback
+    }
+
+    const restoreNpmCacheFromOpfs = async (npmCacheDir: string) => {
+      const opfsRoot = `${SYSTEM_PATHS.USER}/.cache/npm`
+      if (!(await fs.exists(opfsRoot))) return
+
+      let hasAny = false
+      try {
+        hasAny = (await fs.readdir(opfsRoot)).length > 0
+      } catch {
+        hasAny = false
+      }
+      if (!hasAny) return
+
+      try {
+        await instance.fs.mkdir(npmCacheDir, { recursive: true })
+      } catch {}
+
+      const copyDir = async (opfsDir: string, wcDir: string) => {
+        const names = await fs.readdir(opfsDir)
+        for (const name of names) {
+          // Skip logs
+          if (name === '_logs') continue;
+          
+          const opfsPath = `${opfsDir}/${name}`
+          const wcPath = wcDir === '/' ? `/${name}` : `${wcDir}/${name}`
+          const st = await fs.stat(opfsPath)
+          if (st.isDirectory) {
+            await instance.fs.mkdir(wcPath, { recursive: true })
+            await copyDir(opfsPath, wcPath)
+          } else {
+            const bytes = await fs.readFile(opfsPath)
+            await instance.fs.writeFile(wcPath, bytes)
+          }
+        }
+      }
+
+      await copyDir(opfsRoot, npmCacheDir)
+
+      try {
+        await instance.fs.mkdir('/.npm', { recursive: true })
+      } catch {}
+      try {
+        await copyDir(opfsRoot, '/.npm')
+      } catch {}
+    }
+
+    const flushNpmCacheToOpfs = async () => {
+        const opfsRoot = `${SYSTEM_PATHS.USER}/.cache/npm`
+        await fs.mkdir(opfsRoot, true)
+        
+        // --- NEW LOGIC: Save Snapshot as Tar ---
+        try {
+          // Determine key for current project (cwd)
+          // We assume we are in the app root if cwd is set, otherwise try to guess
+          const appPath = cwd.startsWith(SYSTEM_PATHS.USER) ? cwd.replace(SYSTEM_PATHS.USER, '') || '/' : cwd;
+          
+          const { DependencyCacheService } = await import('@/os/kernel/DependencyCacheService');
+          
+          // 1. Try to compute key from package.json or lockfile in current directory
+          let keyInfo = await DependencyCacheService.computeCacheKeyFromWebContainerFs(instance.fs as any, appPath);
+          
+          if (keyInfo) {
+            console.log(`[NPM Cache] Saving snapshot for key: ${keyInfo.key}`);
+            
+            // Use toast.promise for better lifecycle management
+            await toast.promise(
+               DependencyCacheService.saveSnapshot({
+                  key: keyInfo.key,
+                  wcFs: instance.fs as any,
+                  appPath: appPath,
+                  source: keyInfo.source,
+                  sourceName: keyInfo.sourceName
+               }),
+               {
+                  loading: 'Saving Snapshot...',
+                  success: 'Snapshot Saved!',
+                  error: 'Snapshot Failed'
+               }
+            );
+            
+            return; // Success! Skip legacy dir copy
+          } else {
+             console.warn('[NPM Cache] Could not compute cache key for snapshot');
+          }
+        } catch (e) {
+          console.warn('[NPM Cache] Snapshot save failed, falling back to legacy copy:', e);
+        }
+
+        // --- FALLBACK: Legacy Dir Copy (if key computation fails) ---
+        // OPTIMIZATION: Only run fallback if explicitly needed. 
+        // For standard apps, we trust snapshotting. Legacy copy is slow and spammy.
+        // We can just skip it if keyInfo was found but save failed (already logged error).
+        // Or if no key found, maybe it's not worth caching directory by directory.
+        // Let's keep it but make it silent/background if possible, or disable for now to reduce noise.
+        /*
+        const copyDir = async (wcDir: string, opfsDir: string) => {
+          const names = (await instance.fs.readdir(wcDir)) as any[]
+          for (const name of names) {
+            const fileName = typeof name === 'string' ? name : name?.name
+            if (!fileName) continue
+            const wcPath = wcDir === '/' ? `/${fileName}` : `${wcDir}/${fileName}`
+            const opfsPath = `${opfsDir}/${fileName}`
+            const st = await (instance.fs as any).stat(wcPath)
+            if (st.isDirectory()) {
+              await fs.mkdir(opfsPath, true)
+              await copyDir(wcPath, opfsPath)
+            } else {
+              const bytes = (await instance.fs.readFile(wcPath)) as Uint8Array
+              await fs.writeFile(opfsPath, bytes)
+            }
+          }
+        }
+        */
+
+      const npmCacheDir = await ensureNpmCacheDir()
+      const candidates = [
+        { root: npmCacheDir, label: 'env-cache' },
+        { root: '/.npm', label: 'default-dot-npm' },
+        { root: '/tmp/.npm', label: 'tmp-dot-npm' },
+        { root: '/tmp/npm-cache', label: 'tmp-npm-cache' },
+        { root: '/home/node/.npm', label: 'home-node' },
+        { root: '/home/webcontainer/.npm', label: 'home-webcontainer' },
+        { root: '/root/.npm', label: 'root-home' },
+        { root: '/root/.cache/npm', label: 'root-cache' },
+        { root: '/root/.cache', label: 'root-dot-cache' },
+      ]
+
+      const diagTimestamp = Date.now()
+      const diagnostics: any = {
+        version: 2,
+        timestamp: diagTimestamp,
+        envCache: npmCacheDir,
+        checked: [] as any[],
+        chosen: null as null | { root: string; cacache: string; label: string },
+        npmConfigCache: null as null | string,
+      }
+
+      try {
+        const configCache = await spawnCollectStdout('npm', ['config', 'get', 'cache'], '/', {
+          npm_config_cache: npmCacheDir,
+          NPM_CONFIG_CACHE: npmCacheDir,
+          npm_config_userconfig: '/.npmrc',
+          NPM_CONFIG_USERCONFIG: '/.npmrc',
+          HOME: '/',
+          TERM: 'dumb',
+        })
+        if (configCache) {
+          diagnostics.npmConfigCache = configCache
+          if (configCache.startsWith('/')) {
+            candidates.unshift({ root: configCache, label: 'npm-config' })
+          }
+        }
+      } catch {}
+
+      let chosen: { root: string; cacache: string; label: string } | null = null
+      for (const c of candidates) {
+        const names = await safeWcReaddir(c.root)
+        const cacachePath = `${c.root}/_cacache`
+        const cacacheNames = await safeWcReaddir(cacachePath)
+        const info = {
+          label: c.label,
+          root: c.root,
+          rootCount: names?.length ?? null,
+          cacachePath,
+          cacacheCount: cacacheNames?.length ?? null,
+        }
+        diagnostics.checked.push(info)
+        if (!chosen && cacacheNames && cacacheNames.length > 0) {
+          chosen = { root: c.root, cacache: cacachePath, label: c.label }
+        }
+      }
+
+      diagnostics.chosen = chosen
+
+      try {
+        await fs.mkdir(`${SYSTEM_PATHS.USER}/.cache/deps`, true)
+        const bytes = new TextEncoder().encode(JSON.stringify(diagnostics))
+        await fs.writeFile(`${SYSTEM_PATHS.USER}/.cache/deps/npm-cache-diagnostics.json`, bytes)
+        await fs.writeFile(`${SYSTEM_PATHS.USER}/.cache/deps/npm-cache-diagnostics-${diagTimestamp}.json`, bytes)
+      } catch {}
+
+      if (!chosen) {
+        toast.warning('NPM Cache Empty', 'No _cacache directory found after install; downloads may repeat after refresh.')
+        return
+      }
+
+      try {
+        await fs.mkdir(`${opfsRoot}/_cacache`, true)
+        await copyDir(chosen.cacache, `${opfsRoot}/_cacache`)
+        toast.success('NPM Cache Saved', `npm cache persisted from ${chosen.root}.`)
+      } catch (e) {
+        console.warn('[NPM Cache] Flush to OPFS failed:', e)
+        toast.warning('NPM Cache Save Failed', 'npm cache could not be persisted; refresh may re-download.')
+      }
+    }
+
+    if (cmd === 'npm') {
+      try {
+        try {
+          const npmCacheDir = await ensureNpmCacheDir()
+          await (instance.fs as any).writeFile('/.npmrc', `cache=${npmCacheDir}\naudit=false\nfund=false\nprefer-offline=true\n`)
+        } catch {}
+        const npmCacheDir = await ensureNpmCacheDir()
+        await instance.fs.mkdir(npmCacheDir, { recursive: true })
+      } catch {}
+      if (!npmCacheRestoredForSession && useDependencyCache) {
+        try {
+          const npmCacheDir = await ensureNpmCacheDir()
+          await restoreNpmCacheFromOpfs(npmCacheDir)
+          npmCacheRestoredForSession = true
+        } catch {}
+      } else if (!npmCacheRestoredForSession) {
+        npmCacheRestoredForSession = true
+      }
+      // Ensure _logs exists and is writable after restore
+      try {
+          const npmCacheDir = await ensureNpmCacheDir()
+          await instance.fs.mkdir(`${npmCacheDir}/_logs`, { recursive: true })
+      } catch {}
+    }
+
     // Ensure cwd is relative to WC root
     let wcCwd = cwd;
     if (cwd.startsWith(SYSTEM_PATHS.USER)) {
@@ -283,16 +541,29 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
     console.log(`[WC] Spawning: ${cmd} ${args.join(' ')} in ${wcCwd} (detached: ${options.detached})`)
 
     try {
+      const npmCacheDir = cmd === 'npm' ? await ensureNpmCacheDir() : '/.cache/npm'
       const process = await instance.spawn(cmd, args, {
         cwd: wcCwd,
         env: {
           npm_config_yes: 'true', // Auto-confirm npx prompts
+          npm_config_cache: npmCacheDir,
+          NPM_CONFIG_CACHE: npmCacheDir,
+          npm_config_userconfig: '/.npmrc',
+          NPM_CONFIG_USERCONFIG: '/.npmrc',
+          HOME: '/',
+          npm_config_prefer_offline: 'true',
+          npm_config_audit: 'false',
+          npm_config_fund: 'false',
           TERM: 'dumb' // Dumb terminal to avoid escape codes, though some tools ignore this
         }
       })
 
       // Expose stdin writer for interactive commands
       const writer = process.input.getWriter();
+
+      // Collect last few lines of output for error reporting
+      const lastLines: string[] = [];
+      const MAX_LOG_LINES = 20;
 
       // Listen for interactive input events from UI
       const inputHandler = (e: CustomEvent) => {
@@ -314,6 +585,17 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         streamPromise = process.output.pipeTo(new WritableStream({
           write(data) {
             if (onOutput) onOutput(data);
+
+            // Keep track of last lines
+            const lines = data.split('\n');
+            for (const line of lines) {
+              if (line.trim()) {
+                lastLines.push(line);
+                if (lastLines.length > MAX_LOG_LINES) {
+                  lastLines.shift();
+                }
+              }
+            }
 
             if (options.detached && !resolved) {
               outputBuffer += data;
@@ -372,43 +654,47 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // Ignore stream errors on close
       }
 
-      // --- Phase 4: Persistence Optimization (Snapshotting) ---
-      // If this was a successful 'npm install', we should snapshot node_modules
-      if (exitCode === 0 && cmd === 'npm' && args.includes('install')) {
-         console.log('[WC] npm install success! Triggering node_modules snapshot...');
-         try {
-             // 1. Create tarball of node_modules inside WebContainer
-             // Note: 'tar' is available in WebContainer environment
-             // We use -cf (create file)
-             const tarProcess = await instance.spawn('tar', ['-cf', 'node_modules.tar', 'node_modules'], { cwd: wcCwd });
-             await tarProcess.exit;
-             
-             // 2. Read the tarball buffer
-             // We read it as binary
-             const tarBuffer = await instance.fs.readFile(`${wcCwd}/node_modules.tar`);
-             
-             // 3. Write directly to OPFS (Persistent Storage)
-             // We bypass the VFS store state to avoid clogging Zustand with a large binary file
-             // We use the raw 'fs' client which writes to OPFS
-             const { fs } = await import('@/os/kernel/filesystem/FileSystemClient');
-             
-             // Construct absolute path for OPFS
-             const opfsPath = cwd.endsWith('/') ? `${cwd}node_modules.tar` : `${cwd}/node_modules.tar`;
-             
-             console.log(`[Persistence] Saving snapshot to OPFS: ${opfsPath} (${tarBuffer.byteLength} bytes)`);
-             await fs.writeFile(opfsPath, tarBuffer);
-             
-             // 4. Cleanup tarball from WebContainer to save memory
-             await instance.fs.rm(`${wcCwd}/node_modules.tar`);
-             
-             console.log('[Persistence] Snapshot complete!');
-         } catch (e) {
-             console.warn('[Persistence] Snapshot failed:', e);
-         }
+      if (exitCode !== 0) {
+        // Construct error message with last output lines
+        const outputSummary = lastLines.length > 0 
+          ? `\nLast output:\n${lastLines.join('\n')}` 
+          : '\n(No output captured)';
+        
+        throw new Error(`Command "${cmd} ${args.join(' ')}" failed with exit code ${exitCode}${outputSummary}`)
       }
 
-      if (exitCode !== 0) {
-        throw new Error(`Command failed with exit code ${exitCode}`)
+      if (cmd === 'npm' && (args.includes('install') || args.includes('ci') || args.includes('i'))) {
+        try {
+          // Check if dependency cache is enabled
+          const { useSystemSettingsStore } = await import('@/os/kernel/useSystemSettingsStore')
+          if (!useSystemSettingsStore.getState().useDependencyCache) {
+            return exitCode
+          }
+
+          // --- OPTIMIZATION: Better Toast Management ---
+          const toastId = toast.loading('Saving NPM Cache', 'Persisting npm cache for faster next launch...')
+          
+          // Auto-dismiss toast after 60s timeout to prevent hanging UI
+          const toastTimeout = setTimeout(() => {
+             toast.dismiss(toastId);
+             // Optional: Show warning if it took too long
+             // toast.warning('Cache Saving Slow', 'Background cache save is taking longer than expected.');
+          }, 60000);
+
+          try {
+            // --- OPTIMIZATION: Skip Legacy File Markers ---
+            // These markers cause unnecessary SyncWrite logs and IO.
+            // Only create directory if needed.
+            await fs.mkdir(`${SYSTEM_PATHS.USER}/.cache/deps`, true)
+            
+            await flushNpmCacheToOpfs()
+          } finally {
+            clearTimeout(toastTimeout);
+            toast.dismiss(toastId)
+          }
+        } catch (e) {
+          console.warn('[NPM Cache] Flush hook failed:', e)
+        }
       }
       return exitCode
     } catch (e: any) {
@@ -556,7 +842,12 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
         let webcontainer;
         try {
-          webcontainer = await bootPromise
+          webcontainer = await Promise.race([
+              bootPromise,
+              new Promise<never>((_, reject) => 
+                  setTimeout(() => reject(new Error('WebContainer boot timed out after 15s')), 15000)
+              )
+          ])
           // Store the instance globally to prevent losing reference
           globalWebContainerInstance = webcontainer
         } catch (e: any) {
@@ -607,11 +898,6 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         // 2. Sync VFS -> WebContainer Tree
         const { files, rootId, getNodeByPath, createItem, updateFileContent, deleteItem } = useFileSystemStore.getState()
 
-        // --- Phase 4 Restore Logic: Check for tarball snapshots ---
-        // Before we boot or mount, let's scan VFS for any .tar files that might be backups
-        // and add them to our restoration queue.
-        // Actually, we can just do this AFTER boot by running tar -xf.
-        
         // Helper to convert VFS tree to WebContainer mount tree
         const buildMountTree = async (nodeId: string): Promise<any> => {
           const node = files[nodeId]
@@ -639,6 +925,7 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
             for (const child of children) {
               // Skip node_modules folder (it's too big and should be restored via tarball)
               if (child.name === 'node_modules') continue;
+              if (node.name === '.cache' && child.name === 'npm') continue;
               
               const childTree = await buildMountTree(child.id)
               if (childTree) {
@@ -666,37 +953,20 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
 
         // Boot with mounted file system
         // console.log('[WC] Booting with mount tree:', Object.keys(mountTree))
-        await webcontainer.mount(mountTree)
-        
-        // --- Phase 4 Restore Logic: Restore snapshots ---
-        // After mount, scan for node_modules.tar files and extract them
-        const restoreSnapshots = async (dirPath: string) => {
-             try {
-                 const entries = await webcontainer.fs.readdir(dirPath, { withFileTypes: true });
-                 for (const entry of entries) {
-                     if (entry.isDirectory()) {
-                         await restoreSnapshots(dirPath === '/' ? entry.name : `${dirPath}/${entry.name}`);
-                     } else if (entry.name === 'node_modules.tar') {
-                         const fullPath = dirPath === '/' ? entry.name : `${dirPath}/${entry.name}`;
-                         const targetDir = dirPath === '/' ? '.' : dirPath;
-                         console.log(`[Persistence] Found snapshot at ${fullPath}, restoring...`);
-                         try {
-                             await webcontainer.spawn('tar', ['-xf', 'node_modules.tar'], { cwd: targetDir });
-                             console.log(`[Persistence] Restored node_modules in ${targetDir}`);
-                         } catch (e) {
-                             console.warn(`[Persistence] Failed to restore snapshot ${fullPath}:`, e);
-                         }
-                     }
-                 }
-             } catch (e) {
-                 // ignore errors
-             }
-        };
-        
-        // Start restoration in background
-        restoreSnapshots('/').catch(e => console.warn('Snapshot restore error:', e));
-
-        console.log('[Boot] ✅ Mount complete')
+        try {
+          // Add timeout for mount operation (30s)
+          // Mounting large trees can be slow, but shouldn't hang forever
+          await Promise.race([
+            webcontainer.mount(mountTree),
+            new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('WebContainer mount timed out after 30s')), 30000)
+            )
+          ]);
+          console.log('[Boot] ✅ Mount complete')
+        } catch (mountErr: any) {
+           console.error('[Boot] ❌ Mount failed:', mountErr);
+           throw new Error(`Failed to mount file system: ${mountErr.message}`);
+        }
 
         // Skip the comprehensive sync - mount already handles this
         // The file watcher will handle any future changes
@@ -895,17 +1165,32 @@ console.log(\`App running at http://localhost:\${port}\`);
         // 3. WebContainer -> VFS (fs.watch)
         // Watch root to capture all changes
         webcontainer.fs.watch('/', { recursive: true }, async (event, filename) => {
+          // Explicitly check if filename is string. fs.watch type definition might be loose.
+          if (typeof filename !== 'string' || !filename) return
+
+          // OPTIMIZATION: Early exit for node_modules content to prevent state thrashing
+          // We only care about the creation of the node_modules folder itself, not its contents.
+          if (filename.includes('node_modules')) {
+             // Only react if it's the root node_modules folder creation
+             // e.g. "apps/my-app/node_modules" or "node_modules"
+             if (filename.endsWith('node_modules') && event === 'rename') {
+                // We still need to process this specific event, so we proceed below
+             } else {
+                // Ignore all content changes within node_modules
+                return;
+             }
+          }
+
           // Set sync flag to prevent circular sync
           set({ isSyncingFromWC: true })
 
           try {
-            // Explicitly check if filename is string. fs.watch type definition might be loose.
-            if (typeof filename !== 'string' || !filename) return
+            const normalizedFilename = filename.startsWith('/') ? filename.slice(1) : filename
 
-            console.log(`[WC->VFS] File change detected: ${event} ${filename}`)
-
-            // Ignore hidden files/directories
-            if (filename.includes('/.') || filename.startsWith('.')) return
+            // Ignore hidden files/directories except the persisted npm cache
+            const isHidden = normalizedFilename.includes('/.') || normalizedFilename.startsWith('.')
+            const allowHidden = normalizedFilename === '.cache' || normalizedFilename.startsWith('.cache/')
+            if (isHidden && !allowHidden) return
 
             // Special handling for node_modules:
             // We DO NOT want to sync thousands of files to VFS (performance killer).
@@ -1061,15 +1346,22 @@ console.log(\`App running at http://localhost:\${port}\`);
                 const { launchApp, windows, activeWindowId, updateWindow, focusWindow } = useWindowStore.getState();
 
                 const activeWin = activeWindowId ? (windows as any)[activeWindowId] : undefined
+                // Find target browser:
+                // 1. First priority: Browser that is explicitly waiting for server (waitForServer=true)
+                // 2. Second priority: Browser that is just "booting" (launchStatus='booting') - to catch fast launches
+                
                 const isWaitingBrowser = (w: any) =>
                   w?.appId === 'browser' &&
                   w?.componentProps &&
-                  (w.componentProps as any).waitForServer === true
+                  ((w.componentProps as any).waitForServer === true || 
+                   (w.componentProps as any).launchStatus === 'booting' || 
+                   (w.componentProps as any).launchStatus === 'starting');
 
                 let targetBrowser: any | undefined = undefined
                 if (isWaitingBrowser(activeWin)) {
                   targetBrowser = activeWin
                 } else {
+                  // Sort by zIndex to get the topmost waiting browser
                   const waiting = Object.values(windows).filter(isWaitingBrowser) as any[]
                   if (waiting.length > 0) {
                     targetBrowser = waiting.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0]
@@ -1077,16 +1369,36 @@ console.log(\`App running at http://localhost:\${port}\`);
                 }
 
                 if (targetBrowser) {
+                  // 1. Show Ready State
                   updateWindow(targetBrowser.id, {
                     componentProps: {
                       ...(targetBrowser.componentProps || {}),
                       initialUrl: url,
                       url,
-                      waitForServer: false,
-                      launchStatus: undefined,
-                      launchLabel: undefined
+                      isAppMode: true,
+                      // Keep waitForServer true briefly so AppLoader shows the "Ready" state
+                      waitForServer: true,
+                      launchStatus: 'ready',
+                      launchLabel: 'Application Ready'
                     }
                   })
+
+                  // 2. Hide Loader after animation
+                  setTimeout(() => {
+                     // Re-fetch window to ensure we have latest state
+                     const currentWin = useWindowStore.getState().windows[targetBrowser.id]
+                     if (currentWin) {
+                        updateWindow(targetBrowser.id, {
+                            componentProps: {
+                                ...(currentWin.componentProps || {}),
+                                waitForServer: false, // This hides the loader
+                                launchStatus: undefined,
+                                launchLabel: undefined
+                            }
+                        })
+                     }
+                  }, 1500) // Give user time to see the checkmark
+
                   focusWindow(targetBrowser.id)
                   return
                 }
@@ -1108,6 +1420,7 @@ console.log(\`App running at http://localhost:\${port}\`);
                       onClick: () => {
                         launchApp('browser', 'Browser', 'browser', undefined, {
                           initialUrl: url,
+                          isAppMode: true,
                           width: 1024,
                           height: 768
                         });

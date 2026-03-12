@@ -5,11 +5,6 @@ import { DEFAULT_CSP_CONFIG, CSP_COOKIE_NAME } from './os/config/csp'
 export function middleware(request: NextRequest) {
     const response = NextResponse.next()
     
-    // Skip security headers for test page
-    if (request.nextUrl.pathname.includes('/test-webcontainer-iframe.html')) {
-        return response;
-    }
-    
     // Clone default config
     const cspConfig = JSON.parse(JSON.stringify(DEFAULT_CSP_CONFIG))
     

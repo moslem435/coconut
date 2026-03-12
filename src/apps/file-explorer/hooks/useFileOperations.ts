@@ -11,7 +11,7 @@ import { useLanguage } from '@/os/kernel/LanguageContext'
 import { toast } from '@/os/components/Toast'
 
 export function useFileOperations() {
-  const { deleteItem, moveItem, files } = useFileSystemStore()
+  const { deleteItem, deleteItems, moveItem, files } = useFileSystemStore()
   const { clipboard, setClipboard, pasteItems } = useClipboardStore()
   const { openConfirm, openAlert } = useDialogStore()
   const { t } = useLanguage()
@@ -103,6 +103,28 @@ export function useFileOperations() {
     })
   }, [moveItem, openConfirm, files, t])
 
+  /**
+   * 批量删除 (无撤销，直接删除)
+   * 适用于清空回收站或批量删除大量文件
+   */
+  const handleDeleteBatch = useCallback(async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return
+
+    // Check if any selected item is a system folder
+    const systemItems = selectedIds.filter(id => files[id]?.isSystem)
+    if (systemItems.length > 0) {
+       toast.error('Cannot Delete', 'Contains system items.')
+       return
+    }
+
+    try {
+        await deleteItems(selectedIds)
+        toast.success('Deleted', `${selectedIds.length} items deleted`)
+    } catch (e) {
+        toast.error('Delete Failed', String(e))
+    }
+  }, [deleteItems, files])
+
   const handleMove = useCallback(async (itemIds: string[], targetFolderId: string) => {
     // Check if any item is a system folder
     const hasSystemItem = itemIds.some(id => files[id]?.isSystem)
@@ -129,6 +151,7 @@ export function useFileOperations() {
     handleCut,
     handlePaste,
     handleDelete,
+    handleDeleteBatch,
     handleMove,
     clipboard
   }

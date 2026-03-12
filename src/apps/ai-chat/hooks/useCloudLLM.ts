@@ -189,8 +189,7 @@ WORKFLOW (follow this order strictly):
 1. **PLAN**: Briefly tell the user your plan (app type, framework choice, estimated steps). Keep it to 2-3 sentences.
 2. **SCAFFOLD**: Call the appropriate scaffold tool.
 3. **CUSTOMIZE**: Write the app logic file by file.
-4. **VERIFY**: For React apps, ensure npm install has been run and verify the build.
-5. **COMPLETE**: Summarize what was created and tell the user "App created! Double-click [App Name] in File Explorer to run.".
+4. **COMPLETE**: Summarize what was created and tell the user "App created! Double-click [App Name] in File Explorer to run.".
 
 WHEN CREATING AN APP:
 1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
@@ -201,10 +200,9 @@ WHEN CREATING AN APP:
      - After scaffolding, use 'create_file' or 'update_file' to write 'index.html' with complete app logic (HTML + CSS + JS all in one file).
    - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
      - This creates a full React+Vite+Tailwind app.
-     - You MUST run 'npm install' afterwards: run_command({ cmd: "npm", args: ["install"], cwd: "/home/user/apps/<app-name>" })
      - After install, customize 'src/App.jsx' with the app logic.
 3. **ONE FILE PER TOOL CALL**: Write one file at a time. Do NOT try to create all files in a single tool call to avoid truncation errors. Always explain what you are about to do BEFORE calling the tool.
-4. **VERIFY BUILD** (React apps only): After writing all files, run 'npm run dev' in detached mode to verify: run_command({ cmd: "npm", args: ["run", "dev"], cwd: "/home/user/apps/<app-name>", detached: true, successPattern: "Local:" }). If build fails, read the error output, fix the issue, and retry.
+4. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running/installation should happen only after explicit user intent (e.g., user double-clicks the app to launch or asks "帮我启动/运行").
 
 AVAILABLE TOOLS:
 - scaffold_static_app({ name, title, icon }): Create a simple HTML/JS app
@@ -332,7 +330,7 @@ async function callGemini(
             let resultText = '';
             try {
                 if (systemToolsImplementation[name]) {
-                    const rawResult = await systemToolsImplementation[name](args);
+                    const rawResult = await systemToolsImplementation[name](args, { mode });
                     resultText = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult);
                 } else { resultText = `Error: Tool '${name}' not found`; }
             } catch (e: any) { resultText = `Error execution ${name}: ${e.message}`; }
@@ -425,7 +423,7 @@ async function callOpenAI(
                 const args = JSON.parse(tc.function.arguments || '{}');
                 const fnName = tc.function.name;
                 if (systemToolsImplementation[fnName]) {
-                    const res = await systemToolsImplementation[fnName](args);
+                    const res = await systemToolsImplementation[fnName](args, { mode });
                     resultText = typeof res === 'string' ? res : JSON.stringify(res);
                 } else { resultText = `Error: Tool '${fnName}' not found`; }
             } catch (e: any) { resultText = `Error: ${e.message}`; }

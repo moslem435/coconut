@@ -1,6 +1,9 @@
 import { useWindowStore } from './useWindowStore'
 import { useFileSystemStore } from './useFileSystemStore'
 import { useWebContainerStore } from './useWebContainerStore'
+import { useDialogStore } from './useDialogStore'
+import { useSystemSettingsStore } from './useSystemSettingsStore'
+import { DependencyCacheService } from './DependencyCacheService'
 import { toast } from '@/os/components/Toast'
 import { AppBundleConfig } from './initialFileTree'
 
@@ -16,6 +19,16 @@ export class AppLauncherService {
     private static instance: AppLauncherService
     private static webContainerLaunchPromises = new Map<string, Promise<void>>()
     private static webContainerStartupUrls = new Map<string, string>()
+    private static staticAppBlobUrls = new Map<string, { url: string; hash: number }>()
+
+    private static hashString(input: string) {
+        let hash = 2166136261
+        for (let i = 0; i < input.length; i++) {
+            hash ^= input.charCodeAt(i)
+            hash = Math.imul(hash, 16777619)
+        }
+        return hash >>> 0
+    }
 
     private static getWebContainerStartupUrl(cacheKey: string, title: string) {
         const cached = AppLauncherService.webContainerStartupUrls.get(cacheKey)
@@ -220,6 +233,11 @@ export class AppLauncherService {
 
         try {
             let html = await readFileContent(indexFile.id)
+            const htmlHash = AppLauncherService.hashString(html)
+            const cached = AppLauncherService.staticAppBlobUrls.get(fileId)
+            if (cached && cached.hash === htmlHash) {
+                return cached.url
+            }
             
             // Inline Scripts
             const scriptRegex = /<script\s+[^>]*?src=["'](.+?)["'][^>]*?>\s*<\/script>/gi;
@@ -247,8 +265,58 @@ export class AppLauncherService {
                  return null;
             });
 
-            // Inject CSP
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:;">`;
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="
+                default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; 
+                script-src * 'unsafe-inline' 'unsafe-eval' blob: data: https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com https://esm.sh; 
+                style-src * 'unsafe-inline' blob: data: https://fonts.googleapis.com; 
+                img-src * data: blob:; 
+                font-src * data: blob: https://fonts.gstatic.com; 
+                connect-src * data: blob: wss:;
+            ">`;
+
+            const proxyBase = typeof window !== 'undefined'
+                ? `${window.location.origin}/api/proxy?url=`
+                : '/api/proxy?url=';
+            const shouldProxy = (rawUrl: string) => {
+                try {
+                    const hostname = new URL(rawUrl).hostname.toLowerCase();
+                    return [
+                        'cdn.tailwindcss.com',
+                        'cdn.jsdelivr.net',
+                        'unpkg.com',
+                        'fonts.googleapis.com',
+                        'fonts.gstatic.com'
+                    ].includes(hostname);
+                } catch {
+                    return false;
+                }
+            };
+            const toProxy = (rawUrl: string) => `${proxyBase}${encodeURIComponent(rawUrl)}`;
+
+            const externalScriptRegex = /<script\s+([^>]*?)src=["'](https?:\/\/[^"']+)["']([^>]*?)>/gi;
+            html = html.replace(externalScriptRegex, (match, p1, src, p2) => {
+                if (!shouldProxy(src)) return match;
+                return `<script ${p1}src="${toProxy(src)}"${p2}>`;
+            });
+
+            const externalLinkRegex = /<link\s+([^>]*?)href=["'](https?:\/\/[^"']+)["']([^>]*?)>/gi;
+            html = html.replace(externalLinkRegex, (match, p1, href, p2) => {
+                if (!shouldProxy(href)) return match;
+                return `<link ${p1}href="${toProxy(href)}"${p2}>`;
+            });
+
+            const deferProxyScriptRegex = /<script\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi;
+            html = html.replace(deferProxyScriptRegex, (match, p1, src, p2) => {
+                const attrs = `${p1} ${p2}`.toLowerCase();
+                if (attrs.includes('defer') || attrs.includes('async')) return match;
+                if (!src.includes('/api/proxy?url=')) return match;
+                return `<script defer ${p1}src="${src}"${p2}>`;
+            });
+
+            html = html.replace(
+                /<script>\s*lucide\.createIcons\(\);\s*<\/script>/i,
+                `<script>window.addEventListener('DOMContentLoaded', () => { try { (lucide && lucide.createIcons) && lucide.createIcons(); } catch {} });</script>`
+            );
             if (html.includes('<head>')) {
                 html = html.replace('<head>', `<head>${cspMeta}`);
             } else {
@@ -256,7 +324,9 @@ export class AppLauncherService {
             }
 
             const blob = new Blob([html], { type: 'text/html' });
-            return URL.createObjectURL(blob);
+            const url = URL.createObjectURL(blob)
+            AppLauncherService.staticAppBlobUrls.set(fileId, { url, hash: htmlHash })
+            return url
         } catch (e) {
             console.error('[AppLauncher] Failed to regenerate blob URL:', e)
             return null
@@ -345,7 +415,7 @@ export class AppLauncherService {
                     isAppMode: true,
                     waitForServer: true,
                     launchStatus: 'booting',
-                    launchLabel: 'Starting System Runtime...'
+                    // launchLabel: 'Starting System Runtime...'
                 }
             })
             focusWindow(appId)
@@ -356,7 +426,7 @@ export class AppLauncherService {
                 isAppMode: true,
                 waitForServer: true,
                 launchStatus: 'booting',
-                launchLabel: 'Starting System Runtime...'
+                // launchLabel: 'Starting System Runtime...'
             })
         }
 
@@ -370,7 +440,7 @@ export class AppLauncherService {
         const launchPromise = (async () => {
         // Check if WebContainer is ready, try to boot if not
         if (!wcStore.instance) {
-            updateStatus('booting', 'Booting System Runtime...')
+            updateStatus('booting', '')
             // toast.info('Starting Runtime', 'System Runtime is booting, please wait...')
             try {
                 await wcStore.boot()
@@ -400,6 +470,12 @@ export class AppLauncherService {
             const { instance, runCommand } = useWebContainerStore.getState()
             if (!instance) return
 
+            try {
+                await DependencyCacheService.ensureCacheDir()
+            } catch (e) {
+                console.warn('[AppLauncher] Failed to ensure dependency cache directory:', e)
+            }
+
             // Auto-detect node_modules: if missing, run npm install first
             let hasNodeModules = false
             try {
@@ -410,26 +486,239 @@ export class AppLauncherService {
             }
 
             if (!hasNodeModules) {
-                console.log(`[AppLauncher] node_modules not found, running npm install...`)
-                updateStatus('installing', 'Installing Dependencies...')
-                // toast.info('Installing Dependencies', `Running npm install for "${title}"...`)
+                const useCache = useSystemSettingsStore.getState().useDependencyCache
+                let restored = false
+                
+                if (useCache) {
+                    try {
+                        // 1. Try restore from OPFS Cache
+                        const cacheInfo = await DependencyCacheService.computeCacheKeyFromWebContainerFs(instance.fs as any, appPath, { preferPackageJson: false })
+                        if (cacheInfo) {
+                            // Check for Tar Snapshot first (Faster)
+                        if (await DependencyCacheService.hasSnapshot(cacheInfo.key)) {
+                            updateStatus('restoring', '')
+                            restored = await DependencyCacheService.restoreSnapshot({
+                                key: cacheInfo.key,
+                                wcFs: instance.fs as any,
+                                appPath,
+                            })
+                        }
+                        // Fallback to Directory Snapshot
+                        else if (await DependencyCacheService.isDirSnapshotComplete(cacheInfo.key)) {
+                            updateStatus('restoring', '')
+                            restored = await DependencyCacheService.restoreDirSnapshotToWebContainerFs({
+                                key: cacheInfo.key,
+                                wcFs: instance.fs as any,
+                                appPath,
+                            })
+                        }
+                    }
+
+                    // 2. Try restore from Pre-built Template (Public Assets)
+                    if (!restored) {
+                        // Check if this looks like a standard React template
+                        // Heuristic: check if package.json dependencies match our standard template
+                        // For simplicity, we just check for a special flag or assume standard if it's a new app
+                        // Here we simply try to fetch the standard template tar if no other cache exists
+                        try {
+                            updateStatus('downloading', '')
+                            const templateName = 'react-template.tar' // We can make this dynamic later
+                            const response = await fetch(`/templates/${templateName}`, { method: 'HEAD' })
+                            if (response.ok) {
+                                console.log('[AppLauncher] Found pre-built template cache, downloading...')
+                                const blob = await (await fetch(`/templates/${templateName}`)).blob()
+                                const arrayBuffer = await blob.arrayBuffer()
+                                
+                                updateStatus('extracting', '')
+                                const { TarService } = await import('@/os/utils/TarService')
+                                await TarService.extractTarToWebContainer(
+                                    arrayBuffer, 
+                                    instance.fs as any, 
+                                    `${appPath}/node_modules`
+                                )
+                                restored = true
+                                console.log('[AppLauncher] Template cache restored successfully')
+                            }
+                        } catch (templateErr) {
+                            console.warn('[AppLauncher] Failed to load template cache:', templateErr)
+                        }
+                    }
+
+                    if (restored) {
+                        try {
+                            const entriesAfter = await instance.fs.readdir(appPath)
+                            hasNodeModules = entriesAfter.includes('node_modules')
+                        } catch {}
+                    }
+                } catch (e) {
+                    console.warn('[AppLauncher] Dependency restore attempt failed:', e)
+                }
+            } else {
+                console.log('[AppLauncher] Dependency cache disabled by user setting. Skipping restore.')
+            }
+
+            if (hasNodeModules) {
+                updateStatus('restored', '')
+            }
+        }
+
+        if (!hasNodeModules) {
+            console.log(`[AppLauncher] node_modules not found, running npm install...`)
+            // Auto-install without confirmation for "App-like" experience
+            updateStatus('installing', '')
+            
+            try {
+                // Add verbose logging to help diagnose npm issues
+                // Use default install first
+                await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], appPath, (data) => {
+                    console.log(`[${file.name} install] ${data}`)
+                })
+                console.log(`[AppLauncher] npm install completed for ${file.name}`)
+
+                // Only save cache if enabled
+                if (useSystemSettingsStore.getState().useDependencyCache) {
+                    try {
+                        const cacheInfo = await DependencyCacheService.computeCacheKeyFromWebContainerFs(instance.fs as any, appPath, { preferPackageJson: false })
+                        if (cacheInfo) {
+                            ;(async () => {
+                                try {
+                                    // Save snapshot
+                                    await DependencyCacheService.saveSnapshot({
+                                        key: cacheInfo.key,
+                                        wcFs: instance.fs as any,
+                                        appPath,
+                                        source: cacheInfo.source,
+                                        sourceName: cacheInfo.sourceName,
+                                    })
+                                    toast.success('Snapshot Saved', `Dependency snapshot saved for "${title}"`)
+                                } catch (e) {
+                                    console.warn('[AppLauncher] Dependency caching failed:', e)
+                                    // Non-fatal, just log
+                                }
+                            })()
+                        }
+                    } catch (e) {
+                        console.warn('[AppLauncher] Dependency caching failed:', e)
+                    }
+                }
+            } catch (installErr: any) {
+                console.error(`[AppLauncher] npm install failed, retrying with cache cleanup...`, installErr)
+                
+                // --- AUTO-RETRY: Clean cache and try again ---
                 try {
-                    await runCommand('npm', ['install'], appPath, (data) => {
-                        console.log(`[${file.name} install] ${data}`)
+                    updateStatus('installing', 'Retrying...')
+                    toast.info('Install Retry', 'Cleaning cache and retrying install...')
+                    
+                    // Nuke cache
+                    try {
+                        await runCommand('rm', ['-rf', '/.cache/npm', 'node_modules', 'package-lock.json'], appPath)
+                    } catch {}
+
+                    // Retry install
+                    await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=verbose'], appPath, (data) => {
+                        console.log(`[${file.name} install-retry] ${data}`)
                     })
-                    console.log(`[AppLauncher] npm install completed for ${file.name}`)
-                } catch (installErr: any) {
-                    console.error(`[AppLauncher] npm install failed:`, installErr)
-                    toast.error('Install Failed', `npm install failed for "${title}": ${installErr.message}. Please check package.json.`)
+                    console.log(`[AppLauncher] Retry install successful!`)
+                } catch (retryErr: any) {
+                    console.error(`[AppLauncher] Retry install failed:`, retryErr)
+                    toast.error('Install Failed', `npm install failed for "${title}": ${retryErr.message}. Please check package.json.`)
                     return
                 }
             }
+        }
 
-            // Run dev server
-            updateStatus('starting', 'Starting Dev Server...')
-            runCommand('npm', ['run', 'dev'], appPath, (data) => {
-                // console.log(`[${file.name}] ${data}`)
-            }, { detached: true, successPattern: 'Local:' })
+        // Run dev server
+        updateStatus('starting', '')
+            
+            // OPTIMISTIC UI: Wait a bit, then assume it's starting if it takes too long
+            // This is just visual feedback, the actual ready signal comes from server-ready event
+            
+            // --- FIX: Enhanced Error Handling for Startup ---
+            try {
+                // Check if npm run dev script exists first
+                const pkgContent = await instance.fs.readFile(`${appPath}/package.json`, 'utf-8');
+                const pkg = JSON.parse(pkgContent);
+                if (!pkg.scripts || !pkg.scripts.dev) {
+                     throw new Error('No "dev" script found in package.json');
+                }
+
+                // EMERGENCY FIX: Force executable permissions for .bin files
+                // Tar restore might have lost them, or they are symlinks that need fixing.
+                try {
+                    console.log('[AppLauncher] Applying permission fix for .bin executables...');
+                    const binPath = `${appPath}/node_modules/.bin`;
+                    
+                    // Check if .bin exists
+                    let hasBin = false;
+                    try {
+                        await instance.fs.readdir(binPath);
+                        hasBin = true;
+                    } catch {}
+
+                    if (hasBin) {
+                        // Optimization: Use batch chmod -R instead of individual files
+                        // This avoids spawning dozens of processes which freezes the UI
+                        try {
+                            await runCommand('chmod', ['-R', '+x', 'node_modules/.bin'], appPath);
+                        } catch (e) {
+                            console.warn('[AppLauncher] Batch permission fix warning:', e);
+                        }
+                    }
+                } catch (chmodErr) {
+                    console.warn('[AppLauncher] Permission fix warning (non-fatal):', chmodErr);
+                }
+
+                await runCommand('npm', ['run', 'dev'], appPath, async (data) => {
+                    console.log(`[DevServer] ${data}`)
+                    // Check for common error patterns in output
+                    if (data.includes('EADDRINUSE')) {
+                         toast.error('Port Conflict', 'Port is already in use. Please close other apps.');
+                    }
+                    if (data.includes('Vite Error') || data.includes('Error:') || data.includes('permission denied')) {
+                         console.error('[DevServer Error]', data);
+                         
+                         // --- AUTO HEALING: Permission Denied ---
+                         if (data.includes('permission denied')) {
+                             console.log('[AppLauncher] Detected permission denied. Triggering auto-repair...');
+                             const repairToastId = toast.loading('Repairing Runtime', 'Fixing permissions issues, please wait...');
+                             updateStatus('installing', 'Repairing Runtime...');
+                             
+                             try {
+                                 // Re-run npm install to fix broken symlinks/permissions
+                                 await runCommand('npm', ['install', '--force', '--no-audit'], appPath);
+                                 console.log('[AppLauncher] Repair complete. Restarting dev server...');
+                                 toast.dismiss(repairToastId);
+                                 toast.success('Repaired', 'Runtime environment repaired.');
+                                 
+                                 // We can't easily "restart" the current runCommand from inside its callback without complex logic.
+                                 // But since we are inside the callback, the current process is likely exiting or printing error.
+                                 // We should ideally kill the current process and restart.
+                                 // However, `runCommand` wrapper doesn't expose kill easily here.
+                                 // The simplest way is to let the user refresh, or just rely on the fact that `npm run dev` will fail/exit 
+                                 // and the user has to click open again.
+                                 
+                                 // BETTER: Suggest reload
+                                 toast.info('Restart Required', 'Please close and reopen the app to apply fixes.');
+                             } catch (repairErr) {
+                                 console.error('[AppLauncher] Auto-repair failed:', repairErr);
+                                 toast.error('Repair Failed', 'Could not auto-repair. Please reinstall the app.');
+                             }
+                         }
+                    }
+                }, { 
+                    detached: true, 
+                    successPattern: 'Local:',
+                });
+            } catch (runErr: any) {
+                console.error('[AppLauncher] Failed to run dev server:', runErr);
+                updateStatus('error', 'Startup Failed');
+                toast.error('Startup Failed', `Failed to start dev server: ${runErr.message}`);
+                
+                // If startup failed, it might be due to broken node_modules (e.g. symlinks lost).
+                // Suggest reinstall
+                // TODO: Add a "Reinstall" button in UI
+                return;
+            }
 
         } catch (e: any) {
             console.error('[AppLauncher] Failed to launch web container app:', e)

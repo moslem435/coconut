@@ -422,6 +422,7 @@ export function useWebLLM() {
     1. **App-as-a-Folder**: Every app must be a self-contained folder in the file system.
     2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
     3. **Decoupling**: The app should not depend on system-wide configuration changes.
+    4. **No Auto-Run During Build**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running should be triggered by explicit user intent (double-click launch or user asks to run).
 
     WHEN CREATING AN APP:
     1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
@@ -437,7 +438,6 @@ export function useWebLLM() {
     4. **COMPLETION**: When done, tell the user "App created! Double-click [App Name] in File Explorer to run.".
 
     DEBUGGING:
-    - If a command fails, read the output, fix the code/config, and try again.
     - Use 'get_file_tree' to understand the current structure.`,
             };
 
@@ -462,7 +462,7 @@ export function useWebLLM() {
                     }
                     // builder mode: allow tool hints
                     if (mode === 'builder') {
-                        systemContent += `\n\nCRITICAL: BUILDER MODE ACTIVE. You have access to tools like 'run_command' to execute shell commands and 'create_file' to write code. USE THEM. Do not just output code blocks.`;
+                        systemContent += `\n\nCRITICAL: BUILDER MODE ACTIVE. Use tools to scaffold and edit files. Do NOT run 'npm install' or 'npm run dev' during build unless the user explicitly asks to run.`;
                     }
 
                     // CRITICAL FIX: Hermes-2-Pro and some other models THROW ERROR if 'system' role is used with tools.
@@ -749,7 +749,7 @@ export function useWebLLM() {
                     let result = '';
                     if (systemToolsImplementation[functionName]) {
                         try {
-                            result = await systemToolsImplementation[functionName](functionArgs);
+                            result = await systemToolsImplementation[functionName](functionArgs, { mode });
                         } catch (e: any) {
                             result = `Error executing tool: ${e.message}`;
                         }

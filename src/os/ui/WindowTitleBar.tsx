@@ -6,6 +6,7 @@ import { AppIcon } from '@/os/ui/AppIcon'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { Tooltip } from '@/os/ui/Tooltip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
+import { cn } from '@/lib/utils'
 
 interface WindowTitleBarProps {
     title: string
@@ -46,7 +47,7 @@ export function WindowTitleBar({
     onContextMenu,
     onHoverMinimize,
     dragControls,
-    colorMode,
+    colorMode = 'light', // Default to light text (dark background)
     labels = {
         minimize: 'Minimize',
         maximize: 'Maximize',
@@ -61,6 +62,15 @@ export function WindowTitleBar({
     
     const displayTitle = isDefaultTitle && appId ? t(`app.${appId}`) : title
 
+    // Determine text and icon colors based on colorMode
+    // colorMode='dark' means dark text (for light backgrounds)
+    // colorMode='light' means light text (for dark backgrounds)
+    const isDarkText = colorMode === 'dark'
+    
+    const textColorClass = isDarkText ? 'text-gray-800' : 'text-white/90'
+    const iconColorClass = isDarkText ? 'text-gray-700' : 'text-white/80'
+    const hoverBgClass = isDarkText ? 'hover:bg-black/5' : 'hover:bg-white/10'
+
     return (
         <div
             onPointerDown={(e) => {
@@ -72,7 +82,14 @@ export function WindowTitleBar({
                 e.preventDefault()
                 if (isResizable) onMaximize()
             }}
-            className="h-8 flex items-center justify-between px-2.5 select-none shrink-0 cursor-grab active:cursor-grabbing group/titlebar bg-black/5 backdrop-blur-xl transition-colors duration-200 z-50 absolute top-0 left-0 w-full"
+            className={cn(
+                "h-8 flex items-center justify-between px-2.5 select-none shrink-0 cursor-grab active:cursor-grabbing group/titlebar transition-colors duration-200 z-50 absolute top-0 left-0 w-full",
+                // Removing default bg-black/5 for better immersion
+                // Adding a subtle gradient for better text readability
+                isDarkText 
+                    ? "bg-gradient-to-b from-white/30 to-transparent" 
+                    : "bg-gradient-to-b from-black/20 to-transparent"
+            )}
             style={{
                 // backgroundColor handled by class
             }}
@@ -88,7 +105,10 @@ export function WindowTitleBar({
                     />
                 </div>
                 <span
-                    className="text-xs font-medium tracking-wide transition-opacity text-white/90 drop-shadow-md"
+                    className={cn(
+                        "text-xs font-medium tracking-wide transition-opacity drop-shadow-sm",
+                        textColorClass
+                    )}
                     style={{ 
                         opacity: isActive ? 1 : 0.8
                     }}
@@ -104,11 +124,14 @@ export function WindowTitleBar({
                     <button
                         onClick={onMinimize}
                         aria-label={labels.minimize}
-                        className="group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-white/10"
+                        className={cn(
+                            "group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90",
+                            hoverBgClass
+                        )}
                     >
                         <Minus 
                             size={14} 
-                            className="text-white/80 transition-opacity group-hover:opacity-100"
+                            className={cn("transition-opacity group-hover:opacity-100", iconColorClass)}
                         />
                     </button>
                 </Tooltip>
@@ -119,17 +142,20 @@ export function WindowTitleBar({
                     <button
                         onClick={onMaximize}
                         aria-label={isMaximized ? labels.restore : labels.maximize}
-                        className="group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90 hover:bg-white/10"
+                        className={cn(
+                            "group w-7 h-7 flex items-center justify-center rounded-lg transition-[background-color,transform] duration-150 active:scale-90",
+                            hoverBgClass
+                        )}
                     >
                         {isMaximized ? (
                             <Minimize2 
                                 size={14} 
-                                className="text-white/80 transition-opacity group-hover:opacity-100"
+                                className={cn("transition-opacity group-hover:opacity-100", iconColorClass)}
                             />
                         ) : (
                             <Maximize2 
                                 size={14} 
-                                className="text-white/80 transition-opacity group-hover:opacity-100"
+                                className={cn("transition-opacity group-hover:opacity-100", iconColorClass)}
                             />
                         )}
                     </button>
@@ -145,7 +171,10 @@ export function WindowTitleBar({
                     >
                         <X 
                             size={14} 
-                            className="text-white/80 transition-colors group-hover:text-white group-hover:opacity-100"
+                            className={cn(
+                                "transition-colors group-hover:text-white group-hover:opacity-100",
+                                iconColorClass
+                            )}
                         />
                     </button>
                 </Tooltip>

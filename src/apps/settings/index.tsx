@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Palette, Monitor, Volume2, Globe, User, Database, Info, Network } from 'lucide-react'
+import { Palette, Monitor, Volume2, Globe, User, Database, Info, Network, Code } from 'lucide-react'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { SettingCategory } from './types'
 import { SettingSidebar } from './components/SettingSidebar'
@@ -14,6 +14,7 @@ import { AccountPanel } from './panels/AccountPanel'
 import { NetworkPanel } from './panels/NetworkPanel'
 import { DataPanel } from './panels/DataPanel'
 import { AboutPanel } from './panels/AboutPanel'
+import { DeveloperPanel } from './panels/DeveloperPanel'
 
 export default function SettingsApp({ initialCategory }: { initialCategory?: string }) {
     const [activeCategory, setActiveCategory] = useState(initialCategory || 'display')
@@ -28,6 +29,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
         { id: 'network', label: t('settings.network'), icon: Network, description: t('settings.desc.network') },
         { id: 'account', label: t('settings.account'), icon: User, description: t('settings.desc.account') },
         { id: 'data', label: t('settings.data'), icon: Database, description: t('settings.desc.data') },
+        { id: 'developer', label: t('settings.developer'), icon: Code, description: t('settings.desc.developer') },
         { id: 'about', label: t('settings.about'), icon: Info, description: t('settings.desc.about') },
     ]
 
@@ -40,6 +42,7 @@ export default function SettingsApp({ initialCategory }: { initialCategory?: str
         network: NetworkPanel,
         account: AccountPanel,
         data: DataPanel,
+        developer: DeveloperPanel,
         about: AboutPanel
     }
 

@@ -125,7 +125,8 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     handleCut,     // 剪切文件
     handlePaste,   // 粘贴文件
     handleDelete,  // 删除文件
-    handleMove     // 移动文件
+    handleMove,    // 移动文件
+    handleDeleteBatch // 批量删除
   } = useFileOperations()
 
   const {
@@ -243,23 +244,16 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
   /**
    * 批量删除文件
    * 
-   * 显示进度对话框，逐个删除选中的文件
+   * 使用新的 deleteItems 接口一次性删除，不再显示逐个进度，实现秒删
    */
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.length === 0) return
 
-    const items = selectedIds.map(id => ({
-      id,
-      name: files[id]?.name || 'Unknown'
-    }))
-
-    await executeBatch('Deleting Files', items, async (item) => {
-      await handleDelete([item.id])
-    })
+    await handleDeleteBatch(selectedIds)
 
     setSelectedIds([])
     loadFolderContent(currentPathId)
-  }, [selectedIds, files, executeBatch, handleDelete, setSelectedIds, currentPathId, loadFolderContent])
+  }, [selectedIds, handleDeleteBatch, setSelectedIds, currentPathId, loadFolderContent])
 
   /**
    * 键盘快捷键

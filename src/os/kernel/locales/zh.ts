@@ -161,6 +161,18 @@ const zh: Record<string, string> = {
     "boot.fs": "挂载文件系统...",
     "boot.uplink": "建立连接...",
 
+    // App Launch
+    "launch.booting": "正在启动系统运行时",
+    "launch.installing": "正在安装依赖",
+    "launch.restoring": "正在恢复缓存",
+    "launch.extracting": "正在解压模板",
+    "launch.starting": "正在启动开发服务器",
+    "launch.ready": "准备就绪",
+    "launch.error": "错误",
+    "launch.loading": "加载中",
+    "launch.installing.desc": "首次运行需要安装依赖，这只需执行一次。",
+    "launch.ready.desc": "应用环境已就绪，正在启动界面...",
+
     // Action Center
     "action.notifications": "通知中心",
     "action.clear": "清除全部",
@@ -184,6 +196,10 @@ const zh: Record<string, string> = {
     "settings.desc.network": "管理网络连接和安全策略",
     "settings.data": "数据",
     "settings.desc.data": "管理系统数据和备份",
+    "settings.developer": "开发者选项",
+    "settings.desc.developer": "系统高级设置",
+    "settings.developer.cache": "共享依赖缓存",
+    "settings.developer.cache.desc": "启用共享 node_modules 缓存以加速启动。关闭则强制全新安装。",
     "settings.data.reset": "重置系统设置",
     "settings.data.reset.desc": "将所有设置恢复为默认值，需要刷新页面",
     "settings.data.export": "导出数据",
