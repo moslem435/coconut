@@ -399,7 +399,7 @@ export default function FileList({
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
                 onClick={(e) => handleItemClick(node.id, e)}
-                onDoubleClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => handleItemDoubleClick(node.id, e)}
                 onContextMenu={(e) => onContextMenu(e, node.id)}
                 className={cn(
                   "flex items-center h-9 px-1 rounded-md text-sm text-[var(--os-text-primary)] transition-colors cursor-pointer group",
@@ -431,7 +431,7 @@ export default function FileList({
                   {getFileTypeLabel(node)}
                 </div>
                 <div className="w-[80px] text-right text-xs text-[var(--os-text-muted)] font-mono">
-                  {formatSize(node.size)}
+                  {node.type === 'folder' ? '' : formatSize(node.size)}
                 </div>
               </div>
             )

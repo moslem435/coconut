@@ -85,7 +85,10 @@ export const toast = {
     useToastStore.getState().removeToast(id)
   },
 
-  promise: async <T>(promise: Promise<T>, msgs: { loading: string; success: string; error: string }) => {
+  promise: async function <T>(
+    promise: Promise<T>,
+    msgs: { loading: string; success: string; error: string }
+  ) {
     const id = toast.loading(msgs.loading)
     try {
       const data = await promise

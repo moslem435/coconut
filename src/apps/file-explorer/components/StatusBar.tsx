@@ -23,7 +23,9 @@ export default function StatusBar({ totalItems, selectedItems }: StatusBarProps)
   const selectedCount = selectedItems.length
   const fileCount = selectedItems.filter(i => i.type === 'file').length
   const folderCount = selectedItems.filter(i => i.type === 'folder').length
-  const selectedSize = selectedItems.reduce((a, i) => a + (i.size || 0), 0)
+  const fileItems = selectedItems.filter(i => i.type === 'file')
+  const hasUnknownSize = fileItems.some(i => i.size === undefined)
+  const selectedSize = fileItems.reduce((a, i) => a + (i.size ?? 0), 0)
 
   return (
     <div className="shrink-0 flex items-center gap-2.5 px-4 h-6 text-[10px] select-none"
@@ -56,10 +58,10 @@ export default function StatusBar({ totalItems, selectedItems }: StatusBarProps)
             )}
           </div>
 
-          {selectedSize > 0 && (
+          {fileCount > 0 && (
             <>
               <Divider />
-              <span>{formatSize(selectedSize)}</span>
+              <span>{hasUnknownSize ? '—' : formatSize(selectedSize)}</span>
             </>
           )}
 

@@ -3,6 +3,9 @@ import { ChatSession } from '../types';
 
 const STORE_KEY = 'ai-chat-sessions';
 
+let pendingSessions: ChatSession[] | null = null;
+let saveTimer: number | null = null;
+
 export const storage = {
     getSessions: async (): Promise<ChatSession[]> => {
         try {
@@ -20,6 +23,19 @@ export const storage = {
         } catch (error) {
             console.error('Failed to save sessions:', error);
         }
+    },
+
+    saveSessionsDebounced: (sessions: ChatSession[], delayMs: number = 750) => {
+        pendingSessions = sessions;
+        if (saveTimer !== null) {
+            clearTimeout(saveTimer);
+        }
+        saveTimer = window.setTimeout(() => {
+            const toSave = pendingSessions;
+            pendingSessions = null;
+            saveTimer = null;
+            if (toSave) storage.saveSessions(toSave);
+        }, delayMs);
     },
 
     clearSessions: async (): Promise<void> => {

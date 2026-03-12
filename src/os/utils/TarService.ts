@@ -144,7 +144,7 @@ export class TarService {
 
       // Checksum (148-155)
       let checksum = 0;
-      for (let i = 0; i < 512; i++) checksum += (i >= 148 && i < 156) ? 32 : buf[i];
+      for (let i = 0; i < 512; i++) checksum += (i >= 148 && i < 156) ? 32 : (buf[i] ?? 0);
       buf.set(encoder.encode(checksum.toString(8).padStart(6, '0') + '\0 '), 148);
 
       return buf;

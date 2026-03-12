@@ -206,6 +206,7 @@ export function MessageList({
                     
                     // Extract all tool results
                     const allToolResults = group.messages.filter((m: any) => m.role === 'tool');
+                    const lastAssistant = [...group.messages].reverse().find((m: any) => m.role === 'assistant');
 
                     return (
                         <MessageItem
@@ -216,7 +217,10 @@ export function MessageList({
                                 content: combinedContent,
                                 tool_calls: allToolCalls,
                                 mode: group.mode,
-                                timestamp: group.timestamp
+                                timestamp: lastAssistant?.timestamp ?? group.timestamp,
+                                startTime: lastAssistant?.startTime,
+                                duration: lastAssistant?.duration,
+                                tps: lastAssistant?.tps
                             }}
                             toolResults={allToolResults}
                             rawMessages={group.messages} // Pass raw messages for precise event reconstruction

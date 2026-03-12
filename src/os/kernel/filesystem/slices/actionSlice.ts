@@ -12,6 +12,12 @@ import { collectDescendants } from '../utils/indexManager'
 import { syncService } from '@/os/services/FileSystemSyncService'
 import { toast } from '@/os/components/Toast'
 
+const getByteSize = (content?: string | Uint8Array) => {
+  if (content === undefined) return undefined
+  if (typeof content === 'string') return new TextEncoder().encode(content).byteLength
+  return content.byteLength
+}
+
 export interface ActionSlice {
   // 文件操作
   createItem: (
@@ -66,7 +72,8 @@ export const createActionSlice: StateCreator<
       appId,
       content: typeof content === 'string' ? content : undefined, // Only store string content in memory
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      size: type === 'file' ? (getByteSize(content) ?? 0) : undefined
     }
 
     // 1. 乐观更新状态 — 先添加文件节点
@@ -406,7 +413,8 @@ export const createActionSlice: StateCreator<
     // 1. 更新元数据和内容
     get()._updateFile(id, {
       updatedAt: Date.now(),
-      content: typeof content === 'string' ? content : undefined // Only store string content in memory
+      content: typeof content === 'string' ? content : undefined, // Only store string content in memory
+      size: node.type === 'file' ? (getByteSize(content) ?? 0) : undefined
     })
 
     // 2. 发出事件（SyncMiddleware 监听并执行 IO）

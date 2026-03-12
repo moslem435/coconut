@@ -580,13 +580,14 @@ async function loadFolderContentSync(
     if (!res || !res.stats) continue
     const { name, stats } = res
     const existingNode = currentChildrenMap.get(name)
+    const nextSize = stats.isDirectory ? undefined : stats.size
 
     if (existingNode) {
-      if (existingNode.updatedAt !== stats.mtime) {
+      if (existingNode.updatedAt !== stats.mtime || existingNode.size !== nextSize) {
         newFiles[existingNode.id] = {
           ...existingNode,
           updatedAt: stats.mtime,
-          size: stats.size
+          size: nextSize
         }
         hasChanges = true
       }
@@ -605,7 +606,7 @@ async function loadFolderContentSync(
         type: stats.isDirectory ? 'folder' : 'file',
         createdAt: stats.ctime,
         updatedAt: stats.mtime,
-        size: stats.size,
+        size: nextSize,
         isMount: false
       }
       hasChanges = true

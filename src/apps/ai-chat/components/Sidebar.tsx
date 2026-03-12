@@ -637,7 +637,7 @@ export function Sidebar() {
                                     <button
                                         onClick={async () => {
                                             setCloudTestState({ loading: true, message: t('ai.cloud.testing'), ok: null });
-                                            const result = await testCloudConnection(cloudConfig, t);
+                                            const result = await testCloudConnection(cloudConfig);
                                             setCloudTestState({ loading: false, message: result.message, ok: result.ok });
                                         }}
                                         disabled={!cloudConfig.apiKey || cloudTestState.loading}

@@ -178,15 +178,25 @@ export function MessageItem({
                                 <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:0ms]" />
                                 <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:150ms]" />
                                 <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:300ms]" />
+                                {(message.tps !== undefined && Number(message.tps) > 0) && (
+                                    <span className="ml-2 text-zinc-500 font-mono tabular-nums">
+                                        {Number(message.tps).toFixed(1)} t/s
+                                    </span>
+                                )}
                             </span>
                         )}
                         {/* 时间戳 */}
                         {message.timestamp && !isGenerating && (
-                            <span className="ml-auto text-[10px] text-zinc-400/50 tabular-nums">
+                            <span className="ml-auto text-[10px] text-zinc-400/50 tabular-nums flex items-center">
                                 {formatTime(message.timestamp)}
                                 {message.duration && (
                                     <span className="ml-2 text-emerald-400/70">
                                         ({(message.duration / 1000).toFixed(2)}s)
+                                    </span>
+                                )}
+                                {(message.tps !== undefined && Number(message.tps) > 0) && (
+                                    <span className="ml-2 text-zinc-500/70">
+                                        {Number(message.tps).toFixed(1)} t/s
                                     </span>
                                 )}
                             </span>

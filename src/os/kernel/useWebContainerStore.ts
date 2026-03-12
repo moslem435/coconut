@@ -425,6 +425,24 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
         }
         */
 
+      const copyDir = async (wcDir: string, opfsDir: string) => {
+        const names = (await instance.fs.readdir(wcDir)) as any[]
+        for (const name of names) {
+          const fileName = typeof name === 'string' ? name : name?.name
+          if (!fileName) continue
+          const wcPath = wcDir === '/' ? `/${fileName}` : `${wcDir}/${fileName}`
+          const opfsPath = `${opfsDir}/${fileName}`
+          const st = await (instance.fs as any).stat(wcPath)
+          if (st.isDirectory()) {
+            await fs.mkdir(opfsPath, true)
+            await copyDir(wcPath, opfsPath)
+          } else {
+            const bytes = (await instance.fs.readFile(wcPath)) as Uint8Array
+            await fs.writeFile(opfsPath, bytes)
+          }
+        }
+      }
+
       const npmCacheDir = await ensureNpmCacheDir()
       const candidates = [
         { root: npmCacheDir, label: 'env-cache' },

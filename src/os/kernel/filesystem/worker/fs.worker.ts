@@ -328,6 +328,7 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                     // 2. Add or Update
                     for (const [name, fsEntry] of fsMap) {
                         const existing = currentMap.get(name);
+                        const nextSize = fsEntry.isDirectory ? undefined : fsEntry.size;
 
                         if (!existing) {
                             // New file
@@ -338,16 +339,16 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                                 type: fsEntry.isDirectory ? 'folder' : 'file',
                                 createdAt: Date.now(),
                                 updatedAt: fsEntry.mtime,
-                                size: fsEntry.size || 0,
+                                size: nextSize,
                                 isMount: false
                             });
-                        } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== fsEntry.size) {
+                        } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== nextSize) {
                             // Update file
                             patch.toUpdate.push({
                                 id: existing.id,
                                 updates: {
                                     updatedAt: fsEntry.mtime,
-                                    size: fsEntry.size
+                                    size: nextSize
                                 }
                             });
                         }

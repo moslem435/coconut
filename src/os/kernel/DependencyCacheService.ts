@@ -1,6 +1,6 @@
 import { SYSTEM_PATHS } from '@/os/config/paths'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
-import { TarService } from '@/os/utils/TarService'
+import { TarService, type WebContainerFs } from '@/os/utils/TarService'
 
 type CacheIndexEntry = {
   key: string
@@ -234,7 +234,7 @@ export class DependencyCacheService {
 
   static async restoreSnapshot(input: {
     key: string
-    wcFs: { mkdir: (path: string, opts?: any) => Promise<void>; writeFile: (path: string, data: Uint8Array) => Promise<void> }
+    wcFs: WebContainerFs
     appPath: string
   }): Promise<boolean> {
     const tarPath = DependencyCacheService.tarPathForKey(input.key)
@@ -243,7 +243,7 @@ export class DependencyCacheService {
       
       const wcBase = `${input.appPath}/node_modules`
       await TarService.extractTarToWebContainer(
-        tarBytes.buffer, 
+        tarBytes.buffer as ArrayBuffer, 
         input.wcFs, 
         wcBase,
         (count) => {
@@ -264,6 +264,14 @@ export class DependencyCacheService {
       console.error('[DepCache] Restore snapshot failed:', e)
       return false
     }
+  }
+
+  static async restoreDirSnapshotToWebContainerFs(_input: {
+    key: string
+    wcFs: WebContainerFs
+    appPath: string
+  }): Promise<boolean> {
+    return false
   }
 
   // Deprecated: Removed old directory snapshot logic to prevent SyncWrite spam

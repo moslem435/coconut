@@ -21,8 +21,9 @@ const formatDate = (ts: number) =>
         hour: '2-digit', minute: '2-digit'
     })
 
-const formatSize = (bytes?: number) => {
-    if (!bytes) return '—'
+const formatSize = (bytes?: number, isDirectory?: boolean) => {
+    if (isDirectory) return '—'
+    if (bytes === undefined || bytes === null) return '—'
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
     if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`
@@ -43,7 +44,7 @@ const SinglePreview = ({ item, allFiles }: { item: FileNode, allFiles: Record<st
 
     const infoRows = [
         { icon: <Calendar size={11} />, label: '修改时间', value: formatDate(item.updatedAt) },
-        { icon: <HardDrive size={11} />, label: '大小', value: formatSize(item.size) },
+        { icon: <HardDrive size={11} />, label: '大小', value: formatSize(item.size, item.type === 'folder') },
         { icon: <Folder size={11} />, label: '位置', value: parent?.name || '—' },
         ...(ext ? [{ icon: <Tag size={11} />, label: '类型', value: ext.toUpperCase() + (item.type === 'folder' ? ' 文件夹' : ' 文件') }] : []),
     ]
@@ -115,7 +116,9 @@ const SinglePreview = ({ item, allFiles }: { item: FileNode, allFiles: Record<st
 const MultiPreview = ({ items }: { items: FileNode[] }) => {
     const fileCount = items.filter(i => i.type === 'file').length
     const folderCount = items.filter(i => i.type === 'folder').length
-    const totalSize = items.reduce((a, i) => a + (i.size || 0), 0)
+    const fileItems = items.filter(i => i.type === 'file')
+    const hasUnknownSize = fileItems.some(i => i.size === undefined)
+    const totalSize = fileItems.reduce((a, i) => a + (i.size ?? 0), 0)
 
     return (
         <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
@@ -153,9 +156,9 @@ const MultiPreview = ({ items }: { items: FileNode[] }) => {
                 <p className="text-[11px]" style={{ color: 'var(--os-text-muted)' }}>
                     {fileCount > 0 && `${fileCount} 个文件`}{fileCount > 0 && folderCount > 0 && ' · '}{folderCount > 0 && `${folderCount} 个文件夹`}
                 </p>
-                {totalSize > 0 && (
+                {fileCount > 0 && (
                     <p className="text-[11px]" style={{ color: 'var(--os-text-muted)' }}>
-                        总计 {formatSize(totalSize)}
+                        总计 {hasUnknownSize ? '—' : formatSize(totalSize)}
                     </p>
                 )}
             </div>

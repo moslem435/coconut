@@ -198,6 +198,7 @@ WHEN CREATING AN APP:
      - This creates a lightweight HTML/JS app that launches instantly.
      - NO build steps, NO npm install needed.
      - After scaffolding, use 'create_file' or 'update_file' to write 'index.html' with complete app logic (HTML + CSS + JS all in one file).
+     - For small targeted edits, prefer 'replace_in_file' to avoid rewriting the whole file and save tokens.
    - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
      - This creates a full React+Vite+Tailwind app.
      - After install, customize 'src/App.jsx' with the app logic.
@@ -209,6 +210,7 @@ AVAILABLE TOOLS:
 - scaffold_react_app({ name, title, icon }): Create a React+Vite+Tailwind app
 - create_file({ path, content }): Create a new file
 - update_file({ path, content }): Overwrite an existing file
+- replace_in_file({ path, find, replace, expectedCount?, regex?, flags?, replaceAll? }): Replace text inside a file (preferred for small edits)
 - run_command({ cmd, args, cwd, detached, successPattern }): Run a shell command
 - get_file_tree({ path }): List directory structure
 - read_file({ path }): Read file contents
@@ -239,7 +241,7 @@ async function callGemini(
     onUpdate: (update: Partial<any>) => void,
     onNewMessage: (msg: any) => void,
     signal: AbortSignal
-): Promise<void> {
+): Promise<{ tps?: number }> {
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
     const sysInstruction = buildSystemInstruction(mode, systemPrompt);
     const geminiContents = buildGeminiHistory(messages);
@@ -285,6 +287,11 @@ async function callGemini(
         let accumulatedText = '';
         const functionCallParts: any[] = [];
         let finishReason = '';
+        
+        // TPS Calculation
+        const startTime = Date.now();
+        let tokenCount = 0;
+        let lastTps = 0;
 
         outer: while (true) {
             const { done, value } = await reader.read();
@@ -303,15 +310,24 @@ async function callGemini(
                     if (candidate?.finishReason) finishReason = candidate.finishReason;
                     const parts: any[] = candidate?.content?.parts || [];
                     for (const part of parts) {
-                        if (part.text) { accumulatedText += part.text; }
+                        if (part.text) { 
+                            accumulatedText += part.text;
+                            // Estimate token count (rough approximation for streaming)
+                            tokenCount += part.text.length / 4; 
+                        }
                         if (part.functionCall) { functionCallParts.push(part); }
+                        
+                        const currentTps = tokenCount / Math.max(0.1, (Date.now() - startTime) / 1000);
+                        lastTps = currentTps;
+                        
                         onUpdate({
                             content: accumulatedText,
                             tool_calls: functionCallParts.length > 0 ? functionCallParts.map((p, i) => ({
                                 id: `call_${p.functionCall.name}_${round}_${i}`,
                                 function: { name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args) },
                                 type: 'function'
-                            })) : undefined
+                            })) : undefined,
+                            tps: currentTps
                         });
                     }
                 } catch { }
@@ -340,8 +356,11 @@ async function callGemini(
         }
         geminiContents.push({ role: 'user', parts: functionResponseParts });
         accumulatedText = '';
-        if (finishReason === 'STOP') break;
+        if (finishReason === 'STOP') {
+            return { tps: lastTps };
+        }
     }
+    return {};
 }
 
 // ─── OpenAI API Call ──────────────────────────
@@ -356,7 +375,7 @@ async function callOpenAI(
     onNewMessage: (msg: any) => void,
     t: (key: string) => string,
     signal: AbortSignal
-): Promise<void> {
+): Promise<{ tps?: number }> {
     const baseUrl = config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com/v1';
     const sysContent = buildSystemInstruction(mode, systemPrompt);
     const toolNames: string[] = mode === 'control' ? TOOL_CATEGORIES.control : mode === 'builder' ? TOOL_CATEGORIES.builder : [];
@@ -386,6 +405,11 @@ async function callOpenAI(
         let buffer = '';
         let fullContent = '';
         const toolCalls: any[] = [];
+        
+        // TPS Calculation
+        const startTime = Date.now();
+        let tokenCount = 0;
+        let lastTps = 0;
 
         while (true) {
             const { done, value } = await reader.read();
@@ -399,19 +423,27 @@ async function callOpenAI(
                 if (data === '[DONE]') break;
                 try {
                     const delta = JSON.parse(data)?.choices?.[0]?.delta;
-                    if (delta?.content) { fullContent += delta.content; }
+                    if (delta?.content) { 
+                        fullContent += delta.content;
+                        // Estimate token count (rough approximation for streaming)
+                        tokenCount += delta.content.length / 4;
+                    }
                     if (delta?.tool_calls) {
                         for (const tc of delta.tool_calls) {
                             if (!toolCalls[tc.index]) { toolCalls[tc.index] = { id: tc.id, function: { name: tc.function.name || '', arguments: '' }, type: 'function' }; }
                             if (tc.function.arguments) toolCalls[tc.index].function.arguments += tc.function.arguments;
                         }
                     }
-                    onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined });
+                    
+                    const currentTps = tokenCount / Math.max(0.1, (Date.now() - startTime) / 1000);
+                    lastTps = currentTps;
+                    
+                    onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined, tps: currentTps });
                 } catch { }
             }
         }
 
-        if (toolCalls.length === 0) break;
+        if (toolCalls.length === 0) return { tps: lastTps };
         apiMessages.push({ role: 'assistant', content: fullContent, tool_calls: toolCalls });
 
         for (const tc of toolCalls) {
@@ -432,27 +464,39 @@ async function callOpenAI(
             apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: resultText });
         }
     }
+    return {};
 }
 
 // ─── Test Connection ──────────────────────────
 
-export async function testCloudConnection(config: CloudConfig, t: (key: string) => string): Promise<{ ok: boolean; message: string }> {
+export async function testCloudConnection(config: CloudConfig): Promise<{ ok: boolean; message: string }> {
     try {
         const body = config.provider === 'gemini'
             ? { contents: [{ parts: [{ text: 'Hi' }] }], generationConfig: { maxOutputTokens: 5 } }
             : { model: config.modelId, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 };
+        
         const url = config.provider === 'gemini'
             ? `https://generativelanguage.googleapis.com/v1beta/models/${config.modelId}:generateContent?key=${config.apiKey}`
             : `${config.baseUrl?.replace(/\/$/, '') || 'https://api.openai.com/v1'}/chat/completions`;
 
         const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(config.provider !== 'gemini' && { 'Authorization': `Bearer ${config.apiKey}` }) },
+            headers: { 
+                'Content-Type': 'application/json', 
+                ...(config.provider !== 'gemini' && { 'Authorization': `Bearer ${config.apiKey}` }) 
+            },
             body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error(await res.text());
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`API Error: ${res.status} ${errorText}`);
+        }
+        
         return { ok: true, message: 'Success' };
-    } catch (e: any) { return { ok: false, message: e.message }; }
+    } catch (e: any) { 
+        return { ok: false, message: e.message || 'Unknown error' }; 
+    }
 }
 
 // ─── Main Hook ───
@@ -474,7 +518,7 @@ export function useCloudLLM() {
         messages: Message[],
         onUpdate: (update: Partial<any>) => void,
         onNewMessage: (msg: any) => void,
-        onFinish: () => void,
+        onFinish: (stats?: { tps?: number }) => void,
         onError: (err: any) => void,
         systemPrompt: string,
         mode: string,
@@ -486,12 +530,13 @@ export function useCloudLLM() {
         abortControllerRef.current = new AbortController();
 
         try {
+            let stats = {};
             if (config.provider === 'gemini') {
-                await callGemini(messages, config, systemPrompt, mode, modelSettings, onUpdate, onNewMessage, abortControllerRef.current.signal);
+                stats = await callGemini(messages, config, systemPrompt, mode, modelSettings, onUpdate, onNewMessage, abortControllerRef.current.signal);
             } else {
-                await callOpenAI(messages, config, systemPrompt, mode, modelSettings, onUpdate, onNewMessage, t, abortControllerRef.current.signal);
+                stats = await callOpenAI(messages, config, systemPrompt, mode, modelSettings, onUpdate, onNewMessage, t, abortControllerRef.current.signal);
             }
-            onFinish();
+            onFinish(stats);
         } catch (err: any) {
             if (err.name === 'AbortError') return;
             setState({ isLoading: false, error: err.message });

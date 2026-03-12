@@ -9,6 +9,7 @@ export interface Message {
     tool_call_id?: string;
     startTime?: number; // AI回复开始时间
     duration?: number; // AI回复耗时（毫秒）
+    tps?: number; // Tokens per second
 }
 
 export interface ChatSession {

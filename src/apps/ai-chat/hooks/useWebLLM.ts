@@ -355,7 +355,7 @@ export function useWebLLM() {
         messages: Message[],
         onUpdate: (updates: string | Partial<any>) => void,
         onNewMessage: (msg: any) => void,
-        onFinish: () => void,
+        onFinish: (stats?: { tps?: number }) => void,
         onError: (err: any) => void,
         systemPrompt?: string,
         mode: 'chat' | 'control' | 'builder' = 'chat',
@@ -433,7 +433,7 @@ export function useWebLLM() {
            - This automatically creates the folder, package.json, and index.html.
          - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
            - This creates the full Vite structure.
-    3. **CUSTOMIZE**: After scaffolding, use 'create_file' or 'update_file' to modify files.
+    3. **CUSTOMIZE**: After scaffolding, use 'create_file' or 'update_file' to modify files. For small targeted edits, prefer 'replace_in_file' to save tokens.
        - **IMPORTANT**: If creating multiple files or writing long code, do it step-by-step. Do NOT try to write everything in one single response to avoid JSON truncation errors.
     4. **COMPLETION**: When done, tell the user "App created! Double-click [App Name] in File Explorer to run.".
 
@@ -504,9 +504,13 @@ export function useWebLLM() {
             // }
 
             let totalInteractionContent = ''; // NEW: Cumulative content across the loop
+            let lastTps = 0;
 
             // Loop for handling tool calls (max 50 iterations to prevent infinite loops)
             for (let i = 0; i < 50; i++) {
+                const loopStartTime = Date.now();
+                let loopTokenCount = 0;
+
                 // If this is a follow-up turn (after tool execution), we need a new assistant message placeholder in the UI
                 if (i > 0) {
                     onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });
@@ -572,6 +576,7 @@ export function useWebLLM() {
                         fullContent += delta.content;
                         totalInteractionContent += delta.content;
                         hasNewData = true;
+                        loopTokenCount++;
                     }
 
                     // Handle tool calls
@@ -602,13 +607,16 @@ export function useWebLLM() {
                     if (hasNewData) {
                         // Filter out technical artifacts like empty arrays from streaming
                         const trimmedTotal = totalInteractionContent.trim();
+                        const currentTps = loopTokenCount / Math.max(0.1, (Date.now() - loopStartTime) / 1000);
+                        lastTps = currentTps;
+                        
                         if (trimmedTotal === '[]' || trimmedTotal === '[' || trimmedTotal === '') {
                             if (toolCalls.length > 0) {
-                                onUpdate({ content: fullContent, tool_calls: [...toolCalls] });
+                                onUpdate({ content: fullContent, tool_calls: [...toolCalls], tps: currentTps });
                             }
                         } else {
                             // IMPORTANT: Always send BOTH content and tool_calls to prevent store overwrite
-                            onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined });
+                            onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined, tps: currentTps });
                         }
                     }
                 }
@@ -796,7 +804,7 @@ export function useWebLLM() {
                 // Continue loop to generate response based on tool results
             }
 
-            onFinish();
+            onFinish({ tps: lastTps });
         } catch (err: any) {
             if (err.name === 'AbortError') {
                 console.log("Generation aborted by user or system");

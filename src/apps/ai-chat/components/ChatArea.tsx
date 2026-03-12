@@ -1,4 +1,4 @@
-﻿
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation, useWindow, useWindowState } from '@/os/sdk';
 import { useWindowContext } from '@/os/kernel/WindowContext';
@@ -46,6 +46,15 @@ export function ChatArea() {
 
     const llm = aiProvider === 'local' ? webLLM : cloudLLM;
 
+    const sessionIdRef = useRef<string | null>(null);
+    const pendingUpdateRef = useRef<any>(null);
+    const rafIdRef = useRef<number | null>(null);
+    const generationStartRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        sessionIdRef.current = currentSessionId;
+    }, [currentSessionId]);
+
     // Listen for model load events from Sidebar
     useEffect(() => {
         const handler = (e: CustomEvent) => {
@@ -57,10 +66,30 @@ export function ChatArea() {
 
     // Shared callbacks for message updates
     const onUpdate = useCallback((updates: any) => {
-        if (currentSessionId) {
-            updateLastMessage(currentSessionId, updates);
-        }
-    }, [currentSessionId, updateLastMessage]);
+        const sid = sessionIdRef.current;
+        if (!sid) return;
+        const nextUpdates = (() => {
+            if (updates && typeof updates === 'object' && updates.tps === undefined && typeof updates.content === 'string') {
+                const start = generationStartRef.current;
+                if (start) {
+                    const elapsed = (Date.now() - start) / 1000;
+                    const estimatedTokens = updates.content.length / 4;
+                    const tps = estimatedTokens / Math.max(0.1, elapsed);
+                    return { ...updates, tps };
+                }
+            }
+            return updates;
+        })();
+        pendingUpdateRef.current = { ...(pendingUpdateRef.current || {}), ...nextUpdates };
+        if (rafIdRef.current !== null) return;
+        rafIdRef.current = requestAnimationFrame(() => {
+            rafIdRef.current = null;
+            const next = pendingUpdateRef.current;
+            pendingUpdateRef.current = null;
+            const currentSid = sessionIdRef.current;
+            if (currentSid && next) updateLastMessage(currentSid, next);
+        });
+    }, [updateLastMessage]);
 
     const onNewMessage = useCallback((msg: any) => {
         if (!currentSessionId) return;
@@ -97,6 +126,7 @@ export function ChatArea() {
 
         // Add placeholder assistant message that will be streamed into
         const startTime = Date.now();
+        generationStartRef.current = startTime;
         const assistantMsgId = addMessage(currentSessionId!, 'assistant', '', chatMode);
 
         setInput('');
@@ -113,18 +143,19 @@ export function ChatArea() {
                 messagesToSend,
                 onUpdate,
                 onNewMessage,
-                () => {
-                    // onFinish - 计算耗时
+                (stats?: { tps?: number }) => {
                     const duration = Date.now() - startTime;
+                    generationStartRef.current = null;
                     useChatStore.getState().updateMessageById(currentSessionId!, assistantMsgId, {
                         startTime,
-                        duration
+                        duration,
+                        ...(stats?.tps !== undefined ? { tps: stats.tps } : {})
                     });
                 },
                 (err: any) => {
                     setSendError(err?.message || t('ai.error.unknown'));
                 },
-                modelSettings?.systemPrompt,
+                modelSettings?.systemPrompt || '',
                 chatMode,
                 aiProvider === 'cloud' ? cloudConfig : undefined,
                 modelSettings

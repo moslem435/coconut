@@ -28,6 +28,7 @@ function getToolMeta(toolName: string, args: any): { label: string; Icon: React.
         create_directory: { label: `新建文件夹  ${fileName(s.path) || ''}`, Icon: FolderPlus },
         create_file: { label: `创建文件  ${fileName(s.path) || ''}`, Icon: FilePlus },
         update_file: { label: `更新文件  ${fileName(s.path) || ''}`, Icon: FileEdit },
+        replace_in_file: { label: `局部替换  ${fileName(s.path) || ''}`, Icon: FileEdit },
         read_file: { label: `读取文件  ${fileName(s.path) || ''}`, Icon: FileSearch },
         delete_file: { label: `删除文件  ${fileName(s.path) || ''}`, Icon: Trash2 },
         move_file: { label: `移动文件  ${fileName(s.path) || ''}`, Icon: Move },

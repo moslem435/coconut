@@ -183,44 +183,43 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     updateMessageById: (sessionId, messageId, updates) => {
         set(state => {
-            const sessions = state.sessions.map(s => {
-                if (s.id !== sessionId) return s;
-                const messages = s.messages.map(m =>
-                    m.id === messageId ? { ...m, ...updates } as Message : m
-                );
-                return { ...s, messages, updatedAt: Date.now() };
-            });
-            storage.saveSessions(sessions);
+            const idx = state.sessions.findIndex(s => s.id === sessionId);
+            if (idx === -1) return { sessions: state.sessions };
+            const sessions = [...state.sessions];
+            const session = sessions[idx]!;
+            const messages = session.messages.map(m =>
+                m.id === messageId ? ({ ...m, ...updates } as Message) : m
+            );
+            sessions[idx] = { ...session, messages, updatedAt: Date.now() };
+            storage.saveSessionsDebounced(sessions);
             return { sessions };
         });
     },
 
     updateLastMessage: (sessionId, updates) => {
         set(state => {
-            const sessions = state.sessions.map(s => {
-                if (s.id !== sessionId) return s;
+            const idx = state.sessions.findIndex(s => s.id === sessionId);
+            if (idx === -1) return { sessions: state.sessions };
+            const sessions = [...state.sessions];
+            const session = sessions[idx]!;
 
-                const messages = [...s.messages];
-                // Find the LAST assistant message (not just last message,
-                // since tool result messages may have been appended after it)
-                let lastAssistantIdx = -1;
-                for (let i = messages.length - 1; i >= 0; i--) {
-                    if (messages[i]!.role === 'assistant') {
-                        lastAssistantIdx = i;
-                        break;
-                    }
+            const messages = [...session.messages];
+            let lastAssistantIdx = -1;
+            for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i]!.role === 'assistant') {
+                    lastAssistantIdx = i;
+                    break;
                 }
-                if (lastAssistantIdx !== -1) {
-                    messages[lastAssistantIdx] = {
-                        ...messages[lastAssistantIdx],
-                        ...updates
-                    } as Message;
-                }
+            }
+            if (lastAssistantIdx !== -1) {
+                messages[lastAssistantIdx] = {
+                    ...messages[lastAssistantIdx],
+                    ...updates
+                } as Message;
+            }
 
-                return { ...s, messages, updatedAt: Date.now() };
-            });
-
-            storage.saveSessions(sessions);
+            sessions[idx] = { ...session, messages, updatedAt: Date.now() };
+            storage.saveSessionsDebounced(sessions);
             return { sessions };
         });
     },

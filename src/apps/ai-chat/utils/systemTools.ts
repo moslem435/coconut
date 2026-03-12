@@ -679,6 +679,70 @@ export default App`;
         }
     },
 
+    replace_in_file: async (args: { path: string; find: string; replace: string; expectedCount?: number; regex?: boolean; flags?: string; replaceAll?: boolean }) => {
+        try {
+            const original = await System.fs.readFile(args.path);
+            const useRegex = !!args.regex;
+            const replaceAll = args.replaceAll !== false;
+
+            let next = original;
+            let count = 0;
+
+            if (useRegex) {
+                const inputFlags = args.flags || '';
+                const flags = inputFlags.includes('g') ? inputFlags : `${inputFlags}g`;
+                const re = new RegExp(args.find, flags);
+
+                const matches = original.match(re);
+                count = matches ? matches.length : 0;
+
+                if (!replaceAll && count > 0) {
+                    const nonGlobalFlags = flags.replace(/g/g, '');
+                    const reOnce = new RegExp(args.find, nonGlobalFlags);
+                    next = original.replace(reOnce, args.replace);
+                    count = 1;
+                } else {
+                    next = original.replace(re, args.replace);
+                }
+            } else {
+                if (!args.find) {
+                    return `Error: 'find' must be non-empty for literal replacement.`;
+                }
+                if (!replaceAll) {
+                    const idx = original.indexOf(args.find);
+                    if (idx === -1) {
+                        count = 0;
+                        next = original;
+                    } else {
+                        count = 1;
+                        next = original.slice(0, idx) + args.replace + original.slice(idx + args.find.length);
+                    }
+                } else {
+                    let idx = 0;
+                    while (true) {
+                        const found = original.indexOf(args.find, idx);
+                        if (found === -1) break;
+                        count++;
+                        idx = found + args.find.length;
+                    }
+                    next = count > 0 ? original.split(args.find).join(args.replace) : original;
+                }
+            }
+
+            if (typeof args.expectedCount === 'number' && count !== args.expectedCount) {
+                return `No changes applied. Expected ${args.expectedCount} matches but found ${count}.`;
+            }
+            if (count === 0) {
+                return `No changes applied. Found 0 matches.`;
+            }
+
+            await System.fs.writeFile(args.path, next);
+            return `Replaced ${count} occurrence(s) in '${args.path}'.`;
+        } catch (e: any) {
+            return `Error replacing in file: ${e.message || e}`;
+        }
+    },
+
     // --- Execution ---
     run_command: async (args: { cmd: string, args?: string[], cwd?: string, detached?: boolean, successPattern?: string }, ctx?: ToolContext) => {
         if (ctx?.mode === 'builder' && args.cmd === 'npm') {
@@ -1196,6 +1260,26 @@ export const systemToolsDefinitions: ToolDefinition[] = [
     {
         type: 'function',
         function: {
+            name: 'replace_in_file',
+            description: 'Replace text inside an existing file without rewriting the entire file content. Prefer this for small, targeted edits to save tokens.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path to update' },
+                    find: { type: 'string', description: 'String to find (literal) OR regex pattern if regex=true' },
+                    replace: { type: 'string', description: 'Replacement text' },
+                    expectedCount: { type: 'number', description: 'Optional safety check: expected number of matches' },
+                    regex: { type: 'boolean', description: 'If true, treat find as a RegExp pattern' },
+                    flags: { type: 'string', description: 'RegExp flags (e.g. "gmi"). "g" is always enabled when regex=true unless replaceAll=false' },
+                    replaceAll: { type: 'boolean', description: 'If false, replace only the first match (default: true)' }
+                },
+                required: ['path', 'find', 'replace']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'run_command',
             description: 'Run a shell command in the WebContainer environment. For long-running processes (like dev servers), use "detached": true. CRITICAL: Commands MUST be non-interactive and complete within 60 seconds (unless detached). NEVER use: "npm create vite" (interactive), "npm init" (use "npm init -y"), or any command that waits for user input.',
             parameters: {
@@ -1243,6 +1327,7 @@ export const TOOL_CATEGORIES = {
         'create_file',
         'read_file',
         'update_file',
+        'replace_in_file',
         'run_command',
         'get_file_tree'
     ],
@@ -1253,6 +1338,7 @@ export const TOOL_CATEGORIES = {
         'create_file',
         'read_file',
         'update_file',
+        'replace_in_file',
         'run_command',
         'get_file_tree',
         'list_directory'
