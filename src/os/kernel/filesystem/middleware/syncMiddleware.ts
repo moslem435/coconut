@@ -51,6 +51,7 @@ export function createSyncMiddleware(
 
   // 监听文件系统操作事件
   eventBus.on('fs:file:created', (data: any) => {
+    if (data?.source === 'sync' || data?.source === 'opfs') return
     const hasContent = data.content !== undefined && data.content !== null;
     const contentLen = hasContent ? (typeof data.content === 'string' ? data.content.length : data.content.byteLength) : 0;
 
@@ -76,6 +77,7 @@ export function createSyncMiddleware(
   })
 
   eventBus.on('fs:file:deleted', (data: any) => {
+    if (data?.source === 'sync' || data?.source === 'opfs') return
     const operation: SyncOperation = {
       id: data.id,
       type: 'delete',
@@ -87,6 +89,7 @@ export function createSyncMiddleware(
   })
 
   eventBus.on('fs:file:renamed', (data: any) => {
+    if (data?.source === 'sync' || data?.source === 'opfs') return
     const operation: SyncOperation = {
       id: data.id,
       type: 'rename',
@@ -98,6 +101,7 @@ export function createSyncMiddleware(
   })
 
   eventBus.on('fs:file:moved', (data: any) => {
+    if (data?.source === 'sync' || data?.source === 'opfs') return
     const operation: SyncOperation = {
       id: data.id,
       type: 'move',
@@ -109,6 +113,7 @@ export function createSyncMiddleware(
   })
 
   eventBus.on('fs:file:updated', (data: any) => {
+    if (data?.source === 'sync' || data?.source === 'opfs') return
     const operation: SyncOperation = {
       id: data.id,
       type: 'update',

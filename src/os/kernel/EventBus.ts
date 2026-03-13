@@ -42,13 +42,15 @@ interface EventSubscription {
  * - TypeScript可以从键推断对应的payload类型
  * - 新增事件只需在此一处添加，实现集中管理
  */
+export type FileEventSource = 'vfs' | 'wc' | 'opfs' | 'sync' | string
+
 export interface SystemEvents {
   // 文件系统事件
-  'fs:file:created': { id: string; path: string; type: 'file' | 'folder' }
-  'fs:file:updated': { id: string; path: string; content?: string }
-  'fs:file:deleted': { id: string; path: string }
-  'fs:file:renamed': { id: string; oldPath: string; newPath: string }
-  'fs:file:moved': { id: string; oldPath: string; newPath: string }
+  'fs:file:created': { id: string; path: string; type: 'file' | 'folder'; content?: string | Uint8Array; source?: FileEventSource }
+  'fs:file:updated': { id: string; path: string; content?: string | Uint8Array; source?: FileEventSource }
+  'fs:file:deleted': { id: string; path: string; source?: FileEventSource }
+  'fs:file:renamed': { id: string; oldPath: string; newPath: string; source?: FileEventSource }
+  'fs:file:moved': { id: string; oldPath: string; newPath: string; source?: FileEventSource }
   
   // 窗口事件
   'window:opened': { id: string; appId?: string }

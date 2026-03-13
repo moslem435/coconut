@@ -4,6 +4,7 @@ import { useWebContainerStore } from './useWebContainerStore'
 import { useDialogStore } from './useDialogStore'
 import { useSystemSettingsStore } from './useSystemSettingsStore'
 import { DependencyCacheService } from './DependencyCacheService'
+import { System } from '@/os/sdk/system'
 import { toast } from '@/os/components/Toast'
 import { AppBundleConfig } from './initialFileTree'
 
@@ -600,6 +601,20 @@ export class AppLauncherService {
             }
 
             try {
+                // FORCE SYNC: Ensure package.json in WC matches VFS before install
+                // This fixes the "Unexpected end of JSON input" error when WC file is empty/corrupt
+                try {
+                    const vfsPkgContent = await System.fs.readFile(`${appPath}/package.json`);
+                    if (vfsPkgContent && vfsPkgContent.trim().length > 0) {
+                        await instance.fs.writeFile(`${appPath}/package.json`, vfsPkgContent);
+                        console.log(`[AppLauncher] Synced package.json from VFS to WC before install (${vfsPkgContent.length} bytes)`);
+                    } else {
+                        console.warn('[AppLauncher] VFS package.json is empty, skipping sync');
+                    }
+                } catch (syncErr) {
+                    console.warn('[AppLauncher] Failed to sync package.json from VFS:', syncErr);
+                }
+
                 try {
                     const lockRaw = await instance.fs.readFile(`${appPath}/package-lock.json`, 'utf-8')
                     const lock = JSON.parse(lockRaw)

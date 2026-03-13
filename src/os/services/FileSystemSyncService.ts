@@ -64,7 +64,8 @@ class FileSystemSyncService {
     eventBus.emit('fs:file:created', {
       id: path.split('/').pop() || '',
       path,
-      type
+      type,
+      source: 'sync'
     })
   }
 
@@ -99,7 +100,8 @@ class FileSystemSyncService {
     eventBus.emit('fs:file:updated', {
       id: path.split('/').pop() || '',
       path,
-      content: typeof content === 'string' ? content : undefined
+      content: typeof content === 'string' ? content : undefined,
+      source: 'sync'
     })
   }
 
@@ -145,7 +147,8 @@ class FileSystemSyncService {
     // Publish event
     eventBus.emit('fs:file:deleted', {
       id: path.split('/').pop() || '',
-      path
+      path,
+      source: 'sync'
     })
   }
 
@@ -253,7 +256,8 @@ class FileSystemSyncService {
     eventBus.emit('fs:file:renamed', {
       id: newPath.split('/').pop() || '',
       oldPath,
-      newPath
+      newPath,
+      source: 'sync'
     })
   }
 

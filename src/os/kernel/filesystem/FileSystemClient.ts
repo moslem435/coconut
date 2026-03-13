@@ -138,16 +138,16 @@ export class FileSystemClient implements IFileSystemProvider {
         if (!isInternalCachePath) {
             // Emit events for write operations
             if (action === 'writeFile') {
-                eventBus.emit('fs:file:updated', { id: path.split('/').pop() || '', path, content: typeof payload.content === 'string' ? payload.content : undefined });
+                eventBus.emit('fs:file:updated', { id: path.split('/').pop() || '', path, content: typeof payload.content === 'string' ? payload.content : undefined, source: 'opfs' });
             } else if (action === 'unlink') {
-                eventBus.emit('fs:file:deleted', { id: path.split('/').pop() || '', path });
+                eventBus.emit('fs:file:deleted', { id: path.split('/').pop() || '', path, source: 'opfs' });
             } else if (action === 'mkdir') {
-                eventBus.emit('fs:file:created', { id: path.split('/').pop() || '', path, type: 'folder' });
+                eventBus.emit('fs:file:created', { id: path.split('/').pop() || '', path, type: 'folder', source: 'opfs' });
             } else if (action === 'rename') {
                 const oldPath = path;
                 const newPath = payload.newPath; // Ensure payload has newPath for rename
                 if (newPath) {
-                    eventBus.emit('fs:file:renamed', { id: newPath.split('/').pop() || '', oldPath, newPath });
+                    eventBus.emit('fs:file:renamed', { id: newPath.split('/').pop() || '', oldPath, newPath, source: 'opfs' });
                 }
             }
         }

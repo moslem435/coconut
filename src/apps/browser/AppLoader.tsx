@@ -169,33 +169,7 @@ export const AppLoader = ({
           />
         </div>
 
-        {status === 'installing' && typeof downloadProgress === 'number' && (
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-              <span className="font-medium">{downloadLabel || 'Dependencies'}</span>
-              <span className="font-mono tabular-nums">
-                {downloadProgress > 0 ? `${Math.max(0, Math.min(100, Math.round(downloadProgress)))}%` : '…'}
-              </span>
-            </div>
-            <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-              {downloadProgress > 0 ? (
-                <motion.div
-                  className="h-full bg-blue-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.max(0, Math.min(100, downloadProgress))}%` }}
-                  transition={{ type: "spring", stiffness: 60, damping: 22 }}
-                />
-              ) : (
-                <motion.div
-                  className="h-full bg-blue-500/60"
-                  initial={{ x: '-40%', width: '40%' }}
-                  animate={{ x: '140%' }}
-                  transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
-                />
-              )}
-            </div>
-          </div>
-        )}
+        {/* Extra download progress bar removed as per user request */}
 
         <div className="flex justify-between mt-2 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
           <span>{status.toUpperCase()}</span>

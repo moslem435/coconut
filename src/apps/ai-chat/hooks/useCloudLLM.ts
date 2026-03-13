@@ -216,7 +216,8 @@ WHEN CREATING AN APP:
      - This creates a full React+Vite+Tailwind app.
      - After install, customize 'src/App.jsx' with the app logic.
 3. **ONE FILE PER TOOL CALL**: Write one file at a time. Do NOT try to create all files in a single tool call to avoid truncation errors. Always explain what you are about to do BEFORE calling the tool.
-4. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running/installation should happen only after explicit user intent (e.g., user double-clicks the app to launch or asks "帮我启动/运行").
+4. **HANDLE LONG FILES**: If a file is large (> 100 lines), DO NOT use 'update_file' to rewrite the whole file, as it will be truncated. Use 'replace_in_file' to modify specific parts, or split the content into multiple 'update_file' calls (append mode not supported, so replace is better).
+5. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running/installation should happen only after explicit user intent (e.g., user double-clicks the app to launch or asks "帮我启动/运行").
 
 AVAILABLE TOOLS:
 - scaffold_static_app({ name, title, icon }): Create a simple HTML/JS app
@@ -429,6 +430,10 @@ async function callOpenAI(
         if (round > 0) onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });
 
         const requestBody: any = { model: config.modelId, messages: apiMessages, stream: true, temperature: modelSettings.temperature, top_p: modelSettings.top_p };
+        // Increase max tokens for builder mode to avoid truncation in large file edits
+        if (mode === 'builder') {
+             requestBody.max_tokens = 4096; 
+        }
         if (filteredTools.length > 0) { requestBody.tools = filteredTools; requestBody.tool_choice = 'auto'; }
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -536,7 +541,45 @@ async function callOpenAI(
 
             let resultText = '';
             try {
-                const args = JSON.parse(tc.function.arguments || '{}');
+                let args: any;
+                try {
+                    args = JSON.parse(tc.function.arguments || '{}');
+                } catch (parseError: any) {
+                    // JSON Repair for Truncated Output
+                    if (parseError.message.includes('Unterminated string') || parseError.message.includes('JSON')) {
+                        console.warn('[CloudLLM] Detected truncated JSON, attempting to repair...', tc.function.arguments);
+                        const rawArgs = tc.function.arguments || '';
+                        
+                        // 1. Try to extract 'path' and 'content' using regex if JSON parse fails
+                        const pathMatch = tc.function.arguments?.match(/"path"\s*:\s*"([^"]+)"/);
+                        const contentMatch = tc.function.arguments?.match(/"content"\s*:\s*"([\s\S]*)/);
+                        
+                        if (pathMatch && contentMatch) {
+                            const extractedPath = pathMatch[1];
+                            // Remove trailing quote if present, otherwise just use what we have
+                            let extractedContent = contentMatch[1].replace(/"\s*\}?$/, '');
+                            
+                            // Unescape basic JSON characters
+                            extractedContent = extractedContent
+                                .replace(/\\n/g, '\n')
+                                .replace(/\\"/g, '"')
+                                .replace(/\\\\/g, '\\')
+                                .replace(/\\t/g, '\t');
+                            
+                            if (!contentMatch[1].trim().endsWith('"}')) {
+                                extractedContent += '\n\n// [AI WARNING] The code generation was truncated due to length limits.\n// Please ask the AI to "continue generating the rest of the file".';
+                            }
+
+                            args = { path: extractedPath, content: extractedContent };
+                            console.log('[CloudLLM] Successfully repaired truncated JSON args (path/content found)');
+                        } else {
+                            throw parseError;
+                        }
+                    } else {
+                        throw parseError;
+                    }
+                }
+
                 const fnName = tc.function.name;
                 if (systemToolsImplementation[fnName]) {
                     const normalizedArgs = (() => {
@@ -558,7 +601,13 @@ async function callOpenAI(
                     const res = await systemToolsImplementation[fnName](normalizedArgs, { mode });
                     resultText = typeof res === 'string' ? res : JSON.stringify(res);
                 } else { resultText = `Error: Tool '${fnName}' not found`; }
-            } catch (e: any) { resultText = `Error: ${e.message}`; }
+            } catch (e: any) { 
+                if (e.message.includes('Unterminated string') || e.message.includes('JSON')) {
+                    resultText = `Error: JSON arguments parsing failed. The model output might have been truncated due to length limits. Please try to generate smaller code chunks or use 'replace_in_file' for partial edits.\nDetails: ${e.message}`;
+                } else {
+                    resultText = `Error: ${e.message}`; 
+                }
+            }
 
             onNewMessage({ role: 'tool', content: resultText, mode, tool_call_id: tc.id });
             apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: resultText });
