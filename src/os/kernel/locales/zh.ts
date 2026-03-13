@@ -349,6 +349,7 @@ const zh: Record<string, string> = {
     "menu.webapp.name.title": "网站名称",
     "menu.webapp.name.placeholder": "请输入名称",
     "menu.wallpaper": "更换壁纸",
+    "menu.setAsWallpaper": "设置为壁纸",
     "menu.align": "自动整理桌面图标",
     "menu.about": "关于系统",
     "menu.doubleclick": "双击以打开",

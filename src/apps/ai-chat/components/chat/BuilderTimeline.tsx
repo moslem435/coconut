@@ -63,7 +63,7 @@ function TextStep({ content }: { content: string }) {
 }
 
 // ── Tool Step ─────────────────────────────────────────────────────────────────
-function ToolStep({ event }: { event: TimelineEvent }) {
+function ToolStep({ event, isGlobalLoading }: { event: TimelineEvent, isGlobalLoading?: boolean }) {
     const { toolCall, result, isError, status } = event;
     const rawArgs = toolCall?.function?.arguments || '';
     const args = (() => {
@@ -85,6 +85,8 @@ function ToolStep({ event }: { event: TimelineEvent }) {
     // Determine status: explicit status > isError flag > result analysis > loading
     let currentStatus: TimelineStatus;
     if (status) {
+        // If explicit status is 'loading' but global loading stopped and we have no result, maybe mark as pending/cancelled?
+        // But for now, let's just use status if provided.
         currentStatus = status;
     } else if (result) {
         // Check if result indicates an error
@@ -95,7 +97,10 @@ function ToolStep({ event }: { event: TimelineEvent }) {
         const hasErrorKeyword = startsWithError || containsErrorPattern;
         currentStatus = (isError || hasErrorKeyword) ? 'error' : 'success';
     } else {
-        currentStatus = 'loading';
+        // No result yet.
+        // If we are NOT globally loading anymore, and this tool has no result, it's likely pending or failed silently.
+        // Let's mark it as 'pending' (grey dot) instead of 'loading' (spinner) if generation is done.
+        currentStatus = isGlobalLoading ? 'loading' : 'pending';
     }
 
     // Command output streaming state
@@ -405,7 +410,7 @@ export function BuilderTimeline({ events, isLoading }: BuilderTimelineProps) {
                             return <TextStep key={i} content={event.content} />;
                         }
                         if (event.type === 'tool' && event.toolCall) {
-                            return <ToolStep key={event.toolCall?.id || i} event={event} />;
+                            return <ToolStep key={event.toolCall?.id || i} event={event} isGlobalLoading={isLoading} />;
                         }
                         return null;
                     })}

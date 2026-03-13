@@ -76,6 +76,39 @@ function normalizePathForActiveApp(inputPath: string, activeAppName: string, act
     return inputPath;
 }
 
+function parseToolArgs(fnName: string, rawArgs: string): any {
+    const raw = (rawArgs || '').trim();
+    if (!raw) return {};
+
+    const candidates: string[] = [raw];
+    candidates.push(raw.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"));
+    candidates.push(raw.replace(/("path"\s*:\s*"[^"]*")\s*("content"\s*:)/, '$1,$2'));
+    candidates.push(raw.replace(/("path"\s*:\s*"[^"]*")\s*("find"\s*:)/, '$1,$2'));
+    candidates.push(raw.replace(/("find"\s*:\s*"[^"]*")\s*("replace"\s*:)/, '$1,$2'));
+    candidates.push(raw.replace(/^\{\s*path\s*:/, '{"path":').replace(/,\s*content\s*:/, ',"content":'));
+
+    for (const c of candidates) {
+        try { return JSON.parse(c); } catch { }
+    }
+
+    const pathMatch = raw.match(/["']path["']\s*:\s*["']([^"']+)["']/);
+    const contentMatch = raw.match(/["']content["']\s*:\s*["']([\s\S]*)/);
+    if (pathMatch && (fnName === 'update_file' || fnName === 'create_file')) {
+        const path = pathMatch[1] || '';
+        const content = contentMatch
+            ? (contentMatch[1] || '')
+                .replace(/["']\s*\}?\s*$/, '')
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\')
+                .replace(/\\t/g, '\t')
+            : '';
+        return { path, content };
+    }
+
+    throw new Error('Invalid tool arguments JSON');
+}
+
 // ─── Build Gemini History (preserving tool call context) ───────────────────────
 
 function buildGeminiHistory(messages: Message[]): any[] {
@@ -541,46 +574,8 @@ async function callOpenAI(
 
             let resultText = '';
             try {
-                let args: any;
-                try {
-                    args = JSON.parse(tc.function.arguments || '{}');
-                } catch (parseError: any) {
-                    // JSON Repair for Truncated Output
-                    if (parseError.message.includes('Unterminated string') || parseError.message.includes('JSON')) {
-                        console.warn('[CloudLLM] Detected truncated JSON, attempting to repair...', tc.function.arguments);
-                        const rawArgs = tc.function.arguments || '';
-                        
-                        // 1. Try to extract 'path' and 'content' using regex if JSON parse fails
-                        const pathMatch = tc.function.arguments?.match(/"path"\s*:\s*"([^"]+)"/);
-                        const contentMatch = tc.function.arguments?.match(/"content"\s*:\s*"([\s\S]*)/);
-                        
-                        if (pathMatch && contentMatch) {
-                            const extractedPath = pathMatch[1];
-                            // Remove trailing quote if present, otherwise just use what we have
-                            let extractedContent = contentMatch[1].replace(/"\s*\}?$/, '');
-                            
-                            // Unescape basic JSON characters
-                            extractedContent = extractedContent
-                                .replace(/\\n/g, '\n')
-                                .replace(/\\"/g, '"')
-                                .replace(/\\\\/g, '\\')
-                                .replace(/\\t/g, '\t');
-                            
-                            if (!contentMatch[1].trim().endsWith('"}')) {
-                                extractedContent += '\n\n// [AI WARNING] The code generation was truncated due to length limits.\n// Please ask the AI to "continue generating the rest of the file".';
-                            }
-
-                            args = { path: extractedPath, content: extractedContent };
-                            console.log('[CloudLLM] Successfully repaired truncated JSON args (path/content found)');
-                        } else {
-                            throw parseError;
-                        }
-                    } else {
-                        throw parseError;
-                    }
-                }
-
                 const fnName = tc.function.name;
+                const args = parseToolArgs(fnName, tc.function.arguments || '{}');
                 if (systemToolsImplementation[fnName]) {
                     const normalizedArgs = (() => {
                         if (!args || typeof args !== 'object') return args;
@@ -602,11 +597,11 @@ async function callOpenAI(
                     resultText = typeof res === 'string' ? res : JSON.stringify(res);
                 } else { resultText = `Error: Tool '${fnName}' not found`; }
             } catch (e: any) { 
-                if (e.message.includes('Unterminated string') || e.message.includes('JSON')) {
-                    resultText = `Error: JSON arguments parsing failed. The model output might have been truncated due to length limits. Please try to generate smaller code chunks or use 'replace_in_file' for partial edits.\nDetails: ${e.message}`;
-                } else {
-                    resultText = `Error: ${e.message}`; 
-                }
+                const msg = String(e?.message || e);
+                const isJson = msg.includes('JSON') || msg.includes('Unexpected') || msg.includes('Invalid tool arguments JSON');
+                resultText = isJson
+                    ? `Error: Tool arguments are not valid JSON. This model sometimes outputs non-strict JSON for tool calls (missing commas, using single quotes, or unescaped content). Try smaller edits with 'replace_in_file' or ask it to output strict JSON tool arguments.\nDetails: ${msg}`
+                    : `Error: ${msg}`;
             }
 
             onNewMessage({ role: 'tool', content: resultText, mode, tool_call_id: tc.id });

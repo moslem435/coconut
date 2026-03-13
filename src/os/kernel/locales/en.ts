@@ -353,6 +353,7 @@ const en: Record<string, string> = {
     "menu.webapp.name.title": "Website Name",
     "menu.webapp.name.placeholder": "Enter Name",
     "menu.wallpaper": "Change Wallpaper",
+    "menu.setAsWallpaper": "Set as Wallpaper",
     "menu.align": "Organize Icons",
     "menu.about": "About System",
     "menu.doubleclick": "Double-click to open",

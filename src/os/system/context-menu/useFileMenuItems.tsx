@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus, ImagePlus, Sparkles } from 'lucide-react'
+import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus, ImagePlus, Sparkles, Monitor } from 'lucide-react'
 import JSZip from 'jszip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -7,6 +7,7 @@ import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { useUIStore } from '@/os/kernel/useUIStore'
 import { useTrashStore } from '@/os/kernel/useTrashStore'
 import { useClipboardStore } from '@/os/kernel/useClipboardStore'
+import { useSystemSettingsStore } from '@/os/kernel/useSystemSettingsStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 import { toast } from '@/os/components/Toast'
@@ -386,6 +387,42 @@ export function useFileMenuItems(
                     if (ids.length > 0) {
                         // 移至回收站而不是直接删除
                         trashItems(ids)
+                    }
+                }
+            })
+        }
+
+        // Image Wallpaper Logic
+        if (firstItem?.type === 'file' && /\.(png|jpg|jpeg|webp|gif)$/i.test(firstItem.name)) {
+            menuItems.splice(1, 0, {
+                label: t('menu.setAsWallpaper'),
+                icon: Monitor,
+                action: async () => {
+                    hideMenu()
+                    const toastId = toast.loading(t('menu.setAsWallpaper'))
+                    try {
+                        const blob = await getFileBlob(firstItem.id)
+                        if (!blob) throw new Error('Failed to read image')
+
+                        // Convert to base64 for persistence
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                            const base64 = reader.result as string
+                            useSystemSettingsStore.getState().setWallpaper({
+                                type: 'image',
+                                value: base64
+                            })
+                            toast.dismiss(toastId)
+                            toast.success(t('menu.setAsWallpaper'))
+                        }
+                        reader.onerror = () => {
+                            throw new Error('Failed to read file')
+                        }
+                        reader.readAsDataURL(blob)
+                    } catch (e) {
+                        console.error('Failed to set wallpaper', e)
+                        toast.dismiss(toastId)
+                        toast.error(t('menu.setAsWallpaper'), 'Failed to set wallpaper')
                     }
                 }
             })

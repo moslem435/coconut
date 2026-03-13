@@ -4,6 +4,7 @@ import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ZoomIn, ZoomOut, RotateCw, RefreshCcw, Maximize } from 'lucide-react'
+import { eventBus } from '@/os/kernel/EventBus'
 
 interface ImageViewerProps {
     src?: string
@@ -19,51 +20,127 @@ export default function ImageViewer({ src: initialSrc, fileId, alt = 'Image' }: 
 
     useEffect(() => {
         let objectUrl: string | null = null
+        let disposed = false
+        let seq = 0
+
+        const getMimeType = (path: string) => {
+            const ext = path.split('.').pop()?.toLowerCase()
+            if (ext === 'png') return 'image/png'
+            if (ext === 'gif') return 'image/gif'
+            if (ext === 'webp') return 'image/webp'
+            if (ext === 'svg') return 'image/svg+xml'
+            if (ext === 'ico') return 'image/x-icon'
+            if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+            return 'application/octet-stream'
+        }
+
+        const applyBlobType = (blob: Blob, mimeType: string) => {
+            const t = (blob as any)?.type || ''
+            if (!t || t === 'application/octet-stream') {
+                try {
+                    return blob.slice(0, blob.size, mimeType)
+                } catch {
+                    return blob
+                }
+            }
+            return blob
+        }
 
         // If we have a direct src (e.g. http url), use it
         if (initialSrc) {
             setSrc(initialSrc)
+            setError(null)
+            setLoading(false)
             return () => { }
         }
 
         // If we have a fileId, we need to load it from the FS
         if (fileId) {
             setLoading(true)
+            setError(null)
+            setSrc(undefined)
 
-            const loadFile = async () => {
+            const loadFile = async (mySeq: number) => {
                 try {
                     const store = useFileSystemStore.getState()
                     const path = store.resolvePath(fileId)
 
                     if (!path) throw new Error('File not found')
+                    const mimeType = getMimeType(path)
+
+                    try {
+                        const blob = await store.getFileBlob(fileId)
+                        if (disposed || mySeq !== seq) return
+                        if (blob) {
+                            const nextUrl = URL.createObjectURL(applyBlobType(blob, mimeType))
+                            objectUrl = nextUrl
+                            setSrc(nextUrl)
+                            setError(null)
+                            return
+                        }
+                    } catch { }
 
                     const content = await fs.readFile(path)
-
-                    // Detect mime type based on extension (simple version)
-                    const ext = path.split('.').pop()?.toLowerCase()
-                    let mimeType = 'image/jpeg'
-                    if (ext === 'png') mimeType = 'image/png'
-                    if (ext === 'gif') mimeType = 'image/gif'
-                    if (ext === 'webp') mimeType = 'image/webp'
-                    if (ext === 'svg') mimeType = 'image/svg+xml'
-                    if (ext === 'ico') mimeType = 'image/x-icon'
-
+                    if (disposed || mySeq !== seq) return
                     const blob = new Blob([content as any], { type: mimeType })
-                    objectUrl = URL.createObjectURL(blob)
-                    setSrc(objectUrl)
+                    const nextUrl = URL.createObjectURL(blob)
+                    objectUrl = nextUrl
+                    setSrc(nextUrl)
+                    setError(null)
                 } catch (err) {
                     console.error('Failed to load image:', err)
-                    setError('Failed to load image')
+                    if (!disposed) setError('Failed to load image')
                 } finally {
-                    setLoading(false)
+                    if (!disposed) setLoading(false)
                 }
             }
 
-            loadFile()
+            const store = useFileSystemStore.getState()
+            const path = store.resolvePath(fileId)
+
+            const schedule = () => {
+                seq += 1
+                const mySeq = seq
+                setLoading(true)
+                void loadFile(mySeq)
+            }
+
+            const retrySchedule = (attempt: number) => {
+                if (disposed) return
+                if (attempt <= 0) return
+                setTimeout(() => {
+                    if (disposed) return
+                    schedule()
+                    retrySchedule(attempt - 1)
+                }, 250)
+            }
+
+            schedule()
+
+            const subs = path
+                ? [
+                    eventBus.on('fs:file:created', (e) => {
+                        if (e.path !== path) return
+                        schedule()
+                    }),
+                    eventBus.on('fs:file:updated', (e) => {
+                        if (e.path !== path) return
+                        schedule()
+                    })
+                ]
+                : []
+
+            retrySchedule(6)
+
+            return () => {
+                disposed = true
+                for (const s of subs) s.unsubscribe()
+                if (objectUrl) URL.revokeObjectURL(objectUrl)
+            }
         }
 
-        // Cleanup
         return () => {
+            disposed = true
             if (objectUrl) URL.revokeObjectURL(objectUrl)
         }
     }, [initialSrc, fileId])
