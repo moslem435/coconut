@@ -64,6 +64,22 @@ export function ChatArea() {
         return () => window.removeEventListener('ai-chat:load-model', handler as EventListener);
     }, [webLLM.initEngine]);
 
+    // Sync WebLLM state to Global Store
+    useEffect(() => {
+        useChatStore.getState().setIsLocalModelLoading(webLLM.isLoading);
+        
+        if (webLLM.isModelLoaded && webLLM.currentModelId) {
+            useChatStore.getState().setCurrentLocalModelId(webLLM.currentModelId);
+        } else if (!webLLM.isModelLoaded && !webLLM.isLoading) {
+             // If not loaded and not loading, maybe reset? 
+             // But be careful not to reset if it's just initial state.
+             // Actually, if we unload, we should reset.
+             if (webLLM.currentModelId === null) {
+                 useChatStore.getState().setCurrentLocalModelId(null);
+             }
+        }
+    }, [webLLM.isLoading, webLLM.isModelLoaded, webLLM.currentModelId]);
+
     // Shared callbacks for message updates
     const onUpdate = useCallback((updates: any) => {
         const sid = sessionIdRef.current;

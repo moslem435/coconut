@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '../store/useChatStore';
 import { useTranslation } from '@/os/sdk';
+import { CloudConfig } from '../types';
 import {
     Plus,
     Trash2,
@@ -41,8 +42,49 @@ export function Sidebar() {
         customModels,
         addCustomModel,
         removeCustomModel,
-        currentLocalModelId
+        currentLocalModelId,
+        isLocalModelLoading,
+        savedApiKeys,
+        saveApiKey
     } = useChatStore();
+
+    const [localCloudConfig, setLocalCloudConfig] = useState<CloudConfig>(cloudConfig);
+
+    // Sync local config with global config when global config changes (e.g. from other session or on mount)
+    useEffect(() => {
+        setLocalCloudConfig(cloudConfig);
+    }, [cloudConfig]);
+
+    const handleCloudProviderChange = (provider: 'gemini' | 'openai') => {
+        const savedKey = savedApiKeys[provider] || '';
+        const defaultModelId = CLOUD_MODELS[provider][0]!.id;
+        
+        setLocalCloudConfig(prev => ({
+            ...prev,
+            provider,
+            modelId: defaultModelId,
+            apiKey: savedKey,
+            // Reset baseUrl if switching to non-openai (or just keep it clean)
+            baseUrl: provider === 'openai' ? (prev.baseUrl || 'https://api.openai.com/v1') : undefined
+        }));
+    };
+
+    const handleApiKeyChange = (key: string) => {
+        setLocalCloudConfig(prev => ({ ...prev, apiKey: key }));
+        // Save key to store immediately so it persists even without activating
+        saveApiKey(localCloudConfig.provider, key);
+    };
+
+    const handleActivateCloud = () => {
+        updateCloudConfig(localCloudConfig);
+        setAiProvider('cloud');
+    };
+
+    const isCloudConfigActive = aiProvider === 'cloud' && 
+        cloudConfig.provider === localCloudConfig.provider && 
+        cloudConfig.modelId === localCloudConfig.modelId &&
+        cloudConfig.apiKey === localCloudConfig.apiKey &&
+        cloudConfig.baseUrl === localCloudConfig.baseUrl;
 
     const deleteModel = async (modelId: string) => {
         try {
@@ -78,9 +120,9 @@ export function Sidebar() {
                 id: uuidv4(),
                 name: presetName.trim(),
                 provider: 'openai',
-                modelId: cloudConfig.modelId,
-                baseUrl: cloudConfig.baseUrl,
-                apiKey: cloudConfig.apiKey
+                modelId: localCloudConfig.modelId,
+                baseUrl: localCloudConfig.baseUrl,
+                apiKey: localCloudConfig.apiKey
             });
             setIsSavingPreset(false);
             setPresetName('');
@@ -149,27 +191,12 @@ export function Sidebar() {
     }), [modelTab, cachedModels]);
 
     const handleInitModel = (modelId: string) => {
-        // This just sets the provider, actual loading happens in ChatArea via useWebLLM
-        // But we need to signal intent. For now, let's assume selecting it is enough if we use currentLocalModelId store
-        // However, useWebLLM handles initEngine. We might need to expose that or just rely on ChatArea to pick up changes?
-        // Actually, initEngine is imperative.
-        // For this refactor, we'll update the config in store if we had one, or just let the user know.
-        // Since we can't easily call initEngine from here without moving useWebLLM up or using a global event,
-        // we might need a way to trigger it.
-        // A simple way is to use the existing `updateCloudConfig` or similar for local models?
-        // Wait, `currentLocalModelId` in store is just state? No, it's from useWebLLM hook usually.
-        // Let's look at useChatStore... it doesn't store currentLocalModelId for local.
-        // We might need to dispatch an event or use a store field that ChatArea reacts to.
+        // If already active, do nothing
+        if (currentLocalModelId === modelId && aiProvider === 'local') return;
         
-        // For now, let's just select it in UI and maybe emit an event or update a store value?
-        // The original code called `initEngine(modelId)` directly in ChatArea.
-        // We can use the EventBus or just add `selectedLocalModelId` to store and have ChatArea useEffect on it.
-        
-        // Let's use a custom event for now to keep it simple without changing store schema too much yet
-        // Or better, just close the sidebar and let ChatArea handle it? No, we want it in sidebar.
-        
-        // Actually, we can just trigger a window event that ChatArea listens to?
+        // Trigger load event
         window.dispatchEvent(new CustomEvent('ai-chat:load-model', { detail: { modelId } }));
+        setAiProvider('local');
     };
 
     const handleDeleteModel = async (e: React.MouseEvent, modelId: string) => {
@@ -412,7 +439,7 @@ export function Sidebar() {
                         {/* Tabs */}
                         <div className="flex border-b border-black/5 dark:border-white/5 pb-1">
                             <button
-                                onClick={() => { setModelTab('all'); setAiProvider('local'); }}
+                                onClick={() => { setModelTab('all'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
                                     modelTab === 'all' ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
@@ -424,7 +451,7 @@ export function Sidebar() {
                                 )}
                             </button>
                             <button
-                                onClick={() => { setModelTab('downloaded'); setAiProvider('local'); }}
+                                onClick={() => { setModelTab('downloaded'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
                                     modelTab === 'downloaded' ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
@@ -436,7 +463,7 @@ export function Sidebar() {
                                 )}
                             </button>
                             <button
-                                onClick={() => { setModelTab('cloud'); setAiProvider('cloud'); }}
+                                onClick={() => { setModelTab('cloud'); }}
                                 className={cn(
                                     "flex-1 pb-2 text-[11px] font-medium transition-colors relative",
                                     modelTab === 'cloud' ? "text-amber-600 dark:text-amber-300" : "text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
@@ -459,10 +486,10 @@ export function Sidebar() {
                                         {(['gemini', 'openai'] as const).map(p => (
                                             <button
                                                 key={p}
-                                                onClick={() => updateCloudConfig({ provider: p, modelId: CLOUD_MODELS[p][0]!.id })}
+                                                onClick={() => handleCloudProviderChange(p)}
                                                 className={cn(
                                                     "py-2 rounded-lg text-xs font-medium border transition-all text-center",
-                                                    cloudConfig.provider === p
+                                                    localCloudConfig.provider === p
                                                         ? "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30"
                                                         : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                 )}
@@ -477,13 +504,13 @@ export function Sidebar() {
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase tracking-wider">{t('ai.cloud.model_preset')}</label>
                                     <div className="space-y-1">
-                                        {CLOUD_MODELS[cloudConfig.provider].map(m => (
+                                        {CLOUD_MODELS[localCloudConfig.provider].map(m => (
                                             <button
                                                 key={m.id}
-                                                onClick={() => updateCloudConfig({ modelId: m.id })}
+                                                onClick={() => setLocalCloudConfig(prev => ({ ...prev, modelId: m.id }))}
                                                 className={cn(
                                                     "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
-                                                    cloudConfig.modelId === m.id
+                                                    localCloudConfig.modelId === m.id
                                                         ? "bg-amber-500/10 text-amber-600 dark:text-amber-200 border-amber-500/20"
                                                         : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                 )}
@@ -495,7 +522,7 @@ export function Sidebar() {
                                 </div>
 
                                 {/* Custom Model & Base URL (OpenAI only) */}
-                                {cloudConfig.provider === 'openai' && (
+                                {localCloudConfig.provider === 'openai' && (
                                     <>
                                         {/* Saved Custom Models */}
                                         {customModels.filter(m => m.provider === 'openai').length > 0 && (
@@ -505,14 +532,15 @@ export function Sidebar() {
                                                     {customModels.filter(m => m.provider === 'openai').map(m => (
                                                         <div key={m.id} className="flex items-center gap-2 group/model">
                                                             <button
-                                                                onClick={() => updateCloudConfig({
+                                                                onClick={() => setLocalCloudConfig(prev => ({
+                                                                    ...prev,
                                                                     modelId: m.modelId,
                                                                     baseUrl: m.baseUrl || 'https://api.openai.com/v1',
-                                                                    apiKey: m.apiKey || cloudConfig.apiKey
-                                                                })}
+                                                                    apiKey: m.apiKey || prev.apiKey
+                                                                }))}
                                                                 className={cn(
                                                                     "flex-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-all text-left",
-                                                                    cloudConfig.modelId === m.modelId && (cloudConfig.baseUrl || 'https://api.openai.com/v1') === (m.baseUrl || 'https://api.openai.com/v1')
+                                                                    localCloudConfig.modelId === m.modelId && (localCloudConfig.baseUrl || 'https://api.openai.com/v1') === (m.baseUrl || 'https://api.openai.com/v1')
                                                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                                                         : "bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10"
                                                                 )}
@@ -539,10 +567,10 @@ export function Sidebar() {
                                                 {!isSavingPreset && (
                                                     <button
                                                         onClick={() => {
-                                                            setPresetName(cloudConfig.modelId);
+                                                            setPresetName(localCloudConfig.modelId);
                                                             setIsSavingPreset(true);
                                                         }}
-                                                        disabled={!cloudConfig.modelId}
+                                                        disabled={!localCloudConfig.modelId}
                                                         className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-50"
                                                     >
                                                         <Plus size={10} />
@@ -590,8 +618,8 @@ export function Sidebar() {
                                                 <label className="text-[9px] text-zinc-600">{t('ai.cloud.model_id')}</label>
                                                 <input
                                                     type="text"
-                                                    value={cloudConfig.modelId}
-                                                    onChange={e => updateCloudConfig({ modelId: e.target.value })}
+                                                    value={localCloudConfig.modelId}
+                                                    onChange={e => setLocalCloudConfig(prev => ({ ...prev, modelId: e.target.value }))}
                                                     placeholder="e.g. deepseek-chat"
                                                     className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                                 />
@@ -602,8 +630,8 @@ export function Sidebar() {
                                             <label className="text-[9px] text-zinc-600">{t('ai.cloud.base_url')}</label>
                                             <input
                                                 type="text"
-                                                value={cloudConfig.baseUrl || ''}
-                                                onChange={e => updateCloudConfig({ baseUrl: e.target.value })}
+                                                value={localCloudConfig.baseUrl || ''}
+                                                onChange={e => setLocalCloudConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
                                                 placeholder="https://api.openai.com/v1"
                                                 className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                             />
@@ -618,9 +646,9 @@ export function Sidebar() {
                                     <div className="relative">
                                         <input
                                             type={showApiKey ? 'text' : 'password'}
-                                            value={cloudConfig.apiKey}
-                                            onChange={e => updateCloudConfig({ apiKey: e.target.value })}
-                                            placeholder={cloudConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
+                                            value={localCloudConfig.apiKey}
+                                            onChange={e => handleApiKeyChange(e.target.value)}
+                                            placeholder={localCloudConfig.provider === 'gemini' ? 'AIza...' : 'sk-...'}
                                             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 pr-10 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-500 dark:placeholder-zinc-600 outline-none focus:border-amber-500/40 transition-colors font-mono"
                                         />
                                         <button
@@ -637,20 +665,25 @@ export function Sidebar() {
                                     <button
                                         onClick={async () => {
                                             setCloudTestState({ loading: true, message: t('ai.cloud.testing'), ok: null });
-                                            const result = await testCloudConnection(cloudConfig);
+                                            const result = await testCloudConnection(localCloudConfig);
                                             setCloudTestState({ loading: false, message: result.message, ok: result.ok });
                                         }}
-                                        disabled={!cloudConfig.apiKey || cloudTestState.loading}
+                                        disabled={!localCloudConfig.apiKey || cloudTestState.loading}
                                         className="w-full py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-300 border border-black/10 dark:border-white/10 text-xs font-medium transition-colors disabled:opacity-40"
                                     >
                                         {cloudTestState.loading ? t('ai.cloud.testing') : t('ai.cloud.test_connection')}
                                     </button>
                                     <button
-                                        onClick={() => { setAiProvider('cloud'); }}
-                                        disabled={!cloudConfig.apiKey}
-                                        className="w-full py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/20 text-xs font-medium transition-colors disabled:opacity-40"
+                                        onClick={handleActivateCloud}
+                                        disabled={!localCloudConfig.apiKey || isCloudConfigActive}
+                                        className={cn(
+                                            "w-full py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-40",
+                                            isCloudConfigActive
+                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20"
+                                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/20"
+                                        )}
                                     >
-                                        {aiProvider === 'cloud' ? t('ai.cloud.active') : t('ai.cloud.activate')}
+                                        {isCloudConfigActive ? t('ai.cloud.active') : t('ai.cloud.activate')}
                                     </button>
                                 </div>
 
@@ -711,15 +744,27 @@ export function Sidebar() {
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => handleInitModel(model.id)}
-                                                        disabled={false} // Todo: check loading
+                                                        disabled={isLocalModelLoading || isActive}
                                                         className={cn(
-                                                            "flex-1 py-1.5 rounded-md text-[10px] font-medium transition-colors border",
+                                                            "flex-1 py-1.5 rounded-md text-[10px] font-medium transition-colors border flex items-center justify-center gap-1.5",
                                                             isActive
-                                                                ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
-                                                                : "bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10"
+                                                                ? "bg-indigo-500 text-white border-indigo-500 shadow-sm opacity-100"
+                                                                : "bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10",
+                                                            isLocalModelLoading && !isActive && "opacity-50 cursor-not-allowed"
                                                         )}
                                                     >
-                                                        {isActive ? t('ai.model.active') : (isDownloaded ? t('ai.model.switch') : t('ai.model.download'))}
+                                                        {isActive 
+                                                            ? t('ai.model.active') 
+                                                            : (isLocalModelLoading ? (
+                                                                // Simple loading text when ANY model is loading
+                                                                // Since we don't track which specific model is loading in store yet,
+                                                                // we just disable all.
+                                                                // To show 'Loading...' only on the target, we'd need 'loadingModelId' in store.
+                                                                // For now, let's keep it simple: Show 'Loading...' if we think this might be it?
+                                                                // No, just keep text as 'Download/Switch' but dimmed.
+                                                                isDownloaded ? t('ai.model.switch') : t('ai.model.download')
+                                                              ) : (isDownloaded ? t('ai.model.switch') : t('ai.model.download')))
+                                                        }
                                                     </button>
 
                                                     {isDownloaded && !isActive && (

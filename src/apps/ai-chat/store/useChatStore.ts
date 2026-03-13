@@ -16,9 +16,13 @@ interface ChatStore {
         systemPrompt: string;
     };
     currentLocalModelId: string | null;
+    isLocalModelLoading: boolean;
+    savedApiKeys: Record<string, string>;
 
     // Actions
     setCurrentLocalModelId: (id: string | null) => void;
+    setIsLocalModelLoading: (loading: boolean) => void;
+    saveApiKey: (provider: string, key: string) => void;
     createSession: (modelId?: string) => string;
     deleteSession: (id: string) => void;
     selectSession: (id: string) => void;
@@ -47,8 +51,17 @@ const CLOUD_CONFIG_KEY = 'ai-chat-cloud-config';
 const AI_PROVIDER_KEY = 'ai-chat-provider';
 const CUSTOM_MODELS_KEY = 'ai-chat-custom-models';
 const MODEL_SETTINGS_KEY = 'ai-chat-model-settings';
+const SAVED_KEYS_KEY = 'ai-chat-saved-keys';
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant living in a web-based OS. You can chat with users normally. You also have access to system tools (theme, wallpaper, apps). Only use tools when explicitly requested.";
+
+function loadSavedKeys(): Record<string, string> {
+    try {
+        const raw = localStorage.getItem(SAVED_KEYS_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch { }
+    return {};
+}
 
 function loadCloudConfig(): CloudConfig {
     try {
@@ -94,8 +107,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     customModels: loadCustomModels(),
     modelSettings: loadModelSettings(),
     currentLocalModelId: null,
+    isLocalModelLoading: false,
+    savedApiKeys: loadSavedKeys(),
 
     setCurrentLocalModelId: (id) => set({ currentLocalModelId: id }),
+    setIsLocalModelLoading: (loading) => set({ isLocalModelLoading: loading }),
+    saveApiKey: (provider, key) => set(state => {
+        const newKeys = { ...state.savedApiKeys, [provider]: key };
+        localStorage.setItem(SAVED_KEYS_KEY, JSON.stringify(newKeys));
+        return { savedApiKeys: newKeys };
+    }),
 
     createSession: (modelId = 'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC') => {
         const newSession: ChatSession = {

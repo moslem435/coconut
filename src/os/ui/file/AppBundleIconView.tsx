@@ -48,8 +48,17 @@ function normalizeIconPath(icon: string, basePath: string) {
     return `${basePath.replace(/\/$/, '')}/${rel}`.replace(/\/+/g, '/')
   }
   if (icon.startsWith('../')) {
-    const rel = icon.replace(/^\.\//, '')
-    return `${basePath.replace(/\/$/, '')}/${rel}`.replace(/\/+/g, '/')
+    let rel = icon
+    let base = basePath.replace(/\/$/, '')
+    while (rel.startsWith('../')) {
+      rel = rel.slice(3)
+      const idx = base.lastIndexOf('/')
+      base = idx > 0 ? base.slice(0, idx) : ''
+    }
+    return `${base}/${rel}`.replace(/\/+/g, '/')
+  }
+  if (!icon.includes('/') && !icon.includes(':')) {
+    return `${basePath.replace(/\/$/, '')}/${icon}`.replace(/\/+/g, '/')
   }
   return null
 }
@@ -72,6 +81,27 @@ function normalizeLucideName(raw: string) {
   if (/^[A-Za-z][A-Za-z0-9]*$/.test(base)) return (base[0] || '').toUpperCase() + base.slice(1)
   const parts = base.split(/[^A-Za-z0-9]+/).filter(Boolean)
   return parts.map(p => (p[0] || '').toUpperCase() + p.slice(1)).join('')
+}
+
+function mimeFromPath(path: string) {
+  const ext = path.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'svg':
+      return 'image/svg+xml'
+    case 'png':
+      return 'image/png'
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg'
+    case 'gif':
+      return 'image/gif'
+    case 'webp':
+      return 'image/webp'
+    case 'ico':
+      return 'image/x-icon'
+    default:
+      return ''
+  }
 }
 
 export function AppBundleIconView({
@@ -165,7 +195,36 @@ export function AppBundleIconView({
         localUrl = nextUrl
         setResolvedUrl(nextUrl)
       } catch {
-        if (!disposed) setResolvedUrl(null)
+        try {
+          const store = useFileSystemStore.getState()
+          const node = store.getNodeByPath(iconPath)
+          const text =
+            node && typeof (store.files as any)?.[node.id]?.content === 'string'
+              ? (store.files as any)[node.id].content
+              : node
+                ? await store.readFileContent(node.id)
+                : ''
+          if (!text) throw new Error('empty')
+          const nextBlob = new Blob([text], { type: mimeFromPath(iconPath) || 'application/octet-stream' })
+          const nextUrl = URL.createObjectURL(nextBlob)
+          if (disposed) {
+            URL.revokeObjectURL(nextUrl)
+            return
+          }
+          const desiredVersion2 = getBlobVersion(iconPath)
+          const cached2 = blobUrlCache.get(iconPath)
+          if (!cached2 || cached2.refs === 0) {
+            if (cached2?.url) URL.revokeObjectURL(cached2.url)
+            blobUrlCache.set(iconPath, { url: nextUrl, refs: 1, version: desiredVersion2 })
+            usedCache = true
+            setResolvedUrl(nextUrl)
+            return
+          }
+          localUrl = nextUrl
+          setResolvedUrl(nextUrl)
+        } catch {
+          if (!disposed) setResolvedUrl(null)
+        }
       }
     }
 
