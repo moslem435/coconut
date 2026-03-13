@@ -423,6 +423,7 @@ export function useWebLLM() {
     2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
     3. **Decoupling**: The app should not depend on system-wide configuration changes.
     4. **No Auto-Run During Build**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running should be triggered by explicit user intent (double-click launch or user asks to run).
+    5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). Use the system dialog store via '@/os/kernel/useDialogStore' (openAlert/openConfirm/openPrompt/openActionSheet) with async/await.
 
     WHEN CREATING AN APP:
     1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
@@ -462,7 +463,7 @@ export function useWebLLM() {
                     }
                     // builder mode: allow tool hints
                     if (mode === 'builder') {
-                        systemContent += `\n\nCRITICAL: BUILDER MODE ACTIVE. Use tools to scaffold and edit files. Do NOT run 'npm install' or 'npm run dev' during build unless the user explicitly asks to run.`;
+                        systemContent += `\n\nCRITICAL: BUILDER MODE ACTIVE. Use tools to scaffold and edit files. Do NOT run 'npm install' or 'npm run dev' during build unless the user explicitly asks to run. NEVER use window.alert/window.confirm/window.prompt; use useDialogStore (openAlert/openConfirm/openPrompt/openActionSheet) instead.`;
                     }
 
                     // CRITICAL FIX: Hermes-2-Pro and some other models THROW ERROR if 'system' role is used with tools.

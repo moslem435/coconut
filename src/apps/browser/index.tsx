@@ -12,6 +12,7 @@ interface BrowserProps {
   launchLabel?: string;
   launchDownloadProgress?: number;
   launchDownloadLabel?: string;
+  launchLog?: string;
   icon?: string;
   title?: string;
 }
@@ -26,6 +27,7 @@ const BrowserApp = ({
   launchLabel,
   launchDownloadProgress,
   launchDownloadLabel,
+  launchLog,
   icon,
   title
 }: BrowserProps) => {
@@ -303,6 +305,7 @@ const BrowserApp = ({
             progress={loadingProgress}
             downloadProgress={launchDownloadProgress}
             downloadLabel={launchDownloadLabel}
+            logText={launchLog}
             appName={title || 'Application'}
             appIcon={icon}
             onRetry={() => window.location.reload()} // Simple retry for now

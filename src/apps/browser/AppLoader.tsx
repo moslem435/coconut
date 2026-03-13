@@ -9,6 +9,7 @@ interface AppLoaderProps {
   progress?: number // 0-100 (optional, if detailed progress is available)
   downloadProgress?: number // 0-100
   downloadLabel?: string
+  logText?: string
   appName?: string
   appIcon?: string
   onRetry?: () => void
@@ -20,12 +21,14 @@ export const AppLoader = ({
   progress = 0,
   downloadProgress,
   downloadLabel,
+  logText,
   appName = 'Application', 
   appIcon = '📦',
   onRetry 
 }: AppLoaderProps) => {
   const { t } = useLanguage()
   const [dots, setDots] = useState('')
+  const logRef = useRef<HTMLDivElement>(null)
 
   // Animated dots for text
   useEffect(() => {
@@ -115,6 +118,13 @@ export const AppLoader = ({
     return () => clearInterval(timer)
   }, [status, progress])
 
+  useEffect(() => {
+    if (!logText) return
+    const el = logRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [logText])
+
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm transition-colors duration-500">
       
@@ -175,6 +185,15 @@ export const AppLoader = ({
           <span>{status.toUpperCase()}</span>
           <span>{Math.round(simulatedProgress)}%</span>
         </div>
+
+        {status === 'installing' && logText && (
+          <div
+            ref={logRef}
+            className="mt-4 max-h-44 overflow-auto rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 p-2 text-[11px] leading-snug font-mono text-zinc-700 dark:text-zinc-200"
+          >
+            <pre className="whitespace-pre-wrap break-words">{logText}</pre>
+          </div>
+        )}
       </div>
 
       {/* Retry Button (only on error) */}

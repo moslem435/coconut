@@ -501,6 +501,10 @@ const zh: Record<string, string> = {
     "music.playlist.gym": "健身动力",
     "music.playlist.chill": "放松氛围",
     "music.playlist.new": "新建歌单 1",
+    "music.playlist.create": "创建歌单",
+    "music.playlist.create_placeholder": "输入歌单名称",
+    "music.playlist.delete": "删除歌单",
+    "music.playlist.delete_confirm": "确定要删除这个歌单吗？",
 
     // Photo Gallery
     "gallery.library": "图库",

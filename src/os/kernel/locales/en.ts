@@ -476,6 +476,10 @@ const en: Record<string, string> = {
     "music.playlist.gym": "Gym Motivation",
     "music.playlist.chill": "Chill Vibes",
     "music.playlist.new": "New Playlist 1",
+    "music.playlist.create": "Create Playlist",
+    "music.playlist.create_placeholder": "Enter playlist name",
+    "music.playlist.delete": "Delete playlist",
+    "music.playlist.delete_confirm": "Are you sure you want to delete this playlist?",
 
     // Photo Gallery
     "gallery.library": "Library",

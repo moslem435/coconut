@@ -20,6 +20,7 @@ import { twMerge } from 'tailwind-merge';
 import { getRelativeDateGroup } from '../utils/date';
 import { AVAILABLE_MODELS } from '../hooks/useWebLLM';
 import { CLOUD_MODELS, testCloudConnection } from '../hooks/useCloudLLM';
+import { useDialogStore } from '@/os/kernel/useDialogStore';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -201,7 +202,11 @@ export function Sidebar() {
 
     const handleDeleteModel = async (e: React.MouseEvent, modelId: string) => {
         e.stopPropagation();
-        if (window.confirm(t('ai.model.delete_confirm').replace('{modelId}', modelId))) {
+        const confirmed = await useDialogStore.getState().openConfirm(
+            t('ai.model.delete'),
+            t('ai.model.delete_confirm').replace('{modelId}', modelId)
+        );
+        if (confirmed) {
             const success = await deleteModel(modelId);
             if (success) {
                 setCachedModels(prev => {

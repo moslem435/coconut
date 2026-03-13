@@ -230,6 +230,7 @@ CORE PRINCIPLES:
 2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
 3. **Decoupling**: The app should not depend on system-wide configuration changes.
 4. **Code Quality**: Generated code must be COMPLETE and RUNNABLE. No placeholders like "// TODO" or "// Add your code here". Include proper error handling and user-friendly UI.
+5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). Use the system dialog store via '@/os/kernel/useDialogStore' (openAlert/openConfirm/openPrompt/openActionSheet) with async/await.
 
 WORKFLOW (follow this order strictly):
 1. **PLAN**: Briefly tell the user your plan (app type, framework choice, estimated steps). Keep it to 2-3 sentences.

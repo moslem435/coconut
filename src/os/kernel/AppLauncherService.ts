@@ -403,7 +403,7 @@ export class AppLauncherService {
                         launchStatus: status,
                         launchLabel: label,
                         ...(status !== 'installing'
-                            ? { launchDownloadProgress: undefined, launchDownloadLabel: undefined }
+                            ? { launchDownloadProgress: undefined, launchDownloadLabel: undefined, launchLog: undefined }
                             : {})
                     }
                 })
@@ -419,6 +419,19 @@ export class AppLauncherService {
                         ...(win.componentProps || {}),
                         launchDownloadProgress: progress,
                         launchDownloadLabel: label
+                    }
+                })
+            }
+        }
+
+        const updateLaunchLog = (text: string) => {
+            const { windows, updateWindow } = useWindowStore.getState()
+            const win = windows[appId]
+            if (win) {
+                updateWindow(appId, {
+                    componentProps: {
+                        ...(win.componentProps || {}),
+                        launchLog: text
                     }
                 })
             }
@@ -585,6 +598,7 @@ export class AppLauncherService {
             // Auto-install without confirmation for "App-like" experience
             updateStatus('installing', '')
             updateDownloadProgress(0, 'Preparing…')
+            updateLaunchLog('')
 
             let totalUnits: number | null = null
             const downloaded = new Set<string>()
@@ -598,6 +612,27 @@ export class AppLauncherService {
                     const label = totalUnits ? `Packages ${downloaded.size}/${totalUnits}` : `Packages ${downloaded.size}`
                     updateDownloadProgress(next, label)
                 }
+            }
+
+            let logLines: string[] = []
+            let logRemainder = ''
+            let lastLogUpdateAt = 0
+            const stripAnsi = (s: string) => s.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+            const pushLog = (chunk: string) => {
+                const clean = stripAnsi(String(chunk || '')).replace(/\r/g, '')
+                const combined = logRemainder + clean
+                const parts = combined.split('\n')
+                logRemainder = parts.pop() ?? ''
+                for (const p of parts) {
+                    const line = p.trimEnd()
+                    if (!line) continue
+                    logLines.push(line)
+                }
+                if (logLines.length > 220) logLines = logLines.slice(-200)
+                const now = Date.now()
+                if (now - lastLogUpdateAt < 120) return
+                lastLogUpdateAt = now
+                updateLaunchLog(logLines.join('\n').slice(-12000))
             }
 
             try {
@@ -641,6 +676,7 @@ export class AppLauncherService {
                 // Use default install first
                 await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
                     console.log(`[${file.name} install] ${data}`)
+                    pushLog(data)
                     const urls = new Set<string>()
                     const tgzMatches = data.match(/https?:\/\/\S+?\.(?:tgz|tar\.gz)(?:\?\S+)?/g)
                     if (tgzMatches) {
@@ -694,6 +730,7 @@ export class AppLauncherService {
                 try {
                     updateStatus('installing', 'Retrying...')
                     updateDownloadProgress(0, 'Retrying…')
+                    pushLog('--- retry ---\n')
                     toast.info('Install Retry', 'Cleaning cache and retrying install...')
                     
                     // Nuke cache
@@ -704,6 +741,7 @@ export class AppLauncherService {
                     // Retry install
                     await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
                         console.log(`[${file.name} install-retry] ${data}`)
+                        pushLog(data)
                         const urls = new Set<string>()
                         const tgzMatches = data.match(/https?:\/\/\S+?\.(?:tgz|tar\.gz)(?:\?\S+)?/g)
                         if (tgzMatches) {

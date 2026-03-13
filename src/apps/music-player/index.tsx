@@ -267,8 +267,12 @@ export default function MusicPlayer() {
   }, [liked, volume, playlist, currentTrackIndex, repeatMode, isShuffled, playlists])
 
   // Playlist Management
-  const handleCreatePlaylist = () => {
-    const name = prompt('Enter playlist name:')
+  const handleCreatePlaylist = async () => {
+    const name = await useDialogStore.getState().openPrompt(
+      t('music.playlist.create'),
+      '',
+      t('music.playlist.create_placeholder')
+    )
     if (name) {
       const newPlaylist: Playlist = {
         id: `playlist-${Date.now()}`,
@@ -282,7 +286,10 @@ export default function MusicPlayer() {
 
   const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const confirmed = await useDialogStore.getState().openConfirm('Delete this playlist?')
+    const confirmed = await useDialogStore.getState().openConfirm(
+      t('music.playlist.delete'),
+      t('music.playlist.delete_confirm')
+    )
     if (confirmed) {
       setPlaylists(prev => prev.filter(p => p.id !== id))
       if (activeTab === id) setActiveTab('recommend')
