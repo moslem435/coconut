@@ -8,7 +8,7 @@ import { MessageList } from './chat/MessageList';
 import { ChatInput } from './chat/ChatInput';
 import { useWebLLM } from '../hooks/useWebLLM';
 import { useCloudLLM } from '../hooks/useCloudLLM';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, PanelLeft, Plus } from 'lucide-react';
 
 export function ChatArea() {
     const { t } = useTranslation();
@@ -202,8 +202,26 @@ export function ChatArea() {
 
     if (!currentSessionId) {
         return (
-            <div className="flex-1 flex items-center justify-center text-zinc-500 bg-white dark:bg-zinc-950 text-sm">
-                {t('ai.sidebar.no_chats')}
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 bg-white dark:bg-zinc-950 text-sm gap-4">
+                <p>{t('ai.sidebar.no_chats')}</p>
+                <div className="flex gap-2">
+                    {!isSidebarOpen && (
+                        <button
+                            onClick={toggleSidebar}
+                            className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-zinc-700 dark:text-zinc-300 transition-colors"
+                        >
+                            <PanelLeft size={16} />
+                            {t('ai.sidebar.open')}
+                        </button>
+                    )}
+                    <button
+                        onClick={() => useChatStore.getState().createSession()}
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--os-accent)] hover:brightness-110 text-white rounded-lg transition-colors shadow-sm shadow-[var(--os-accent)]/20"
+                    >
+                        <Plus size={16} />
+                        {t('ai.sidebar.new_chat')}
+                    </button>
+                </div>
             </div>
         );
     }

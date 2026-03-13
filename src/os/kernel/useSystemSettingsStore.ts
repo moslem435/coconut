@@ -50,6 +50,7 @@ export interface SystemSettings {
     devMode: boolean
     useDependencyCache: boolean
     warmupWebContainer: boolean
+    isOOBECompleted: boolean
 }
 
 interface SystemSettingsActions {
@@ -75,6 +76,7 @@ interface SystemSettingsActions {
     setDevMode: (enable: boolean) => void
     setUseDependencyCache: (enable: boolean) => void
     setWarmupWebContainer: (enable: boolean) => void
+    completeOOBE: () => void
     isSettingsLoaded: boolean
 }
 
@@ -103,8 +105,9 @@ const DEFAULT_SETTINGS: SystemSettings = {
         value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'
     },
     devMode: false,
-    useDependencyCache: true,
-    warmupWebContainer: true
+    useDependencyCache: false,
+    warmupWebContainer: false,
+    isOOBECompleted: false
 }
 
 export const useSystemSettingsStore = create<SystemSettingsState>()(
@@ -141,6 +144,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 setDevMode: (enable) => set({ devMode: enable }),
                 setUseDependencyCache: (enable) => set({ useDependencyCache: enable }),
                 setWarmupWebContainer: (enable) => set({ warmupWebContainer: enable }),
+                completeOOBE: () => set({ isOOBECompleted: true }),
             }),
             {
                 name: 'cloud-os-settings',
@@ -150,7 +154,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                         setTransparencyLevel, setBlurLevel, setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
                         setIconTheme, setDisplayScale, setVolume, setBrightness, setMuted, toggleMute,
                         setSnapToGrid, setShowWeatherWidget, pinApp, unpinApp, setWallpaper, setDevMode,
-                        setUseDependencyCache, setWarmupWebContainer,
+                        setUseDependencyCache, setWarmupWebContainer, completeOOBE,
                         ...settings } = state
                     return settings
                 },

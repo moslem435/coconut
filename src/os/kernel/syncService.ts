@@ -190,13 +190,13 @@ class FileSystemSyncService {
                     // Initial Content Hydration (Only for initial static files)
                     let initialContent: string | Uint8Array = ''
                     if (node.name === 'hello_world.ts') initialContent = '// Hello World...'
-                    if (node.name === 'Welcome.txt') initialContent = 'Welcome to Portfolio OS!...'
+                    if (node.name === 'Welcome.txt') initialContent = 'Welcome to Coconut OS! This is a simulated system.'
 
                     // Gallery images are now handled by StaticHttpProvider mounted at /rom
 
                     // Basic restoration of template content
                     if (node.id === 'code-1') initialContent = `// Hello World in TypeScript\nfunction sayHello(name: string): void {\n    console.log("Hello, " + name + "!");\n}\n\nconst user = "Developer";\nsayHello(user);`
-                    if (node.id === 'welcome-txt') initialContent = 'Welcome to Portfolio OS! This is a simulated file system.'
+                    if (node.id === 'welcome-txt') initialContent = 'Welcome to Coconut OS! This is a simulated system.'
                     if (node.id === 'about-md') initialContent = '# About Me\n\nI am a full-stack developer...'
 
                     await fs.writeFile(path, initialContent)

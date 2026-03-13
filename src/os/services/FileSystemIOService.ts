@@ -81,6 +81,15 @@ class FileSystemIOService {
   }
 
   /**
+   * Preload blob into cache (e.g. for optimistic UI updates)
+   */
+  preloadBlob(path: string, content: Uint8Array | Blob): void {
+    PathValidator.validate(path)
+    const blob = content instanceof Blob ? content : new Blob([new Uint8Array(content)])
+    this.blobCache.setBlob(path, blob)
+  }
+
+  /**
    * 读取文件内容（自动选择流式或一次性读取）
    */
   async readFile(path: string): Promise<string> {

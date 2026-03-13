@@ -375,6 +375,8 @@ const en: Record<string, string> = {
     "menu.copy": "Copy",
     "menu.cut": "Cut",
     "menu.paste": "Paste",
+    "menu.favorites.add": "Add to Favorites",
+    "menu.favorites.remove": "Remove from Favorites",
 
     // Messages / Notifications
     "msg.pinned": "Pinned to Taskbar",

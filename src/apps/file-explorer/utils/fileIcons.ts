@@ -157,6 +157,17 @@ const SYSTEM_FOLDERS: Record<string, { icon: React.ElementType, color: string }>
   'Trash': { icon: Trash2, color: COLORS.red },
 }
 
+// System Folder IDs (Backup for when name might be localized or different)
+const SYSTEM_IDS: Record<string, { icon: React.ElementType, color: string }> = {
+  'desktop': { icon: DesktopIcon, color: COLORS.blue },
+  'documents': { icon: BookIcon, color: COLORS.orange },
+  'downloads': { icon: DownloadIcon, color: COLORS.green },
+  'pictures': { icon: ImageIcon, color: COLORS.purple },
+  'music': { icon: Music, color: COLORS.pink },
+  'code': { icon: Code, color: COLORS.slate },
+  'trash': { icon: Trash2, color: COLORS.red },
+}
+
 import { Disc, Trash2 } from 'lucide-react'
 
 export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
@@ -176,7 +187,19 @@ export const getFileIconAndTheme = (node: FileNode): FileIconTheme => {
 
   // 2. Folder
   if (node.type === 'folder') {
-    // Check for special system folders
+    // Check for special system folders (By ID first - most reliable)
+    if (SYSTEM_IDS[node.id]) {
+      const match = SYSTEM_IDS[node.id]!
+      return {
+        Icon: match.icon,
+        backgroundColor: match.color,
+        useAppIcon: false,
+        color: '#ffffff',
+        fill: false
+      }
+    }
+
+    // Check by Name (Legacy/Fallback)
     if (SYSTEM_FOLDERS[node.name]) {
       const match = SYSTEM_FOLDERS[node.name]!
       return {

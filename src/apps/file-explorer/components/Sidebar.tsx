@@ -108,7 +108,7 @@ const SectionHeader = ({ title, collapsed, onToggle, action }: SectionHeaderProp
 
 export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
   const { files, mountLocalFolder, unmountLocalFolder } = useFileSystemStore()
-  const { hiddenIds, hideFavorite } = useFavoritesStore()
+  const { hiddenIds, hideFavorite, pinnedIds, unpinFavorite } = useFavoritesStore()
   const { t } = useLanguage()
   const { usage, quota, usagePercent } = useStorageInfo()
 
@@ -139,6 +139,20 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
 
     return true
   })
+
+  const systemItemIds = React.useMemo(() => new Set<string>(systemItems.map(i => i.id)), [systemItems])
+  const pinnedItems = React.useMemo(() => {
+    return (pinnedIds || [])
+      .map(id => files[id])
+      .filter((node): node is NonNullable<typeof node> => {
+        if (!node) return false
+        if (systemItemIds.has(node.id)) return false
+        if (node.type !== 'folder') return false
+        if (node.parentId === FILE_IDS.TRASH) return false
+        return true
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [pinnedIds, files, systemItemIds])
 
   const userMounts = Object.values(files).filter(node => node?.isMount && !node.isSystem)
 
@@ -174,6 +188,19 @@ export default function Sidebar({ currentPathId, onNavigate }: SidebarProps) {
                 onRemove={item.id !== FILE_IDS.ROOT ? hideFavorite : undefined} // Root cannot be hidden
                 iconColor={item.iconColor}
                 iconBg={item.iconBg}
+              />
+            ))}
+            {pinnedItems.map(node => (
+              <SidebarItem
+                key={node.id}
+                id={node.id}
+                icon={node.isMount ? HardDrive : Folder}
+                label={node.name}
+                isActive={currentPathId === node.id}
+                onClick={onNavigate}
+                onRemove={unpinFavorite}
+                iconBg={node.isMount ? 'rgba(156,163,175,0.1)' : 'rgba(251,191,36,0.12)'}
+                iconColor={node.isMount ? '#9ca3af' : '#fbbf24'}
               />
             ))}
           </div>

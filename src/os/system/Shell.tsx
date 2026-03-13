@@ -48,6 +48,7 @@ import GlobalShortcuts from './GlobalShortcuts'
 import GlobalDialogs from './GlobalDialogs'
 import { ToastContainer } from '@/os/components/Toast'
 import { LucideIconPickerDialog } from '@/os/ui/dialogs/LucideIconPickerDialog'
+import SetupWizard from './setup/SetupWizard'
 
 /**
  * Shell 组件属性
@@ -71,6 +72,9 @@ export default function Shell({ onShutdown }: ShellProps) {
 
   // 文件系统初始化
   const { initialize } = useFileSystemStore()
+  
+  // OOBE 状态
+  const isOOBECompleted = useSystemSettingsStore(state => state.isOOBECompleted)
 
   /**
    * 系统初始化
@@ -167,6 +171,13 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       <LucideIconPickerDialog />
       
+      {/* 8. OOBE 引导 (z-10000) */}
+      <AnimatePresence>
+        {!isOOBECompleted && (
+          <SetupWizard onComplete={() => {}} />
+        )}
+      </AnimatePresence>
+
       {/* 6. Toast 通知（z-10000） */}
       <ToastContainer />
       

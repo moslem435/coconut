@@ -26,7 +26,7 @@ export function FileListItem({
   ...props
 }: FileListItemProps) {
   const { displayName, iconTheme, thumbnail } = useFileDisplay(item)
-  const { Icon, backgroundColor, useAppIcon, manifest, color } = iconTheme
+  const { Icon, backgroundColor, useAppIcon, manifest, color, fill } = iconTheme
   const IconComponent = Icon as any
 
   // App Bundle Logic
@@ -70,6 +70,7 @@ export function FileListItem({
             <IconComponent
               size={backgroundColor === 'transparent' ? iconSize : iconSize * 0.7}
               strokeWidth={2}
+              fill={fill ? 'currentColor' : 'none'}
             />
           </div>
         )}

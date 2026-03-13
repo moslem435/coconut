@@ -10,6 +10,7 @@ import type { FileNode, FileType } from '../../initialFileTree'
 import { eventBus } from '../../EventBus'
 import { collectDescendants } from '../utils/indexManager'
 import { syncService } from '@/os/services/FileSystemSyncService'
+import { ioService } from '@/os/services/FileSystemIOService'
 import { toast } from '@/os/components/Toast'
 
 const getByteSize = (content?: string | Uint8Array) => {
@@ -102,6 +103,15 @@ export const createActionSlice: StateCreator<
 
     // 3. 发出事件（SyncMiddleware 监听并执行 IO）
     const path = get().resolvePath(id)
+
+    // Preload blob cache for binary files (images) to avoid race condition with OPFS sync
+    if (path && content instanceof Uint8Array) {
+      try {
+        ioService.preloadBlob(path, content)
+      } catch (e) {
+        console.warn('[ActionSlice] Failed to preload blob cache:', e)
+      }
+    }
 
     eventBus.emit('fs:file:created', {
       id,

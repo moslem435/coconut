@@ -371,6 +371,8 @@ const zh: Record<string, string> = {
     "menu.copy": "复制",
     "menu.cut": "剪切",
     "menu.paste": "粘贴",
+    "menu.favorites.add": "添加到收藏夹",
+    "menu.favorites.remove": "从收藏夹移除",
 
     // Messages / Notifications
     "msg.pinned": "已固定到任务栏",

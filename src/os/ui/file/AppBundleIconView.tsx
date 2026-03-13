@@ -3,6 +3,7 @@ import { FileNode, useFileSystemStore } from '@/os/kernel/useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { cn } from '@/lib/utils'
 import { eventBus } from '@/os/kernel/EventBus'
+import { Globe, Terminal, Cpu } from 'lucide-react'
 
 type Variant = 'list' | 'grid'
 
@@ -276,21 +277,52 @@ export function AppBundleIconView({
   const shadow = variant === 'grid' ? 'shadow-md' : 'shadow-sm'
   const scale = selected ? 'scale-105' : ''
 
+  const badgeInfo = useMemo(() => {
+    const type = item.appConfig?.type
+    switch (type) {
+      case 'web-static':
+        return { Icon: Globe, bg: 'bg-emerald-500', title: 'Static App' }
+      case 'web-container':
+      case 'web-app':
+        return { Icon: Terminal, bg: 'bg-orange-500', title: 'Node.js App' }
+      default:
+        return null
+    }
+  }, [item.appConfig?.type])
+
   return (
     <div
-      className={cn(`flex items-center justify-center overflow-hidden ${rounded} ${shadow} transition-transform duration-200`, scale, className)}
-      style={{ width: size, height: size, background: gradient, color: '#ffffff' }}
+      className={cn(`relative transition-transform duration-200`, scale, className)}
+      style={{ width: size, height: size }}
     >
-      {lucideName && lucideIcon ? (
-        React.createElement(lucideIcon, { size: Math.round(size * 0.62), strokeWidth: 1.8, color: '#ffffff' })
-      ) : resolvedUrl ? (
-        <img src={resolvedUrl} alt="" className="w-full h-full object-cover" draggable={false} onError={() => setResolvedUrl(null)} />
-      ) : isEmoji ? (
-        <span style={{ fontSize: size * 0.72, lineHeight: 1 }}>{iconSpec}</span>
-      ) : (
-        <span className="font-semibold tracking-wide" style={{ fontSize: size * 0.38, lineHeight: 1 }}>
-          {getInitials(displayName)}
-        </span>
+      <div
+        className={cn(`absolute inset-0 flex items-center justify-center overflow-hidden ${rounded} ${shadow}`)}
+        style={{ background: gradient, color: '#ffffff' }}
+      >
+        {lucideName && lucideIcon ? (
+          React.createElement(lucideIcon, { size: Math.round(size * 0.62), strokeWidth: 1.8, color: '#ffffff' })
+        ) : resolvedUrl ? (
+          <img src={resolvedUrl} alt="" className="w-full h-full object-cover" draggable={false} onError={() => setResolvedUrl(null)} />
+        ) : isEmoji ? (
+          <span style={{ fontSize: size * 0.72, lineHeight: 1 }}>{iconSpec}</span>
+        ) : (
+          <span className="font-semibold tracking-wide" style={{ fontSize: size * 0.38, lineHeight: 1 }}>
+            {getInitials(displayName)}
+          </span>
+        )}
+      </div>
+
+      {badgeInfo && (
+        <div
+          className={cn(
+            "absolute flex items-center justify-center rounded-full shadow-sm border border-white/20 text-white z-10",
+            badgeInfo.bg,
+            variant === 'grid' ? "-bottom-1 -right-1 w-5 h-5" : "-bottom-0.5 -right-0.5 w-3 h-3"
+          )}
+          title={badgeInfo.title}
+        >
+          <badgeInfo.Icon size={variant === 'grid' ? 12 : 8} strokeWidth={2.5} />
+        </div>
       )}
     </div>
   )

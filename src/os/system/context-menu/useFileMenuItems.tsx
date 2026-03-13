@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus, ImagePlus, Sparkles, Monitor } from 'lucide-react'
+import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus, ImagePlus, Sparkles, Monitor, Star } from 'lucide-react'
 import JSZip from 'jszip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -12,6 +12,8 @@ import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 import { toast } from '@/os/components/Toast'
 import { useLucideIconPickerStore } from '@/os/kernel/useLucideIconPickerStore'
+import { useFavoritesStore } from '@/os/kernel/useFavoritesStore'
+import { FILE_IDS } from '@/os/config/paths'
 
 interface MenuItem {
     label?: string
@@ -35,12 +37,32 @@ export function useFileMenuItems(
     const { openWindow } = useWindowStore()
     const { trashItems } = useTrashStore()
     const { setClipboard } = useClipboardStore()
+    const { pinnedIds, pinFavorite, unpinFavorite } = useFavoritesStore()
 
     return useMemo<MenuItem[]>(() => {
         if (!visible || !isVisibleType) return []
 
         const ids = data.selectedIds || (data.id ? [data.id] : [])
         const firstItem = ids.length === 1 ? getItem(ids[0]) : null
+        const canFavoriteFolder = !!firstItem
+            && ids.length === 1
+            && firstItem.type === 'folder'
+            && !firstItem.isSystem
+            && firstItem.parentId !== FILE_IDS.TRASH
+        const isPinnedFavorite = canFavoriteFolder ? pinnedIds.includes(firstItem.id) : false
+        const favoriteMenuItem: MenuItem | null = canFavoriteFolder ? {
+            label: isPinnedFavorite ? t('menu.favorites.remove') : t('menu.favorites.add'),
+            icon: Star,
+            action: () => {
+                if (!firstItem) return
+                if (isPinnedFavorite) {
+                    unpinFavorite(firstItem.id)
+                } else {
+                    pinFavorite(firstItem.id)
+                }
+                hideMenu()
+            }
+        } : null
 
         // App Bundle Detection
         const isAppBundle = firstItem?.type === 'folder' && (firstItem.name.endsWith('.app') || (firstItem as any).isAppBundle)
@@ -83,6 +105,7 @@ export function useFileMenuItems(
                         hideMenu()
                     }
                 },
+                ...(favoriteMenuItem ? [favoriteMenuItem] : []),
                 { type: 'separator' },
                 {
                     label: t('menu.rename'),
@@ -204,6 +227,7 @@ export function useFileMenuItems(
                     hideMenu()
                 }
             },
+            ...(favoriteMenuItem ? [favoriteMenuItem] : []),
             { type: 'separator' },
             {
                 label: t('menu.copy'),
@@ -429,5 +453,5 @@ export function useFileMenuItems(
         }
 
         return menuItems
-    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu, trashItems, setClipboard])
+    }, [visible, isVisibleType, data, t, getItem, readFileContent, deleteItem, setRenamingId, openWindow, hideMenu, trashItems, setClipboard, pinnedIds, pinFavorite, unpinFavorite])
 }

@@ -39,7 +39,7 @@ export const INITIAL_ROOT_ID = FILE_IDS.ROOT
 export const INITIAL_HOME_ID = FILE_IDS.HOME
 export const INITIAL_USER_ID = FILE_IDS.USER
 
-export const FILESYSTEM_VERSION = 12; // Increment this to force re-sync
+export const FILESYSTEM_VERSION = 14; // Increment this to force re-sync
 
 export const INITIAL_FILES: Record<string, FileNode> = {
     [INITIAL_ROOT_ID]: {

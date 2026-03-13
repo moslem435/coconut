@@ -471,7 +471,7 @@ async function callOpenAI(
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'Authorization': `Bearer ${config.apiKey}` },
             body: JSON.stringify(requestBody),
             signal
         });
@@ -521,16 +521,24 @@ async function callOpenAI(
             return calls;
         };
 
+        let sawDone = false;
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? '';
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') break;
+            const events = buffer.split(/\r?\n\r?\n/);
+            buffer = events.pop() ?? '';
+            for (const evt of events) {
+                const dataLines = evt
+                    .split(/\r?\n/)
+                    .filter(l => l.startsWith('data:'))
+                    .map(l => l.replace(/^data:\s?/, ''));
+                if (dataLines.length === 0) continue;
+                const data = dataLines.join('\n').trim();
+                if (data === '[DONE]') {
+                    sawDone = true;
+                    break;
+                }
                 try {
                     const delta = JSON.parse(data)?.choices?.[0]?.delta;
                     if (delta?.content) { 
@@ -556,6 +564,7 @@ async function callOpenAI(
                     });
                 } catch { }
             }
+            if (sawDone) break;
         }
 
         if (toolCalls.length === 0) {
