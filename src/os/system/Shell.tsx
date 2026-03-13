@@ -36,6 +36,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { Kernel } from '@/os/kernel/Kernel'
 import { useProcessStore } from '@/os/kernel/useProcessStore'
 import { logger } from '@/os/utils/logger'
+import { useWebContainerStore } from '@/os/kernel/useWebContainerStore'
+import { useSystemSettingsStore } from '@/os/kernel/useSystemSettingsStore'
 
 // 组件
 import Taskbar from './Taskbar'
@@ -83,6 +85,38 @@ export default function Shell({ onShutdown }: ShellProps) {
     
     // 初始化文件系统
     initialize().catch(logger.error)
+
+    const shouldWarmup = () => {
+      const s = useSystemSettingsStore.getState()
+      if (!s.warmupWebContainer) return false
+      const nav: any = typeof navigator === 'undefined' ? null : navigator
+      const conn = nav?.connection
+      if (conn?.saveData) return false
+      const effectiveType = conn?.effectiveType
+      if (effectiveType === 'slow-2g' || effectiveType === '2g') return false
+      const deviceMemory = nav?.deviceMemory
+      if (typeof deviceMemory === 'number' && deviceMemory > 0 && deviceMemory < 4) return false
+      return true
+    }
+
+    const warmup = async () => {
+      const wc = useWebContainerStore.getState()
+      if (wc.instance || wc.isBooting) return
+      try {
+        await wc.boot()
+      } catch (e) {
+        logger.warn(e)
+      }
+    }
+
+    if (shouldWarmup()) {
+      const ric: any = (globalThis as any).requestIdleCallback
+      if (typeof ric === 'function') {
+        ric(() => { void warmup() }, { timeout: 3000 })
+      } else {
+        setTimeout(() => { void warmup() }, 1500)
+      }
+    }
 
     // 启动进程管理器定时器
     const interval = setInterval(() => {

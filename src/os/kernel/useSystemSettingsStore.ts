@@ -49,6 +49,7 @@ export interface SystemSettings {
     wallpaper: Wallpaper
     devMode: boolean
     useDependencyCache: boolean
+    warmupWebContainer: boolean
 }
 
 interface SystemSettingsActions {
@@ -73,6 +74,7 @@ interface SystemSettingsActions {
     setWallpaper: (wallpaper: Wallpaper) => void
     setDevMode: (enable: boolean) => void
     setUseDependencyCache: (enable: boolean) => void
+    setWarmupWebContainer: (enable: boolean) => void
     isSettingsLoaded: boolean
 }
 
@@ -101,7 +103,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
         value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'
     },
     devMode: false,
-    useDependencyCache: true
+    useDependencyCache: true,
+    warmupWebContainer: true
 }
 
 export const useSystemSettingsStore = create<SystemSettingsState>()(
@@ -137,6 +140,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                 setWallpaper: (wallpaper) => set({ wallpaper }),
                 setDevMode: (enable) => set({ devMode: enable }),
                 setUseDependencyCache: (enable) => set({ useDependencyCache: enable }),
+                setWarmupWebContainer: (enable) => set({ warmupWebContainer: enable }),
             }),
             {
                 name: 'cloud-os-settings',
@@ -146,7 +150,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
                         setTransparencyLevel, setBlurLevel, setUseAnimations, setUseTaskbarPreviews, setSkipBootSequence,
                         setIconTheme, setDisplayScale, setVolume, setBrightness, setMuted, toggleMute,
                         setSnapToGrid, setShowWeatherWidget, pinApp, unpinApp, setWallpaper, setDevMode,
-                        setUseDependencyCache,
+                        setUseDependencyCache, setWarmupWebContainer,
                         ...settings } = state
                     return settings
                 },
