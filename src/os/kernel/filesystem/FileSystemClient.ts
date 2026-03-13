@@ -177,16 +177,45 @@ export class FileSystemClient implements IFileSystemProvider {
     async getFileBlob(path: string): Promise<Blob> {
         const { provider, relativePath } = this.resolveProvider(path);
 
+        const mimeFromPath = (p: string) => {
+            const ext = p.split('.').pop()?.toLowerCase()
+            switch (ext) {
+                case 'svg': return 'image/svg+xml'
+                case 'png': return 'image/png'
+                case 'jpg':
+                case 'jpeg': return 'image/jpeg'
+                case 'gif': return 'image/gif'
+                case 'webp': return 'image/webp'
+                case 'ico': return 'image/x-icon'
+                case 'bmp': return 'image/bmp'
+                default: return ''
+            }
+        }
+
+        const withMime = (blob: Blob, p: string) => {
+            const desired = mimeFromPath(p)
+            if (!desired) return blob
+            const t = (blob as any)?.type || ''
+            if (t && t !== 'application/octet-stream') return blob
+            try {
+                return blob.slice(0, blob.size, desired)
+            } catch {
+                return blob
+            }
+        }
+
         if (provider) {
             if (provider.getFileBlob) {
-                return provider.getFileBlob(relativePath);
+                const blob = await provider.getFileBlob(relativePath);
+                return withMime(blob, relativePath);
             }
             // Fallback
             const content = await provider.readFile(relativePath);
-            return new Blob([content as any]);
+            return withMime(new Blob([content as any]), relativePath);
         }
 
-        return this.sendWorker<Blob>('getFileBlob', { path });
+        const blob = await this.sendWorker<Blob>('getFileBlob', { path });
+        return withMime(blob, path);
     }
 
     async writeFile(path: string, content: Uint8Array | string): Promise<void> {

@@ -342,15 +342,20 @@ self.onmessage = (e: MessageEvent<FileSystemRequest>) => {
                                 size: nextSize,
                                 isMount: false
                             });
-                        } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== nextSize) {
-                            // Update file
-                            patch.toUpdate.push({
-                                id: existing.id,
-                                updates: {
-                                    updatedAt: fsEntry.mtime,
-                                    size: nextSize
-                                }
-                            });
+                        } else {
+                            const shouldUpdateTimestamp = !fsEntry.isDirectory && existing.updatedAt !== fsEntry.mtime;
+                            const shouldUpdateSize = existing.size !== nextSize;
+
+                            if (shouldUpdateTimestamp || shouldUpdateSize) {
+                                const updates: any = {};
+                                if (shouldUpdateTimestamp) updates.updatedAt = fsEntry.mtime;
+                                if (shouldUpdateSize) updates.size = nextSize;
+
+                                patch.toUpdate.push({
+                                    id: existing.id,
+                                    updates
+                                });
+                            }
                         }
                     }
 

@@ -47,6 +47,7 @@ import Window from './Window'
 import GlobalShortcuts from './GlobalShortcuts'
 import GlobalDialogs from './GlobalDialogs'
 import { ToastContainer } from '@/os/components/Toast'
+import { LucideIconPickerDialog } from '@/os/ui/dialogs/LucideIconPickerDialog'
 
 /**
  * Shell 组件属性
@@ -163,6 +164,8 @@ export default function Shell({ onShutdown }: ShellProps) {
 
       {/* 5. 全局对话框（z-99999） */}
       <GlobalDialogs />
+
+      <LucideIconPickerDialog />
       
       {/* 6. Toast 通知（z-10000） */}
       <ToastContainer />

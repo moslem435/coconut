@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus } from 'lucide-react'
+import { ExternalLink, FileEdit, Download, FileText, Trash2, Copy, Scissors, Clipboard, FolderPlus, ImagePlus, Sparkles } from 'lucide-react'
 import JSZip from 'jszip'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { useWindowStore } from '@/os/kernel/useWindowStore'
@@ -10,6 +10,7 @@ import { useClipboardStore } from '@/os/kernel/useClipboardStore'
 import { APPS_REGISTRY } from '@/os/registry/config'
 import { ContextMenuData } from '@/os/kernel/useContextMenuStore'
 import { toast } from '@/os/components/Toast'
+import { useLucideIconPickerStore } from '@/os/kernel/useLucideIconPickerStore'
 
 interface MenuItem {
     label?: string
@@ -88,6 +89,73 @@ export function useFileMenuItems(
                     action: () => {
                         setRenamingId(firstItem.id)
                         hideMenu()
+                    }
+                },
+                {
+                    label: t('menu.changeIcon'),
+                    icon: ImagePlus,
+                    action: () => {
+                        hideMenu()
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/svg+xml,image/png'
+                        input.onchange = async () => {
+                            const file = input.files?.[0]
+                            if (!file) return
+                            const fsStore = useFileSystemStore.getState()
+                            const children = fsStore.getChildren(firstItem.id)
+                            const pkg = children.find(c => c.name === 'package.json')
+                            if (!pkg) {
+                                toast.error(t('menu.changeIcon'), 'package.json not found')
+                                return
+                            }
+
+                            const isPng = file.type === 'image/png' || /\.png$/i.test(file.name)
+                            const iconName = isPng ? 'icon.png' : 'icon.svg'
+                            const existingIcon = children.find(c => c.name === iconName)
+                            const content = isPng ? new Uint8Array(await file.arrayBuffer()) : await file.text()
+
+                            try {
+                                if (existingIcon) {
+                                    fsStore.updateFileContent(existingIcon.id, content, { source: 'ui' })
+                                } else {
+                                    await fsStore.createItem(firstItem.id, iconName, 'file', content, undefined, { source: 'ui' })
+                                }
+
+                                const pkgText = await fsStore.readFileContent(pkg.id)
+                                const json = JSON.parse(pkgText || '{}')
+                                json.cocount = { ...(json.cocount || {}), icon: `./${iconName}` }
+                                fsStore.updateFileContent(pkg.id, JSON.stringify(json, null, 2), { source: 'ui' })
+                                toast.success(t('menu.changeIcon'))
+                            } catch (e: any) {
+                                toast.error(t('menu.changeIcon'), e?.message || String(e))
+                            }
+                        }
+                        input.click()
+                    }
+                },
+                {
+                    label: t('menu.changeIcon.lucide'),
+                    icon: Sparkles,
+                    action: () => {
+                        hideMenu()
+                        void (async () => {
+                            const fsStore = useFileSystemStore.getState()
+                            const children = fsStore.getChildren(firstItem.id)
+                            const pkg = children.find(c => c.name === 'package.json')
+                            if (!pkg) {
+                                toast.error(t('menu.changeIcon.lucide'), 'package.json not found')
+                                return
+                            }
+                            const pkgText = await fsStore.readFileContent(pkg.id)
+                            const json = JSON.parse(pkgText || '{}')
+                            const currentIcon = typeof json?.cocount?.icon === 'string' ? json.cocount.icon : ''
+                            const initial = currentIcon.startsWith('lucide:') ? currentIcon.replace(/^lucide:/i, '') : ''
+                            const picked = await useLucideIconPickerStore.getState().open({ title: t('menu.changeIcon.lucide'), initial })
+                            if (!picked) return
+                            json.cocount = { ...(json.cocount || {}), icon: `lucide:${picked}` }
+                            fsStore.updateFileContent(pkg.id, JSON.stringify(json, null, 2), { source: 'ui' })
+                        })()
                     }
                 },
                 {

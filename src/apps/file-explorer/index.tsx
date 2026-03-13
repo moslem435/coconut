@@ -372,10 +372,11 @@ export default function FileExplorer({ initialPath = 'root' }: FileExplorerProps
     e.preventDefault()
     e.stopPropagation()
     // 如果右键的项未被选中，则先选中
+    const idsToUse = selectedIds.includes(id) ? selectedIds : [id]
     if (!selectedIds.includes(id)) {
       setSelectedIds([id])
     }
-    showMenu(e.clientX, e.clientY, 'desktop-item', { id })
+    showMenu(e.clientX, e.clientY, 'desktop-item', { id, selectedIds: idsToUse })
   }
 
   /**

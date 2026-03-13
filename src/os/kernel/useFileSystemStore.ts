@@ -58,17 +58,19 @@ export const useFileSystemStore = create<FileSystemStore>()(
       name: 'filesystem-storage',
       skipHydration: true,
       partialize: (state) => {
+        const filesWithoutContent = Object.fromEntries(
+          Object.entries(state.files).map(([id, node]: any) => {
+            if (!node || typeof node !== 'object') return [id, node]
+            const { content, ...rest } = node
+            return [id, rest]
+          })
+        )
+
         const persisted = {
-          files: state.files,
+          files: filesWithoutContent,
           rootId: state.rootId,
           tombstoneEntries: state.tombstoneEntries
         };
-        const fileCount = Object.keys(persisted.files).length;
-        const userNode = state.getNodeByPath('/home/user');
-        const userChildren = userNode ? state.getChildren(userNode.id).map(f => f.name) : [];
-        
-        console.log('[FileSystem] Partializing state for persistence:', fileCount, 'files');
-        console.log('[FileSystem] /home/user children being saved:', userChildren);
         return persisted;
       },
       onRehydrateStorage: () => {

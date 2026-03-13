@@ -2,7 +2,6 @@ import { FileSystemState, FileNode } from './useFileSystemStore'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { get, set as setIdx } from 'idb-keyval'
 import { FILESYSTEM_VERSION, INITIAL_FILES } from './initialFileTree'
-import { eventBus } from '@/os/kernel/EventBus'
 import { SYSTEM_PATHS, FILE_IDS } from '@/os/config/paths'
 
 // SyncOptions for backward compatibility or future use
@@ -14,12 +13,6 @@ export interface SyncOptions {
 
 class FileSystemSyncService {
     constructor() {
-        // Listen to FileSystemClient events
-        eventBus.on('fs:file:created', this.handleFileCreated.bind(this));
-        eventBus.on('fs:file:updated', this.handleFileUpdated.bind(this));
-        eventBus.on('fs:file:deleted', this.handleFileDeleted.bind(this));
-        eventBus.on('fs:file:renamed', this.handleFileRenamed.bind(this));
-        eventBus.on('fs:file:moved', this.handleFileRenamed.bind(this)); // Handle moved same as renamed for sync
     }
 
     private async handleFileCreated(data: { id: string; path: string; type: 'file' | 'folder'; content?: string | Uint8Array }) {

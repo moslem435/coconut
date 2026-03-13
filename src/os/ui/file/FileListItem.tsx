@@ -4,7 +4,7 @@ import { AppIcon } from '@/os/ui/AppIcon'
 import { RenameInput } from '@/os/ui/RenameInput'
 import { useFileDisplay } from '@/os/hooks/useFileDisplay'
 import { cn } from '@/lib/utils'
-import { AppWindow } from 'lucide-react'
+import { AppBundleIconView } from './AppBundleIconView'
 
 export interface FileListItemProps extends React.HTMLAttributes<HTMLDivElement> {
   item: FileNode
@@ -32,11 +32,6 @@ export function FileListItem({
   // App Bundle Logic
   const isAppBundle = item.type === 'folder' && (item.name.endsWith('.app') || item.isAppBundle)
   const appBundleName = isAppBundle ? item.name.replace(/\.app$/, '') : displayName
-  const AppBundleIcon = AppWindow
-  
-  // Custom Bundle Icon
-  const customBundleIcon = item.appConfig?.icon;
-  const isEmojiIcon = customBundleIcon && !customBundleIcon.startsWith('http');
 
   return (
     <div
@@ -45,28 +40,7 @@ export function FileListItem({
     >
       <div className="relative shrink-0">
         {isAppBundle ? (
-          <div
-            className="flex items-center justify-center rounded-md shadow-sm overflow-hidden"
-            style={{
-              width: iconSize,
-              height: iconSize,
-              backgroundColor: isEmojiIcon ? 'transparent' : '#3b82f6',
-              color: '#ffffff'
-            }}
-          >
-             {customBundleIcon ? (
-                isEmojiIcon ? (
-                   <span style={{ fontSize: iconSize * 0.8, lineHeight: 1 }}>{customBundleIcon}</span>
-                ) : (
-                   <img src={customBundleIcon} alt="" className="w-full h-full object-cover" />
-                )
-             ) : (
-                <AppBundleIcon
-                  size={iconSize * 0.7}
-                  strokeWidth={1.5}
-                />
-             )}
-          </div>
+          <AppBundleIconView item={item} size={iconSize} variant="list" />
         ) : useAppIcon && manifest ? (
           <AppIcon
             manifest={manifest}

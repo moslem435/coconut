@@ -4,7 +4,8 @@ import { AppIcon } from '@/os/ui/AppIcon'
 import { RenameInput } from '@/os/ui/RenameInput'
 import { useFileDisplay } from '@/os/hooks/useFileDisplay'
 import { cn } from '@/lib/utils'
-import { AppWindow, Package, Lock, Shield } from 'lucide-react'
+import { Lock, Shield } from 'lucide-react'
+import { AppBundleIconView } from './AppBundleIconView'
 
 export interface FileGridItemProps extends React.HTMLAttributes<HTMLDivElement> {
   item: FileNode
@@ -39,11 +40,6 @@ export function FileGridItem({
   // App Bundle Logic
   const isAppBundle = item.type === 'folder' && (item.name.endsWith('.app') || item.isAppBundle)
   const appBundleName = isAppBundle ? item.name.replace(/\.app$/, '') : displayName
-  const AppBundleIcon = AppWindow // or Package
-  
-  // Custom Bundle Icon
-  const customBundleIcon = item.appConfig?.icon;
-  const isEmojiIcon = customBundleIcon && !customBundleIcon.startsWith('http');
 
   return (
     <div
@@ -58,28 +54,7 @@ export function FileGridItem({
     >
       <div className="relative group">
         {isAppBundle ? (
-           <div
-            className={cn(`flex items-center justify-center rounded-xl shadow-md transition-transform duration-200 overflow-hidden`, selected && 'scale-105', iconClassName)}
-            style={{
-              width: iconSize,
-              height: iconSize,
-              backgroundColor: isEmojiIcon ? 'transparent' : '#3b82f6', // Blue for apps
-              color: '#ffffff'
-            }}
-          >
-             {customBundleIcon ? (
-                isEmojiIcon ? (
-                   <span style={{ fontSize: iconSize * 0.8, lineHeight: 1 }}>{customBundleIcon}</span>
-                ) : (
-                   <img src={customBundleIcon} alt="" className="w-full h-full object-cover" />
-                )
-             ) : (
-                <AppBundleIcon
-                  size={Math.round(iconSize * 0.6)}
-                  strokeWidth={1.5}
-                />
-             )}
-          </div>
+          <AppBundleIconView item={item} size={iconSize} selected={selected} variant="grid" className={iconClassName} />
         ) : useAppIcon && manifest ? (
           <AppIcon
             manifest={manifest}
@@ -159,4 +134,3 @@ export function FileGridItem({
     </div>
   )
 }
-

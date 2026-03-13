@@ -128,6 +128,7 @@ class FileSystemWorkerClient {
     
     // 找出需要删除的
     for (const [name, file] of currentMap) {
+      if (file.isMount || file.isSystem) continue
       if (!fsMap.has(name)) {
         patch.toRemove.push(file.id)
       }
@@ -148,14 +149,17 @@ class FileSystemWorkerClient {
           size: fsEntry.size,
           isMount: false
         })
-      } else if (existing.updatedAt !== fsEntry.mtime || existing.size !== fsEntry.size) {
-        patch.toUpdate.push({
-          id: existing.id,
-          updates: {
-            updatedAt: fsEntry.mtime,
-            size: fsEntry.size
-          }
-        })
+      } else {
+        const shouldUpdateTimestamp = !fsEntry.isDirectory && existing.updatedAt !== fsEntry.mtime
+        const nextSize = fsEntry.isDirectory ? undefined : fsEntry.size
+        const shouldUpdateSize = existing.size !== nextSize
+
+        if (shouldUpdateTimestamp || shouldUpdateSize) {
+          const updates: any = {}
+          if (shouldUpdateTimestamp) updates.updatedAt = fsEntry.mtime
+          if (shouldUpdateSize) updates.size = nextSize
+          patch.toUpdate.push({ id: existing.id, updates })
+        }
       }
     }
     

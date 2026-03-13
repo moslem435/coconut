@@ -324,6 +324,13 @@ class FileSystemIOService {
     try {
       await fs.rename(oldPath, newPath)
     } catch (error) {
+      const anyErr: any = error
+      const msg = String(anyErr?.message || '')
+      const isNotFound = anyErr?.code === 'ENOENT' || msg.includes('ENOENT') || msg.includes('no such file or directory')
+      const isTrashMove = newPath.includes('/Trash/')
+      if (isNotFound && isTrashMove) {
+        return
+      }
       console.error(`[IOService] Failed to rename ${oldPath} to ${newPath}:`, error)
       throw error
     }

@@ -6,6 +6,7 @@
 import { ioService } from './FileSystemIOService'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
 import { eventBus } from '@/os/kernel/EventBus'
+import { SYSTEM_PATHS } from '@/os/config/paths'
 
 export interface SyncOptions {
   syncToOPFS?: boolean
@@ -229,8 +230,21 @@ class FileSystemSyncService {
             // Directory might already exist, ignore
           }
         }
-        
-        await ioService.rename(oldPath, newPath)
+
+        try {
+          await ioService.rename(oldPath, newPath)
+        } catch (error: any) {
+          const msg = String(error?.message || '')
+          const isNotFound = error?.code === 'ENOENT' || msg.includes('ENOENT') || msg.includes('no such file or directory')
+          const isTrashMove =
+            newPath === SYSTEM_PATHS.TRASH ||
+            newPath.startsWith(`${SYSTEM_PATHS.TRASH}/`) ||
+            newPath.includes('/Trash/')
+          if (isNotFound && isTrashMove) {
+            return
+          }
+          throw error
+        }
       };
       await this.executeTasks([opfsTask]);
     }

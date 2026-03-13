@@ -17,6 +17,53 @@ type ToolContext = {
     mode?: 'chat' | 'control' | 'builder';
 };
 
+const hashToHue = (input: string) => {
+    let h = 2166136261
+    for (let i = 0; i < input.length; i++) {
+        h ^= input.charCodeAt(i)
+        h = Math.imul(h, 16777619)
+    }
+    return Math.abs(h) % 360
+}
+
+const getInitials = (name: string) => {
+    const s = (name || '').trim()
+    if (!s) return 'A'
+    const compact = s.replace(/\s+/g, ' ')
+    const parts = compact.split(' ').filter((p): p is string => Boolean(p))
+    const take = (str: string) => Array.from(str)[0] || ''
+    if (parts.length >= 2) return (take(parts[0] || '') + take(parts[1] || '')).toUpperCase()
+    const chars = Array.from(compact.replace(/[^0-9A-Za-z\u4e00-\u9fff]/g, ''))
+    if (chars.length >= 2) return ((chars[0] || '') + (chars[1] || '')).toUpperCase()
+    return (chars[0] || take(compact) || 'A').toUpperCase()
+}
+
+const looksLikeEmoji = (icon: string) => {
+    const s = (icon || '').trim()
+    if (!s) return false
+    if (/^https?:\/\//i.test(s) || /^data:image\//i.test(s)) return false
+    const chars = Array.from(s)
+    return chars.length > 0 && chars.length <= 3
+}
+
+const generateIconSvg = (name: string, title: string, icon: string) => {
+    const hue = hashToHue(name || title || 'app')
+    const hue2 = (hue + 48) % 360
+    const text = looksLikeEmoji(icon) ? icon.trim() : getInitials(title || name)
+    const fontSize = looksLikeEmoji(icon) ? 160 : 132
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="hsl(${hue} 85% 55%)"/>
+      <stop offset="100%" stop-color="hsl(${hue2} 85% 55%)"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="128" fill="url(#g)"/>
+  <text x="256" y="274" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="${fontSize}" font-weight="700" fill="#ffffff">${text}</text>
+</svg>`
+}
+
 // Map of function names to their implementations
 export const systemToolsImplementation: Record<string, Function> = {
     // --- Scaffolding ---
@@ -26,6 +73,8 @@ export const systemToolsImplementation: Record<string, Function> = {
 
         try {
             await System.fs.createDirectory(appPath);
+            const usesLucide = (icon || '').trim().toLowerCase().startsWith('lucide:')
+            const displayIcon = looksLikeEmoji(icon) ? icon : getInitials(title || name)
 
             // 1. index.html (MUST be created BEFORE package.json!)
             // Reason: package.json with cocount triggers isAppBundle detection,
@@ -91,7 +140,7 @@ export const systemToolsImplementation: Record<string, Function> = {
             <i data-lucide="zap" class="w-3 h-3"></i> Static App
         </div>
 
-        <div class="text-5xl mb-4 animate-bounce inline-block">${icon}</div>
+        <div class="text-5xl mb-4 animate-bounce inline-block">${displayIcon}</div>
         
         <h1 class="text-3xl font-bold mb-3 tracking-tight">${title}</h1>
         <p class="text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
@@ -126,13 +175,15 @@ export const systemToolsImplementation: Record<string, Function> = {
             console.log(`[SystemTools] Writing index.html, length: ${html.length}`);
             await System.fs.writeFile(`${appPath}/index.html`, html);
 
+            await System.fs.writeFile(`${appPath}/icon.svg`, generateIconSvg(name, title, icon));
+
             // 2. package.json (LAST! triggers isAppBundle detection)
             const pkgJson = {
                 name: name,
                 version: "1.0.0",
                 cocount: {
                     type: "web-static",
-                    icon: icon,
+                    icon: usesLucide ? icon : "./icon.svg",
                     window: { title, width: 800, height: 600 }
                 }
             };
@@ -173,6 +224,8 @@ export const systemToolsImplementation: Record<string, Function> = {
   }
 }`;
             await System.fs.writeFile(`${appPath}/jsconfig.json`, jsConfig);
+
+            await System.fs.writeFile(`${appPath}/icon.svg`, generateIconSvg(name, title, icon));
 
             // 1. vite.config.js
             const viteConfig = `import { defineConfig } from 'vite'
@@ -557,7 +610,7 @@ export default App`;
                 },
                 cocount: {
                     type: "web-container",
-                    icon: icon,
+                    icon: (icon || '').trim().toLowerCase().startsWith('lucide:') ? icon : "./icon.svg",
                     window: { title, width: 1000, height: 800 }
                 }
             };
@@ -1050,6 +1103,20 @@ export default App`;
             const files = System.fs.readDir(args.path);
             return JSON.stringify(files.map(f => f.name));
         } catch (e) {
+            const p = typeof args?.path === 'string' ? args.path : '';
+            if (p && String(e).includes('Directory not found:')) {
+                const parts = p.split('/').filter(Boolean);
+                const base = parts[parts.length - 1] || '';
+                if (base && p === `${SYSTEM_PATHS.USER}/${base}`) {
+                    const candidate = `${SYSTEM_PATHS.USER}/apps/${base}`;
+                    if (System.fs.exists(candidate)) {
+                        try {
+                            const files = System.fs.readDir(candidate);
+                            return `Directory not found: ${p}. Using: ${candidate}\n${JSON.stringify(files.map(f => f.name))}`;
+                        } catch {}
+                    }
+                }
+            }
             return `Error getting file tree: ${e}`;
         }
     }

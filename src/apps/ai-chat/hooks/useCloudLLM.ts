@@ -63,6 +63,19 @@ function formatGeminiTools(toolNames: string[]) {
     return functionDeclarations;
 }
 
+function normalizePathForActiveApp(inputPath: string, activeAppName: string, activeAppPath: string): string {
+    if (inputPath === `/${activeAppName}`) return activeAppPath;
+    if (inputPath.startsWith(`/${activeAppName}/`)) return `${activeAppPath}${inputPath.slice(activeAppName.length + 1)}`;
+    const mistakenRoot = `${SYSTEM_PATHS.USER}/${activeAppName}`;
+    if (inputPath === mistakenRoot) return activeAppPath;
+    if (inputPath.startsWith(`${mistakenRoot}/`)) return `${activeAppPath}${inputPath.slice(mistakenRoot.length)}`;
+    if (!inputPath.startsWith('/')) {
+        const rel = inputPath.replace(/^\.?\//, '');
+        return `${activeAppPath}/${rel}`;
+    }
+    return inputPath;
+}
+
 // ─── Build Gemini History (preserving tool call context) ───────────────────────
 
 function buildGeminiHistory(messages: Message[]): any[] {
@@ -367,19 +380,11 @@ async function callGemini(
                             }
                             return args;
                         }
-                        const p = (args as any).path;
-                        if (!activeAppName || !activeAppPath || typeof p !== 'string') return args;
-                        if (p === `/${activeAppName}`) {
-                            return { ...(args as any), path: activeAppPath };
-                        }
-                        if (p.startsWith(`/${activeAppName}/`)) {
-                            return { ...(args as any), path: `${activeAppPath}${p.slice(activeAppName.length + 1)}` };
-                        }
-                        if (!p.startsWith('/')) {
-                            const rel = p.replace(/^\.?\//, '');
-                            return { ...(args as any), path: `${activeAppPath}/${rel}` };
-                        }
-                        return args;
+                        if (!activeAppName || !activeAppPath) return args;
+                        const next: any = { ...(args as any) };
+                        if (typeof next.path === 'string') next.path = normalizePathForActiveApp(next.path, activeAppName, activeAppPath);
+                        if (typeof next.cwd === 'string') next.cwd = normalizePathForActiveApp(next.cwd, activeAppName, activeAppPath);
+                        return next;
                     })();
 
                     const rawResult = await systemToolsImplementation[name](normalizedArgs, { mode });
@@ -416,6 +421,8 @@ async function callOpenAI(
     const apiMessages = buildOpenAIHistory(messages, sysContent);
     const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
     const maxRounds = mode === 'builder' ? 50 : 6;
+    let activeAppName: string | null = null;
+    let activeAppPath: string | null = null;
 
     for (let round = 0; round < maxRounds; round++) {
         if (signal.aborted) break;
@@ -532,7 +539,23 @@ async function callOpenAI(
                 const args = JSON.parse(tc.function.arguments || '{}');
                 const fnName = tc.function.name;
                 if (systemToolsImplementation[fnName]) {
-                    const res = await systemToolsImplementation[fnName](args, { mode });
+                    const normalizedArgs = (() => {
+                        if (!args || typeof args !== 'object') return args;
+                        if (fnName === 'scaffold_static_app' || fnName === 'scaffold_react_app') {
+                            const nextName = typeof (args as any).name === 'string' ? (args as any).name : null;
+                            if (nextName) {
+                                activeAppName = nextName;
+                                activeAppPath = `${SYSTEM_PATHS.USER}/apps/${nextName}`;
+                            }
+                            return args;
+                        }
+                        if (!activeAppName || !activeAppPath) return args;
+                        const next: any = { ...(args as any) };
+                        if (typeof next.path === 'string') next.path = normalizePathForActiveApp(next.path, activeAppName, activeAppPath);
+                        if (typeof next.cwd === 'string') next.cwd = normalizePathForActiveApp(next.cwd, activeAppName, activeAppPath);
+                        return next;
+                    })();
+                    const res = await systemToolsImplementation[fnName](normalizedArgs, { mode });
                     resultText = typeof res === 'string' ? res : JSON.stringify(res);
                 } else { resultText = `Error: Tool '${fnName}' not found`; }
             } catch (e: any) { resultText = `Error: ${e.message}`; }
