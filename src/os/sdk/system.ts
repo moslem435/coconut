@@ -33,13 +33,14 @@ export const System = {
 
       // Ensure parent directory exists (using createDirectory which has locking)
       const parentId = await System.fs.createDirectory(parentPath);
-      const parentNode = store.files[parentId];
+      const latestStore = useFileSystemStore.getState()
+      const parentNode = latestStore.files[parentId];
 
       if (!parentNode || parentNode.type !== 'folder') {
         throw new Error(`Parent is not a directory: ${parentPath}`)
       }
 
-      return store.createItem(parentNode.id, fileName, 'file', content)
+      return latestStore.createItem(parentNode.id, fileName, 'file', content)
     },
     exists: (path: string) => !!useFileSystemStore.getState().getNodeByPath(path),
     readDir: (path: string) => {
@@ -79,17 +80,18 @@ export const System = {
 
           // Recursive parent creation via locked createDirectory
           const parentId = await System.fs.createDirectory(parentPath)
-          const parentNode = store.files[parentId]
+          const latestStore = useFileSystemStore.getState()
+          const parentNode = latestStore.files[parentId]
 
           if (!parentNode || parentNode.type !== 'folder') {
             throw new Error(`Parent directory missing for: ${normalizedPath}`)
           }
 
           // Final check after parent lock released
-          const checkAgain = store.getNodeByPath(normalizedPath)
+          const checkAgain = latestStore.getNodeByPath(normalizedPath)
           if (checkAgain) return checkAgain.id
 
-          return await store.createItem(parentNode.id, name, 'folder')
+          return await latestStore.createItem(parentNode.id, name, 'folder')
         } finally {
           // Cleanup lock after a short delay to allow store state to settle across events
           setTimeout(() => pathLocks.delete(normalizedPath), 100)
