@@ -400,7 +400,24 @@ export class AppLauncherService {
                     componentProps: {
                         ...(win.componentProps || {}),
                         launchStatus: status,
-                        launchLabel: label
+                        launchLabel: label,
+                        ...(status !== 'installing'
+                            ? { launchDownloadProgress: undefined, launchDownloadLabel: undefined }
+                            : {})
+                    }
+                })
+            }
+        }
+
+        const updateDownloadProgress = (progress: number, label: string) => {
+            const { windows, updateWindow } = useWindowStore.getState()
+            const win = windows[appId]
+            if (win) {
+                updateWindow(appId, {
+                    componentProps: {
+                        ...(win.componentProps || {}),
+                        launchDownloadProgress: progress,
+                        launchDownloadLabel: label
                     }
                 })
             }
@@ -566,13 +583,67 @@ export class AppLauncherService {
             console.log(`[AppLauncher] node_modules not found, running npm install...`)
             // Auto-install without confirmation for "App-like" experience
             updateStatus('installing', '')
-            
+            updateDownloadProgress(0, 'Preparing…')
+
+            let totalUnits: number | null = null
+            const downloaded = new Set<string>()
+            let maxPct = 0
+            const tick = () => {
+                const denom = totalUnits ?? 200
+                const pct = Math.min(95, (downloaded.size / Math.max(1, denom)) * 100)
+                const next = Math.max(maxPct, pct)
+                if (next > maxPct) {
+                    maxPct = next
+                    const label = totalUnits ? `Packages ${downloaded.size}/${totalUnits}` : `Packages ${downloaded.size}`
+                    updateDownloadProgress(next, label)
+                }
+            }
+
             try {
+                try {
+                    const lockRaw = await instance.fs.readFile(`${appPath}/package-lock.json`, 'utf-8')
+                    const lock = JSON.parse(lockRaw)
+                    if (lock && lock.packages && typeof lock.packages === 'object') {
+                        const keys = Object.keys(lock.packages)
+                        totalUnits = keys.filter(k => k && (lock.packages[k]?.resolved || lock.packages[k]?.version)).length
+                    } else if (lock && lock.dependencies && typeof lock.dependencies === 'object') {
+                        const seen = new Set<any>()
+                        const walk = (deps: any) => {
+                            if (!deps || typeof deps !== 'object') return
+                            for (const v of Object.values(deps)) {
+                                if (!v || typeof v !== 'object') continue
+                                if (seen.has(v)) continue
+                                seen.add(v)
+                                if ((v as any).dependencies) walk((v as any).dependencies)
+                            }
+                        }
+                        walk(lock.dependencies)
+                        totalUnits = seen.size
+                    }
+                } catch {}
+
                 // Add verbose logging to help diagnose npm issues
                 // Use default install first
-                await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], appPath, (data) => {
+                await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
                     console.log(`[${file.name} install] ${data}`)
+                    const urls = new Set<string>()
+                    const tgzMatches = data.match(/https?:\/\/\S+?\.(?:tgz|tar\.gz)(?:\?\S+)?/g)
+                    if (tgzMatches) {
+                        for (const u of tgzMatches) urls.add(u)
+                    }
+                    const httpFetchMatches = data.match(/http fetch GET \d+\s+(https?:\/\/\S+)/g)
+                    if (httpFetchMatches) {
+                        for (const line of httpFetchMatches) {
+                            const m = line.match(/(https?:\/\/\S+)/)
+                            if (m?.[1]) urls.add(m[1])
+                        }
+                    }
+                    if (urls.size > 0) {
+                        for (const u of urls) downloaded.add(u)
+                        tick()
+                    }
                 })
+                updateDownloadProgress(100, totalUnits ? `Packages ${downloaded.size}/${totalUnits}` : `Packages ${downloaded.size}`)
                 console.log(`[AppLauncher] npm install completed for ${file.name}`)
 
                 // Only save cache if enabled
@@ -607,6 +678,7 @@ export class AppLauncherService {
                 // --- AUTO-RETRY: Clean cache and try again ---
                 try {
                     updateStatus('installing', 'Retrying...')
+                    updateDownloadProgress(0, 'Retrying…')
                     toast.info('Install Retry', 'Cleaning cache and retrying install...')
                     
                     // Nuke cache
@@ -615,9 +687,26 @@ export class AppLauncherService {
                     } catch {}
 
                     // Retry install
-                    await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=verbose'], appPath, (data) => {
+                    await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
                         console.log(`[${file.name} install-retry] ${data}`)
+                        const urls = new Set<string>()
+                        const tgzMatches = data.match(/https?:\/\/\S+?\.(?:tgz|tar\.gz)(?:\?\S+)?/g)
+                        if (tgzMatches) {
+                            for (const u of tgzMatches) urls.add(u)
+                        }
+                        const httpFetchMatches = data.match(/http fetch GET \d+\s+(https?:\/\/\S+)/g)
+                        if (httpFetchMatches) {
+                            for (const line of httpFetchMatches) {
+                                const m = line.match(/(https?:\/\/\S+)/)
+                                if (m?.[1]) urls.add(m[1])
+                            }
+                        }
+                        if (urls.size > 0) {
+                            for (const u of urls) downloaded.add(u)
+                            tick()
+                        }
                     })
+                    updateDownloadProgress(100, totalUnits ? `Packages ${downloaded.size}/${totalUnits}` : `Packages ${downloaded.size}`)
                     console.log(`[AppLauncher] Retry install successful!`)
                 } catch (retryErr: any) {
                     console.error(`[AppLauncher] Retry install failed:`, retryErr)

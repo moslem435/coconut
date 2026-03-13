@@ -643,6 +643,13 @@ export default App`;
             if (!args.content) {
                 console.warn(`[SystemTools] create_file: Warning - content is empty for '${args.path}'`);
             }
+            if (args.path?.endsWith('package.json')) {
+                try {
+                    JSON.parse(args.content || '');
+                } catch (e: any) {
+                    return `Error creating file: package.json must be valid JSON (${e.message || e})`;
+                }
+            }
             await System.fs.writeFile(args.path, args.content);
 
             return `File created at '${args.path}'`;
@@ -672,6 +679,13 @@ export default App`;
 
     update_file: async (args: { path: string; content: string }) => {
         try {
+            if (args.path?.endsWith('package.json')) {
+                try {
+                    JSON.parse(args.content || '');
+                } catch (e: any) {
+                    return `Error updating file: package.json must be valid JSON (${e.message || e})`;
+                }
+            }
             await System.fs.writeFile(args.path, args.content);
             return `File updated at '${args.path}'`;
         } catch (e: any) {

@@ -251,10 +251,12 @@ async function callGemini(
     const toolPrefix = mode === 'control' ? '[Control]' : '[Builder]';
 
     const maxRounds = mode === 'builder' ? 50 : 6;
+    let activeAppName: string | null = null;
+    let activeAppPath: string | null = null;
 
     for (let round = 0; round < maxRounds; round++) {
         if (signal.aborted) break;
-        if (round > 0) onNewMessage({ role: 'assistant', content: '', mode });
+        if (round > 0) onNewMessage({ role: 'assistant', content: '', mode, isPlaceholder: true });
 
         const body: any = {
             systemInstruction: { parts: [{ text: sysInstruction }] },
@@ -322,11 +324,15 @@ async function callGemini(
                         
                         onUpdate({
                             content: accumulatedText,
-                            tool_calls: functionCallParts.length > 0 ? functionCallParts.map((p, i) => ({
-                                id: `call_${p.functionCall.name}_${round}_${i}`,
-                                function: { name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args) },
-                                type: 'function'
-                            })) : undefined,
+                            ...(functionCallParts.length > 0
+                                ? {
+                                      tool_calls: functionCallParts.map((p, i) => ({
+                                          id: `call_${p.functionCall.name}_${round}_${i}`,
+                                          function: { name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args) },
+                                          type: 'function'
+                                      }))
+                                  }
+                                : {}),
                             tps: currentTps
                         });
                     }
@@ -334,9 +340,14 @@ async function callGemini(
             }
         }
 
+        try {
+            const fnNames = functionCallParts.map(p => p?.functionCall?.name).filter(Boolean)
+            console.debug('[Gemini][Builder] round=%d finishReason=%s toolCalls=%o', round, finishReason, fnNames)
+        } catch {}
+
         if (functionCallParts.length === 0) break;
 
-        geminiContents.push({ role: 'model', parts: functionCallParts.map(p => ({ functionCall: p.functionCall })) });
+        geminiContents.push({ role: 'model', parts: functionCallParts });
         const functionResponseParts: any[] = [];
 
         for (let i = 0; i < functionCallParts.length; i++) {
@@ -346,7 +357,32 @@ async function callGemini(
             let resultText = '';
             try {
                 if (systemToolsImplementation[name]) {
-                    const rawResult = await systemToolsImplementation[name](args, { mode });
+                    const normalizedArgs = (() => {
+                        if (!args || typeof args !== 'object') return args;
+                        if (name === 'scaffold_static_app' || name === 'scaffold_react_app') {
+                            const nextName = typeof (args as any).name === 'string' ? (args as any).name : null;
+                            if (nextName) {
+                                activeAppName = nextName;
+                                activeAppPath = `${SYSTEM_PATHS.USER}/apps/${nextName}`;
+                            }
+                            return args;
+                        }
+                        const p = (args as any).path;
+                        if (!activeAppName || !activeAppPath || typeof p !== 'string') return args;
+                        if (p === `/${activeAppName}`) {
+                            return { ...(args as any), path: activeAppPath };
+                        }
+                        if (p.startsWith(`/${activeAppName}/`)) {
+                            return { ...(args as any), path: `${activeAppPath}${p.slice(activeAppName.length + 1)}` };
+                        }
+                        if (!p.startsWith('/')) {
+                            const rel = p.replace(/^\.?\//, '');
+                            return { ...(args as any), path: `${activeAppPath}/${rel}` };
+                        }
+                        return args;
+                    })();
+
+                    const rawResult = await systemToolsImplementation[name](normalizedArgs, { mode });
                     resultText = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult);
                 } else { resultText = `Error: Tool '${name}' not found`; }
             } catch (e: any) { resultText = `Error execution ${name}: ${e.message}`; }
@@ -356,9 +392,6 @@ async function callGemini(
         }
         geminiContents.push({ role: 'user', parts: functionResponseParts });
         accumulatedText = '';
-        if (finishReason === 'STOP') {
-            return { tps: lastTps };
-        }
     }
     return {};
 }
@@ -403,6 +436,7 @@ async function callOpenAI(
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let rawContent = '';
         let fullContent = '';
         const toolCalls: any[] = [];
         
@@ -410,6 +444,37 @@ async function callOpenAI(
         const startTime = Date.now();
         let tokenCount = 0;
         let lastTps = 0;
+
+        const stripDsml = (input: string) => input
+            .replace(/<\|DSML\|\s*function_calls\s*>[\s\S]*?<\/\|DSML\|\s*function_calls\s*>/g, '')
+            .replace(/<\|DSML\|[^>]*>/g, '')
+            .replace(/<\/\|DSML\|[^>]*>/g, '')
+            .trim();
+
+        const parseDsmlToolCalls = (input: string) => {
+            const calls: any[] = [];
+            const invokeRe = /<\|DSML\|\s*invoke\s+name="([^"]+)"\s*>\s*([\s\S]*?)<\/\|DSML\|\s*invoke\s*>/g;
+            let m: RegExpExecArray | null;
+            while ((m = invokeRe.exec(input)) !== null) {
+                const fnName = m[1] || '';
+                const block = m[2] || '';
+                if (!fnName) continue;
+                const args: Record<string, any> = {};
+                const paramRe = /<\|DSML\|\s*parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/\|DSML\|\s*parameter\s*>/g;
+                let pm: RegExpExecArray | null;
+                while ((pm = paramRe.exec(block)) !== null) {
+                    const key = pm[1];
+                    const value = pm[2] ?? '';
+                    if (key) args[key] = value;
+                }
+                calls.push({
+                    id: `call_${fnName}_${round}_${calls.length}`,
+                    function: { name: fnName, arguments: JSON.stringify(args) },
+                    type: 'function'
+                });
+            }
+            return calls;
+        };
 
         while (true) {
             const { done, value } = await reader.read();
@@ -424,7 +489,8 @@ async function callOpenAI(
                 try {
                     const delta = JSON.parse(data)?.choices?.[0]?.delta;
                     if (delta?.content) { 
-                        fullContent += delta.content;
+                        rawContent += delta.content;
+                        fullContent = stripDsml(rawContent);
                         // Estimate token count (rough approximation for streaming)
                         tokenCount += delta.content.length / 4;
                     }
@@ -438,12 +504,23 @@ async function callOpenAI(
                     const currentTps = tokenCount / Math.max(0.1, (Date.now() - startTime) / 1000);
                     lastTps = currentTps;
                     
-                    onUpdate({ content: fullContent, tool_calls: toolCalls.length > 0 ? [...toolCalls] : undefined, tps: currentTps });
+                    onUpdate({
+                        content: fullContent,
+                        ...(toolCalls.length > 0 ? { tool_calls: [...toolCalls] } : {}),
+                        tps: currentTps
+                    });
                 } catch { }
             }
         }
 
-        if (toolCalls.length === 0) return { tps: lastTps };
+        if (toolCalls.length === 0) {
+            const dsmlCalls = mode === 'builder' && rawContent.includes('<|DSML|')
+                ? parseDsmlToolCalls(rawContent)
+                : [];
+            if (dsmlCalls.length === 0) return { tps: lastTps };
+            toolCalls.push(...dsmlCalls);
+            fullContent = stripDsml(rawContent);
+        }
         apiMessages.push({ role: 'assistant', content: fullContent, tool_calls: toolCalls });
 
         for (const tc of toolCalls) {

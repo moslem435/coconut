@@ -128,6 +128,17 @@ export function MessageItem({
                         event.isError = hasError;
                         // Update status based on result
                         event.status = hasError ? 'error' : 'success';
+                    } else {
+                        const fallback = timelineEvents.find(e => e.type === 'tool' && !e.result);
+                        if (fallback) {
+                            fallback.result = msg.content;
+                            const contentTrimmed = (msg.content || '').trim();
+                            const startsWithError = contentTrimmed.startsWith('Error') || contentTrimmed.startsWith('Failed');
+                            const containsErrorPattern = /Error:/i.test(contentTrimmed) || /Failed:/i.test(contentTrimmed);
+                            const hasError = startsWithError || containsErrorPattern;
+                            fallback.isError = hasError;
+                            fallback.status = hasError ? 'error' : 'success';
+                        }
                     }
                 }
             }

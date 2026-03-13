@@ -10,6 +10,8 @@ interface BrowserProps {
   waitForServer?: boolean;
   launchStatus?: string;
   launchLabel?: string;
+  launchDownloadProgress?: number;
+  launchDownloadLabel?: string;
   icon?: string;
   title?: string;
 }
@@ -22,6 +24,8 @@ const BrowserApp = ({
   waitForServer = false,
   launchStatus = 'loading',
   launchLabel,
+  launchDownloadProgress,
+  launchDownloadLabel,
   icon,
   title
 }: BrowserProps) => {
@@ -297,6 +301,8 @@ const BrowserApp = ({
             status={launchStatus || 'loading'} 
             label={launchLabel}
             progress={loadingProgress}
+            downloadProgress={launchDownloadProgress}
+            downloadLabel={launchDownloadLabel}
             appName={title || 'Application'}
             appIcon={icon}
             onRetry={() => window.location.reload()} // Simple retry for now
