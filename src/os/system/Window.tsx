@@ -492,7 +492,9 @@ export default function Window({ id }: WindowProps) {
           )}
         </div>
 
-        <div className="flex-1 relative overflow-hidden w-full h-full z-0">
+        <div className={`flex-1 relative overflow-hidden w-full h-full z-0 
+          ${(!windowState.hideTitleBar && windowState.componentProps?.waitForServer) ? 'pt-8' : ''}
+        `}>
           <WindowContext.Provider value={{
             windowId: id,
             dragControls: windowState.isMaximized ? dragControls : ghostDragControls

@@ -52,6 +52,7 @@ const BrowserApp = ({
   const isRecoveringRef = React.useRef(false);
 
   const isWebContainerUrl = React.useMemo(() => (
+    iframeUrl.startsWith('blob:') || // Allow internal startup and static blobs
     iframeUrl.includes('localhost') ||
     iframeUrl.includes('webcontainer') ||
     iframeUrl.includes('127.0.0.1') ||

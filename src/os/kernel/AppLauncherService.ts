@@ -138,17 +138,19 @@ export class AppLauncherService {
                                  } catch {}
                              }
                              
-                             if (hasEntry) {
-                                return {
-                                    type: 'web-static',
-                                    icon: pkg.icon || '📦',
-                                    window: {
-                                        title: pkg.title || pkg.name,
-                                        width: 800,
-                                        height: 600
-                                    }
-                                }
-                             }
+                              if (hasEntry) {
+                                 // Node App Heuristic: If it has scripts, prefer web-container
+                                 const isNode = pkg.scripts && (pkg.scripts.dev || pkg.scripts.start || pkg.scripts.serve);
+                                 return {
+                                     type: isNode ? 'web-container' : 'web-static',
+                                     icon: pkg.icon || '📦',
+                                     window: {
+                                         title: pkg.title || pkg.name,
+                                         width: 800,
+                                         height: 600
+                                     }
+                                 }
+                              }
                          }
                     }
                 } catch (physicalErr) {
@@ -169,12 +171,13 @@ export class AppLauncherService {
                     return pkg.cocount as AppBundleConfig
                 }
 
-                // 2. Fallback: Heuristic Detection (If it looks like an app, treat it as one)
-                // This handles cases where AI or user forgets the 'cocount' wrapper
+                // 25. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. These commands are EXPLICITLY FORBIDDEN to be called via 'run_command'. Running/installation is handled by the system internally after the user launches the app.
                 if (pkg.name && (pkg.entry || children.find(c => c.name === 'index.html'))) {
                     console.log('[AppLauncher] Heuristic match found for:', pkg.name)
+                    // Node App Heuristic: If it has scripts or is a React app, prefer web-container
+                    const isNode = pkg.scripts && (pkg.scripts.dev || pkg.scripts.start || pkg.scripts.serve);
                     return {
-                        type: 'web-static',
+                        type: isNode ? 'web-container' : 'web-static',
                         icon: pkg.icon || '📦',
                         window: {
                             title: pkg.title || pkg.name,
@@ -202,7 +205,7 @@ export class AppLauncherService {
         const windowOptions = {
             width: config.window?.width || 800,
             height: config.window?.height || 600,
-            titleBarColor: 'auto',
+            titleBarColor: (config.type === 'web-container' || config.type === 'web-app') ? 'light' : 'auto',
             isResizable: true,
             isMaximized: false
         }
@@ -265,16 +268,6 @@ export class AppLauncherService {
                  }
                  return null;
             });
-
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="
-                default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; 
-                script-src * 'unsafe-inline' 'unsafe-eval' blob: data: https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com https://esm.sh; 
-                style-src * 'unsafe-inline' blob: data: https://fonts.googleapis.com; 
-                img-src * data: blob:; 
-                font-src * data: blob: https://fonts.gstatic.com; 
-                connect-src * data: blob: wss:;
-            ">`;
-
             const proxyBase = typeof window !== 'undefined'
                 ? `${window.location.origin}/api/proxy?url=`
                 : '/api/proxy?url=';
@@ -319,9 +312,9 @@ export class AppLauncherService {
                 `<script>window.addEventListener('DOMContentLoaded', () => { try { (lucide && lucide.createIcons) && lucide.createIcons(); } catch {} });</script>`
             );
             if (html.includes('<head>')) {
-                html = html.replace('<head>', `<head>${cspMeta}`);
+                html = html.replace('<head>', `<head><meta charset="utf-8"/>`);
             } else {
-                html = `${cspMeta}${html}`;
+                html = `<meta charset="utf-8"/>${html}`;
             }
 
             const blob = new Blob([html], { type: 'text/html' });
@@ -674,7 +667,19 @@ export class AppLauncherService {
 
                 // Add verbose logging to help diagnose npm issues
                 // Use default install first
-                await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
+                // OPTIMIZATION: Use npm with aliyun registry for stability and speed.
+                // NOTE: We reverted from pnpm because its symlink layout causes postinstall issues with esbuild in WebContainer.
+                const installArgs = [
+                    'install', 
+                    '--registry=https://registry.npmmirror.com',
+                    '--maxsockets=20',
+                    '--prefer-offline', 
+                    '--no-audit', 
+                    '--no-fund',
+                    '--loglevel=http'
+                ];
+                
+                await runCommand('npm', installArgs, appPath, (data) => {
                     console.log(`[${file.name} install] ${data}`)
                     pushLog(data)
                     const urls = new Set<string>()
@@ -738,8 +743,17 @@ export class AppLauncherService {
                         await runCommand('rm', ['-rf', '/.cache/npm', 'node_modules', 'package-lock.json'], appPath)
                     } catch {}
 
-                    // Retry install
-                    await runCommand('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel=http'], appPath, (data) => {
+                    // Retry install with pnpm and optimized flags
+                    const retryArgs = [
+                        'install', 
+                        '--registry=https://registry.npmmirror.com',
+                        '--maxsockets=20',
+                        '--prefer-offline', 
+                        '--no-audit', 
+                        '--no-fund',
+                        '--loglevel=http'
+                    ];
+                    await runCommand('npm', retryArgs, appPath, (data) => {
                         console.log(`[${file.name} install-retry] ${data}`)
                         pushLog(data)
                         const urls = new Set<string>()
@@ -812,6 +826,17 @@ export class AppLauncherService {
 
                 await runCommand('npm', ['run', 'dev'], appPath, async (data) => {
                     console.log(`[DevServer] ${data}`)
+                    
+                    // --- OPTIMIZATION: Smooth Transition ---
+                    // When Vite prints "Local:", the server is up but hasn't compiled anything yet.
+                    // This often results in a few seconds of black screen while the first request is processed.
+                    // We add a small delay before considering the app "ready" to hide the black screen transition.
+                    if (data.includes('Local:')) {
+                        console.log('[AppLauncher] Dev server ready signal detected. Waiting for buffer...');
+                        await new Promise(r => setTimeout(r, 1500)); // 1.5s buffer for initial compilation
+                        console.log('[AppLauncher] Buffer complete. Transitioning to app UI.');
+                    }
+
                     // Check for common error patterns in output
                     if (data.includes('EADDRINUSE')) {
                          toast.error('Port Conflict', 'Port is already in use. Please close other apps.');

@@ -64,15 +64,37 @@ function formatGeminiTools(toolNames: string[]) {
 }
 
 function normalizePathForActiveApp(inputPath: string, activeAppName: string, activeAppPath: string): string {
+    // 1. If it's already an absolute path and starts with activeAppPath, return as-is
+    if (inputPath.startsWith(activeAppPath)) return inputPath;
+
+    // 2. Handle Case: AI thinks root is /activeAppName
     if (inputPath === `/${activeAppName}`) return activeAppPath;
-    if (inputPath.startsWith(`/${activeAppName}/`)) return `${activeAppPath}${inputPath.slice(activeAppName.length + 1)}`;
+    if (inputPath.startsWith(`/${activeAppName}/`)) {
+        return `${activeAppPath}${inputPath.slice(activeAppName.length + 1)}`;
+    }
+
+    // 3. Handle Case: AI thinks root is /home/user/activeAppName (missing /apps/ part)
     const mistakenRoot = `${SYSTEM_PATHS.USER}/${activeAppName}`;
     if (inputPath === mistakenRoot) return activeAppPath;
-    if (inputPath.startsWith(`${mistakenRoot}/`)) return `${activeAppPath}${inputPath.slice(mistakenRoot.length)}`;
-    if (!inputPath.startsWith('/')) {
-        const rel = inputPath.replace(/^\.?\//, '');
-        return `${activeAppPath}/${rel}`;
+    if (inputPath.startsWith(`${mistakenRoot}/`)) {
+        return `${activeAppPath}${inputPath.slice(mistakenRoot.length)}`;
     }
+
+    // 4. Handle Case: Relative paths (e.g., "src/App.tsx" or "pixel-adventure/src/App.jsx")
+    if (!inputPath.startsWith('/')) {
+        let rel = inputPath.replace(/^\.?\//, '');
+        
+        // DEDUPLICATION: If the relative path starts with the current active app name (redundant),
+        // we strip it to avoid nested paths like /apps/my-app/my-app/src/...
+        if (rel.startsWith(`${activeAppName}/`)) {
+            rel = rel.slice(activeAppName.length + 1);
+        } else if (rel === activeAppName) {
+            rel = '';
+        }
+
+        return rel ? `${activeAppPath}/${rel}` : activeAppPath;
+    }
+
     return inputPath;
 }
 
@@ -230,7 +252,9 @@ CORE PRINCIPLES:
 2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
 3. **Decoupling**: The app should not depend on system-wide configuration changes.
 4. **Code Quality**: Generated code must be COMPLETE and RUNNABLE. No placeholders like "// TODO" or "// Add your code here". Include proper error handling and user-friendly UI.
-5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). Use the system dialog store via '@/os/kernel/useDialogStore' (openAlert/openConfirm/openPrompt/openActionSheet) with async/await.
+5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). You MUST create your own custom UI components (e.g., a Tailwind CSS modal) for all user interactions.
+6. **NO HOST IMPORTS (CRITICAL)**: Generated apps are sandboxed. You are EXPLICITLY FORBIDDEN from importing anything from the host system's source tree. Do NOT use paths starting with '@/os', '@/lib', '@/apps', etc. The app must be 100% self-contained within its folder.
+7. **Naming Constraint (CRITICAL)**: Always use lowercase English, numbers, and hyphens (kebab-case) for app folder "name", directory names, and filenames. NEVER use Chinese or special characters in paths/names. You may use Chinese for the application's display "title".
 
 WORKFLOW (follow this order strictly):
 1. **PLAN**: Briefly tell the user your plan (app type, framework choice, estimated steps). Keep it to 2-3 sentences.
@@ -251,7 +275,7 @@ WHEN CREATING AN APP:
      - After install, customize 'src/App.jsx' with the app logic.
 3. **ONE FILE PER TOOL CALL**: Write one file at a time. Do NOT try to create all files in a single tool call to avoid truncation errors. Always explain what you are about to do BEFORE calling the tool.
 4. **HANDLE LONG FILES**: If a file is large (> 100 lines), DO NOT use 'update_file' to rewrite the whole file, as it will be truncated. Use 'replace_in_file' to modify specific parts, or split the content into multiple 'update_file' calls (append mode not supported, so replace is better).
-5. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running/installation should happen only after explicit user intent (e.g., user double-clicks the app to launch or asks "帮我启动/运行").
+5. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. These commands are EXPLICITLY FORBIDDEN to be called via 'run_command'. Running/installation is handled by the system internally after the user launches the app.
 
 AVAILABLE TOOLS:
 - scaffold_static_app({ name, title, icon }): Create a simple HTML/JS app
