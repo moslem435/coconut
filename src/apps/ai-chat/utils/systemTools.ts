@@ -2,6 +2,7 @@
 import { System, ThemeMode } from '@/os/sdk';
 import { SYSTEM_PATHS } from '@/os/config/paths';
 import { useWebContainerStore } from '@/os/kernel/useWebContainerStore';
+import { AstTools } from './astTools';
 
 // Define the tool structure expected by OpenAI/WebLLM
 export interface ToolDefinition {
@@ -616,8 +617,8 @@ export default App`;
             };
             await System.fs.writeFile(`${appPath}/package.json`, JSON.stringify(pkgJson, null, 2));
 
-            // Wait for VFS state to fully propagate
-            await new Promise(r => setTimeout(r, 200));
+            // Force wait for VFS state to fully propagate and trigger WebContainer Sync
+            await new Promise(r => setTimeout(r, 1000));
 
             return `App "${title}" created successfully. Click the icon on your desktop or in File Explorer to launch it.`;
         } catch (e: any) {
@@ -807,6 +808,38 @@ export default App`;
             return `Replaced ${count} occurrence(s) in '${args.path}'.`;
         } catch (e: any) {
             return `Error replacing in file: ${e.message || e}`;
+        }
+    },
+
+    // --- AST Modification ---
+    insert_jsx_component: async (args: { path: string, componentName: string, targetElement?: string, position: 'prepend' | 'append' | 'before' | 'after', jsxCode: string }) => {
+        try {
+            const code = await System.fs.readFile(args.path);
+            const newCode = AstTools.insertJsx(
+                code, 
+                args.componentName, 
+                args.targetElement || null, 
+                args.position, 
+                args.jsxCode
+            );
+            await System.fs.writeFile(args.path, newCode);
+            return `Successfully inserted JSX into '${args.componentName}' in ${args.path}`;
+        } catch (e: any) {
+            return `Error inserting JSX: ${e.message}`;
+        }
+    },
+
+    add_import: async (args: { path: string, importCode: string }) => {
+        try {
+            const code = await System.fs.readFile(args.path);
+            const newCode = AstTools.addImport(code, args.importCode);
+            if (code === newCode) {
+                return `Import already exists or no changes made in ${args.path}`;
+            }
+            await System.fs.writeFile(args.path, newCode);
+            return `Successfully added import to ${args.path}`;
+        } catch (e: any) {
+            return `Error adding import: ${e.message}`;
         }
     },
 
@@ -1078,9 +1111,32 @@ export default App`;
                 if (args.detached) {
                     return `Process started successfully in background.\nInitial Output:\n${output.slice(0, 2000)}`;
                 }
-                return `Command executed successfully.\nOutput:\n${output.slice(0, 1000)}${output.length > 1000 ? '...(truncated)' : ''}`;
+                
+                // Smart truncation: keep first 500 chars (context) and last 1500 chars (errors)
+                const limit = 2000;
+                let finalOutput = output;
+                if (output.length > limit) {
+                    finalOutput = output.slice(0, 500) + '\n...[truncated]...\n' + output.slice(-(limit - 500));
+                }
+                
+                return `Command executed successfully.\nOutput:\n${finalOutput}`;
             } else {
-                return `Command failed with exit code ${exitCode}.\nOutput:\n${output.slice(0, 1000)}`;
+                // Smart truncation for errors too
+                const limit = 2000;
+                let finalOutput = output;
+                if (output.length > limit) {
+                    finalOutput = output.slice(0, 500) + '\n...[truncated]...\n' + output.slice(-(limit - 500));
+                }
+
+                // Add specific hints for common errors
+                let hint = '';
+                if (output.includes('ENOENT') && output.includes('package.json')) {
+                    hint = '\n\nHint: package.json is missing. Did you forget to run `scaffold_react_app` or create the file?';
+                } else if (output.includes('vite: command not found')) {
+                    hint = '\n\nHint: vite is not installed. Run `npm install` first.';
+                }
+
+                return `Command failed with exit code ${exitCode}.\nOutput:\n${finalOutput}${hint}`;
             }
         } catch (e: any) {
             // Include output in error message if available
@@ -1341,6 +1397,39 @@ export const systemToolsDefinitions: ToolDefinition[] = [
     {
         type: 'function',
         function: {
+            name: 'add_import',
+            description: 'Add an import statement to a file. Smartly handles duplicates and placement.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path' },
+                    importCode: { type: 'string', description: 'The full import statement (e.g. "import { useState } from \'react\';")' }
+                },
+                required: ['path', 'importCode']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'insert_jsx_component',
+            description: 'Insert JSX code into a React component using AST analysis. More reliable than regex for code injection.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The file path' },
+                    componentName: { type: 'string', description: 'The name of the React component to modify (e.g. "App")' },
+                    targetElement: { type: 'string', description: 'Optional: The JSX element to target (e.g. "div", "Header"). If omitted, targets the root element returned by the component.' },
+                    position: { type: 'string', enum: ['prepend', 'append', 'before', 'after'], description: 'Where to insert relative to the target element.' },
+                    jsxCode: { type: 'string', description: 'The JSX code to insert' }
+                },
+                required: ['path', 'componentName', 'position', 'jsxCode']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'replace_in_file',
             description: 'Replace text inside an existing file without rewriting the entire file content. Prefer this for small, targeted edits to save tokens.',
             parameters: {
@@ -1419,6 +1508,8 @@ export const TOOL_CATEGORIES = {
         'create_file',
         'read_file',
         'update_file',
+        'add_import',
+        'insert_jsx_component',
         'replace_in_file',
         'run_command',
         'get_file_tree',

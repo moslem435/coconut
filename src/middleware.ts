@@ -89,9 +89,14 @@ export function middleware(request: NextRequest) {
     // 跨域隔离配置 - WebContainer必需
     // 为什么需要：WebContainer使用SharedArrayBuffer实现多线程，需要Cross-Origin-Isolation
     // COOP + COEP组合启用crossOriginIsolated状态
-    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-    response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
-    response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    // 检查兼容模式Cookie：如果用户开启了兼容模式(允许跨域图片但禁用WebContainer)，则不设置隔离头
+    const isCompatibilityMode = request.cookies.get('webos_compatibility_mode')?.value === 'true'
+    
+    if (!isCompatibilityMode) {
+        response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+        response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+        response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
 
     return response
 }

@@ -494,6 +494,18 @@ export class AppLauncherService {
             const { instance, runCommand } = useWebContainerStore.getState()
             if (!instance) return
 
+            // Ensure synchronization is fully complete before checking for files
+            // Force read package.json through VFS to trigger its sync to WC
+            try {
+                const pkgPath = `${vfsPath}/package.json`;
+                const { readFileContent } = useFileSystemStore.getState();
+                await readFileContent(pkgPath); // Force VFS load -> sync to WC
+                // Wait briefly for syncMiddleware to flush
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (e) {
+                console.log(`[AppLauncher] package.json not found in VFS at ${vfsPath}, skipping sync check`);
+            }
+
             try {
                 await DependencyCacheService.ensureCacheDir()
             } catch (e) {

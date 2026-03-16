@@ -203,14 +203,27 @@ function buildOpenAIHistory(messages: Message[], systemContent: string): any[] {
                 msg.tool_calls = m.tool_calls.map((tc: any, idx: number) => {
                     const resolvedId = tc.id || `call_${Date.now()}_${idx}`;
                     fallbackToolCallIds.push(resolvedId);
+                    
+                    // OpenAI requires arguments to be a JSON string, not an object
+                    let argsString = '{}';
+                    if (tc.function && tc.function.arguments) {
+                        if (typeof tc.function.arguments === 'string') {
+                            argsString = tc.function.arguments || '{}';
+                        } else {
+                            try {
+                                argsString = JSON.stringify(tc.function.arguments);
+                            } catch (e) {
+                                console.error('Failed to stringify tool arguments:', e);
+                            }
+                        }
+                    }
+
                     return {
                         id: resolvedId,
                         type: tc.type || 'function',
                         function: {
                             name: tc.function.name,
-                            arguments: typeof tc.function.arguments === 'string'
-                                ? tc.function.arguments
-                                : JSON.stringify(tc.function.arguments)
+                            arguments: argsString
                         }
                     };
                 });
@@ -454,7 +467,21 @@ async function callOpenAI(
             signal
         });
 
-        if (!response.ok) throw new Error(`OpenAI API error ${response.status}: ${await response.text()}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            let friendlyMessage = `OpenAI API error ${response.status}: ${errorText}`;
+
+            // Handle common OpenAI error codes
+            if (response.status === 403 && (errorText.includes('insufficient_quota') || errorText.includes('FreeTierOnly'))) {
+                friendlyMessage = 'API Quota Exceeded: Your API key has run out of funds or the free tier is exhausted. Please check your billing at platform.openai.com.';
+            } else if (response.status === 401) {
+                friendlyMessage = 'Authentication Error: Invalid API Key. Please check your settings.';
+            } else if (response.status === 429) {
+                friendlyMessage = 'Rate Limit Exceeded: You are sending requests too quickly. Please wait a moment.';
+            }
+
+            throw new Error(friendlyMessage);
+        }
 
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
@@ -553,7 +580,31 @@ async function callOpenAI(
             toolCalls.push(...dsmlCalls);
             fullContent = stripDsml(rawContent);
         }
-        apiMessages.push({ role: 'assistant', content: fullContent, tool_calls: toolCalls });
+        
+        // Ensure all tool calls have properly formatted JSON string arguments before pushing to history
+        const formattedToolCalls = toolCalls.map(tc => {
+            let argsString = '{}';
+            if (tc.function && tc.function.arguments) {
+                if (typeof tc.function.arguments === 'string') {
+                    argsString = tc.function.arguments || '{}';
+                } else {
+                    try {
+                        argsString = JSON.stringify(tc.function.arguments);
+                    } catch (e) {
+                        argsString = '{}';
+                    }
+                }
+            }
+            return {
+                ...tc,
+                function: {
+                    ...tc.function,
+                    arguments: argsString
+                }
+            };
+        });
+        
+        apiMessages.push({ role: 'assistant', content: fullContent, tool_calls: formattedToolCalls });
 
         for (const tc of toolCalls) {
             if (signal.aborted) break;

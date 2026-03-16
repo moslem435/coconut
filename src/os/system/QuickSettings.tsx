@@ -14,11 +14,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Volume2, VolumeX, Sun, Moon, Monitor,
   Activity, LayoutTemplate, Languages,
-  Wifi, Battery, Shield
+  Wifi, Battery, Shield, Settings
 } from 'lucide-react'
 import { useSystemSettings } from '@/os/kernel/SystemSettingsContext'
 import { useLanguage } from '@/os/kernel/LanguageContext'
 import { Tooltip } from '@/os/ui/Tooltip'
+import { System } from '@/os/sdk'
 
 interface QuickSettingsProps {
   isOpen: boolean
@@ -231,6 +232,20 @@ export default function QuickSettings({ isOpen, onClose, toggleRef }: QuickSetti
             />
 
 
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex justify-end pt-3 mt-2 border-t border-[var(--os-border)]">
+             <button
+               onClick={() => {
+                 System.process.launch('settings')
+                 onClose()
+               }}
+               className="p-2 rounded-full hover:bg-[var(--os-hover-bg)] transition-colors text-[var(--os-text-primary)]"
+               title={t('app.settings') || 'Settings'}
+             >
+               <Settings size={18} />
+             </button>
           </div>
 
         </motion.div>
