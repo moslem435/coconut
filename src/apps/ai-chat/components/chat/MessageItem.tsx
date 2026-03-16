@@ -109,7 +109,7 @@ export function MessageItem({
                                     type: 'tool',
                                     toolCall: tc,
                                     result: null,
-                                    status: 'loading'
+                                    status: isLoading ? 'loading' : 'pending'
                                 });
                             }
                         });

@@ -3,6 +3,7 @@ import { CreateWebWorkerMLCEngine, MLCEngineInterface, InitProgressCallback } fr
 import { Message, ModelConfig } from '../types';
 import { systemToolsDefinitions, systemToolsImplementation, TOOL_CATEGORIES } from '../utils/systemTools';
 import { SYSTEM_PATHS } from '@/os/config/paths';
+import { SYSTEM_PROMPTS } from '../config/systemPrompts';
 
 export interface WebLLMState {
     isLoading: boolean;
@@ -413,36 +414,9 @@ export function useWebLLM() {
             // OR we need to let the engine handle it via init options, but for now,
             // let's try to MERGE the system prompt into the first user message if tools are active.
 
-            const modeSystemPrompts = {
-                chat: "", // Default behavior
-                control: "You are a system control assistant for a web OS. Respond in the same language the user speaks (Chinese users → reply in Chinese). RULES: 1) If the user asks a QUESTION (e.g. 'what can you do?', '你有什么功能?'), answer it directly in text — do NOT call any tools. 2) Only call a tool when the user EXPLICITLY requests an action (e.g. '切换暗色主题', 'set volume to 50'). 3) When calling a tool, call EXACTLY ONE tool that matches the request. 4) NEVER call unrelated tools. 5) When creating apps, add 'cocount' metadata to package.json (icon, window size) so it appears as an App Bundle.",
-                builder: `You are an expert full-stack developer and system architect. Respond in the same language as the user (Chinese users → reply in Chinese).
+            const modeSystemPrompts = SYSTEM_PROMPTS;
 
-    CORE PRINCIPLES:
-    1. **App-as-a-Folder**: Every app must be a self-contained folder in the file system.
-    2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
-    3. **Decoupling**: The app should not depend on system-wide configuration changes.
-    4. **No Auto-Run During Build**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. Running should be triggered by explicit user intent (double-click launch or user asks to run).
-    5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). Use the system dialog store via '@/os/kernel/useDialogStore' (openAlert/openConfirm/openPrompt/openActionSheet) with async/await.
-
-    WHEN CREATING AN APP:
-    1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
-    2. **MANDATORY SCAFFOLDING**:
-       - **NEVER** manually create the root folder or 'index.html' from scratch.
-       - **ALWAYS** start by calling a scaffolding tool:
-         - **SIMPLE/STATIC**: Call 'scaffold_static_app({ name, title, icon })'. 
-           - This automatically creates the folder, package.json, and index.html.
-         - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
-           - This creates the full Vite structure.
-    3. **CUSTOMIZE**: After scaffolding, use 'create_file' or 'update_file' to modify files. For small targeted edits, prefer 'replace_in_file' to save tokens.
-       - **IMPORTANT**: If creating multiple files or writing long code, do it step-by-step. Do NOT try to write everything in one single response to avoid JSON truncation errors.
-    4. **COMPLETION**: When done, tell the user "App created! Double-click [App Name] in File Explorer to run.".
-
-    DEBUGGING:
-    - Use 'get_file_tree' to understand the current structure.`,
-            };
-
-            const effectiveSystemPrompt = mode !== 'chat' ? modeSystemPrompts[mode] : systemPrompt;
+            const effectiveSystemPrompt = mode !== 'chat' ? modeSystemPrompts[mode as keyof typeof modeSystemPrompts] : systemPrompt;
 
             // Handle System Prompt Logic
             if (effectiveSystemPrompt) {

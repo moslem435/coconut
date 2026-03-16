@@ -85,9 +85,12 @@ function ToolStep({ event, isGlobalLoading }: { event: TimelineEvent, isGlobalLo
     // Determine status: explicit status > isError flag > result analysis > loading
     let currentStatus: TimelineStatus;
     if (status) {
-        // If explicit status is 'loading' but global loading stopped and we have no result, maybe mark as pending/cancelled?
-        // But for now, let's just use status if provided.
-        currentStatus = status;
+        // If explicit status is 'loading' but global loading stopped and we have no result, mark as pending
+        if (status === 'loading' && !isGlobalLoading && !result) {
+            currentStatus = 'pending';
+        } else {
+            currentStatus = status;
+        }
     } else if (result) {
         // Check if result indicates an error
         // Only mark as error if it starts with "Error" or "Failed" or contains "Error:" pattern

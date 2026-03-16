@@ -3,6 +3,7 @@ import { useTranslation } from '@/os/sdk';
 import { Message, CloudConfig } from '../types';
 import { systemToolsDefinitions, systemToolsImplementation, TOOL_CATEGORIES } from '../utils/systemTools';
 import { SYSTEM_PATHS } from '@/os/config/paths';
+import { buildSystemInstruction } from '../config/systemPrompts';
 
 export interface CloudLLMState {
     isLoading: boolean;
@@ -227,80 +228,32 @@ function buildOpenAIHistory(messages: Message[], systemContent: string): any[] {
             });
         }
     }
+
+    // Ensure all tool_calls have matching tool messages to prevent OpenAI 400 error
+    const toolCallIdsWithResponse = new Set<string>();
+    for (const msg of apiMessages) {
+        if (msg.role === 'tool' && msg.tool_call_id) {
+            toolCallIdsWithResponse.add(msg.tool_call_id);
+        }
+    }
+
+    for (const msg of apiMessages) {
+        if (msg.role === 'assistant' && msg.tool_calls?.length) {
+            msg.tool_calls = msg.tool_calls.filter((tc: any) => toolCallIdsWithResponse.has(tc.id));
+            if (msg.tool_calls.length === 0) {
+                delete msg.tool_calls;
+                if (!msg.content) {
+                    msg.content = "Action cancelled or interrupted.";
+                }
+            }
+        }
+    }
+
     return apiMessages;
 }
 
 // ─── Build System Instruction ────────────────────────────────────────
-
-function buildSystemInstruction(mode: string, systemPrompt: string): string {
-    const hardcoded: Record<string, string> = {
-        control: `You are a system control assistant for a web OS. Respond in the user's language.
-You have tools to control the system. Follow these rules:
-1. THEME: use set_theme with 'light' or 'dark'.
-2. VOLUME: use set_volume with a level from 0 to 100.
-3. WALLPAPER: use set_wallpaper with a real, publicly accessible image URL (e.g. from unsplash.com).
-4. LAUNCH APP: use launch_app with one of these exact appId values:
-   "vscode-lite", "terminal", "file-explorer", "settings", "portfolio-hub",
-   "notepad", "music-player", "photo-gallery", "weather", "task-manager",
-   "ai-chat", "code-runner", "yume", "emulator"
-5. CLOSE APP: First call get_running_apps to retrieve the windowId, then call close_app with that windowId.
-6. STATUS: use get_system_status to read current settings before modifying if needed.`,
-        builder: `You are an expert full-stack developer and system architect. Respond in the same language as the user (Chinese users → reply in Chinese).
-
-CORE PRINCIPLES:
-1. **App-as-a-Folder**: Every app must be a self-contained folder in the file system.
-2. **Data-as-Files**: NEVER use localStorage/IndexedDB. Persist all data to files (e.g., SQLite, JSON) within the app folder.
-3. **Decoupling**: The app should not depend on system-wide configuration changes.
-4. **Code Quality**: Generated code must be COMPLETE and RUNNABLE. No placeholders like "// TODO" or "// Add your code here". Include proper error handling and user-friendly UI.
-5. **Immersive UI**: NEVER use browser-native dialogs (window.alert/window.confirm/window.prompt). You MUST create your own custom UI components (e.g., a Tailwind CSS modal) for all user interactions.
-6. **NO HOST IMPORTS (CRITICAL)**: Generated apps are sandboxed. You are EXPLICITLY FORBIDDEN from importing anything from the host system's source tree. Do NOT use paths starting with '@/os', '@/lib', '@/apps', etc. The app must be 100% self-contained within its folder.
-7. **Naming Constraint (CRITICAL)**: Always use lowercase English, numbers, and hyphens (kebab-case) for app folder "name", directory names, and filenames. NEVER use Chinese or special characters in paths/names. You may use Chinese for the application's display "title".
-
-WORKFLOW (follow this order strictly):
-1. **PLAN**: Briefly tell the user your plan (app type, framework choice, estimated steps). Keep it to 2-3 sentences.
-2. **SCAFFOLD**: Call the appropriate scaffold tool.
-3. **CUSTOMIZE**: Write the app logic file by file.
-4. **COMPLETE**: Summarize what was created and tell the user "App created! Double-click [App Name] in File Explorer to run.".
-
-WHEN CREATING AN APP:
-1. **ANALYZE**: Determine if the user needs a simple/static tool (calculator, clock, game) or a complex app (React, state, libraries).
-2. **DECIDE & EXECUTE**:
-   - **SIMPLE/STATIC**: Call 'scaffold_static_app({ name, title, icon })'.
-     - This creates a lightweight HTML/JS app that launches instantly.
-     - NO build steps, NO npm install needed.
-     - After scaffolding, use 'create_file' or 'update_file' to write 'index.html' with complete app logic (HTML + CSS + JS all in one file).
-     - For small targeted edits, prefer 'replace_in_file' to avoid rewriting the whole file and save tokens.
-   - **COMPLEX/REACT**: Call 'scaffold_react_app({ name, title, icon })'.
-     - This creates a full React+Vite+Tailwind app.
-     - After install, customize 'src/App.jsx' with the app logic.
-3. **ONE FILE PER TOOL CALL**: Write one file at a time. Do NOT try to create all files in a single tool call to avoid truncation errors. Always explain what you are about to do BEFORE calling the tool.
-4. **HANDLE LONG FILES**: If a file is large (> 100 lines), DO NOT use 'update_file' to rewrite the whole file, as it will be truncated. Use 'replace_in_file' to modify specific parts, or split the content into multiple 'update_file' calls (append mode not supported, so replace is better).
-5. **NO AUTO-RUN DURING BUILD**: Do NOT run 'npm install' or 'npm run dev' during the build workflow. These commands are EXPLICITLY FORBIDDEN to be called via 'run_command'. Running/installation is handled by the system internally after the user launches the app.
-
-AVAILABLE TOOLS:
-- scaffold_static_app({ name, title, icon }): Create a simple HTML/JS app
-- scaffold_react_app({ name, title, icon }): Create a React+Vite+Tailwind app
-- create_file({ path, content }): Create a new file
-- update_file({ path, content }): Overwrite an existing file
-- replace_in_file({ path, find, replace, expectedCount?, regex?, flags?, replaceAll? }): Replace text inside a file (preferred for small edits)
-- run_command({ cmd, args, cwd, detached, successPattern }): Run a shell command
-- get_file_tree({ path }): List directory structure
-- read_file({ path }): Read file contents
-
-DEBUGGING:
-- If 'npm install' fails: Check package.json for typos, remove node_modules and retry.
-- If 'npx' command fails with "could not determine executable": Use '-y' flag, e.g. run_command({ cmd: "npx", args: ["-y", "<package>@latest", ...] }).
-- If build fails: Read the FULL error output, identify the file and line, fix with 'update_file'.
-- If port conflict: The WebContainer handles ports automatically, do NOT try to change ports.
-- Always use 'get_file_tree' before making assumptions about file structure.`
-    };
-
-    if (mode === 'chat') {
-        return systemPrompt || 'You are a helpful assistant in a web-based OS.';
-    }
-    const base = hardcoded[mode] || 'You are a helpful assistant.';
-    return systemPrompt ? `${base}\n\n[User custom instructions]: ${systemPrompt}` : base;
-}
+// Imported from ../config/systemPrompts.ts
 
 // ─── Gemini API Call ──────────────────────────────────────
 
