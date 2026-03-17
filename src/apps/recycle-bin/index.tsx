@@ -15,6 +15,8 @@ import { soundManager } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 import { toast } from '@/os/components/Toast'
 
+import { useWindowContext } from '@/os/kernel/WindowContext'
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(ts?: number) {
@@ -155,65 +157,75 @@ const RecycleBin: React.FC = () => {
   }
 
   const allSelected = filtered.length > 0 && filtered.every(f => selectedIds.has(f.id))
+  const { dragControls } = useWindowContext() || {}
 
   return (
-    <div className="h-full w-full flex flex-col pt-10 overflow-hidden"
+    <div className="h-full w-full flex flex-col overflow-hidden"
       style={{ background: 'var(--os-bg-window)', color: 'var(--os-text-primary)' }}>
 
       {/* ══ TOP BAR ══════════════════════════════════════════════════════ */}
-      <div className="shrink-0 flex items-center gap-2 px-3 h-11 border-b"
+      <div className="shrink-0 flex flex-col border-b"
         style={{ borderColor: 'var(--os-border)', background: 'var(--os-bg-panel)' }}>
+        
+        {/* Immersive Title Bar Placeholder & Drag Handle */}
+        <div 
+          onPointerDown={e => dragControls?.start(e)}
+          className="h-8 shrink-0 flex items-center px-3 select-none"
+        />
 
-        {/* Actions */}
-        <button onClick={handleEmpty} disabled={!deletedFiles.length}
-          className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{ background: 'rgba(239,68,68,0.1)', color: 'rgb(248,113,113)', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <Eraser size={12} />{t('recycle.empty')}
-        </button>
+        {/* Toolbar actions */}
+        <div className="flex items-center gap-2 px-3 h-11">
+          {/* Actions */}
+          <button onClick={handleEmpty} disabled={!deletedFiles.length}
+            className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(239,68,68,0.1)', color: 'rgb(248,113,113)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <Eraser size={12} />{t('recycle.empty')}
+          </button>
 
-        <button onClick={handleRestore} disabled={!selectedIds.size}
-          className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{ background: 'rgba(52,211,153,0.1)', color: 'rgb(52,211,153)', border: '1px solid rgba(52,211,153,0.2)' }}>
-          <RotateCcw size={12} />{t('recycle.restore')}
-          {selectedIds.size > 0 &&
-            <span className="ml-0.5 px-1 rounded-full text-[9px]"
-              style={{ background: 'rgba(52,211,153,0.2)' }}>{selectedIds.size}</span>}
-        </button>
+          <button onClick={handleRestore} disabled={!selectedIds.size}
+            className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(52,211,153,0.1)', color: 'rgb(52,211,153)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <RotateCcw size={12} />{t('recycle.restore')}
+            {selectedIds.size > 0 &&
+              <span className="ml-0.5 px-1 rounded-full text-[9px]"
+                style={{ background: 'rgba(52,211,153,0.2)' }}>{selectedIds.size}</span>}
+          </button>
 
-        {/* Divider */}
-        <div className="w-px h-5 mx-1" style={{ background: 'var(--os-border)' }} />
+          {/* Divider */}
+          <div className="w-px h-5 mx-1" style={{ background: 'var(--os-border)' }} />
 
-        {/* Search */}
-        <div className="flex items-center gap-1.5 flex-1 max-w-56 h-7 px-2.5 rounded-md text-[11px]"
-          style={{ background: 'var(--os-bg-window)', border: '1px solid var(--os-border)' }}>
-          <Search size={11} style={{ color: 'var(--os-text-muted)', flexShrink: 0 }} />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="搜索回收站…"
-            className="flex-1 bg-transparent outline-none placeholder:opacity-40 text-[11px]"
-            style={{ color: 'var(--os-text-primary)' }} />
-          {search && <button onClick={() => setSearch('')}><X size={10} style={{ color: 'var(--os-text-muted)' }} /></button>}
+          {/* Search */}
+          <div className="flex items-center gap-1.5 flex-1 max-w-56 h-7 px-2.5 rounded-md text-[11px]"
+            style={{ background: 'var(--os-bg-window)', border: '1px solid var(--os-border)' }}>
+            <Search size={11} style={{ color: 'var(--os-text-muted)', flexShrink: 0 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="搜索回收站…"
+              className="flex-1 bg-transparent outline-none placeholder:opacity-40 text-[11px]"
+              style={{ color: 'var(--os-text-primary)' }} />
+            {search && <button onClick={() => setSearch('')}><X size={10} style={{ color: 'var(--os-text-muted)' }} /></button>}
+          </div>
+
+          <div className="flex-1" />
+
+          {/* View toggle */}
+          <div className="flex items-center rounded-md overflow-hidden" style={{ border: '1px solid var(--os-border)' }}>
+            {(['list', 'grid'] as const).map(m => (
+              <button key={m} onClick={() => setViewMode(m)}
+                className="flex items-center justify-center w-7 h-7 transition-all"
+                style={{
+                  background: viewMode === m ? 'var(--os-accent)' : 'var(--os-bg-window)',
+                  color: viewMode === m ? '#fff' : 'var(--os-text-muted)'
+                }}>
+                {m === 'list' ? <List size={13} /> : <LayoutGrid size={13} />}
+              </button>
+            ))}
+          </div>
+
+          {/* Count */}
+          <span className="text-[10px] tabular-nums px-2" style={{ color: 'var(--os-text-muted)' }}>
+            {deletedFiles.length} 项
+          </span>
         </div>
-
-        <div className="flex-1" />
-
-        {/* View toggle */}
-        <div className="flex items-center rounded-md overflow-hidden" style={{ border: '1px solid var(--os-border)' }}>
-          {(['list', 'grid'] as const).map(m => (
-            <button key={m} onClick={() => setViewMode(m)}
-              className="flex items-center justify-center w-7 h-7 transition-all"
-              style={{
-                background: viewMode === m ? 'var(--os-accent)' : 'var(--os-bg-window)',
-                color: viewMode === m ? '#fff' : 'var(--os-text-muted)'
-              }}>
-              {m === 'list' ? <List size={13} /> : <LayoutGrid size={13} />}
-            </button>
-          ))}
-        </div>
-
-        {/* Count */}
-        <span className="text-[10px] tabular-nums px-2" style={{ color: 'var(--os-text-muted)' }}>
-          {deletedFiles.length} 项
-        </span>
       </div>
 
       {/* ══ BODY ══════════════════════════════════════════════════════════ */}

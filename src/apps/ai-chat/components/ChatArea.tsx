@@ -8,6 +8,7 @@ import { MessageList } from './chat/MessageList';
 import { ChatInput } from './chat/ChatInput';
 import { useWebLLM } from '../hooks/useWebLLM';
 import { useCloudLLM } from '../hooks/useCloudLLM';
+import { useBatchUpdate, useRAFThrottle, useTPSCalculator } from '../hooks/useBatchUpdate';
 import { AlertCircle, PanelLeft, Plus } from 'lucide-react';
 
 export function ChatArea() {
@@ -47,9 +48,28 @@ export function ChatArea() {
     const llm = aiProvider === 'local' ? webLLM : cloudLLM;
 
     const sessionIdRef = useRef<string | null>(null);
-    const pendingUpdateRef = useRef<any>(null);
-    const rafIdRef = useRef<number | null>(null);
     const generationStartRef = useRef<number | null>(null);
+    const tpsCalculator = useTPSCalculator();
+
+    const { batchUpdate: batchUpdateMessage, flush: flushMessageUpdates } = useBatchUpdate(
+        useCallback((updates: any) => {
+            const sid = sessionIdRef.current;
+            if (sid) {
+                updateLastMessage(sid, updates);
+            }
+        }, [updateLastMessage]),
+        {
+            maxBatchSize: 5,
+            maxWaitTime: 50,
+            onFlush: () => {
+                console.debug('[ChatArea] Message updates flushed');
+            }
+        }
+    );
+
+    const throttledScroll = useRAFThrottle(() => {
+        console.debug('[ChatArea] Scroll throttled');
+    });
 
     useEffect(() => {
         sessionIdRef.current = currentSessionId;
@@ -84,6 +104,7 @@ export function ChatArea() {
     const onUpdate = useCallback((updates: any) => {
         const sid = sessionIdRef.current;
         if (!sid) return;
+
         const nextUpdates = (() => {
             if (updates && typeof updates === 'object' && updates.tps === undefined && typeof updates.content === 'string') {
                 const start = generationStartRef.current;
@@ -96,16 +117,9 @@ export function ChatArea() {
             }
             return updates;
         })();
-        pendingUpdateRef.current = { ...(pendingUpdateRef.current || {}), ...nextUpdates };
-        if (rafIdRef.current !== null) return;
-        rafIdRef.current = requestAnimationFrame(() => {
-            rafIdRef.current = null;
-            const next = pendingUpdateRef.current;
-            pendingUpdateRef.current = null;
-            const currentSid = sessionIdRef.current;
-            if (currentSid && next) updateLastMessage(currentSid, next);
-        });
-    }, [updateLastMessage]);
+
+        batchUpdateMessage(nextUpdates);
+    }, [batchUpdateMessage]);
 
     const onNewMessage = useCallback((msg: any) => {
         if (!currentSessionId) return;
@@ -137,12 +151,16 @@ export function ChatArea() {
 
         setSendError(null);
 
+        // Flush any pending updates before starting new generation
+        flushMessageUpdates();
+
         // Add user message
         addMessage(currentSessionId!, 'user', input, chatMode);
 
         // Add placeholder assistant message that will be streamed into
         const startTime = Date.now();
         generationStartRef.current = startTime;
+        tpsCalculator.start();
         const assistantMsgId = addMessage(currentSessionId!, 'assistant', '', chatMode);
 
         setInput('');
@@ -162,6 +180,7 @@ export function ChatArea() {
                 (stats?: { tps?: number }) => {
                     const duration = Date.now() - startTime;
                     generationStartRef.current = null;
+                    tpsCalculator.reset();
                     useChatStore.getState().updateMessageById(currentSessionId!, assistantMsgId, {
                         startTime,
                         duration,
@@ -169,6 +188,7 @@ export function ChatArea() {
                     });
                 },
                 (err: any) => {
+                    tpsCalculator.reset();
                     setSendError(err?.message || t('ai.error.unknown'));
                 },
                 modelSettings?.systemPrompt || '',
@@ -177,9 +197,10 @@ export function ChatArea() {
                 modelSettings
             );
         } catch (err: any) {
+            tpsCalculator.reset();
             setSendError(err?.message || t('ai.error.unknown'));
         }
-    }, [input, currentSessionId, llm, aiProvider, webLLM.isModelLoaded, chatMode, cloudConfig, modelSettings, addMessage, onUpdate, onNewMessage, t]);
+    }, [input, currentSessionId, llm, aiProvider, webLLM.isModelLoaded, chatMode, cloudConfig, modelSettings, addMessage, onUpdate, onNewMessage, t, flushMessageUpdates, tpsCalculator]);
 
     const handleCopy = useCallback((content: string, id: string) => {
         navigator.clipboard.writeText(content).then(() => {

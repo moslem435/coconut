@@ -20,6 +20,6 @@ export const manifest: AppManifest = {
     defaultWindowOptions: {
         width: 900,
         height: 600,
-        titleBarColor: 'dark'
+        titleBarColor: 'auto'
     }
 }

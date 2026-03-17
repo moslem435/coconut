@@ -67,6 +67,57 @@ const generateIconSvg = (name: string, title: string, icon: string) => {
 
 // Map of function names to their implementations
 export const systemToolsImplementation: Record<string, Function> = {
+    /**
+     * Validates the syntax of all JS/TS/JSX/TSX files in a given directory.
+     * Useful for post-generation checks to ensure no syntax errors were introduced.
+     */
+    validate_app_code: async (args: { path: string }) => {
+        const { path } = args;
+        const results: { file: string; status: 'ok' | 'error'; message?: string }[] = [];
+
+        const scan = async (dir: string) => {
+            const entries = await System.fs.readDirectory(dir);
+            for (const entry of entries) {
+                const fullPath = `${dir}/${entry.name}`;
+                if (entry.type === 'directory') {
+                    await scan(fullPath);
+                } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
+                    try {
+                        const content = await System.fs.readFile(fullPath, 'utf8');
+                        // Use the existing parser via a dummy AstTools call or direct parse if available
+                        // Since we have parse available in the scope via AstTools (implicitly or we can import it)
+                        // Actually, we can just try to parse it here.
+                        const { parse } = require('@babel/parser');
+                        parse(content, {
+                            sourceType: 'module',
+                            plugins: ['jsx', 'typescript']
+                        });
+                        results.push({ file: fullPath, status: 'ok' });
+                    } catch (e: any) {
+                        results.push({ 
+                            file: fullPath, 
+                            status: 'error', 
+                            message: `Syntax Error at line ${e.loc?.line}, col ${e.loc?.column}: ${e.message}` 
+                        });
+                    }
+                }
+            }
+        };
+
+        try {
+            await scan(path);
+            const errors = results.filter(r => r.status === 'error');
+            if (errors.length === 0) {
+                return `✅ Validation Passed: All ${results.length} files in '${path}' are syntactically correct.`;
+            } else {
+                return `❌ Validation Failed: Found ${errors.length} syntax errors in '${path}':\n` + 
+                       errors.map(e => `- ${e.file}: ${e.message}`).join('\n');
+            }
+        } catch (e: any) {
+            return `Failed to validate code: ${e.message}`;
+        }
+    },
+
     // --- Scaffolding ---
     scaffold_static_app: async (args: { name: string, title: string, icon: string }) => {
         const { name, title, icon } = args;
@@ -623,6 +674,624 @@ export default App`;
             return `App "${title}" created successfully. Click the icon on your desktop or in File Explorer to launch it.`;
         } catch (e: any) {
             return `Failed to scaffold React app: ${e.message}`;
+        }
+    },
+
+    scaffold_vue_app: async (args: { name: string, title: string, icon: string }) => {
+        const { name, title, icon } = args;
+        const appPath = `${SYSTEM_PATHS.USER}/apps/${name}`;
+
+        try {
+            await System.fs.createDirectory(appPath);
+            await System.fs.createDirectory(`${appPath}/src`);
+            await System.fs.createDirectory(`${appPath}/public`);
+            await System.fs.createDirectory(`${appPath}/src/components`);
+
+            const jsConfig = `{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}`;
+            await System.fs.writeFile(`${appPath}/jsconfig.json`, jsConfig);
+            await System.fs.writeFile(`${appPath}/icon.svg`, generateIconSvg(name, title, icon));
+
+            const viteConfig = `import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [vue()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+  }
+})`;
+            await System.fs.writeFile(`${appPath}/vite.config.js`, viteConfig);
+
+            const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+  ],
+  theme: { extend: {} },
+  plugins: [],
+}`;
+            await System.fs.writeFile(`${appPath}/tailwind.config.js`, tailwindConfig);
+
+            const postcssConfig = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`;
+            await System.fs.writeFile(`${appPath}/postcss.config.js`, postcssConfig);
+
+            const indexHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${title}</title>
+  </head>
+  <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`;
+            await System.fs.writeFile(`${appPath}/index.html`, indexHtml);
+
+            const mainJs = `import { createApp } from 'vue'
+import './style.css'
+import App from './App.vue'
+
+createApp(App).mount('#app')`;
+            await System.fs.writeFile(`${appPath}/src/main.js`, mainJs);
+
+            const styleCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;`;
+            await System.fs.writeFile(`${appPath}/src/style.css`, styleCss);
+
+            const appVue = `<script setup>
+import { ref } from 'vue'
+
+const count = ref(0)
+</script>
+
+<template>
+  <div class="min-h-screen flex items-center justify-center p-8">
+    <div class="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 text-center p-10">
+      <div class="text-5xl mb-6 inline-block animate-bounce">${(icon || '').trim().toLowerCase().startsWith('lucide:') ? '✨' : icon || '✨'}</div>
+      <h1 class="text-3xl font-bold mb-4">${title}</h1>
+      <p class="text-gray-500 dark:text-gray-400 mb-8">
+        Vue 3 + Vite + Tailwind CSS App.
+      </p>
+      <button 
+        @click="count++" 
+        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-lg shadow-blue-500/30"
+      >
+        Clicked: {{ count }}
+      </button>
+    </div>
+  </div>
+</template>`;
+            await System.fs.writeFile(`${appPath}/src/App.vue`, appVue);
+
+            const pkgJson = {
+                name: name,
+                version: "1.0.0",
+                private: true,
+                type: "module",
+                scripts: {
+                    "dev": "vite",
+                    "build": "vite build",
+                    "preview": "vite preview"
+                },
+                dependencies: {
+                    "vue": "^3.4.21"
+                },
+                devDependencies: {
+                    "vite": "^5.1.4",
+                    "@vitejs/plugin-vue": "^5.0.4",
+                    "tailwindcss": "^3.4.1",
+                    "postcss": "^8.4.35",
+                    "autoprefixer": "^10.4.18"
+                },
+                cocount: {
+                    type: "web-container",
+                    icon: (icon || '').trim().toLowerCase().startsWith('lucide:') ? icon : "./icon.svg",
+                    window: { title, width: 1000, height: 800 }
+                }
+            };
+            await System.fs.writeFile(`${appPath}/package.json`, JSON.stringify(pkgJson, null, 2));
+            await new Promise(r => setTimeout(r, 1000));
+            return `Vue App "${title}" created successfully.`;
+        } catch (e: any) {
+            return `Failed to scaffold Vue app: ${e.message}`;
+        }
+    },
+
+    scaffold_fullstack_app: async (args: { name: string, title: string, icon: string }) => {
+        const { name, title, icon } = args;
+        const appPath = `${SYSTEM_PATHS.USER}/apps/${name}`;
+
+        try {
+            await System.fs.createDirectory(appPath);
+            await System.fs.createDirectory(`${appPath}/frontend`);
+            await System.fs.createDirectory(`${appPath}/frontend/src`);
+            await System.fs.createDirectory(`${appPath}/frontend/public`);
+            await System.fs.createDirectory(`${appPath}/backend`);
+
+            await System.fs.writeFile(`${appPath}/icon.svg`, generateIconSvg(name, title, icon));
+
+            const viteConfig = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: { '@': path.resolve(__dirname, './src') },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      }
+    },
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+  }
+})`;
+            await System.fs.writeFile(`${appPath}/frontend/vite.config.js`, viteConfig);
+
+            const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: { extend: {} },
+  plugins: [],
+}`;
+            await System.fs.writeFile(`${appPath}/frontend/tailwind.config.js`, tailwindConfig);
+
+            const postcssConfig = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`;
+            await System.fs.writeFile(`${appPath}/frontend/postcss.config.js`, postcssConfig);
+
+            const indexHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>${title}</title>
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>`;
+            await System.fs.writeFile(`${appPath}/frontend/index.html`, indexHtml);
+
+            const indexCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;`;
+            await System.fs.writeFile(`${appPath}/frontend/src/index.css`, indexCss);
+
+            const mainJsx = `import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)`;
+            await System.fs.writeFile(`${appPath}/frontend/src/main.jsx`, mainJsx);
+
+            const appJsx = `import { useState, useEffect } from 'react'
+import { Plus, Trash2, CheckCircle2, Circle, Database, Server, Cpu } from 'lucide-react'
+
+function App() {
+  const [todos, setTodos] = useState([])
+  const [inputValue, setInputValue] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [status, setStatus] = useState({ backend: 'checking', db: 'checking' })
+
+  // Fetch todos on mount
+  useEffect(() => {
+    fetchTodos()
+    checkStatus()
+  }, [])
+
+  const checkStatus = async () => {
+    try {
+      const res = await fetch('/api/status')
+      const data = await res.json()
+      setStatus({ backend: 'online', db: data.db })
+    } catch (err) {
+      setStatus({ backend: 'offline', db: 'offline' })
+      setError('Cannot connect to backend server on port 3001.')
+    }
+  }
+
+  const fetchTodos = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/todos')
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      setTodos(data)
+      setError(null)
+    } catch (err) {
+      setError('Failed to load todos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addTodo = async (e) => {
+    e.preventDefault()
+    if (!inputValue.trim()) return
+
+    const newTodo = { title: inputValue, completed: 0 }
+    setInputValue('')
+    
+    // Optimistic UI update
+    const tempId = Date.now()
+    setTodos([...todos, { ...newTodo, id: tempId }])
+
+    try {
+      const res = await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTodo)
+      })
+      if (!res.ok) throw new Error('Failed to add')
+      fetchTodos() // Refresh to get real ID
+    } catch (err) {
+      setError('Failed to add todo.')
+      setTodos(todos.filter(t => t.id !== tempId)) // Revert
+    }
+  }
+
+  const toggleTodo = async (id, currentStatus) => {
+    // Optimistic UI update
+    setTodos(todos.map(t => t.id === id ? { ...t, completed: currentStatus ? 0 : 1 } : t))
+    
+    try {
+      await fetch(\`/api/todos/\${id}\`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: currentStatus ? 0 : 1 })
+      })
+    } catch (err) {
+      setError('Failed to update.')
+      fetchTodos() // Revert
+    }
+  }
+
+  const deleteTodo = async (id) => {
+    // Optimistic UI update
+    const previousTodos = [...todos]
+    setTodos(todos.filter(t => t.id !== id))
+    
+    try {
+      await fetch(\`/api/todos/\${id}\`, { method: 'DELETE' })
+    } catch (err) {
+      setError('Failed to delete.')
+      setTodos(previousTodos) // Revert
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto space-y-8">
+        
+        {/* Header Section */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">${title}</h1>
+          <p className="text-gray-500">React Frontend + Express Backend + SQLite WASM</p>
+        </div>
+
+        {/* System Status Panel */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-wrap gap-6 items-center justify-center text-sm">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-blue-500" />
+            <span className="font-medium">Frontend:</span>
+            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md">Vite (Port 5173)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Server className={\`w-5 h-5 \${status.backend === 'online' ? 'text-green-500' : 'text-red-500'}\`} />
+            <span className="font-medium">Backend:</span>
+            <span className={\`px-2 py-1 rounded-md \${status.backend === 'online' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}\`}>
+              {status.backend === 'online' ? 'Express (Port 3001)' : 'Offline'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Database className={\`w-5 h-5 \${status.db === 'connected' ? 'text-purple-500' : 'text-gray-400'}\`} />
+            <span className="font-medium">Database:</span>
+            <span className={\`px-2 py-1 rounded-md \${status.db === 'connected' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-700'}\`}>
+              {status.db === 'connected' ? 'SQLite (Memory + VFS)' : 'Waiting...'}
+            </span>
+          </div>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+            <p className="text-red-700 font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* Todo App Core */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Input Form */}
+          <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+            <form onSubmit={addTodo} className="flex gap-3">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="What needs to be done?"
+                className="flex-1 rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                disabled={status.backend !== 'online'}
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || status.backend !== 'online'}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Add
+              </button>
+            </form>
+          </div>
+
+          {/* Todo List */}
+          <div className="divide-y divide-gray-100">
+            {loading ? (
+              <div className="p-8 text-center text-gray-500">Loading data from database...</div>
+            ) : todos.length === 0 ? (
+              <div className="p-12 text-center text-gray-400 flex flex-col items-center">
+                <Database className="w-12 h-12 mb-3 opacity-20" />
+                <p>No tasks found in the database. Add one above!</p>
+              </div>
+            ) : (
+              todos.map(todo => (
+                <div key={todo.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors group">
+                  <button 
+                    onClick={() => toggleTodo(todo.id, todo.completed)}
+                    className={\`flex-shrink-0 transition-colors \${todo.completed ? 'text-green-500' : 'text-gray-300 hover:text-blue-500'}\`}
+                  >
+                    {todo.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                  </button>
+                  
+                  <span className={\`flex-1 text-lg transition-all \${todo.completed ? 'text-gray-400 line-through' : 'text-gray-700'}\`}>
+                    {todo.title}
+                  </span>
+                  
+                  <button 
+                    onClick={() => deleteTodo(todo.id)}
+                    className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 p-2 rounded-lg hover:bg-red-50"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+export default App`;
+            await System.fs.writeFile(`${appPath}/frontend/src/App.jsx`, appJsx);
+
+            const pkgJsonFrontend = {
+                name: "frontend",
+                private: true,
+                type: "module",
+                scripts: { "dev": "vite", "build": "vite build" },
+                dependencies: {
+                    "react": "^18.3.1",
+                    "react-dom": "^18.3.1",
+                    "lucide-react": "^0.344.0"
+                },
+                devDependencies: {
+                    "vite": "^5.1.4",
+                    "@vitejs/plugin-react": "^4.2.1",
+                    "tailwindcss": "^3.4.1",
+                    "postcss": "^8.4.35",
+                    "autoprefixer": "^10.4.18"
+                }
+            };
+            await System.fs.writeFile(`${appPath}/frontend/package.json`, JSON.stringify(pkgJsonFrontend, null, 2));
+
+            const serverJs = `import express from 'express';
+import { initDb, getDb, saveDb } from './db.js';
+
+const app = express();
+app.use(express.json());
+
+// System Status Check
+app.get('/api/status', async (req, res) => {
+    try {
+        const db = await getDb();
+        res.json({ backend: 'online', db: 'connected' });
+    } catch (e) {
+        res.status(500).json({ backend: 'online', db: 'error', error: e.message });
+    }
+});
+
+// GET all todos
+app.get('/api/todos', async (req, res) => {
+    try {
+        const db = await getDb();
+        const results = db.exec("SELECT * FROM todos ORDER BY id DESC");
+        const todos = results.length > 0 
+          ? results[0].values.map(row => Object.fromEntries(row.map((val, i) => [results[0].columns[i], val])))
+          : [];
+        res.json(todos);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST a new todo
+app.post('/api/todos', async (req, res) => {
+    try {
+        const { title } = req.body;
+        if (!title) return res.status(400).json({ error: 'Title is required' });
+        
+        const db = await getDb();
+        const id = Date.now();
+        db.run("INSERT INTO todos (id, title, completed) VALUES (?, ?, ?)", [id, title, 0]);
+        saveDb();
+        
+        res.status(201).json({ id, title, completed: 0 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT (update) a todo
+app.put('/api/todos/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { completed } = req.body;
+        
+        const db = await getDb();
+        db.run("UPDATE todos SET completed = ? WHERE id = ?", [completed, Number(id)]);
+        saveDb();
+        
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE a todo
+app.delete('/api/todos/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const db = await getDb();
+        db.run("DELETE FROM todos WHERE id = ?", [Number(id)]);
+        saveDb();
+        
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+const PORT = 3001;
+
+initDb().then(() => {
+    app.listen(PORT, () => {
+        console.log(\`Backend running on port \${PORT}\`);
+    });
+}).catch(console.error);`;
+            await System.fs.writeFile(`${appPath}/backend/server.js`, serverJs);
+
+            const dbJs = `import fs from 'fs';
+import path from 'path';
+import initSqlJs from 'sql.js';
+
+const DB_PATH = path.join(process.cwd(), 'data.sqlite');
+let dbInstance = null;
+
+export async function initDb() {
+    const SQL = await initSqlJs({});
+
+    if (fs.existsSync(DB_PATH)) {
+        const filebuffer = fs.readFileSync(DB_PATH);
+        dbInstance = new SQL.Database(filebuffer);
+        console.log('Loaded existing DB.');
+    } else {
+        dbInstance = new SQL.Database();
+        console.log('Created new DB.');
+    }
+    
+    // Always ensure the table exists (in case a blank db was loaded or just created)
+    dbInstance.run("CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY, title TEXT, completed INTEGER);");
+    saveDb();
+    
+    return dbInstance;
+}
+
+export async function getDb() {
+    if (!dbInstance) await initDb();
+    return dbInstance;
+}
+
+export function saveDb() {
+    if (!dbInstance) return;
+    const data = dbInstance.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(DB_PATH, buffer);
+}`;
+            await System.fs.writeFile(`${appPath}/backend/db.js`, dbJs);
+
+            const pkgJsonBackend = {
+                name: "backend",
+                private: true,
+                type: "module",
+                scripts: { "dev": "node server.js" },
+                dependencies: {
+                    "express": "^4.19.2",
+                    "sql.js": "^1.10.2"
+                }
+            };
+            await System.fs.writeFile(`${appPath}/backend/package.json`, JSON.stringify(pkgJsonBackend, null, 2));
+
+            const rootPkgJson = {
+                name: name,
+                version: "1.0.0",
+                private: true,
+                scripts: {
+                    "postinstall": "npm install --prefix frontend && npm install --prefix backend",
+                    "install:all": "npm install",
+                    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\""
+                },
+                devDependencies: {
+                    "concurrently": "^8.2.2"
+                },
+                cocount: {
+                    type: "web-container",
+                    icon: (icon || '').trim().toLowerCase().startsWith('lucide:') ? icon : "./icon.svg",
+                    window: { title, width: 1000, height: 800 }
+                }
+            };
+            await System.fs.writeFile(`${appPath}/package.json`, JSON.stringify(rootPkgJson, null, 2));
+
+            await new Promise(r => setTimeout(r, 1000));
+            return `Fullstack App "${title}" created successfully. IMPORTANT: You must run 'npm run install:all' before starting the app. The app consists of a React frontend (Vite) and an Express backend (with sql.js WASM SQLite).`;
+        } catch (e: any) {
+            return `Failed to scaffold Fullstack app: ${e.message}`;
         }
     },
 
@@ -1231,6 +1900,56 @@ export const systemToolsDefinitions: ToolDefinition[] = [
             }
         }
     },
+    {
+        type: 'function',
+        function: {
+            name: 'scaffold_vue_app',
+            description: 'Create a Vue 3 + Vite + Tailwind CSS app. Use this when the user specifically requests Vue.js.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'App folder name (e.g., "vue-app"). lowercase, no spaces.'
+                    },
+                    title: {
+                        type: 'string',
+                        description: 'App window title'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Emoji icon for the app'
+                    }
+                },
+                required: ['name', 'title', 'icon']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'scaffold_fullstack_app',
+            description: 'Create a Fullstack React + Express + WASM SQLite app. Generates frontend/ and backend/ with concurrently script. This is the SAFEST way to build an app with a backend database.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'App folder name (e.g., "fullstack-app"). lowercase, no spaces.'
+                    },
+                    title: {
+                        type: 'string',
+                        description: 'App window title'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Emoji icon for the app'
+                    }
+                },
+                required: ['name', 'title', 'icon']
+            }
+        }
+    },
     // --- System Settings ---
     {
         type: 'function',
@@ -1468,6 +2187,20 @@ export const systemToolsDefinitions: ToolDefinition[] = [
     {
         type: 'function',
         function: {
+            name: 'validate_app_code',
+            description: 'Recursively scan a directory for JS/TS/JSX/TSX files and validate their syntax. Use this ALWAYS after generating or modifying files to catch syntax errors immediately.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'The directory path to validate (e.g., "/home/user/apps/my-app")' }
+                },
+                required: ['path']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'get_file_tree',
             description: 'Get a list of files in a directory (shallow)',
             parameters: {
@@ -1504,6 +2237,9 @@ export const TOOL_CATEGORIES = {
     builder: [
         'scaffold_static_app',
         'scaffold_react_app',
+        'scaffold_vue_app',
+        'scaffold_fullstack_app',
+        'validate_app_code',
         'create_directory',
         'create_file',
         'read_file',

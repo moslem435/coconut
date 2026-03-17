@@ -1,8 +1,9 @@
 import { create } from 'zustand'
-import { WebContainer } from '@webcontainer/api'
+import { WebContainer, WebContainerProcess } from '@webcontainer/api'
 import { SYSTEM_PATHS } from '@/os/config/paths'
 import { toast } from '@/os/components/Toast'
 import { fs } from '@/os/kernel/filesystem/FileSystemClient'
+import { eventBus } from '@/os/kernel/EventBus'
 
 interface SyncQueueItem {
   type: 'mkdir' | 'file' | 'unlink'
@@ -27,8 +28,13 @@ interface WebContainerState {
   isSyncingFromWC: boolean
   setSyncingFromWC: (val: boolean) => void
 
+  // Process Management
+  activeProcesses: Map<string, WebContainerProcess[]>
+  registerProcess: (windowId: string, process: WebContainerProcess) => void
+  killProcessesForWindow: (windowId: string) => void
+
   // Execution
-  runCommand: (cmd: string, args: string[], cwd?: string, onOutput?: (data: string) => void, options?: { detached?: boolean, successPattern?: string }) => Promise<number>
+  runCommand: (cmd: string, args: string[], cwd?: string, onOutput?: (data: string) => void, options?: { detached?: boolean, successPattern?: string, windowId?: string }) => Promise<number>
 }
 
 let bootPromise: Promise<WebContainer> | null = null
@@ -42,8 +48,38 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
   instance: null,
   isBooting: false,
   error: null,
-  isSyncingFromWC: false, // Internal flag exposed for VFS check
+  isSyncingFromWC: false,
   setSyncingFromWC: (val) => set({ isSyncingFromWC: val }),
+  activeProcesses: new Map(),
+
+  registerProcess: (windowId: string, process: WebContainerProcess) => {
+    set(state => {
+      const newMap = new Map(state.activeProcesses);
+      const processes = newMap.get(windowId) || [];
+      newMap.set(windowId, [...processes, process]);
+      return { activeProcesses: newMap };
+    });
+  },
+
+  killProcessesForWindow: (windowId: string) => {
+    const { activeProcesses } = get();
+    const processes = activeProcesses.get(windowId);
+    if (processes && processes.length > 0) {
+      console.log(`[ProcessManager] Killing ${processes.length} WebContainer processes for window: ${windowId}`);
+      processes.forEach(p => {
+        try {
+          p.kill();
+        } catch (e) {
+          console.warn(`[ProcessManager] Failed to kill process:`, e);
+        }
+      });
+      set(state => {
+        const newMap = new Map(state.activeProcesses);
+        newMap.delete(windowId);
+        return { activeProcesses: newMap };
+      });
+    }
+  },
 
   // New: Explicit Sync Methods for VFS (Optimized)
   syncFile: async (path, content) => {
@@ -575,6 +611,10 @@ export const useWebContainerStore = create<WebContainerState>((set, get) => ({
           TERM: 'dumb' // Dumb terminal to avoid escape codes, though some tools ignore this
         }
       })
+
+      if (options.windowId) {
+        get().registerProcess(options.windowId, process);
+      }
 
       // Expose stdin writer for interactive commands
       const writer = process.input.getWriter();
@@ -1353,6 +1393,13 @@ console.log(\`App running at http://localhost:\${port}\`);
         webcontainer.on('server-ready', (port, url) => {
           console.log(`[WC] Server ready: port=${port}, url=${url}`)
 
+          // Ignore common backend ports so the preview window waits for the frontend (e.g. Vite on 5173)
+          const ignoredPorts = [3001, 8000, 8080];
+          if (ignoredPorts.includes(port)) {
+            console.log(`[WC] Ignoring backend port ${port} for UI preview`);
+            return;
+          }
+
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('server-ready', {
               detail: { port, url }
@@ -1488,3 +1535,8 @@ console.log(\`App running at http://localhost:\${port}\`);
     return new TextDecoder().decode(uint8)
   }
 }))
+
+// Listen for window close events to clean up orphaned WebContainer processes
+eventBus.on('window:closed', ({ id }) => {
+  useWebContainerStore.getState().killProcessesForWindow(id)
+})

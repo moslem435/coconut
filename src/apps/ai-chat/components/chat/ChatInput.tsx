@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useState } from 'react';
-import { Send, StopCircle, MessageSquare, Settings2, Hammer } from 'lucide-react';
+import { Send, StopCircle, MessageSquare, Settings2, Hammer, Zap, Atom, Hexagon, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/os/sdk';
 
@@ -44,11 +44,55 @@ export function ChatInput({
         }
     };
 
+    const handleTemplateClick = (templatePrompt: string) => {
+        setChatMode('builder');
+        setInput(templatePrompt);
+        // We use setTimeout to allow state to update before sending
+        setTimeout(() => {
+            onSend();
+        }, 50);
+    };
+
     return (
-        <div className="absolute bottom-0 left-0 right-0 p-6 pt-20 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-zinc-950 dark:via-zinc-950/80 z-10">
-            <div className="max-w-3xl mx-auto relative pointer-events-auto">
+        <div className="absolute bottom-0 left-0 right-0 p-6 pt-32 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-zinc-950 dark:via-zinc-950/80 z-10">
+            <div className="max-w-3xl mx-auto relative pointer-events-auto flex flex-col w-full">
+                
+                {/* Quick Templates (Only in Builder Mode) */}
+                {chatMode === 'builder' && !isLoading && (
+                    <div className="flex flex-wrap justify-center gap-2 mb-3 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <button
+                            onClick={() => handleTemplateClick('直接调用 scaffold_static_app 生成一个基础静态模板应用。名称设为 demo-static。不要做任何其他修改。')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-white/60 dark:bg-black/40 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-black hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm backdrop-blur-md"
+                        >
+                            <Zap size={12} className="text-amber-500" />
+                            <span>Static App</span>
+                        </button>
+                        <button
+                            onClick={() => handleTemplateClick('直接调用 scaffold_react_app 生成一个基础 React 模板应用。名称设为 demo-react。不要做任何其他修改。')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-white/60 dark:bg-black/40 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-black hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm backdrop-blur-md"
+                        >
+                            <Atom size={12} className="text-cyan-500" />
+                            <span>React App</span>
+                        </button>
+                        <button
+                            onClick={() => handleTemplateClick('直接调用 scaffold_vue_app 生成一个基础 Vue 3 模板应用。名称设为 demo-vue。不要做任何其他修改。')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-white/60 dark:bg-black/40 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-black hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm backdrop-blur-md"
+                        >
+                            <Hexagon size={12} className="text-emerald-500" />
+                            <span>Vue App</span>
+                        </button>
+                        <button
+                            onClick={() => handleTemplateClick('直接调用 scaffold_fullstack_app 生成一个基础全栈模板应用。名称设为 demo-fullstack。不要做任何其他修改。')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-white/60 dark:bg-black/40 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-black hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm backdrop-blur-md"
+                        >
+                            <Database size={12} className="text-purple-500" />
+                            <span>Fullstack App</span>
+                        </button>
+                    </div>
+                )}
+
                 {/* Mode Selector */}
-                <div className="flex items-center gap-2 mb-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
+                <div className="flex items-center self-start gap-2 mb-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100 w-full">
                     <button
                         onClick={() => setChatMode('chat')}
                         className={cn(

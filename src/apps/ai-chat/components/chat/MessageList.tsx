@@ -1,5 +1,5 @@
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { MessageItem } from './MessageItem';
 import { AlertCircle, Download, Sparkles, Code2, PenTool, BrainCircuit, Zap, Settings } from 'lucide-react';
 import { useTranslation } from '@/os/sdk';
@@ -47,11 +47,48 @@ export function MessageList({
 }: MessageListProps) {
     const { t } = useTranslation();
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
-    // Auto-scroll
+    const handleScroll = useCallback(() => {
+        if (!scrollContainerRef.current) return;
+        
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+        
+        setIsUserScrolling(!isAtBottom);
+        
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+        
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsUserScrolling(false);
+        }, 3000);
+    }, []);
+
+    const scrollToBottom = useCallback((smooth = true) => {
+        if (!messagesEndRef.current || isUserScrolling) return;
+        messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    }, [isUserScrolling]);
+
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages.length, isLoading, progressValue]);
+        const container = scrollContainerRef.current;
+        if (container) {
+            container.addEventListener('scroll', handleScroll, { passive: true });
+            return () => {
+                container.removeEventListener('scroll', handleScroll);
+                if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
+                }
+            };
+        }
+    }, [handleScroll]);
+
+    useEffect(() => {
+        scrollToBottom(true);
+    }, [messages.length, isLoading, progressValue, scrollToBottom]);
 
     // ── Pre-process messages into display groups ──
     const displayGroups = (() => {
@@ -99,7 +136,7 @@ export function MessageList({
     })();
 
     return (
-        <div className="flex-1 overflow-y-auto p-4 space-y-0 custom-scrollbar pb-64">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-0 custom-scrollbar pb-64">
             {messages.length === 0 && (
                 // ... (Empty State Code - No Changes) ...
                 <div className="flex flex-col items-center justify-center h-full select-none pb-20">

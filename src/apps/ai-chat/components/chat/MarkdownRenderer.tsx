@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -7,7 +6,55 @@ import { Play, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/os/sdk';
 
-// 语言 → 左侧竖条颜色映射
+interface MarkdownCache {
+    content: string;
+    rendered: React.ReactNode;
+    timestamp: number;
+}
+
+const markdownCache = new Map<string, MarkdownCache>();
+const MAX_CACHE_SIZE = 50;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(content: string, isUser: boolean): string {
+    return `${isUser ? 'user' : 'assistant'}:${content.slice(0, 100)}`;
+}
+
+function getCachedRender(content: string, isUser: boolean): React.ReactNode | null {
+    const key = getCacheKey(content, isUser);
+    const cached = markdownCache.get(key);
+    
+    if (!cached) return null;
+    
+    if (Date.now() - cached.timestamp > CACHE_TTL) {
+        markdownCache.delete(key);
+        return null;
+    }
+    
+    return cached.rendered;
+}
+
+function setCachedRender(content: string, isUser: boolean, rendered: React.ReactNode): void {
+    const key = getCacheKey(content, isUser);
+    
+    if (markdownCache.size >= MAX_CACHE_SIZE) {
+        const oldestKey = markdownCache.keys().next().value;
+        if (oldestKey) {
+            markdownCache.delete(oldestKey);
+        }
+    }
+    
+    markdownCache.set(key, {
+        content,
+        rendered,
+        timestamp: Date.now()
+    });
+}
+
+function clearMarkdownCache(): void {
+    markdownCache.clear();
+}
+
 const LANG_COLORS: Record<string, string> = {
     tsx: 'border-l-cyan-400',
     jsx: 'border-l-cyan-400',
@@ -31,7 +78,6 @@ const LANG_COLORS: Record<string, string> = {
     md: 'border-l-zinc-400',
 };
 
-// 语言 → 标签文字颜色
 const LANG_LABEL_COLORS: Record<string, string> = {
     tsx: 'text-cyan-400',
     jsx: 'text-cyan-400',
@@ -70,8 +116,7 @@ interface MarkdownRendererProps {
     isLoading?: boolean;
 }
 
-// 代码块独立组件
-function CodeBlock({
+const CodeBlock = memo(function CodeBlock({
     language,
     codeContent,
     children,
@@ -97,17 +142,16 @@ function CodeBlock({
         language &&
         ['tsx', 'jsx', 'javascript', 'typescript', 'js', 'ts', 'html'].includes(language);
 
-    const handleCopy = () => {
+    const handleCopy = useCallback(() => {
         navigator.clipboard.writeText(codeContent).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         });
-    };
+    }, [codeContent]);
 
     const langBarColor = getLangColor(language);
     const langLabelColor = getLangLabelColor(language);
 
-    // 用户消息 — 简洁深色
     if (isUser) {
         return (
             <div className={cn("relative my-3 rounded-lg overflow-hidden border border-white/10 bg-black/40 border-l-2", langBarColor)}>
@@ -122,7 +166,6 @@ function CodeBlock({
         );
     }
 
-    // 助手消息
     return (
         <div className={cn(
             "relative my-3 rounded-lg overflow-hidden",
@@ -130,13 +173,11 @@ function CodeBlock({
             "bg-zinc-50 dark:bg-[#1a1a1a]",
             "border-l-2", langBarColor
         )}>
-            {/* Header */}
             <div className="flex items-center justify-between px-3 py-1.5 bg-black/[0.03] dark:bg-white/[0.03] border-b border-black/5 dark:border-white/5">
                 <span className={cn("text-[10px] font-mono font-semibold", langLabelColor)}>
                     {language?.toUpperCase() ?? 'CODE'}
                 </span>
                 <div className="flex items-center gap-1">
-                    {/* 运行按钮 — 生成中隐藏 */}
                     {isRunnable && onRunApp && !isLoading && (
                         <button
                             onClick={() => onRunApp(codeContent, language || '')}
@@ -147,7 +188,6 @@ function CodeBlock({
                             {t('ai.msg.run_app')}
                         </button>
                     )}
-                    {/* 复制按钮 */}
                     <button
                         onClick={handleCopy}
                         className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/8 transition-colors"
@@ -159,16 +199,48 @@ function CodeBlock({
                     </button>
                 </div>
             </div>
-            {/* Code */}
             <div className="p-4 overflow-x-auto">
                 <code className={className} {...props}>{children}</code>
             </div>
         </div>
     );
-}
+});
 
-export function MarkdownRenderer({ content, isUser, onRunApp, isLoading }: MarkdownRendererProps) {
-    return (
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isUser, onRunApp, isLoading }: MarkdownRendererProps) {
+    const [isStreaming, setIsStreaming] = useState(false);
+    const lastContentRef = useRef(content);
+    const renderTimeoutRef = useRef<NodeJS.Timeout>();
+
+    useEffect(() => {
+        if (content !== lastContentRef.current) {
+            lastContentRef.current = content;
+            setIsStreaming(true);
+            
+            if (renderTimeoutRef.current) {
+                clearTimeout(renderTimeoutRef.current);
+            }
+            
+            renderTimeoutRef.current = setTimeout(() => {
+                setIsStreaming(false);
+            }, 300);
+        }
+    }, [content]);
+
+    useEffect(() => {
+        return () => {
+            if (renderTimeoutRef.current) {
+                clearTimeout(renderTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const cached = getCachedRender(content, isUser ?? false);
+    
+    if (cached) {
+        return <>{cached}</>;
+    }
+
+    const rendered = (
         <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
@@ -185,7 +257,6 @@ export function MarkdownRenderer({ content, isUser, onRunApp, isLoading }: Markd
                     };
                     const codeContent = extractText(children).replace(/\n$/, '');
 
-                    // 行内代码
                     if (inline || !match) {
                         return (
                             <code
@@ -221,4 +292,14 @@ export function MarkdownRenderer({ content, isUser, onRunApp, isLoading }: Markd
             {content}
         </ReactMarkdown>
     );
-}
+
+    setCachedRender(content, isUser ?? false, rendered);
+
+    return (
+        <div className={cn("transition-opacity duration-200", isStreaming ? "opacity-70" : "opacity-100")}>
+            {rendered}
+        </div>
+    );
+});
+
+export { clearMarkdownCache };
