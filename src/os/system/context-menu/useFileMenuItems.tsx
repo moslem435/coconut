@@ -67,14 +67,75 @@ export function useFileMenuItems(
         // App Bundle Detection
         const isAppBundle = firstItem?.type === 'folder' && (firstItem.name.endsWith('.app') || (firstItem as any).isAppBundle)
 
+        // Helper for ZIP download (reusable)
+        const handleDownloadZip = async (ids: string[]) => {
+            hideMenu()
+            const items = ids.map((id: string) => getItem(id)).filter(Boolean)
+            if (items.length === 0) return
+
+            const zip = new JSZip()
+            const toastId = toast.loading(t('menu.downloading'))
+
+            try {
+                const addFilesToZip = async (folderId: string, currentPath: string) => {
+                    try { await loadFolderContent(folderId) } catch (e) { console.warn(`Failed to load content for folder ${folderId}`, e) }
+                    const children = getChildren(folderId)
+                    for (const child of children) {
+                        if (child.type === 'folder') {
+                            await addFilesToZip(child.id, `${currentPath}${child.name}/`)
+                        } else {
+                            try {
+                                const blob = await getFileBlob(child.id)
+                                if (blob) { zip.file(`${currentPath}${child.name}`, blob) }
+                                else {
+                                    const content = await readFileContent(child.id)
+                                    if (content) zip.file(`${currentPath}${child.name}`, content)
+                                }
+                            } catch (e) { console.warn(`Failed to add file ${child.name} to zip`, e) }
+                        }
+                    }
+                }
+
+                for (const item of items) {
+                    if (!item) continue
+                    if (item.type === 'folder') {
+                        try { await loadFolderContent(item.id) } catch (e) { console.warn(`Failed to load root folder ${item.name}`, e) }
+                        await addFilesToZip(item.id, `${item.name}/`)
+                    } else {
+                        try {
+                            const blob = await getFileBlob(item.id)
+                            if (blob) { zip.file(item.name, blob) }
+                            else {
+                                const content = await readFileContent(item.id)
+                                if (content) zip.file(item.name, content)
+                            }
+                        } catch (e) { console.warn(`Failed to add root file ${item.name} to zip`, e) }
+                    }
+                }
+
+                const content = await zip.generateAsync({ type: 'blob' })
+                const url = URL.createObjectURL(content)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = items.length === 1 ? `${items[0]?.name}.zip` : 'archive.zip'
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                URL.revokeObjectURL(url)
+                toast.dismiss(toastId)
+            } catch (e) {
+                console.error('Failed to download zip', e)
+                toast.dismiss(toastId)
+                toast.error(t('menu.download.error'), 'Failed to create zip archive')
+            }
+        }
+
         if (isAppBundle && firstItem) {
             return [
                 {
                     label: t('menu.open'),
                     icon: ExternalLink,
                     action: () => {
-                        // TODO: Phase 3 - Implement Launch Logic
-                        // For now, open as folder
                         const explorerApp = APPS_REGISTRY['file-explorer']
                         if (explorerApp) {
                             openWindow(
@@ -107,6 +168,11 @@ export function useFileMenuItems(
                 },
                 ...(favoriteMenuItem ? [favoriteMenuItem] : []),
                 { type: 'separator' },
+                {
+                    label: t('menu.download'),
+                    icon: Download,
+                    action: () => handleDownloadZip([firstItem.id])
+                },
                 {
                     label: t('menu.rename'),
                     icon: FileEdit,

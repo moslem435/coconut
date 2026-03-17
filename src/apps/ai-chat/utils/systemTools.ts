@@ -550,9 +550,9 @@ function DocsPage() {
         <h2 className="text-3xl font-bold">Documentation</h2>
        </div>
        
-       <div className="space-y-6 text-muted-foreground">
-         <p>This template is designed to be "AI-Friendly".</p>
+         <p>This template is designed to be "AI-Friendly" and <b>WebContainer-Compatible</b>.</p>
          <ul className="list-disc pl-5 space-y-2">
+           <li><strong>NO NATIVE MODULES:</strong> Use <code>sql.js</code> for DB, <code>bcryptjs</code> for crypto.</li>
            <li><strong>Path Aliases:</strong> Use <code>@/components</code> or <code>@/lib/utils</code> imports.</li>
            <li><strong>Utils:</strong> Use <code>cn()</code> for conditional classes.</li>
            <li><strong>Routing:</strong> React Router is set up in <code>App.jsx</code>.</li>
