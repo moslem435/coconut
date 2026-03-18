@@ -2,6 +2,7 @@
 import { System, ThemeMode } from '@/os/sdk';
 import { SYSTEM_PATHS } from '@/os/config/paths';
 import { useWebContainerStore } from '@/os/kernel/useWebContainerStore';
+import { useFileSystemStore } from '@/os/kernel/useFileSystemStore';
 import { AstTools } from './astTools';
 
 // Define the tool structure expected by OpenAI/WebLLM
@@ -65,6 +66,21 @@ const generateIconSvg = (name: string, title: string, icon: string) => {
 </svg>`
 }
 
+const normalizePath = (p: string): string => {
+    if (!p) return p;
+    // If the path looks like it should be in /home/user/apps but is missing the prefix
+    if (p.startsWith('/') && !p.startsWith('/home') && !p.startsWith('/Trash') && !p.startsWith('/rom')) {
+        const parts = p.split('/').filter(Boolean);
+        if (parts.length === 1) {
+            const candidate = `/home/user/apps/${parts[0]}`;
+            // We can't easily check exists synchronously here without a try/catch in the caller,
+            // but for LLM convenience, we can try to be smart.
+            return candidate;
+        }
+    }
+    return p;
+};
+
 // Map of function names to their implementations
 export const systemToolsImplementation: Record<string, Function> = {
     /**
@@ -72,43 +88,44 @@ export const systemToolsImplementation: Record<string, Function> = {
      * Useful for post-generation checks to ensure no syntax errors were introduced.
      */
     validate_app_code: async (args: { path: string }) => {
-        const { path } = args;
+        const path = normalizePath(args.path);
         const results: { file: string; status: 'ok' | 'error'; message?: string }[] = [];
 
         const scan = async (dir: string) => {
-            const entries = await System.fs.readDirectory(dir);
-            for (const entry of entries) {
-                const fullPath = `${dir}/${entry.name}`;
-                if (entry.type === 'directory') {
-                    await scan(fullPath);
-                } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
-                    try {
-                        const content = await System.fs.readFile(fullPath, 'utf8');
-                        // Use the existing parser via a dummy AstTools call or direct parse if available
-                        // Since we have parse available in the scope via AstTools (implicitly or we can import it)
-                        // Actually, we can just try to parse it here.
-                        const { parse } = require('@babel/parser');
-                        parse(content, {
-                            sourceType: 'module',
-                            plugins: ['jsx', 'typescript']
-                        });
-                        results.push({ file: fullPath, status: 'ok' });
-                    } catch (e: any) {
-                        results.push({ 
-                            file: fullPath, 
-                            status: 'error', 
-                            message: `Syntax Error at line ${e.loc?.line}, col ${e.loc?.column}: ${e.message}` 
-                        });
+            try {
+                const entries = System.fs.readDir(dir);
+                for (const entry of entries) {
+                    const fullPath = `${dir}/${entry.name}`;
+                    if (entry.type === 'directory') {
+                        await scan(fullPath);
+                    } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
+                        try {
+                            const content = await System.fs.readFile(fullPath, 'utf8');
+                            const { parse } = require('@babel/parser');
+                            parse(content, {
+                                sourceType: 'module',
+                                plugins: ['jsx', 'typescript']
+                            });
+                            results.push({ file: fullPath, status: 'ok' });
+                        } catch (e: any) {
+                            results.push({ 
+                                file: fullPath, 
+                                status: 'error', 
+                                message: `Syntax Error at line ${e.loc?.line}, col ${e.loc?.column}: ${e.message}` 
+                            });
+                        }
                     }
                 }
-            }
+            } catch {}
         };
 
         try {
             await scan(path);
             const errors = results.filter(r => r.status === 'error');
-            if (errors.length === 0) {
+            if (errors.length === 0 && results.length > 0) {
                 return `✅ Validation Passed: All ${results.length} files in '${path}' are syntactically correct.`;
+            } else if (results.length === 0) {
+                return `Error: No valid source files found in '${path}'.`;
             } else {
                 return `❌ Validation Failed: Found ${errors.length} syntax errors in '${path}':\n` + 
                        errors.map(e => `- ${e.file}: ${e.message}`).join('\n');
@@ -1348,52 +1365,70 @@ export function saveDb() {
     // --- File System ---
     create_directory: async (args: { path: string }) => {
         try {
-            await System.fs.createDirectory(args.path);
-            return `Directory created at '${args.path}'`;
+            const path = normalizePath(args.path);
+            if (!path) return "Error: Path is required";
+            await System.fs.createDirectory(path);
+            return `Directory created at '${path}'`;
         } catch (e: any) {
-            // If error is "Path exists but is not a directory", it's an error.
-            // If it already exists as a folder, System.fs.createDirectory returns the id, so no error thrown usually?
-            // Let's check System.fs implementation: it throws "Path exists but is not a directory".
-            // If it is a folder, it returns node.id.
-            // So we are good.
             return `Error creating directory: ${e.message || e}`;
         }
     },
 
     create_file: async (args: { path: string, content: string }) => {
         try {
-            // console.log(`[SystemTools] create_file: writing to '${args.path}', length: ${args.content?.length}`);
-            if (!args.content) {
-                console.warn(`[SystemTools] create_file: Warning - content is empty for '${args.path}'`);
-            }
-            if (args.path?.endsWith('package.json')) {
+            const path = normalizePath(args.path);
+            if (!path) return "Error: Path is required";
+            
+            if (path.endsWith('package.json')) {
                 try {
                     JSON.parse(args.content || '');
                 } catch (e: any) {
                     return `Error creating file: package.json must be valid JSON (${e.message || e})`;
                 }
             }
-            await System.fs.writeFile(args.path, args.content);
-
-            return `File created at '${args.path}'`;
+            await System.fs.writeFile(path, args.content || '');
+            return `File created at '${path}'`;
         } catch (e: any) {
-            console.error(`[SystemTools] create_file error:`, e);
             return `Error creating file: ${e.message || e}`;
         }
     },
 
-    list_directory: (args: { path: string }) => {
+    list_directory: async (args: { path: string }) => {
         try {
-            const files = System.fs.readDir(args.path);
-            return JSON.stringify(files.map(f => f.name));
+            const path = normalizePath(args.path);
+            const entries = System.fs.readDir(path);
+            const results = await Promise.all(entries.map(async (e) => {
+                let size = 0;
+                if (e.type === 'file') {
+                    try {
+                        const content = await System.fs.readFile(`${path}/${e.name}`);
+                        size = content.length;
+                    } catch {}
+                }
+                return {
+                    name: e.name,
+                    type: e.type,
+                    size: size > 0 ? `${(size / 1024).toFixed(1)} KB` : undefined
+                };
+            }));
+            return JSON.stringify(results);
         } catch (e) {
             return `Error listing directory: ${e}`;
         }
     },
 
-    read_file: async (args: { path: string }) => {
+    read_file: async (args: { path: string; start_line?: number; end_line?: number }) => {
         try {
-            const content = await System.fs.readFile(args.path);
+            const path = normalizePath(args.path);
+            const content = await System.fs.readFile(path);
+            if (args.start_line !== undefined || args.end_line !== undefined) {
+                const lines = content.split('\n');
+                const start = (args.start_line || 1) - 1;
+                const end = args.end_line || lines.length;
+                const sliced = lines.slice(start, end);
+                const totalLines = lines.length;
+                return `[File: ${path}, Lines ${start + 1}-${Math.min(end, totalLines)} of ${totalLines}]\n${sliced.join('\n')}`;
+            }
             return content;
         } catch (e: any) {
             return `Error reading file: ${e.message || e}`;
@@ -1402,15 +1437,16 @@ export function saveDb() {
 
     update_file: async (args: { path: string; content: string }) => {
         try {
-            if (args.path?.endsWith('package.json')) {
+            const path = normalizePath(args.path);
+            if (path?.endsWith('package.json')) {
                 try {
                     JSON.parse(args.content || '');
                 } catch (e: any) {
                     return `Error updating file: package.json must be valid JSON (${e.message || e})`;
                 }
             }
-            await System.fs.writeFile(args.path, args.content);
-            return `File updated at '${args.path}'`;
+            await System.fs.writeFile(path, args.content);
+            return `File updated at '${path}'`;
         } catch (e: any) {
             return `Error updating file: ${e.message || e}`;
         }
@@ -1418,7 +1454,8 @@ export function saveDb() {
 
     replace_in_file: async (args: { path: string; find: string; replace: string; expectedCount?: number; regex?: boolean; flags?: string; replaceAll?: boolean }) => {
         try {
-            const original = await System.fs.readFile(args.path);
+            const path = normalizePath(args.path);
+            const original = await System.fs.readFile(path);
             const useRegex = !!args.regex;
             const replaceAll = args.replaceAll !== false;
 
@@ -1473,8 +1510,8 @@ export function saveDb() {
                 return `No changes applied. Found 0 matches.`;
             }
 
-            await System.fs.writeFile(args.path, next);
-            return `Replaced ${count} occurrence(s) in '${args.path}'.`;
+            await System.fs.writeFile(path, next);
+            return `Replaced ${count} occurrence(s) in '${path}'.`;
         } catch (e: any) {
             return `Error replacing in file: ${e.message || e}`;
         }
@@ -1483,7 +1520,8 @@ export function saveDb() {
     // --- AST Modification ---
     insert_jsx_component: async (args: { path: string, componentName: string, targetElement?: string, position: 'prepend' | 'append' | 'before' | 'after', jsxCode: string }) => {
         try {
-            const code = await System.fs.readFile(args.path);
+            const path = normalizePath(args.path);
+            const code = await System.fs.readFile(path);
             const newCode = AstTools.insertJsx(
                 code, 
                 args.componentName, 
@@ -1491,8 +1529,8 @@ export function saveDb() {
                 args.position, 
                 args.jsxCode
             );
-            await System.fs.writeFile(args.path, newCode);
-            return `Successfully inserted JSX into '${args.componentName}' in ${args.path}`;
+            await System.fs.writeFile(path, newCode);
+            return `Successfully inserted JSX into '${args.componentName}' in ${path}`;
         } catch (e: any) {
             return `Error inserting JSX: ${e.message}`;
         }
@@ -1500,349 +1538,192 @@ export function saveDb() {
 
     add_import: async (args: { path: string, importCode: string }) => {
         try {
-            const code = await System.fs.readFile(args.path);
+            const path = normalizePath(args.path);
+            const code = await System.fs.readFile(path);
             const newCode = AstTools.addImport(code, args.importCode);
             if (code === newCode) {
-                return `Import already exists or no changes made in ${args.path}`;
+                return `Import already exists or no changes made in ${path}`;
             }
-            await System.fs.writeFile(args.path, newCode);
-            return `Successfully added import to ${args.path}`;
+            await System.fs.writeFile(path, newCode);
+            return `Successfully added import to ${path}`;
         } catch (e: any) {
             return `Error adding import: ${e.message}`;
         }
     },
 
+    delete_node: async (args: { path: string }) => {
+        try {
+            const path = normalizePath(args.path);
+            const store = useFileSystemStore.getState();
+            const node = store.getNodeByPath(path);
+            if (!node) return `Error: Node not found at '${path}'`;
+            
+            store.deleteItem(node.id);
+            return `Successfully deleted '${path}'`;
+        } catch (e: any) {
+            return `Error deleting node: ${e.message || e}`;
+        }
+    },
+
+    move_node: async (args: { oldPath: string, newPath: string }) => {
+        try {
+            const oldPath = normalizePath(args.oldPath);
+            const newPath = normalizePath(args.newPath);
+            const store = useFileSystemStore.getState();
+            const node = store.getNodeByPath(oldPath);
+            if (!node) return `Error: Node not found at '${oldPath}'`;
+
+            const parts = newPath.split('/').filter(Boolean);
+            const newName = parts.pop();
+            const parentPath = '/' + parts.join('/');
+            
+            if (!newName) return `Error: Invalid newPath '${newPath}'`;
+
+            const parentNode = store.getNodeByPath(parentPath);
+            if (!parentNode || parentNode.type !== 'folder') return `Error: Target parent directory '${parentPath}' not found.`;
+
+            store.moveItem(node.id, parentNode.id, newName);
+            return `Successfully moved/renamed '${oldPath}' to '${newPath}'`;
+        } catch (e: any) {
+            return `Error moving node: ${e.message || e}`;
+        }
+    },
+
     // --- Execution ---
     run_command: async (args: { cmd: string, args?: string[], cwd?: string, detached?: boolean, successPattern?: string }, ctx?: ToolContext) => {
-        if (ctx?.mode === 'builder' && args.cmd === 'npm') {
-            const joined = (args.args || []).join(' ').toLowerCase()
-            const isInstall = /\b(install|i|ci)\b/.test(joined)
-            const isDevLike = /\b(run\s+dev|dev|start|serve|watch)\b/.test(joined)
-            if (isInstall || isDevLike) {
-                return `Skipped: Command '${args.cmd} ${args.args?.join(' ') || ''}' is disabled during build. Please run the app by double-clicking it in File Explorer (or explicitly ask to run/launch).`
-            }
+        // STRICT RESTRICTION: No destructive or long-running commands in Builder mode via Shell.
+        const forbiddenCommands = ['rm', 'mkdir', 'mv', 'cp', 'touch', 'npm', 'yarn', 'pnpm', 'npx'];
+        if (forbiddenCommands.includes(args.cmd.toLowerCase())) {
+            return `Refused: Command '${args.cmd}' is forbidden for safety and persistence. Use the provided VFS tools (create_file, delete_node, move_node, etc.) instead. AI should NEVER use shell to modify files.`;
         }
 
-        // Prevent running long-running processes that would timeout (unless detached mode is requested)
-        const longRunningCommands = ['dev', 'start', 'watch', 'serve'];
-        if (args.cmd === 'npm' && args.args && args.args.some(arg => longRunningCommands.includes(arg)) && !args.detached) {
-            return `Command '${args.cmd} ${args.args.join(' ')}' skipped. Long-running processes (like dev servers) block execution. To run this, you MUST set "detached": true in the arguments.`;
-        }
-
+        const cwd = normalizePath(args.cwd || '/');
         let output = '';
-
         try {
-            // Ensure WebContainer is ready
             const store = useWebContainerStore.getState();
             if (!store.instance) {
-                try {
-                    await store.boot();
-                    // Double check after boot
-                    if (!store.instance && !useWebContainerStore.getState().instance) {
-                        return `Failed to initialize WebContainer. Please refresh the page and try again.`;
-                    }
-                } catch (bootError: any) {
-                    // Check if it's a session conflict
-                    if (bootError.message && bootError.message.includes('session conflict')) {
-                        return `WebContainer initialization conflict detected. Please refresh the page to reset the environment, then try again.`;
-                    }
-                    return `Failed to initialize WebContainer: ${bootError.message || bootError}`;
-                }
+                await store.boot();
+                if (!store.instance) return `Failed to initialize WebContainer.`;
             }
 
-            // Track the last output length when we dispatched a prompt
-            // This allows us to detect new prompts after user responds
             let lastPromptOutputLength = 0;
-
-            // Dispatch a custom event to notify UI about the output stream
-            // This is a temporary solution until we have a proper streaming tool response architecture
             const dispatchOutput = (data: string) => {
-                // Strip ANSI escape codes (colors, cursor movements, etc.)
-                // eslint-disable-next-line no-control-regex
                 const cleanData = data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-
                 output += cleanData;
                 window.dispatchEvent(new CustomEvent('ai-builder:command-output', {
                     detail: { cmd: args.cmd, output: cleanData }
                 }));
-
-                // Skip if output hasn't grown significantly since last prompt
-                // This prevents duplicate triggers for the same prompt
                 if (output.length - lastPromptOutputLength < 10) return;
-
-                // Heuristic detection for interactive prompts
-                // Check the FULL output (not just the current chunk) for better detection
-                const trimmed = cleanData.trim();
-                const fullOutput = output;
-                const fullOutputTrimmed = fullOutput.trim();
-                const fullOutputLower = fullOutput.toLowerCase();
-
-                // 1. Detect prompt patterns (questions, colons, prompts)
-                const hasPromptPattern =
-                    fullOutputTrimmed.endsWith('?') ||
-                    fullOutputTrimmed.endsWith(':') ||
-                    fullOutputTrimmed.endsWith('?:') || // Vite uses "?:"
-                    fullOutputTrimmed.endsWith('>') ||
-                    fullOutputTrimmed.endsWith('...') || // Waiting indicator
-                    // Yes/No confirmations (case insensitive)
-                    /\(y\/n\)/i.test(fullOutput) ||
-                    /\[y\/n\]/i.test(fullOutput) ||
-                    /\(yes\/no\)/i.test(fullOutput) ||
-                    /\[yes\/no\]/i.test(fullOutput) ||
-                    /\[y\/n\]/i.test(fullOutput) ||
-                    // Selection prompts
-                    fullOutputLower.includes('select a') ||
-                    fullOutputLower.includes('select an') ||
-                    fullOutputLower.includes('choose a') ||
-                    fullOutputLower.includes('choose an') ||
-                    fullOutputLower.includes('please select') ||
-                    fullOutputLower.includes('please choose') ||
-                    fullOutputLower.includes('pick a') ||
-                    fullOutputLower.includes('which') ||
-                    // Input prompts
-                    fullOutputLower.includes('enter your') ||
-                    fullOutputLower.includes('enter a') ||
-                    fullOutputLower.includes('enter the') ||
-                    fullOutputLower.includes('type your') ||
-                    fullOutputLower.includes('provide a') ||
-                    fullOutputLower.includes('input') ||
-                    // Common field names
-                    fullOutputLower.includes('package name:') ||
-                    fullOutputLower.includes('project name:') ||
-                    fullOutputLower.includes('name:') ||
-                    fullOutputLower.includes('version:') ||
-                    fullOutputLower.includes('description:') ||
-                    fullOutputLower.includes('author:') ||
-                    fullOutputLower.includes('license:') ||
-                    fullOutputLower.includes('dest dir:') ||
-                    fullOutputLower.includes('directory:') ||
-                    // Password/sensitive input
-                    fullOutputLower.includes('password:') ||
-                    fullOutputLower.includes('passphrase:') ||
-                    fullOutputLower.includes('token:') ||
-                    fullOutputLower.includes('secret:') ||
-                    // Framework/tool specific
-                    fullOutputLower.includes('use vite') ||
-                    fullOutputLower.includes('framework:') ||
-                    fullOutputLower.includes('template:') ||
-                    fullOutputLower.includes('variant:') ||
-                    // Special characters used by modern CLIs
-                    fullOutputLower.includes('◆') || // Vite
-                    fullOutputLower.includes('◇') || // Alternative
-                    fullOutputLower.includes('●') || // Bullet
-                    fullOutputLower.includes('○') || // Circle
-                    fullOutputLower.includes('▸') || // Arrow
-                    fullOutputLower.includes('❯') || // Prompt arrow
-                    fullOutputLower.includes('›'); // Right arrow
-
-                // 2. Check for option markers (visual indicators of choices)
-                const hasOptions = /[○●•❯›│▸◆◇]\s+/g.test(output);
-
-                // 3. Check for numbered options (1. Option, 1) Option, [1] Option)
-                const hasNumberedOptions = /^\s*[\[\(]?\d+[\.\)\]]\s+\w+/m.test(output);
-
-                // 4. Check for text input prompts (where no options might be present)
-                const isTextInputPrompt =
-                    /project name:|package name:|enter your|enter a|enter the|name:|version:|description:|author:|license:|dest dir:|directory:|password:|passphrase:|token:|secret:/i.test(fullOutputTrimmed);
-
-                // 5. Check for waiting state (output ends with colon or prompt and hasn't grown)
-                const looksLikeWaiting =
-                    (fullOutputTrimmed.endsWith(':') || fullOutputTrimmed.endsWith('>')) &&
-                    output.length > 20 &&
-                    output.length < 500;
-
-                // 6. Content length check (reasonable size for a prompt)
-                const hasReasonableContent = output.length > 20 && output.length < 3000;
-
-                // Debug logging
-                if (hasPromptPattern || hasOptions || hasNumberedOptions || isTextInputPrompt || looksLikeWaiting) {
-                    console.log('[SystemTools] Prompt detection check:', {
-                        hasPromptPattern,
-                        hasOptions,
-                        hasNumberedOptions,
-                        isTextInputPrompt,
-                        looksLikeWaiting,
-                        hasReasonableContent,
-                        outputLength: output.length,
-                        lastLine: fullOutputTrimmed.split('\n').pop()?.slice(-100)
-                    });
-                }
-
-                // Trigger interactive prompt if any of these conditions are met:
-                // 1. Prompt pattern + options (visual or numbered)
-                // 2. Text input prompt detected
-                // 3. Looks like waiting for input
-                // 4. Prompt pattern + reasonable content (not too short, not too long)
-                const shouldTrigger =
-                    (hasPromptPattern && (hasOptions || hasNumberedOptions)) ||
-                    isTextInputPrompt ||
-                    looksLikeWaiting ||
-                    (hasPromptPattern && hasReasonableContent);
-
-                if (shouldTrigger) {
-                    // Update the last prompt output length to allow future prompts
-                    lastPromptOutputLength = output.length;
-
-                    console.log('[SystemTools] ✅ Interactive prompt detected!');
-                    console.log('[SystemTools] Full output:', output);
-
-                    // Extract the prompt line (usually the last non-empty line)
-                    const lines = fullOutputTrimmed.split('\n').filter(l => l.trim());
-                    const promptLine = lines[lines.length - 1] || trimmed;
-
-                    window.dispatchEvent(new CustomEvent('ai-builder:interactive-prompt', {
-                        detail: {
-                            cmd: args.cmd,
-                            prompt: promptLine,
-                            output: output
-                        }
-                    }));
-                }
             };
 
-            // Create a timeout promise (60 seconds for most commands)
             const timeoutMs = 60000;
             const timeoutPromise = new Promise<number>((_, reject) => {
                 setTimeout(() => {
-                    reject(new Error(`Command timed out after ${timeoutMs / 1000} seconds. The command may be waiting for user input or taking too long.`));
+                    reject(new Error(`Command timed out after ${timeoutMs / 1000} seconds. Shell commands should be short diagnostic tasks only.`));
                 }, timeoutMs);
             });
 
-            // Race between command execution and timeout
-            let exitCode = -1;
-            try {
-                exitCode = await Promise.race([
-                    store.runCommand(
-                        args.cmd,
-                        args.args || [],
-                        args.cwd || '/',
-                        dispatchOutput,
-                        {
-                            detached: args.detached,
-                            successPattern: args.successPattern
-                        }
-                    ),
-                    timeoutPromise
-                ]);
-            } catch (cmdError: any) {
-                // WebContainer / npx fallback: file system might not have fully flushed bin symlinks yet
-                const isNpxError = args.cmd === 'npx' && (
-                    output.includes('could not determine executable to run') ||
-                    cmdError.message?.includes('exit code 1')
-                );
+            const exitCode = await Promise.race([
+                store.runCommand(args.cmd, args.args || [], cwd, dispatchOutput, { detached: args.detached, successPattern: args.successPattern }),
+                timeoutPromise
+            ]);
 
-                if (isNpxError && args.args && args.args.length > 0) {
-                    console.log(`[SystemTools] npx execution failed (possibly timing). Retrying in 2 seconds...`);
-
-                    // Wait 2 seconds for WebContainer file system to settle
-                    await new Promise(r => setTimeout(r, 2000));
-
-                    output = ''; // Reset output buffer
-                    console.log(`[SystemTools] Retrying original npx command...`);
-
-                    const retryTimeoutPromise = new Promise<number>((_, reject) => {
-                        setTimeout(() => {
-                            reject(new Error(`Fallback command timed out after ${timeoutMs / 1000} seconds.`));
-                        }, timeoutMs);
-                    });
-
-                    exitCode = await Promise.race([
-                        store.runCommand(
-                            args.cmd,
-                            args.args,
-                            args.cwd || '/',
-                            dispatchOutput,
-                            {
-                                detached: args.detached,
-                                successPattern: args.successPattern
-                            }
-                        ),
-                        retryTimeoutPromise
-                    ]);
-                } else {
-                    throw cmdError;
-                }
-            }
-
-            // After command completes successfully, sync WebContainer to VFS
             if (exitCode === 0) {
-                console.log(`[SystemTools] Command succeeded, syncing WC to VFS...`);
-                try {
-                    // Always sync from root to catch all changes
-                    // This is especially important for commands like "npm create vite"
-                    // which create new directories
-                    await store.syncWCToVFS('/');
-                    console.log(`[SystemTools] ✅ Sync complete`);
-                } catch (syncError) {
-                    console.warn(`[SystemTools] Sync failed:`, syncError);
-                }
-
-                if (args.detached) {
-                    return `Process started successfully in background.\nInitial Output:\n${output.slice(0, 2000)}`;
-                }
-                
-                // Smart truncation: keep first 500 chars (context) and last 1500 chars (errors)
                 const limit = 2000;
                 let finalOutput = output;
                 if (output.length > limit) {
                     finalOutput = output.slice(0, 500) + '\n...[truncated]...\n' + output.slice(-(limit - 500));
                 }
-                
                 return `Command executed successfully.\nOutput:\n${finalOutput}`;
             } else {
-                // Smart truncation for errors too
-                const limit = 2000;
-                let finalOutput = output;
-                if (output.length > limit) {
-                    finalOutput = output.slice(0, 500) + '\n...[truncated]...\n' + output.slice(-(limit - 500));
-                }
-
-                // Add specific hints for common errors
-                let hint = '';
-                if (output.includes('ENOENT') && output.includes('package.json')) {
-                    hint = '\n\nHint: package.json is missing. Did you forget to run `scaffold_react_app` or create the file?';
-                } else if (output.includes('vite: command not found')) {
-                    hint = '\n\nHint: vite is not installed. Run `npm install` first.';
-                }
-
-                return `Command failed with exit code ${exitCode}.\nOutput:\n${finalOutput}${hint}`;
+                return `Command failed with exit code ${exitCode}.\nOutput:\n${output.slice(-2000)}`;
             }
         } catch (e: any) {
-            // Include output in error message if available
-            // This is crucial for commands that fail but output useful stderr info
-            const outputInfo = (output && output.length > 0) ? `\nOutput before failure:\n${output.slice(0, 1000)}` : '';
-
-            // Check if it's a timeout error
-            if (e.message && e.message.includes('timed out')) {
-                return `Error: ${e.message}${outputInfo}\n\nTip: Avoid interactive commands. Use non-interactive alternatives (e.g., 'npm init -y' instead of 'npm init', or add '-y' flag to skip prompts).`;
-            }
-
-            return `Error running command: ${e.message || e}${outputInfo}`;
+            return `Error running command: ${e.message || e}`;
         }
     },
 
-    get_file_tree: (args: { path: string, depth?: number }) => {
-        try {
-            // Basic recursive listing (simplified for now)
-            // In real implementation we might want a tree structure
-            const files = System.fs.readDir(args.path);
-            return JSON.stringify(files.map(f => f.name));
-        } catch (e) {
-            const p = typeof args?.path === 'string' ? args.path : '';
-            if (p && String(e).includes('Directory not found:')) {
-                const parts = p.split('/').filter(Boolean);
-                const base = parts[parts.length - 1] || '';
-                if (base && p === `${SYSTEM_PATHS.USER}/${base}`) {
-                    const candidate = `${SYSTEM_PATHS.USER}/apps/${base}`;
-                    if (System.fs.exists(candidate)) {
-                        try {
-                            const files = System.fs.readDir(candidate);
-                            return `Directory not found: ${p}. Using: ${candidate}\n${JSON.stringify(files.map(f => f.name))}`;
-                        } catch {}
+    get_file_tree: async (args: { path: string, depth?: number, exclude?: string[] }) => {
+        const rootPath = normalizePath(args.path);
+        const { depth = 2, exclude = ['node_modules', '.next', '.git', 'dist', 'build'] } = args;
+        
+        const scan = async (dir: string, currentDepth: number): Promise<any[]> => {
+            if (currentDepth > depth) return [];
+            try {
+                const entries = System.fs.readDir(dir);
+                const results: any[] = [];
+                
+                for (const entry of entries) {
+                    if (exclude.some(pattern => entry.name.includes(pattern))) continue;
+                    
+                    const fullPath = `${dir}/${entry.name}`;
+                    if (entry.type === 'directory') {
+                        results.push({
+                            name: entry.name,
+                            type: 'directory',
+                            children: await scan(fullPath, currentDepth + 1)
+                        });
+                    } else {
+                        results.push({
+                            name: entry.name,
+                            type: 'file'
+                        });
                     }
                 }
+                return results;
+            } catch (e) {
+                return [];
             }
+        };
+
+        try {
+            const tree = await scan(rootPath, 1);
+            return JSON.stringify(tree);
+        } catch (e) {
             return `Error getting file tree: ${e}`;
+        }
+    },
+
+    search_code: async (args: { query: string, path: string, extensions?: string[], exclude?: string[] }) => {
+        const rootPath = normalizePath(args.path);
+        const { query, extensions = ['.js', '.jsx', '.ts', '.tsx', '.css', '.html'], exclude = ['node_modules', '.next', '.git'] } = args;
+        const results: { file: string, line: number, content: string }[] = [];
+
+        const scan = async (dir: string) => {
+            try {
+                const entries = System.fs.readDir(dir);
+                for (const entry of entries) {
+                    if (exclude.some(pattern => entry.name.includes(pattern))) continue;
+                    
+                    const fullPath = `${dir}/${entry.name}`;
+                    if (entry.type === 'directory') {
+                        await scan(fullPath);
+                    } else if (extensions.some(ext => entry.name.endsWith(ext))) {
+                        try {
+                            const content = await System.fs.readFile(fullPath);
+                            const lines = content.split('\n');
+                            lines.forEach((line, index) => {
+                                if (line.includes(query)) {
+                                    results.push({
+                                        file: fullPath,
+                                        line: index + 1,
+                                        content: line.trim().slice(0, 200)
+                                    });
+                                }
+                            });
+                        } catch {}
+                    }
+                    if (results.length > 50) break; // Limit results
+                }
+            } catch {}
+        };
+
+        try {
+            await scan(rootPath);
+            if (results.length === 0) return `No matches found for "${query}" in ${rootPath}`;
+            return JSON.stringify(results);
+        } catch (e) {
+            return `Error searching code: ${e}`;
         }
     }
 };
@@ -2088,11 +1969,13 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'read_file',
-            description: 'Read the content of an existing file',
+            description: 'Read file content. Use start_line/end_line for large files.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The file path to read' }
+                    path: { type: 'string', description: 'File path' },
+                    start_line: { type: 'number', description: 'Start line (1-based)' },
+                    end_line: { type: 'number', description: 'End line' }
                 },
                 required: ['path']
             }
@@ -2102,12 +1985,12 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'update_file',
-            description: 'Overwrite an existing file with new content',
+            description: 'Overwrite an existing file with new content.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The file path to update' },
-                    content: { type: 'string', description: 'The new file content' }
+                    path: { type: 'string', description: 'File path' },
+                    content: { type: 'string', description: 'New content' }
                 },
                 required: ['path', 'content']
             }
@@ -2117,12 +2000,12 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'add_import',
-            description: 'Add an import statement to a file. Smartly handles duplicates and placement.',
+            description: 'Add an import statement to a file.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The file path' },
-                    importCode: { type: 'string', description: 'The full import statement (e.g. "import { useState } from \'react\';")' }
+                    path: { type: 'string' },
+                    importCode: { type: 'string', description: 'e.g. "import { x } from \'y\';"' }
                 },
                 required: ['path', 'importCode']
             }
@@ -2132,15 +2015,15 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'insert_jsx_component',
-            description: 'Insert JSX code into a React component using AST analysis. More reliable than regex for code injection.',
+            description: 'Insert JSX into a React component using AST.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The file path' },
-                    componentName: { type: 'string', description: 'The name of the React component to modify (e.g. "App")' },
-                    targetElement: { type: 'string', description: 'Optional: The JSX element to target (e.g. "div", "Header"). If omitted, targets the root element returned by the component.' },
-                    position: { type: 'string', enum: ['prepend', 'append', 'before', 'after'], description: 'Where to insert relative to the target element.' },
-                    jsxCode: { type: 'string', description: 'The JSX code to insert' }
+                    path: { type: 'string' },
+                    componentName: { type: 'string' },
+                    targetElement: { type: 'string', description: 'Optional target element' },
+                    position: { type: 'string', enum: ['prepend', 'append', 'before', 'after'] },
+                    jsxCode: { type: 'string' }
                 },
                 required: ['path', 'componentName', 'position', 'jsxCode']
             }
@@ -2150,17 +2033,15 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'replace_in_file',
-            description: 'Replace text inside an existing file without rewriting the entire file content. Prefer this for small, targeted edits to save tokens.',
+            description: 'Replace text in a file without rewriting everything.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The file path to update' },
-                    find: { type: 'string', description: 'String to find (literal) OR regex pattern if regex=true' },
-                    replace: { type: 'string', description: 'Replacement text' },
-                    expectedCount: { type: 'number', description: 'Optional safety check: expected number of matches' },
-                    regex: { type: 'boolean', description: 'If true, treat find as a RegExp pattern' },
-                    flags: { type: 'string', description: 'RegExp flags (e.g. "gmi"). "g" is always enabled when regex=true unless replaceAll=false' },
-                    replaceAll: { type: 'boolean', description: 'If false, replace only the first match (default: true)' }
+                    path: { type: 'string' },
+                    find: { type: 'string' },
+                    replace: { type: 'string' },
+                    regex: { type: 'boolean' },
+                    replaceAll: { type: 'boolean' }
                 },
                 required: ['path', 'find', 'replace']
             }
@@ -2169,16 +2050,43 @@ export const systemToolsDefinitions: ToolDefinition[] = [
     {
         type: 'function',
         function: {
-            name: 'run_command',
-            description: 'Run a shell command in the WebContainer environment. For long-running processes (like dev servers), use "detached": true. CRITICAL: Commands MUST be non-interactive and complete within 60 seconds (unless detached). NEVER use: "npm create vite" (interactive), "npm init" (use "npm init -y"), or any command that waits for user input.',
+            name: 'delete_node',
+            description: 'Permanently delete a file or directory.',
             parameters: {
                 type: 'object',
                 properties: {
-                    cmd: { type: 'string', description: 'The command to run (e.g., "npm")' },
-                    args: { type: 'array', items: { type: 'string' }, description: 'Arguments for the command (e.g., ["install", "react"])' },
-                    cwd: { type: 'string', description: 'Current working directory for the command (e.g. "/home/user/apps/myapp")' },
-                    detached: { type: 'boolean', description: 'Set to true for long-running processes (e.g. npm run dev). Returns early after detecting successPattern.' },
-                    successPattern: { type: 'string', description: 'String to watch for in output to confirm successful start in detached mode (default: "Local:")' }
+                    path: { type: 'string' }
+                },
+                required: ['path']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'move_node',
+            description: 'Move or rename a file or directory.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    oldPath: { type: 'string' },
+                    newPath: { type: 'string' }
+                },
+                required: ['oldPath', 'newPath']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'run_command',
+            description: 'Run read-only diagnostic commands (e.g. ls, grep, cat).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    cmd: { type: 'string' },
+                    args: { type: 'array', items: { type: 'string' } },
+                    cwd: { type: 'string' }
                 },
                 required: ['cmd']
             }
@@ -2188,11 +2096,11 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'validate_app_code',
-            description: 'Recursively scan a directory for JS/TS/JSX/TSX files and validate their syntax. Use this ALWAYS after generating or modifying files to catch syntax errors immediately.',
+            description: 'Check JS/TS files for syntax errors.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The directory path to validate (e.g., "/home/user/apps/my-app")' }
+                    path: { type: 'string' }
                 },
                 required: ['path']
             }
@@ -2202,13 +2110,31 @@ export const systemToolsDefinitions: ToolDefinition[] = [
         type: 'function',
         function: {
             name: 'get_file_tree',
-            description: 'Get a list of files in a directory (shallow)',
+            description: 'Get a recursive list of files in a directory.',
             parameters: {
                 type: 'object',
                 properties: {
-                    path: { type: 'string', description: 'The directory path' }
+                    path: { type: 'string' },
+                    depth: { type: 'number' },
+                    exclude: { type: 'array', items: { type: 'string' } }
                 },
                 required: ['path']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'search_code',
+            description: 'Global code search (grep-like).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string' },
+                    path: { type: 'string' },
+                    extensions: { type: 'array', items: { type: 'string' } }
+                },
+                required: ['query', 'path']
             }
         }
     }
@@ -2228,11 +2154,14 @@ export const TOOL_CATEGORIES = {
     filesystem: [
         'create_directory',
         'create_file',
+        'delete_node',
+        'move_node',
         'read_file',
         'update_file',
         'replace_in_file',
         'run_command',
-        'get_file_tree'
+        'get_file_tree',
+        'search_code'
     ],
     builder: [
         'scaffold_static_app',
@@ -2242,6 +2171,8 @@ export const TOOL_CATEGORIES = {
         'validate_app_code',
         'create_directory',
         'create_file',
+        'delete_node',
+        'move_node',
         'read_file',
         'update_file',
         'add_import',
@@ -2249,6 +2180,7 @@ export const TOOL_CATEGORIES = {
         'replace_in_file',
         'run_command',
         'get_file_tree',
-        'list_directory'
+        'list_directory',
+        'search_code'
     ]
 };

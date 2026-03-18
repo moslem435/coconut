@@ -4,10 +4,11 @@ import { AppLoader } from './AppLoader';
 
 interface BrowserProps {
   url?: string;
-  initialUrl?: string; // Support both prop names
-  isAppMode?: boolean; // Hide address bar for app-like experience
-  filePath?: string;   // Original file path for static app recovery
+  initialUrl?: string;
+  isAppMode?: boolean;
+  filePath?: string;
   waitForServer?: boolean;
+  hasTitleBarPadding?: boolean;
   launchStatus?: string;
   launchLabel?: string;
   launchDownloadProgress?: number;
@@ -23,6 +24,7 @@ const BrowserApp = ({
   isAppMode = false, 
   filePath, 
   waitForServer = false,
+  hasTitleBarPadding = false,
   launchStatus = 'loading',
   launchLabel,
   launchDownloadProgress,
