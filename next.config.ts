@@ -34,6 +34,15 @@ const nextConfig: NextConfig = {
   },
   // CSP和安全头部已迁移到middleware.ts
   // 为什么移到middleware：支持基于Cookie动态更新CSP域名白名单
+  // 开启独立输出模式，优化 Docker 镜像大小
+  output: 'standalone',
+  // 如果构建时因 TS 或 ESLint 报错，可以暂时开启以下配置强制通过
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;

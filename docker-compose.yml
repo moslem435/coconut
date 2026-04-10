@@ -1,0 +1,17 @@
+services:
+  portfolio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextjs-portfolio
+    restart: always
+    ports:
+      - "4466:3000"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - 1panel-network
+
+networks:
+  1panel-network:
+    external: true

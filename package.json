@@ -45,6 +45,7 @@
     "lunar-javascript": "^1.7.7",
     "maath": "^0.10.8",
     "magic-string": "^0.30.21",
+    "monaco-editor": "^0.52.2",
     "next": "16.1.6",
     "prettier": "^3.8.1",
     "prismjs": "^1.30.0",

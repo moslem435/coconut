@@ -498,147 +498,27 @@ export function cn(...inputs) {
 }`;
             await System.fs.writeFile(`${appPath}/src/lib/utils.js`, utilsJs);
 
-            // 8. src/App.jsx (Starter Template with Routing and Animation)
+            // 8. src/App.jsx (Minimal Entry Point to avoid large JSON payload)
             const appJsx = `import { useState } from 'react'
-import { Sparkles, Terminal, Cpu, Zap, ArrowRight, Home } from 'lucide-react'
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { cn } from '@/lib/utils'
 
 function App() {
-  return (
-    <Router>
-      <div className="min-h-screen w-full flex items-center justify-center p-8 bg-dot-pattern">
-        <AnimatedRoutes />
-      </div>
-    </Router>
-  )
-}
-
-function AnimatedRoutes() {
-  const location = useLocation();
-
-  return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/docs" element={<DocsPage />} />
-      </Routes>
-    </AnimatePresence>
-  );
-}
-
-function HomePage() {
   const [count, setCount] = useState(0)
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="card w-full max-w-3xl overflow-hidden bg-card border border-border shadow-xl rounded-xl"
-    >
-      {/* Header Strip */}
-      <div className="h-2 w-full bg-gradient-to-r from-primary to-orange-400" />
-      
-      <div className="p-10 md:p-14 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-8 border border-primary/20">
-          <Sparkles size={14} /> System Ready
-        </div>
-
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-foreground">
-          ${title}
-        </h1>
-        
-        <p className="text-lg text-muted-foreground max-w-lg mx-auto mb-10 leading-relaxed">
-          AI-Ready React Template. Features standardized infrastructure, Shadcn UI compatibility, and modern tooling.
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-8">
+      <div className="max-w-md w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-8 text-center">
+        <div className="text-5xl mb-4">🚀</div>
+        <h1 className="text-3xl font-bold mb-2">${title}</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm">
+          Successfully scaffolded. Use tools to add more features.
         </p>
-
-        <div className="flex justify-center gap-4 mb-16">
-          <button 
-            onClick={() => setCount(c => c + 1)}
-            className={cn(
-              "inline-flex items-center justify-center px-5 py-2.5 rounded-lg font-medium transition-all duration-200",
-              "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-lg shadow-primary/20 group"
-            )}
-          >
-            <Zap size={18} className="mr-2 group-hover:fill-current transition-all" />
-            Interactive: {count}
-          </button>
-          <Link 
-            to="/docs"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg font-medium transition-all duration-200 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-          >
-            Documentation <ArrowRight size={16} className="ml-2" />
-          </Link>
-        </div>
-
-        {/* Grid Features */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-          <Feature 
-            icon={<Terminal size={20} />}
-            title="Infrastructure"
-            desc="Alias paths (@/), Router, and Utils pre-configured."
-          />
-          <Feature 
-            icon={<Cpu size={20} />}
-            title="Performance"
-            desc="Vite 5 + React 18 optimized build setup."
-          />
-          <Feature 
-            icon={<Sparkles size={20} />}
-            title="Styling"
-            desc="Tailwind CSS with CSS variables for theming."
-          />
-        </div>
+        <button 
+          onClick={() => setCount(c => c + 1)}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Count is {count}
+        </button>
       </div>
-      
-      {/* Footer */}
-      <div className="bg-muted/30 p-4 text-center text-xs text-muted-foreground border-t border-border font-mono">
-        src/App.jsx
-      </div>
-    </motion.div>
-  )
-}
-
-function DocsPage() {
-  return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3 }}
-      className="card w-full max-w-3xl overflow-hidden bg-card border border-border shadow-xl rounded-xl p-10"
-    >
-       <div className="flex items-center gap-4 mb-8">
-        <Link to="/" className="p-2 rounded-full hover:bg-muted transition-colors">
-          <Home size={24} />
-        </Link>
-        <h2 className="text-3xl font-bold">Documentation</h2>
-       </div>
-       
-         <p>This template is designed to be "AI-Friendly" and <b>WebContainer-Compatible</b>.</p>
-         <ul className="list-disc pl-5 space-y-2">
-           <li><strong>NO NATIVE MODULES:</strong> Use <code>sql.js</code> for DB, <code>bcryptjs</code> for crypto.</li>
-           <li><strong>Path Aliases:</strong> Use <code>@/components</code> or <code>@/lib/utils</code> imports.</li>
-           <li><strong>Utils:</strong> Use <code>cn()</code> for conditional classes.</li>
-           <li><strong>Routing:</strong> React Router is set up in <code>App.jsx</code>.</li>
-           <li><strong>Styling:</strong> CSS Variables in <code>index.css</code> control the theme.</li>
-         </ul>
-       </div>
-    </motion.div>
-  )
-}
-
-function Feature({ icon, title, desc }) {
-  return (
-    <div className="p-4 rounded-xl hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-      <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center mb-3 text-foreground">
-        {icon}
-      </div>
-      <h3 className="font-semibold text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground">{desc}</p>
     </div>
   )
 }
@@ -660,22 +540,16 @@ export default App`;
                 dependencies: {
                     "react": "^18.3.1",
                     "react-dom": "^18.3.1",
-                    "react-router-dom": "^6.22.3",
                     "lucide-react": "^0.344.0",
                     "clsx": "^2.1.0",
-                    "tailwind-merge": "^2.2.1",
-                    "framer-motion": "^11.0.8"
+                    "tailwind-merge": "^2.2.1"
                 },
                 devDependencies: {
                     "vite": "^5.1.4",
                     "@vitejs/plugin-react": "^4.2.1",
                     "tailwindcss": "^3.4.1",
                     "postcss": "^8.4.35",
-                    "autoprefixer": "^10.4.18",
-                    "typescript": "^5.3.3",
-                    "@types/react": "^18.2.43",
-                    "@types/react-dom": "^18.2.17",
-                    "@types/node": "^20.11.24" 
+                    "autoprefixer": "^10.4.18"
                 },
                 cocount: {
                     type: "web-container",
