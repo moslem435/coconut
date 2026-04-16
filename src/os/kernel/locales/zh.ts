@@ -322,6 +322,7 @@ const zh: Record<string, string> = {
     "wallpaper.preset.neon": "赛博霓虹",
     "wallpaper.preset.midnight": "午夜渐变",
     "wallpaper.image.daily": "每日壁纸",
+    "wallpaper.image.default": "默认风景",
     "wallpaper.image.snow": "雪山",
     "wallpaper.image.desert": "沙漠",
     "wallpaper.image.city": "城市",

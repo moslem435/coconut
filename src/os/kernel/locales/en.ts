@@ -279,6 +279,7 @@ const en: Record<string, string> = {
     "wallpaper.preset.neon": "Neon",
     "wallpaper.preset.midnight": "Midnight",
     "wallpaper.image.daily": "Daily Wallpaper",
+    "wallpaper.image.default": "Default Landscape",
     "wallpaper.image.snow": "Snow",
     "wallpaper.image.desert": "Desert",
     "wallpaper.image.city": "City",

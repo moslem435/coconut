@@ -101,8 +101,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
     showWeatherWidget: true,
     pinnedAppIds: ['portfolio-hub', 'vscode-lite'],
     wallpaper: {
-        type: 'preset',
-        value: 'linear-gradient(to bottom right, var(--os-bg-base), var(--os-accent-dim))'
+        type: 'image',
+        value: '/wallpapers/default/pexels-pixabay-33545.jpg'
     },
     devMode: false,
     useDependencyCache: false,
