@@ -152,6 +152,36 @@ graph TD
 
 ---
 
+## 🧠 深度解析：端侧自主开发 AI 智能体 (AI Agent Core)
+
+本项目内置的 AI 模块不仅是一个问答对话框，而是一个典型的**基于浏览器沙盒环境的自主开发智能体（Local Web-based Software Engineer Agent）**。它完整地实现了 **ReAct (Reason + Act)** 闭环机制：
+
+```mermaid
+graph LR
+    User[1. 用户指令] --> Perception[2. 感知环境]
+    Perception --> Decision[3. 决策规划]
+    Decision --> Action[4. 执行行动]
+    Action --> |物理环境反馈<br/>VFS/WebContainer 结果或报错| Perception
+```
+
+### 1. ⚙️ 感知、行动与反馈回路 (ReAct Loop)
+在 `builder` 模式下，大模型可以独立驱动系统工具，并根据结果持续迭代，最大支持长达 **50 轮** 的闭环自主开发：
+*   **Action (执行行动)**：AI 可以自主调用系统工具（如 `create_file`, `update_file`, `run_command`），直接修改虚拟文件系统（VFS）中的源码，或在 WebContainer 终端中运行编译和测试。
+*   **Feedback (反馈感知)**：命令运行成功与否、编译报错信息等环境变化会作为 `role: 'tool'` 消息重组输入模型，供其在下一轮决策中感知。
+*   **Planning (决策规划)**：如果遇到编译错误，AI 会自动寻找 bug 所在，自我规划修正方案并重新编写代码，直至编译成功或达到上限。
+
+### 2. 🛡️ 极客级的端侧防御性容错 (Frontend Robustness)
+大模型在复杂任务中常会出现 JSON 语法损坏或路径幻觉。为了保证 Agent 在纯前端环境下的高可用性，项目在 [useCloudLLM.ts](file:///e:/project/cocount/src/apps/ai-chat/hooks/useCloudLLM.ts) 中手写了大量健壮性容错机制：
+*   **JSON 乱序自修复**：当大模型输出的 Tool 参数中混杂了非法引号、缺失逗号等格式错误时，解析器通过 6 种容错正则进行自我恢复解析。
+*   **DSML 专有标记提取**：支持解析特定格式的 `<|DSML|>` 标记（如 DeepSeek/Qwen 的推理标志），通过 `parseDsmlToolCalls` 正则提取其中嵌入的函数调用（`invoke`），从而在没有严格 Function Calling 支持的模型上也能驱动工具。
+*   **路径智能纠偏**：通过 `normalizePathForActiveApp` 算法自动识别 AI 对相对/绝对路径的混淆，自动将其定位到当前开发应用的正确绝对目录下。
+
+### 3. ☁️ 混合双引擎驱动与流式响应 (Hybrid & Streaming)
+*   **混合双擎 (Hybrid)**：本地端侧 WebGPU 硬件加速推理（采用 `@mlc-ai/web-llm`）与云端 API 原生流式响应（支持 Gemini SSE 原生对接与 OpenAI API 格式转换）共存。在支持 WebGPU 的现代浏览器上享受 100% 本地隐私安全的端侧推理，在旧版设备上优雅降级至云端驱动。
+*   **双模型流式协议适配**：手写了 Gemini 与 OpenAI 的消息和工具历史转换规范，并在前端提取二进制 SSE 流，实时计算推理的 **TPS (每秒生成 Token 数)**，为用户提供极其顺畅的动画反馈。
+
+---
+
 ## 🚀 快速开始
 
 ### 1. 前置环境要求
