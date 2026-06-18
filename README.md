@@ -21,12 +21,14 @@
 借助 `@mlc-ai/web-llm` 与 WebGPU 硬件加速，在浏览器内提供完全本地化、隐私安全的 AI 推理引擎：
 *   **100% 本地运行**：直接在 Web Worker 里加载并运行本地大语言模型（如 Llama 3/Qwen 等），无需调用云端 API，无需任何 API Key，断网亦可使用。
 *   **Copilot 侧边栏模式**：支持将 AI 助手以 `Sidebar` 贴边模式打开，与桌面及 IDE 保持无缝上下文交互，随时辅助编程和文本处理。
+*   💡 **运行要求**：运行本地大模型需浏览器支持 **WebGPU**（推荐使用最新版 Chrome 或 Edge 浏览器），且建议系统拥有 **8GB** 以上可用内存/显存。默认推理模型及相关参数可在 `/src/apps/ai-chat/` 配置中进行自定义与扩展。
 
 ### 📂 3. 多源虚拟文件系统 (VFS)
 针对 Web 场景精心设计的高性能抽象文件系统：
 *   **OPFS 驱动**：使用 Web Worker 异步操作浏览器私有文件系统（Origin Private File System），实现非阻塞、超高吞吐量的本地虚拟文件读写。
 *   **物理磁盘挂载 (Native Driver)**：利用浏览器 `File System Access API`，支持将本地真实的电脑物理文件夹（如 `/mnt/d`）安全挂载到 Coconut OS。在虚拟桌面中对文件的任何修改，将直接同步写入您的物理硬盘！
 *   **云端静态资源**：通过 `StaticHttpProvider` 无缝集成只读的网络静态资源（如自带音频、示例图片、壁纸等）。
+*   ⚠️ **兼容性提示**：物理磁盘挂载由于安全规范高度依赖浏览器的 `File System Access API`，目前主要在 **Chrome, Edge** 等 Chromium 内核浏览器上获得支持，Safari 与 Firefox 可能无法进行本地物理挂载。
 
 ### 💻 4. x86 虚拟机模拟器 (Retro PC)
 内置基于 WebAssembly 的 `v86` 模拟器：
@@ -265,6 +267,62 @@ coconut
 │   │   └── ui/                # 全局通用 UI 控件与弹窗
 │   └── components/            # 全局 React 通用业务组件
 ```
+
+---
+
+## 🛠️ 开发者指南：添加自定义应用
+
+Coconut OS 设计了中央应用注册表（`APPS_REGISTRY`），使得开发者能够以极低的耦合度轻松添加自定义应用。只需按照以下三步进行：
+
+### 步骤 1：创建您的应用组件
+在 `/src/apps/` 下新建一个文件夹（例如 `my-app`），并创建应用的主渲染入口 `index.tsx`：
+```tsx
+// /src/apps/my-app/index.tsx
+export default function MyApp() {
+  return (
+    <div className="h-full w-full flex items-center justify-center bg-gray-900 text-white p-4">
+      <h1 className="text-xl font-mono">Hello, Coconut OS! 🥥</h1>
+    </div>
+  )
+}
+```
+
+### 步骤 2：创建应用声明配置 (manifest)
+在同级目录下创建 `manifest.tsx` 以注册应用的基本元信息和默认窗口选项：
+```typescript
+// /src/apps/my-app/manifest.tsx
+import { AppManifest } from '@/os/registry/types'
+import { Smile } from 'lucide-react' // 可以引入任意 Lucide 图标
+import dynamic from 'next/dynamic'
+
+const MyAppComp = dynamic(() => import('./index'), { ssr: false })
+
+export const manifest: AppManifest = {
+    id: 'my-app',                // 唯一的应用 ID
+    title: 'My Custom App',      // 显示在任务栏/开始菜单中的名称
+    icon: Smile,                 // 应用图标
+    theme: {
+        backgroundColor: '#111827', // 默认窗口背景
+        iconColor: '#f59e0b',       // 主题图标颜色
+        lineColor: '#fbbf24'
+    },
+    component: MyAppComp,
+    defaultWindowOptions: {
+        width: 600,
+        height: 400,
+        isResizable: true,        // 是否可缩放
+    }
+}
+```
+
+### 步骤 3：在中央注册表中完成注册
+打开 [/src/os/registry/config.tsx](file:///e:/project/cocount/src/os/registry/config.tsx)，仅需添加一行代码即可激活您的应用：
+```typescript
+// /src/os/registry/config.tsx
+// ...
+register(require('@/apps/my-app/manifest').manifest) // 添加这一行
+```
+系统启动时将自动为您生成桌面图标、任务栏关联、双击启动进程以及窗口管理器路由！
 
 ---
 
